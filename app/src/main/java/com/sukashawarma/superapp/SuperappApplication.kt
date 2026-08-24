@@ -1,0 +1,18 @@
+package com.sukashawarma.superapp
+
+import android.app.Application
+import com.sukashawarma.superapp.data.local.AuthPrefs
+import com.sukashawarma.superapp.data.remote.NetworkMonitor
+import com.sukashawarma.superapp.data.remote.SupabaseClient
+import com.sukashawarma.superapp.data.remote.AuthSessionManager
+import dagger.hilt.android.HiltAndroidApp
+
+@HiltAndroidApp
+class SuperappApplication : Application() {
+    override fun onCreate() {
+        super.onCreate()
+        AuthPrefs.init(this)
+        SupabaseClient.onRefreshNeeded = { AuthSessionManager.refresh() }
+        NetworkMonitor.init(this)
+    }
+}
