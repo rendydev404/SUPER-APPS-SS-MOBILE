@@ -50,20 +50,20 @@ import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.google.gson.JsonObject
 import com.sukashawarma.superapp.data.face.NormalizedFaceContours
 import com.sukashawarma.superapp.data.face.NormalizedPoint
-import com.sukashawarma.superapp.data.remote.Postgrest
+import com.sukashawarma.superapp.domain.util.JakartaTime
 import com.sukashawarma.superapp.domain.model.ClockPhase
 import com.sukashawarma.superapp.domain.session.AppSession
 import com.sukashawarma.superapp.presentation.components.FaceCameraPreview
 import com.sukashawarma.superapp.presentation.theme.*
-import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Date
+import java.time.Instant
+import java.time.LocalDate
+import java.time.OffsetDateTime
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 import com.sukashawarma.superapp.feature.absensi.R
+import com.sukashawarma.superapp.presentation.absensi.enroll.captureJpeg
 import androidx.compose.ui.res.painterResource
 import androidx.compose.material.icons.filled.NotificationsNone
 
@@ -74,7 +74,6 @@ fun ClockScreen(isActive: Boolean = true, onExit: () -> Unit) {
     val staff by AppSession.staff.collectAsState()
     val outletId = staff?.outletId
     val allowManual = staff?.allowManualButton == true
-    val coroutineScope = rememberCoroutineScope()
 
     if (outletId == null) {
         Scaffold(containerColor = SukaSurface) { padding ->
@@ -132,8 +131,6 @@ fun ClockScreen(isActive: Boolean = true, onExit: () -> Unit) {
         )
     )
     val state by viewModel.state.collectAsState()
-    var history by remember { mutableStateOf<List<JsonObject>>(emptyList()) }
-
     var hasCameraPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
@@ -167,20 +164,9 @@ fun ClockScreen(isActive: Boolean = true, onExit: () -> Unit) {
         if (permissionsToRequest.isNotEmpty()) {
             permissionLauncher.launch(permissionsToRequest.toTypedArray())
         }
-        staff?.id?.let { staffId ->
-            try {
-                val list = Postgrest.select("attendance", listOf(
-                    "outlet_staff_id" to "eq.$staffId",
-                    "order" to "ts_client.desc",
-                    "limit" to "5"
-                ))
-                history = list.map { it.asJsonObject }
-            } catch (e: Exception) {}
-        }
     }
 
     var lastFrameMs by remember { mutableStateOf(0L) }
-
     // Pulse dot animation (status badge)
     val infiniteTransition = rememberInfiniteTransition(label = "statusPulse")
     val pulseAlpha by infiniteTransition.animateFloat(
@@ -193,21 +179,14 @@ fun ClockScreen(isActive: Boolean = true, onExit: () -> Unit) {
         label = "pulse"
     )
 
-    // Today's formatted date string (e.g., "Kamis, 20 Agustus 2026")
-    val todayFormatted = remember {
-        SimpleDateFormat("EEEE, d MMMM yyyy", Locale("id", "ID")).format(Date())
+    val todayFormatted = formatJakartaDate(JakartaTime.now().toLocalDate())
+    val latestHistoryToday = state.attendanceHistory.firstOrNull {
+        attendanceInstant(it.occurredAtIso)?.atZone(JakartaTime.ZONE)?.toLocalDate() == JakartaTime.now().toLocalDate()
     }
-
-    // Determine current work status
-    val latestHistoryToday = history.firstOrNull { item ->
-        val ts = item.get("ts_client")?.asString ?: item.get("ts_server")?.asString ?: ""
-        val (isToday, _) = checkIsToday(ts)
-        isToday
-    }
-    val currentStatusText = when {
-        latestHistoryToday?.get("type")?.asString == "in" -> "Sedang Bekerja"
-        latestHistoryToday?.get("type")?.asString == "out" -> "Shift Selesai"
-        else -> "Sedang Bekerja"
+    val currentStatusText = when (latestHistoryToday?.type) {
+        "in" -> "Sedang Bekerja"
+        "out" -> "Shift Selesai"
+        else -> "Belum Clock In"
     }
 
     val scrollState = rememberScrollState()
@@ -261,7 +240,12 @@ fun ClockScreen(isActive: Boolean = true, onExit: () -> Unit) {
                     StatusHariIni(todayFormatted, currentStatusText, pulseAlpha)
 
                     // History Section
-                    HistorySection(history)
+                    HistorySection(
+                        history = state.attendanceHistory,
+                        isLoading = state.isAttendanceLoading,
+                        error = state.attendanceError,
+                        onRefresh = viewModel::refreshAttendance,
+                    )
 
                     Spacer(Modifier.height(32.dp))
                 }
@@ -546,20 +530,7 @@ private fun FaceMeshOverlay(
             drawRealFaceMesh(faceMesh, meshColor.copy(alpha = lockAlpha * meshPresence), pulse)
         }
 
-        // Sweep highlight berputar (indikator "aktif memindai")
-        if (isDetecting) {
-            val sweepRad = Math.toRadians(sweepAngle.toDouble())
-            val sweepP = pt(kotlin.math.cos(sweepRad).toFloat(), kotlin.math.sin(sweepRad).toFloat())
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(Color.White.copy(alpha = 0.9f * lockAlpha), Color.Transparent),
-                    center = sweepP,
-                    radius = 14.dp.toPx()
-                ),
-                radius = 14.dp.toPx(),
-                center = sweepP
-            )
-        }
+
 
         // Ripple selesai (sukses/gagal) — cincin membesar & memudar, tanpa menutupi mesh
         if (ripple.value > 0f) {
@@ -591,7 +562,7 @@ private fun ClockModernOverlay(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF1E293B))
+            .background(if (state.phase == ClockPhase.LOCATION_INVALID) Color(0xFFF1F4F5) else Color(0xFF1E293B))
             .padding(24.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -601,19 +572,7 @@ private fun ClockModernOverlay(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(64.dp)
-                            .clip(CircleShape)
-                            .background(SukaOrange.copy(alpha = 0.15f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(
-                            color = SukaOrange,
-                            modifier = Modifier.size(36.dp),
-                            strokeWidth = 3.dp
-                        )
-                    }
+                    LocationScanAnimation()
                     Text(
                         "Memeriksa Lokasi GPS...",
                         color = Color.White,
@@ -626,40 +585,47 @@ private fun ClockModernOverlay(
             ClockPhase.LOCATION_INVALID -> {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(56.dp)
+                            .size(52.dp)
                             .clip(CircleShape)
                             .background(Color(0xFFEF4444).copy(alpha = 0.15f)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            Icons.Default.LocationOff,
+                            Icons.Default.LocationOn,
                             contentDescription = null,
                             tint = Color(0xFFEF4444),
-                            modifier = Modifier.size(28.dp)
+                            modifier = Modifier.size(25.dp)
                         )
                     }
                     Text(
-                        state.result?.message ?: "Di Luar Radius Outlet",
-                        color = Color.White,
-                        fontSize = 16.sp,
+                        "Di luar jangkauan",
+                        color = Color(0xFF1E293B),
+                        fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center
                     )
                     Text(
-                        "Pastikan GPS aktif dan Anda berada di area outlet.",
-                        color = Color.White.copy(alpha = 0.7f),
-                        fontSize = 13.sp,
+                        state.result?.message ?: "Lokasi Anda belum berada di area outlet.",
+                        color = SukaOrange,
+                        fontSize = 12.sp,
                         textAlign = TextAlign.Center
                     )
-                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "Silakan mendekat ke area kasir.\nPastikan GPS aktif dan akurat.",
+                        color = Color(0xFF64748B),
+                        fontSize = 11.sp,
+                        textAlign = TextAlign.Center,
+                    )
+                    Spacer(Modifier.height(2.dp))
                     Button(
                         onClick = onRetryLocation,
                         colors = ButtonDefaults.buttonColors(containerColor = SukaOrange),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(11.dp),
+                        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 9.dp),
                     ) {
                         Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(8.dp))
@@ -902,7 +868,12 @@ private fun StatusHariIni(todayFormatted: String, currentStatusText: String, pul
 }
 
 @Composable
-private fun HistorySection(history: List<com.google.gson.JsonObject>) {
+private fun HistorySection(
+    history: List<AttendanceHistoryItem>,
+    isLoading: Boolean,
+    error: String?,
+    onRefresh: () -> Unit,
+) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -915,7 +886,35 @@ private fun HistorySection(history: List<com.google.gson.JsonObject>) {
             modifier = Modifier.padding(horizontal = 4.dp)
         )
 
-        if (history.isEmpty()) {
+        if (isLoading) {
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = Color.White,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp, color = SukaOrange)
+                }
+            }
+        } else if (error != null) {
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = Color.White,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Text(error, fontSize = 14.sp, color = Color.Gray, textAlign = TextAlign.Center)
+                    TextButton(onClick = onRefresh) { Text("Coba lagi") }
+                }
+            }
+        } else if (history.isEmpty()) {
             Surface(
                 shape = RoundedCornerShape(24.dp),
                 color = Color.White,
@@ -937,14 +936,8 @@ private fun HistorySection(history: List<com.google.gson.JsonObject>) {
             }
         } else {
             history.forEach { item ->
-                val type = item.get("type")?.asString ?: "in"
-                val tsClient = item.get("ts_client")?.asString ?: item.get("ts_server")?.asString ?: ""
-                val isClockIn = type == "in"
-                // Re-implement formatAttendanceTimeAndTag inline
-                val formatter = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US)
-                val date = formatter.parse(tsClient.take(19))
-                val timeStr = if (date != null) java.text.SimpleDateFormat("HH:mm 'WIB'", java.util.Locale("id", "ID")).format(date) else tsClient
-                val relativeTag = "Hari ini"
+                val isClockIn = item.type == "in"
+                val (timeStr, relativeTag) = formatAttendanceTimeAndTag(item.occurredAtIso)
 
                 Surface(
                     shape = RoundedCornerShape(24.dp),
@@ -1131,6 +1124,7 @@ private fun ActionArea(
     lastFrameMs: Long,
     onUpdateLastFrameMs: (Long) -> Unit
 ) {
+    val context = LocalContext.current
     // Kamera tetap TER-MOUNT (bind CameraX jalan di background) sepanjang izin ada, TIDAK
     // digating oleh fase LOCATING/LOCATION_INVALID/LOCKED lagi — dulu kamera baru mulai
     // bind begitu fase itu selesai, jadi user selalu melihat jeda hitam (PreviewView kosong
@@ -1145,8 +1139,18 @@ private fun ActionArea(
     var faceTrack by remember { mutableStateOf<FaceTrackData?>(null) }
     var smoothedMesh by remember { mutableStateOf<NormalizedFaceContours?>(null) }
     var lastMeshSeenMs by remember { mutableStateOf(0L) }
+    var imageCapture by remember { mutableStateOf<androidx.camera.core.ImageCapture?>(null) }
+    val cameraExecutor = remember { ContextCompat.getMainExecutor(context) }
+
+    LaunchedEffect(state.selfieCaptureRequestId) {
+        if (state.selfieCaptureRequestId != null) {
+            imageCapture?.captureJpeg(cameraExecutor) { result -> viewModel.onSelfieCaptured(result.getOrNull()) }
+                ?: viewModel.onSelfieCaptured(null)
+        }
+    }
 
     val resultOk = state.result?.ok
+    val isLocationInvalid = state.phase == ClockPhase.LOCATION_INVALID
     // Warna bingkai kamera mengikuti status yang sama dengan mesh (oranye = memindai,
     // hijau/merah = hasil) — satu bahasa visual, bukan navy statis yang sama terus.
     val frameAccentTarget = when {
@@ -1156,6 +1160,13 @@ private fun ActionArea(
         else -> SukaOrange
     }
     val frameAccent by animateColorAsState(frameAccentTarget, tween(320), label = "frameAccent")
+    // Mesh menjadi pembeda visual dari bingkai: biru saat memindai, sementara hasil
+    // tetap memakai hijau/merah agar status berhasil/gagal langsung terbaca.
+    val meshAccent = when {
+        state.phase == ClockPhase.RESULT && resultOk == true -> Color(0xFF10B981)
+        state.phase == ClockPhase.RESULT && resultOk == false -> Color(0xFFEF4444)
+        else -> Color(0xFF3B82F6)
+    }
     val glowPulse by rememberInfiniteTransition(label = "frameGlow").animateFloat(
         initialValue = 0.5f,
         targetValue = 1f,
@@ -1188,16 +1199,10 @@ private fun ActionArea(
                 .matchParentSize()
                 .padding(10.dp),
             shape = RoundedCornerShape(28.dp),
-            color = Color.Black,
-            border = BorderStroke(
+            color = if (isLocationInvalid) Color(0xFFF1F4F5) else Color.Black,
+            border = if (isLocationInvalid) BorderStroke(1.dp, Color(0xFFD8E0E2)) else BorderStroke(
                 1.5.dp,
-                Brush.linearGradient(
-                    colors = listOf(
-                        frameAccent.copy(alpha = 0.95f),
-                        Color.White.copy(alpha = 0.18f),
-                        frameAccent.copy(alpha = 0.6f),
-                    )
-                )
+                Brush.linearGradient(colors = listOf(frameAccent.copy(alpha = 0.95f), Color.White.copy(alpha = 0.18f), frameAccent.copy(alpha = 0.6f)))
             ),
             shadowElevation = 14.dp
         ) {
@@ -1207,25 +1212,27 @@ private fun ActionArea(
                     modifier = Modifier.fillMaxSize(),
                     isActive = isActive,
                     needsCrop = { state.phase == ClockPhase.IDLE },
-                ) { frame ->
-                    faceTrack = frame.faceBox?.let { box ->
-                        FaceTrackData(cx = box.cx, cy = box.cy, w = box.w, h = box.h, yawDeg = frame.signal.yawDeg)
-                    }
-                    val mesh = frame.faceMesh
-                    if (mesh != null) {
-                        smoothedMesh = smoothedMesh?.let { lerpContours(it, mesh, 0.4f) } ?: mesh
-                        lastMeshSeenMs = System.currentTimeMillis()
-                    } else if (System.currentTimeMillis() - lastMeshSeenMs > 600L) {
-                        smoothedMesh = null
-                    }
+                    onFrame = { frame ->
+                        faceTrack = frame.faceBox?.let { box ->
+                            FaceTrackData(cx = box.cx, cy = box.cy, w = box.w, h = box.h, yawDeg = frame.signal.yawDeg)
+                        }
+                        val mesh = frame.faceMesh
+                        if (mesh != null) {
+                            smoothedMesh = smoothedMesh?.let { lerpContours(it, mesh, 0.4f) } ?: mesh
+                            lastMeshSeenMs = System.currentTimeMillis()
+                        } else if (System.currentTimeMillis() - lastMeshSeenMs > 600L) {
+                            smoothedMesh = null
+                        }
 
-                    val now = System.currentTimeMillis()
-                    val minIntervalMs = if (state.phase == ClockPhase.LIVENESS) 200L else 250L
-                    if (now - lastFrameMs < minIntervalMs) return@FaceCameraPreview
-                    onUpdateLastFrameMs(now)
-                    if (state.phase == ClockPhase.IDLE) viewModel.onIdleFrame(frame)
-                    else if (state.phase == ClockPhase.LIVENESS) viewModel.onLivenessFrame(frame)
-                }
+                        val now = System.currentTimeMillis()
+                        val minIntervalMs = if (state.phase == ClockPhase.LIVENESS) 200L else 250L
+                        if (now - lastFrameMs < minIntervalMs) return@FaceCameraPreview
+                        onUpdateLastFrameMs(now)
+                        if (state.phase == ClockPhase.IDLE) viewModel.onIdleFrame(frame)
+                        else if (state.phase == ClockPhase.LIVENESS) viewModel.onLivenessFrame(frame)
+                    },
+                    onImageCaptureReady = { imageCapture = it },
+                )
             }
 
             if (showScanUi) {
@@ -1244,15 +1251,13 @@ private fun ActionArea(
                         )
                 )
 
-                // Mesh SELALU tampil selama kamera hidup — tak pernah dihilangkan saat
-                // sukses/gagal, hanya warnanya yang bereaksi (oranye→hijau/merah) dan pill
-                // di bawah yang menampilkan teks info. Warnanya sama dengan `frameAccent`
-                // (bingkai kamera) — satu bahasa visual yang konsisten.
+                // Mesh SELALU tampil selama kamera hidup. Aksen pemindaian biru membuatnya
+                // mudah dibedakan dari bingkai oranye; hasil tetap hijau/merah.
                 FaceMeshOverlay(
                     faceTrack = faceTrack,
                     faceMesh = smoothedMesh,
                     isDetecting = state.phase == ClockPhase.IDLE || state.phase == ClockPhase.LIVENESS || state.phase == ClockPhase.SUBMITTING,
-                    accentColor = frameAccent,
+                    accentColor = meshAccent,
                     celebrate = state.phase == ClockPhase.RESULT,
                     modifier = Modifier.fillMaxSize()
                 )
@@ -1362,45 +1367,84 @@ private fun ViewfinderCorners(color: Color, alpha: Float, modifier: Modifier = M
 }
 
 
-private fun checkIsToday(ts: String): Pair<Boolean, Boolean> {
-    return try {
-        val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
-        val date = parser.parse(ts.take(19)) ?: return Pair(false, false)
+private val indonesianLocale = Locale("id", "ID")
+private val jakartaDateFormatter = DateTimeFormatter.ofPattern("EEEE, d MMMM uuuu", indonesianLocale)
+private val jakartaShortDateFormatter = DateTimeFormatter.ofPattern("d MMM uuuu", indonesianLocale)
+private val jakartaTimeFormatter = DateTimeFormatter.ofPattern("HH:mm 'WIB'", indonesianLocale)
 
-        val calDate = Calendar.getInstance().apply { time = date }
-        val calToday = Calendar.getInstance()
-        val calYesterday = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }
+private fun formatJakartaDate(date: LocalDate): String = date.format(jakartaDateFormatter)
 
-        val isToday = calDate.get(Calendar.YEAR) == calToday.get(Calendar.YEAR) &&
-                calDate.get(Calendar.DAY_OF_YEAR) == calToday.get(Calendar.DAY_OF_YEAR)
+/** Server mengirim `timestamptz`; konversi selalu dilakukan dari instant ke WIB, bukan
+ * timezone default perangkat. Fallback OffsetDateTime menjaga kompatibilitas format ISO lain. */
+private fun attendanceInstant(timestamp: String): Instant? = runCatching {
+    Instant.parse(timestamp)
+}.recoverCatching {
+    OffsetDateTime.parse(timestamp).toInstant()
+}.getOrNull()
 
-        val isYesterday = calDate.get(Calendar.YEAR) == calYesterday.get(Calendar.YEAR) &&
-                calDate.get(Calendar.DAY_OF_YEAR) == calYesterday.get(Calendar.DAY_OF_YEAR)
-
-        Pair(isToday, isYesterday)
-    } catch (e: Exception) {
-        Pair(false, false)
+/** Format data absensi otoritatif dalam zona Indonesia barat. */
+private fun formatAttendanceTimeAndTag(timestamp: String): Pair<String, String> {
+    val dateTime = attendanceInstant(timestamp)?.atZone(JakartaTime.ZONE)
+        ?: return Pair("—", "Waktu tidak tersedia")
+    val today = JakartaTime.now().toLocalDate()
+    val date = dateTime.toLocalDate()
+    val tag = when (date) {
+        today -> "Hari ini"
+        today.minusDays(1) -> "Kemarin"
+        else -> date.format(jakartaShortDateFormatter)
     }
+    return dateTime.format(jakartaTimeFormatter) to tag
 }
 
-/**
- * Formats timestamp to "HH:mm WIB" and relative tag ("Hari ini", "Kemarin", "dd MMM")
- */
-private fun formatAttendanceTimeAndTag(ts: String): Pair<String, String> {
-    return try {
-        val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
-        val date = parser.parse(ts.take(19)) ?: return Pair(ts, "Hari ini")
-
-        val (isToday, isYesterday) = checkIsToday(ts)
-        val tag = when {
-            isToday -> "Hari ini"
-            isYesterday -> "Kemarin"
-            else -> SimpleDateFormat("dd MMM", Locale("id", "ID")).format(date)
+/** Pemindaian lokasi berbasis Canvas: tiga pulse, sweep tipis, dan pin tengah. Semua
+ * digambar satu Canvas sehingga ringan dibanding animasi gambar/lottie. */
+@Composable
+private fun LocationScanAnimation(modifier: Modifier = Modifier) {
+    val transition = rememberInfiniteTransition(label = "locationScan")
+    val progress by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(1600, easing = LinearEasing), RepeatMode.Restart),
+        label = "locationScanPulse",
+    )
+    val sweep by transition.animateFloat(
+        initialValue = -90f,
+        targetValue = 270f,
+        animationSpec = infiniteRepeatable(tween(2200, easing = LinearEasing), RepeatMode.Restart),
+        label = "locationScanSweep",
+    )
+    val blue = Color(0xFF38BDF8)
+    Box(modifier = modifier.size(92.dp), contentAlignment = Alignment.Center) {
+        Canvas(Modifier.fillMaxSize()) {
+            val center = Offset(size.width / 2f, size.height / 2f)
+            val baseRadius = size.minDimension * 0.16f
+            repeat(3) { index ->
+                val phase = (progress + index / 3f) % 1f
+                val radius = baseRadius + phase * size.minDimension * 0.34f
+                drawCircle(
+                    color = blue.copy(alpha = (1f - phase) * 0.28f),
+                    radius = radius,
+                    center = center,
+                    style = Stroke(width = 1.5.dp.toPx()),
+                )
+            }
+            drawCircle(blue.copy(alpha = 0.16f), radius = baseRadius * 1.8f, center = center)
+            drawArc(
+                color = blue.copy(alpha = 0.9f),
+                startAngle = sweep,
+                sweepAngle = 58f,
+                useCenter = false,
+                topLeft = Offset(center.x - baseRadius * 2.35f, center.y - baseRadius * 2.35f),
+                size = Size(baseRadius * 4.7f, baseRadius * 4.7f),
+                style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round),
+            )
         }
-        val time = SimpleDateFormat("HH:mm 'WIB'", Locale("id", "ID")).format(date)
-        Pair(time, tag)
-    } catch (e: Exception) {
-        Pair(ts, "Hari ini")
+        Icon(
+            Icons.Default.MyLocation,
+            contentDescription = null,
+            tint = blue,
+            modifier = Modifier.size(30.dp),
+        )
     }
 }
 

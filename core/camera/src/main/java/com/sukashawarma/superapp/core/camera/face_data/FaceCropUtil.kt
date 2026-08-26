@@ -1,6 +1,8 @@
 package com.sukashawarma.superapp.data.face
 
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Matrix
 import android.graphics.Rect
 import androidx.annotation.OptIn
 import androidx.camera.core.ExperimentalGetImage
@@ -8,10 +10,42 @@ import androidx.camera.core.ImageProxy
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetectorOptions
+import com.google.mlkit.vision.face.Face
+import com.google.mlkit.vision.face.FaceLandmark
+import com.sukashawarma.superapp.domain.face.ArcFaceSimilarityTransform
+import com.sukashawarma.superapp.domain.face.FacePoint
 import kotlinx.coroutines.tasks.await
 import java.io.ByteArrayOutputStream
 
 object FaceCropUtil {
+    private const val ARCFACE_IMAGE_SIZE = 112
+
+    /** Mengubah wajah ke template ArcFace 112×112 melalui lima landmark wajah. */
+    fun alignForArcFace(bitmap: Bitmap, face: Face): Bitmap? {
+        val landmarks = listOf(
+            FaceLandmark.LEFT_EYE,
+            FaceLandmark.RIGHT_EYE,
+            FaceLandmark.NOSE_BASE,
+            FaceLandmark.MOUTH_LEFT,
+            FaceLandmark.MOUTH_RIGHT,
+        ).map { face.getLandmark(it)?.position ?: return null }
+        val source = landmarks.map { FacePoint(it.x, it.y) }
+        val target = listOf(
+            FacePoint(38.2946f, 51.6963f), FacePoint(73.5318f, 51.5014f),
+            FacePoint(56.0252f, 71.7366f), FacePoint(41.5493f, 92.3655f),
+            FacePoint(70.7299f, 92.2041f),
+        )
+        val alignment = ArcFaceSimilarityTransform.fit(source, target) ?: return null
+        val transform = Matrix().apply { setValues(alignment.asAndroidMatrixValues()) }
+        return try {
+            Bitmap.createBitmap(ARCFACE_IMAGE_SIZE, ARCFACE_IMAGE_SIZE, Bitmap.Config.ARGB_8888).also {
+                Canvas(it).drawBitmap(bitmap, transform, null)
+            }
+        } catch (_: IllegalArgumentException) {
+            null
+        }
+    }
+
     /** Crop [bitmap] ke [box] + margin (wajah utuh dgn sedikit ruang, bukan mepet dahi/dagu —
      *  cocok utk model face-embedding yg dilatih pada crop longgar). Diklem ke batas bitmap. */
     fun cropToFace(bitmap: Bitmap, box: Rect, marginRatio: Float = 0.25f): Bitmap? {
@@ -27,18 +61,18 @@ object FaceCropUtil {
         return Bitmap.createBitmap(bitmap, left, top, w, h)
     }
 
-    /** Dipakai alur enrollment: 1 foto JPEG utuh (bukan tiap-frame) → deteksi wajah sekali,
-     *  lalu crop. ACCURATE mode karena bukan real-time (dijalankan sekali per capture). */
-    suspend fun detectAndCrop(bitmap: Bitmap): Bitmap? {
+    /** Dipakai enrollment: foto utuh → deteksi + five-point alignment sekali. */
+    suspend fun detectAndAlignForArcFace(bitmap: Bitmap): Bitmap? {
         val detector = FaceDetection.getClient(
             FaceDetectorOptions.Builder()
                 .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)
+                .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
                 .build()
         )
         return try {
             val faces = detector.process(InputImage.fromBitmap(bitmap, 0)).await()
-            val face = faces.firstOrNull() ?: return null
-            cropToFace(bitmap, face.boundingBox)
+            if (faces.size != 1) return null
+            alignForArcFace(bitmap, faces.first())
         } catch (e: Exception) {
             null
         } finally {

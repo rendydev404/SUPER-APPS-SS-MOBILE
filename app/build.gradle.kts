@@ -105,7 +105,6 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:$cameraVersion")
     implementation("androidx.camera:camera-view:$cameraVersion")
     implementation("com.google.mlkit:face-detection:16.1.6")
-    implementation("org.tensorflow:tensorflow-lite:2.14.0")
 
     // Location
     implementation("com.google.android.gms:play-services-location:21.3.0")

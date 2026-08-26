@@ -12,6 +12,7 @@ import com.sukashawarma.superapp.data.remote.AbsensiWebApi
 import com.sukashawarma.superapp.data.remote.NetworkMonitor
 import com.sukashawarma.superapp.data.remote.Postgrest
 import com.sukashawarma.superapp.data.remote.optString
+import com.sukashawarma.superapp.core.storage.StorageUtil
 import com.sukashawarma.superapp.domain.face.FaceEmbeddingExtractor
 import com.sukashawarma.superapp.domain.face.UnavailableFaceEmbeddingExtractor
 import com.sukashawarma.superapp.domain.gps.GpsMath
@@ -36,9 +37,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * Orkestrasi absen — cermin useClockKiosk.ts (web). `lockToStaffId` diisi untuk mode
  * panel pribadi (1:1, terkunci ke akun login); null untuk kiosk outlet (1:N).
  *
- * Ekstraksi embedding wajah (`FaceEmbeddingExtractor`) BELUM diisi — lihat komentar
- * di interface itu. Jalur manual (`doSubmitManual`) tidak butuh wajah sama sekali dan
- * SUDAH bisa dipakai end-to-end.
+ * Identitas wajah diekstrak memakai InsightFace ArcFace melalui NCNN.
  */
 class ClockViewModel(
     application: Application,
@@ -62,11 +61,13 @@ class ClockViewModel(
     val state: StateFlow<ClockUiState> = _state
 
     private var livenessDetector: LivenessDetector? = null
+    private var pendingManualButton = false
 
     init {
         checkLocation()
         observePending()
         observeOnline()
+        refreshAttendance()
     }
 
     private fun observePending() {
@@ -81,7 +82,45 @@ class ClockViewModel(
         viewModelScope.launch {
             NetworkMonitor.isOnline.collect { online ->
                 _state.value = _state.value.copy(isOnline = online)
-                if (online) flushQueue()
+                if (online) {
+                    flushQueue()
+                    refreshAttendance()
+                }
+            }
+        }
+    }
+
+    /** Memuat tiga absensi terakhir milik akun yang sedang login. Query berada di ViewModel
+     * agar UI hanya merender state dan tidak mengelola akses backend secara langsung. */
+    fun refreshAttendance() {
+        val staffId = lockToStaffId ?: return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isAttendanceLoading = true, attendanceError = null)
+            try {
+                val rows = Postgrest.select(
+                    "attendance",
+                    listOf(
+                        "outlet_staff_id" to "eq.$staffId",
+                        "select" to "type,ts_server,ts_client",
+                        "order" to "ts_server.desc",
+                        "limit" to "3",
+                    ),
+                )
+                val history = rows.mapNotNull { element ->
+                    val row = element.asJsonObject
+                    val occurredAt = row.optString("ts_server") ?: row.optString("ts_client")
+                    occurredAt?.let { AttendanceHistoryItem(row.optString("type") ?: "", it) }
+                }
+                _state.value = _state.value.copy(
+                    attendanceHistory = history,
+                    isAttendanceLoading = false,
+                    attendanceError = null,
+                )
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(
+                    isAttendanceLoading = false,
+                    attendanceError = "Riwayat absensi belum dapat dimuat.",
+                )
             }
         }
     }
@@ -180,10 +219,8 @@ class ClockViewModel(
             try {
                 val descriptor = faceEmbeddingExtractor.extract(faceCrop)
                 if (descriptor == null) {
-                    // Model gagal load / crop tak layak (mis. terlalu gelap) — bypass ke identitas
-                    // login supaya alur clock-in tetap jalan (device personal, sudah ada gate login).
-                    val currentStaff = AppSession.staff.value
-                    proceedAfterIdentified(lockToStaffId ?: currentStaff?.id ?: "unknown", currentStaff?.name ?: "Staff")
+                    // Jangan pernah bypass verifikasi wajah saat model/alignment gagal.
+                    showCameraGuidance("Wajah belum terbaca jelas. Hadap kamera dengan pencahayaan cukup lalu coba lagi.")
                     return@launch
                 }
 
@@ -262,7 +299,7 @@ class ClockViewModel(
         busy.set(true)
         viewModelScope.launch {
             try {
-                doSubmit()
+                requestAttendanceSubmission()
             } finally {
                 busy.set(false)
             }
@@ -304,10 +341,26 @@ class ClockViewModel(
             return
         }
         _state.value = _state.value.copy(whoId = staffId, whoName = staffName, action = if (next == NextAction.OUT) "out" else "in")
-        doSubmit(isManualButton = true)
+        requestAttendanceSubmission(isManualButton = true)
     }
 
-    private suspend fun doSubmit(isManualButton: Boolean = false) {
+    /** Meminta UI mengambil satu frame seperti `captureFrame(video)` pada web. Frame ini
+     * tidak memengaruhi pencocokan wajah maupun face-mesh; hanya audit selfie attendance. */
+    private fun requestAttendanceSubmission(isManualButton: Boolean = false) {
+        pendingManualButton = isManualButton
+        _state.value = _state.value.copy(
+            phase = ClockPhase.SUBMITTING,
+            selfieCaptureRequestId = UUID.randomUUID().toString(),
+        )
+    }
+
+    fun onSelfieCaptured(jpegBytes: ByteArray?) {
+        if (_state.value.phase != ClockPhase.SUBMITTING) return
+        _state.value = _state.value.copy(selfieCaptureRequestId = null)
+        viewModelScope.launch { doSubmit(pendingManualButton, jpegBytes) }
+    }
+
+    private suspend fun doSubmit(isManualButton: Boolean, jpegBytes: ByteArray?) {
         val s = _state.value
         val staffId = s.whoId ?: return
         _state.value = s.copy(phase = ClockPhase.SUBMITTING)
@@ -325,7 +378,7 @@ class ClockViewModel(
             isMock = false,
             isManualButton = isManualButton,
             tsClientIso = nowIso,
-            selfiePath = null, // TODO(selfie): capture+upload via CameraX ImageCapture (belum diisi)
+            selfiePath = null,
             createdAtMs = System.currentTimeMillis(),
         )
 
@@ -336,8 +389,17 @@ class ClockViewModel(
             return
         }
 
+        // Sama dengan web: ambil frame sebelum submit, unggah ke bucket `selfies`, lalu
+        // kirim path object (tanpa nama bucket) sebagai `attendance.selfie_path`.
+        val selfiePath = jpegBytes?.let { bytes ->
+            try {
+                StorageUtil.uploadJpeg("selfies", "$outletId/$id.jpg", bytes).removePrefix("selfies/")
+            } catch (_: Exception) {
+                null // Jangan mengirim path palsu bila upload gagal.
+            }
+        }
         val res = try {
-            com.sukashawarma.superapp.feature.absensi.usecase.SubmitAttendanceUseCase(entity)
+            com.sukashawarma.superapp.feature.absensi.usecase.SubmitAttendanceUseCase(entity.copy(selfiePath = selfiePath))
         } catch (e: Exception) {
             db.pendingAttendanceDao().insert(entity)
             setResult(true, if (s.action == "in") "Selamat bekerja! (Tersimpan offline)" else "Hati-hati di jalan! (Tersimpan offline)", ClockPhase.RESULT)
@@ -346,6 +408,7 @@ class ClockViewModel(
         }
 
         if (res.ok) {
+            refreshAttendance()
             // Status was returned in reason when OK in UseCase
             val status = res.reason
             setResult(true, if (s.action == "in") "Selamat bekerja! ($status)" else "Hati-hati di jalan! ($status)", ClockPhase.RESULT)
@@ -467,8 +530,6 @@ class ClockViewModelFactory(
     override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T =
         ClockViewModel(
             application, outletId, lockToStaffId,
-            faceEmbeddingExtractor = com.sukashawarma.superapp.domain.face.TfliteFaceEmbeddingExtractor(application),
+            faceEmbeddingExtractor = com.sukashawarma.superapp.domain.face.NcnnArcFaceEmbeddingExtractor(application),
         ) as T
 }
-
-

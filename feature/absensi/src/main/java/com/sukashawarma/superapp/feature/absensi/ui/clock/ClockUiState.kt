@@ -5,6 +5,12 @@ import com.sukashawarma.superapp.domain.liveness.Challenge
 import com.sukashawarma.superapp.domain.model.ClockPhase
 import com.sukashawarma.superapp.domain.model.ClockResult
 
+data class AttendanceHistoryItem(
+    val type: String,
+    /** Waktu yang dicatat server. Dipakai sebagai sumber waktu utama agar konsisten lintas perangkat. */
+    val occurredAtIso: String,
+)
+
 data class ClockUiState(
     val phase: ClockPhase = ClockPhase.LOCATING,
     val outletCoords: LatLng? = null,
@@ -24,6 +30,9 @@ data class ClockUiState(
     val challenge: Challenge? = null,
     val pendingCount: Int = 0,
     val isOnline: Boolean = true,
+    /** Token satu-kali untuk meminta UI mengambil frame kamera sebelum submit. */
+    val selfieCaptureRequestId: String? = null,
+    val attendanceHistory: List<AttendanceHistoryItem> = emptyList(),
+    val isAttendanceLoading: Boolean = true,
+    val attendanceError: String? = null,
 )
-
-

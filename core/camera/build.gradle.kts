@@ -22,9 +22,11 @@ android {
     buildFeatures {
         compose = true
     }
-    androidResources {
-        // .tflite di-mmap langsung dari assets (FileChannel.map) — harus uncompressed di APK.
-        noCompress += "tflite"
+    ndkVersion = "28.2.13676358"
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+        }
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.8"
@@ -37,7 +39,6 @@ dependencies {
     api("androidx.camera:camera-lifecycle:$cameraVersion")
     api("androidx.camera:camera-view:$cameraVersion")
     implementation("com.google.mlkit:face-detection:16.1.6")
-    implementation("org.tensorflow:tensorflow-lite:2.14.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
     val composeBom = platform("androidx.compose:compose-bom:2024.02.00")
     implementation(composeBom)
@@ -49,6 +50,5 @@ dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("com.google.dagger:hilt-android:2.51")
     kapt("com.google.dagger:hilt-compiler:2.51")
+    testImplementation("junit:junit:4.13.2")
 }
-
-

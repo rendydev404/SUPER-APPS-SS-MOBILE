@@ -4,6 +4,7 @@ import android.util.Log
 import android.util.Size
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageCapture
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
@@ -33,12 +34,14 @@ fun FaceCameraPreview(
     isActive: Boolean = true,
     needsCrop: () -> Boolean = { true },
     onFrame: (FrameFaceResult) -> Unit,
+    onImageCaptureReady: (ImageCapture) -> Unit = {},
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
     val currentNeedsCrop by rememberUpdatedState(needsCrop)
     val currentOnFrame by rememberUpdatedState(onFrame)
+    val currentOnImageCaptureReady by rememberUpdatedState(onImageCaptureReady)
 
     var previewView by remember { mutableStateOf<PreviewView?>(null) }
 
@@ -82,13 +85,17 @@ fun FaceCameraPreview(
                         ))
                     }
 
+                val imageCapture = ImageCapture.Builder().build()
+
                 cameraProvider.unbindAll()
                 cameraProvider.bindToLifecycle(
                     lifecycleOwner,
                     CameraSelector.DEFAULT_FRONT_CAMERA,
                     preview,
-                    analysis
+                    analysis,
+                    imageCapture,
                 )
+                currentOnImageCaptureReady(imageCapture)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to bind camera to lifecycle", e)
             }

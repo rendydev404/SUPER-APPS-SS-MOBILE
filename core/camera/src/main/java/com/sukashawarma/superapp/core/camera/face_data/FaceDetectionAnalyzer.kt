@@ -69,7 +69,7 @@ class FaceDetectionAnalyzer(
     private val detector = FaceDetection.getClient(
         FaceDetectorOptions.Builder()
             .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
-            .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_NONE)
+            .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
             .setContourMode(FaceDetectorOptions.CONTOUR_MODE_ALL)
             .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_NONE)
             .enableTracking()
@@ -104,7 +104,7 @@ class FaceDetectionAnalyzer(
                     // user lihat & lakukan, bukan sudut pandang sensor mentah.
                     val signal = FaceSignal(yawDeg = -face.headEulerAngleY, faceCount = faces.size)
                     val crop = if (faces.size == 1 && needsCrop()) {
-                        imageProxy.toRotatedBitmapOrNull()?.let { FaceCropUtil.cropToFace(it, face.boundingBox) }
+                        imageProxy.toRotatedBitmapOrNull()?.let { FaceCropUtil.alignForArcFace(it, face) }
                     } else null
                     val box = face.boundingBox
                     val faceBox = if (imgW > 0 && imgH > 0) NormalizedFaceBox(

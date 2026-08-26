@@ -13,6 +13,7 @@ import com.sukashawarma.superapp.data.remote.Postgrest
 import com.sukashawarma.superapp.data.remote.optString
 import com.sukashawarma.superapp.domain.face.FaceEmbeddingExtractor
 import com.sukashawarma.superapp.domain.face.UnavailableFaceEmbeddingExtractor
+import com.sukashawarma.superapp.domain.model.Role
 import com.sukashawarma.superapp.domain.session.AppSession
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,10 +22,14 @@ import java.time.Instant
 import java.util.UUID
 
 data class EnrollCrewOption(val id: String, val name: String, val alreadyEnrolled: Boolean)
+data class EnrollOutletOption(val id: String, val name: String)
 
 data class EnrollUiState(
+    val loadingOutlets: Boolean = false,
     val loadingCrew: Boolean = true,
     val error: String? = null,
+    val outlets: List<EnrollOutletOption> = emptyList(),
+    val selectedOutletId: String? = null,
     val crew: List<EnrollCrewOption> = emptyList(),
     val selectedStaffId: String? = null,
     val capturing: Boolean = false,
@@ -35,10 +40,8 @@ data class EnrollUiState(
 /** Enrollment foto wajah crew (SPV-tier saja, gate [[ENROLL_ALLOWED_ROLES]] di
  *  [[AbsensiHubScreen]]) — tulis ke kolom `*_mobile` di `outlet_staff`
  *  (face_descriptor_mobile/ref_photo_url_mobile/mobile_enrolled_at/mobile_enrolled_by),
- *  TERPISAH dari kolom web (face_descriptor/ref_photo_url/enrolled_at) karena model
- *  embedding native (facenet.tflite, 192d) beda dari model web (@vladmandic/human) —
- *  descriptor dari dua model TIDAK comparable, makanya kolom & jalur match-nya dipisah
- *  ([[TfliteFaceEmbeddingExtractor]], RPC `match_face_mobile`).
+ *  Kolom descriptor mobile ditimpa dengan embedding ArcFace 512d saat enrollment;
+ *  descriptor 192d sebelumnya tidak pernah dipertahankan atau dicampurkan.
  *  Foto tetap tersimpan walau descriptor gagal diekstrak (mis. wajah tak terdeteksi jelas
  *  di foto) — SPV bisa ulangi capture tanpa mengulang seluruh alur pilih-staff. */
 class EnrollViewModel(
@@ -49,15 +52,54 @@ class EnrollViewModel(
     private val _state = MutableStateFlow(EnrollUiState())
     val state: StateFlow<EnrollUiState> = _state
 
-    init { loadCrew() }
+    init {
+        val staff = AppSession.staff.value
+        if (staff?.role == Role.REGIONAL_MANAGER) loadOutlets()
+        else staff?.outletId?.let(::selectOutlet)
+            ?: run { _state.value = EnrollUiState(loadingCrew = false, error = "Akun tidak terhubung ke outlet.") }
+    }
 
-    fun loadCrew() {
-        val outletId = AppSession.staff.value?.outletId
-        if (outletId == null) {
-            _state.value = EnrollUiState(loadingCrew = false, error = "Akun tidak terhubung ke outlet.")
-            return
+    /** Daftar outlet tidak dibatasi di client. RLS backend menentukan outlet mana yang
+     * benar-benar boleh dilihat Regional Manager. */
+    private fun loadOutlets() {
+        _state.value = _state.value.copy(loadingOutlets = true, loadingCrew = false, error = null)
+        viewModelScope.launch {
+            try {
+                val rows = Postgrest.select(
+                    "outlets",
+                    listOf(
+                        "is_active" to "eq.true",
+                        "select" to "id,name",
+                        "order" to "name.asc",
+                    )
+                )
+                val outlets = rows.map { el ->
+                    val o = el.asJsonObject
+                    EnrollOutletOption(
+                        id = o.optString("id") ?: "",
+                        name = o.optString("name") ?: "-",
+                    )
+                }
+                _state.value = _state.value.copy(loadingOutlets = false, outlets = outlets)
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(loadingOutlets = false, error = "Gagal memuat daftar outlet: ${e.message}")
+            }
         }
-        _state.value = _state.value.copy(loadingCrew = true, error = null)
+    }
+
+    fun selectOutlet(outletId: String) {
+        _state.value = _state.value.copy(
+            selectedOutletId = outletId,
+            selectedStaffId = null,
+            crew = emptyList(),
+            captureResult = null,
+            loadingCrew = true,
+            error = null,
+        )
+        loadCrew(outletId)
+    }
+
+    private fun loadCrew(outletId: String) {
         viewModelScope.launch {
             try {
                 val rows = Postgrest.select(
@@ -88,6 +130,8 @@ class EnrollViewModel(
         _state.value = _state.value.copy(selectedStaffId = staffId, captureResult = null)
     }
 
+    fun closeCamera() = selectStaff(null)
+
     fun onPhotoCaptured(jpegBytes: ByteArray) {
         val staffId = _state.value.selectedStaffId ?: return
         val enrolledBy = AppSession.staff.value?.id ?: return
@@ -95,11 +139,9 @@ class EnrollViewModel(
         viewModelScope.launch {
             try {
                 val bitmap: Bitmap? = BitmapFactory.decodeByteArray(jpegBytes, 0, jpegBytes.size)
-                // Foto capture = frame utuh (orang + latar) — HARUS di-crop ke wajah dulu sebelum
-                // diekstrak, kalau tidak embedding-nya rusak (model dilatih pada crop wajah rapat,
-                // bukan foto framing bebas). Lihat FaceCropUtil.detectAndCrop.
-                val faceCrop = bitmap?.let { FaceCropUtil.detectAndCrop(it) }
-                val descriptor = faceCrop?.let { faceEmbeddingExtractor.extract(it) }
+                // ArcFace wajib menerima wajah yang disejajarkan oleh lima landmark.
+                val alignedFace = bitmap?.let { FaceCropUtil.detectAndAlignForArcFace(it) }
+                val descriptor = alignedFace?.let { faceEmbeddingExtractor.extract(it) }
 
                 val path = StorageUtil.uploadJpeg("face-refs", "$staffId/${UUID.randomUUID()}.jpg", jpegBytes)
 
@@ -122,7 +164,7 @@ class EnrollViewModel(
                     captureResult = if (descriptor != null) "Foto & wajah berhasil didaftarkan."
                     else "Foto tersimpan, tapi wajah tak terdeteksi jelas di foto ini (coba pencahayaan lebih terang / wajah lebih dekat & frontal) — ulangi capture, atau pakai tombol absen manual sementara.",
                 )
-                loadCrew()
+                _state.value.selectedOutletId?.let(::loadCrew)
             } catch (e: Exception) {
                 _state.value = _state.value.copy(capturing = false, captureOk = false, captureResult = "Gagal mendaftarkan: ${e.message}")
             }
@@ -135,6 +177,6 @@ class EnrollViewModelFactory(private val application: Application) : androidx.li
     override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T =
         EnrollViewModel(
             application,
-            faceEmbeddingExtractor = com.sukashawarma.superapp.domain.face.TfliteFaceEmbeddingExtractor(application),
+            faceEmbeddingExtractor = com.sukashawarma.superapp.domain.face.NcnnArcFaceEmbeddingExtractor(application),
         ) as T
 }
