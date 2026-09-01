@@ -16,7 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.sukashawarma.superapp.domain.model.Role
 import com.sukashawarma.superapp.domain.session.AppSession
 import com.sukashawarma.superapp.domain.session.StartDestination
 import com.sukashawarma.superapp.domain.session.resolveStartDestination
@@ -69,21 +68,18 @@ private fun RootNav() {
     }
 
     val destination = resolveStartDestination(staff, mitraProfile, mitraLoadFailed)
-    val isMitra = staff?.role == Role.MITRA
+    val isMitra = destination == StartDestination.MITRA_DASHBOARD ||
+        destination == StartDestination.MITRA_NO_PROFILE ||
+        destination == StartDestination.MITRA_LOAD_ERROR
 
     NavHost(navController = navController, startDestination = routeFor(destination)) {
         composable(Routes.LOGIN) {
-            LoginScreen(onLoggedIn = {
-                // Tujuan dihitung ulang dari sesi yang BARU terisi — jangan menebak di sini.
-                val target = routeFor(
-                    resolveStartDestination(
-                        AppSession.staff.value,
-                        AppSession.mitraProfile.value,
-                        AppSession.mitraLoadFailed.value,
-                    )
-                )
-                navController.navigate(target) { popUpTo(Routes.LOGIN) { inclusive = true } }
-            })
+            // Sengaja TIDAK navigate() di sini. Saat callback ini jalan, recomposition
+            // belum sempat berjalan, jadi graph di NavController MASIH graph sesi-kosong
+            // (tanpa rute mitra) dan navigate("mitra") akan melempar IllegalArgumentException.
+            // Begitu AppSession terisi, `destination` + `isMitra` berubah, NavHost menyusun
+            // graph baru, dan setGraph memindahkan sendiri ke start destination yang baru.
+            LoginScreen(onLoggedIn = {})
         }
 
         if (isMitra) {
@@ -101,7 +97,7 @@ private fun RootNav() {
             }
             composable(Routes.MITRA_LOAD_ERROR) {
                 MitraLoadErrorScreen(
-                    onRetry = { scope.launch { AppSession.tryAutoLogin() } },
+                    onRetry = { scope.launch { AppSession.retryLoadMitraProfile() } },
                     onLoggedOut = {
                         navController.navigate(Routes.LOGIN) { popUpTo(0) }
                     },

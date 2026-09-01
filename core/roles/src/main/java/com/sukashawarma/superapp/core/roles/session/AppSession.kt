@@ -111,6 +111,14 @@ object AppSession {
         }
     }
 
+    /** Retry khusus layar galat mitra: HANYA memuat ulang profil, tak menyentuh sesi staff.
+     *  Memakai tryAutoLogin() di sini akan men-sign-out mitra begitu jaringan masih mati —
+     *  kebalikan dari maksud desainnya (sinyal jelek tidak boleh menghukum pengguna). */
+    suspend fun retryLoadMitraProfile() {
+        val current = _staff.value ?: return
+        loadMitraProfileIfNeeded(current)
+    }
+
     private fun signOutWith(message: String): LoginResult {
         signOut()
         return LoginResult.Failure(message)
