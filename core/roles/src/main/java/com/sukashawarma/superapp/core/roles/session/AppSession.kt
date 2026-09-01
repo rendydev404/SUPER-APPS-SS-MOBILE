@@ -5,7 +5,10 @@ import com.sukashawarma.superapp.data.remote.AuthSessionManager
 import com.sukashawarma.superapp.data.remote.SessionTokenHolder
 import com.sukashawarma.superapp.data.remote.SignInPayload
 import com.sukashawarma.superapp.data.remote.SupabaseClient
+import com.sukashawarma.superapp.data.repository.MitraRepository
 import com.sukashawarma.superapp.data.repository.StaffRepository
+import com.sukashawarma.superapp.domain.model.MitraProfile
+import com.sukashawarma.superapp.domain.model.Role
 import com.sukashawarma.superapp.domain.model.StaffProfile
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,6 +23,14 @@ sealed interface LoginResult {
 object AppSession {
     private val _staff = MutableStateFlow<StaffProfile?>(null)
     val staff: StateFlow<StaffProfile?> = _staff
+
+    private val _mitraProfile = MutableStateFlow<MitraProfile?>(null)
+    val mitraProfile: StateFlow<MitraProfile?> = _mitraProfile
+
+    /** true = profil GAGAL dimuat (jaringan/server), BUKAN "tidak punya profil".
+     *  Dibedakan supaya mitra bersinyal jelek tak disuruh menelepon admin pusat. */
+    private val _mitraLoadFailed = MutableStateFlow(false)
+    val mitraLoadFailed: StateFlow<Boolean> = _mitraLoadFailed
 
     private val _loading = MutableStateFlow(true)
     val loading: StateFlow<Boolean> = _loading
@@ -78,7 +89,26 @@ object AppSession {
             return signOutWith("Akun Anda berstatus $reason. Hubungi admin/SPV.")
         }
         _staff.value = staff
+        loadMitraProfileIfNeeded(staff)
         return LoginResult.Success
+    }
+
+    /** Dipanggil dari KEDUA jalur masuk. Kalau hanya dipasang di login(), app terlihat
+     *  benar saat login pertama lalu jadi layar kosong keesokan harinya lewat auto-login. */
+    private suspend fun loadMitraProfileIfNeeded(staff: StaffProfile) {
+        if (staff.role != Role.MITRA) {
+            _mitraProfile.value = null
+            _mitraLoadFailed.value = false
+            return
+        }
+        try {
+            _mitraProfile.value = MitraRepository.getProfile(staff.id)
+            _mitraLoadFailed.value = false
+        } catch (e: Exception) {
+            android.util.Log.e("AppSession", "loadMitraProfileIfNeeded() gagal", e)
+            _mitraProfile.value = null
+            _mitraLoadFailed.value = true
+        }
     }
 
     private fun signOutWith(message: String): LoginResult {
@@ -89,6 +119,8 @@ object AppSession {
     fun signOut() {
         AuthSessionManager.signOut()
         _staff.value = null
+        _mitraProfile.value = null
+        _mitraLoadFailed.value = false
     }
 
     /** Sebelumnya SEMUA exception (DNS gagal, timeout, TLS, JSON tak terduga dari server, dst)
