@@ -20,6 +20,18 @@ enum class StartDestination {
  * Urutan pemeriksaan `mitraLoadFailed` SEBELUM profil-null itu disengaja: mitra dengan
  * sinyal jelek tidak boleh disuruh menelepon admin pusat.
  */
+/**
+ * true untuk ketiga tujuan area mitra (MITRA_DASHBOARD/MITRA_NO_PROFILE/MITRA_LOAD_ERROR).
+ * Bentuk graph navigasi (rute mana yang didaftarkan) DAN start destination HARUS diturunkan
+ * dari satu nilai yang sama — sebelumnya MainActivity menghitung ini sendiri lewat `||` inline
+ * terpisah dari resolveStartDestination(), dan ketidaksepakatan keduanya pernah menyebabkan
+ * crash navigasi produksi. Taruh di sini supaya dites, bukan cuma dibaca.
+ */
+val StartDestination.isMitraArea: Boolean
+    get() = this == StartDestination.MITRA_DASHBOARD ||
+        this == StartDestination.MITRA_NO_PROFILE ||
+        this == StartDestination.MITRA_LOAD_ERROR
+
 fun resolveStartDestination(
     staff: StaffProfile?,
     mitraProfile: MitraProfile?,

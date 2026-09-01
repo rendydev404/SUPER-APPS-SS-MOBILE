@@ -39,7 +39,7 @@ data class MitraProfile(
                 userId = userId,
                 namaMitra = row.optString("nama_mitra") ?: "Mitra",
                 outletIds = row.optJsonArray("outlet_ids")
-                    ?.mapNotNull { el -> el.takeIf { !it.isJsonNull }?.asString }
+                    ?.mapNotNull { it.takeIf { e -> !e.isJsonNull }?.asString }
                     ?: emptyList(),
                 profitSharingPct = row.optDouble("profit_sharing_pct"),
                 bankName = row.optString("bank_name"),

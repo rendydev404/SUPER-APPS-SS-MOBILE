@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -17,6 +18,7 @@ import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.PersonOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -112,6 +114,9 @@ fun MitraNoProfileScreen(onLoggedOut: () -> Unit) {
 
 @Composable
 fun MitraLoadErrorScreen(onRetry: () -> Unit, onLoggedOut: () -> Unit) {
+    // Dikoleksi di sini (bukan di MitraMessageScreen umum) karena hanya layar galat yang
+    // punya tombol retry — layar "belum terdaftar" tak pernah retry.
+    val retrying by AppSession.mitraRetrying.collectAsState()
     MitraMessageScreen(
         icon = Icons.Default.CloudOff,
         title = "Gagal Memuat Data Kemitraan",
@@ -119,6 +124,7 @@ fun MitraLoadErrorScreen(onRetry: () -> Unit, onLoggedOut: () -> Unit) {
             "Periksa koneksi internet, lalu coba lagi.",
         primaryLabel = "Coba Lagi",
         onPrimary = onRetry,
+        primaryLoading = retrying,
         onLoggedOut = onLoggedOut,
     )
 }
@@ -131,6 +137,7 @@ private fun MitraMessageScreen(
     primaryLabel: String?,
     onPrimary: (() -> Unit)?,
     onLoggedOut: () -> Unit,
+    primaryLoading: Boolean = false,
 ) {
     Box(
         modifier = Modifier.fillMaxSize().background(SukaSurface),
@@ -174,8 +181,17 @@ private fun MitraMessageScreen(
             if (primaryLabel != null && onPrimary != null) {
                 Button(
                     onClick = onPrimary,
+                    enabled = !primaryLoading,
                     colors = ButtonDefaults.buttonColors(containerColor = SukaOrange),
                 ) {
+                    if (primaryLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = Color.White,
+                            strokeWidth = 2.dp,
+                        )
+                        Spacer(Modifier.width(8.dp))
+                    }
                     Text(primaryLabel, color = Color.White, fontWeight = FontWeight.Bold)
                 }
                 Spacer(Modifier.height(4.dp))

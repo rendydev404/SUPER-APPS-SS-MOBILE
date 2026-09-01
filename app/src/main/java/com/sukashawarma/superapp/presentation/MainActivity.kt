@@ -18,6 +18,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.sukashawarma.superapp.domain.session.AppSession
 import com.sukashawarma.superapp.domain.session.StartDestination
+import com.sukashawarma.superapp.domain.session.isMitraArea
 import com.sukashawarma.superapp.domain.session.resolveStartDestination
 import com.sukashawarma.superapp.presentation.absensi.AbsensiNavGraph
 import com.sukashawarma.superapp.presentation.home.HomeScreen
@@ -68,9 +69,7 @@ private fun RootNav() {
     }
 
     val destination = resolveStartDestination(staff, mitraProfile, mitraLoadFailed)
-    val isMitra = destination == StartDestination.MITRA_DASHBOARD ||
-        destination == StartDestination.MITRA_NO_PROFILE ||
-        destination == StartDestination.MITRA_LOAD_ERROR
+    val isMitra = destination.isMitraArea
 
     NavHost(navController = navController, startDestination = routeFor(destination)) {
         composable(Routes.LOGIN) {

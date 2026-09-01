@@ -78,4 +78,24 @@ class StartDestinationTest {
     fun `role tak dikenal diperlakukan seperti role biasa`() {
         assertEquals(StartDestination.HOME, resolveStartDestination(staff(null), null, false))
     }
+
+    @Test
+    fun `isMitraArea partisi persis sesuai graph navigasi mitra`() {
+        // Jangan ganti jadi cek per-nilai satu-satu: tujuannya walk exhaustive supaya
+        // menambah enum StartDestination baru MEMAKSA keputusan eksplisit di sini,
+        // bukan diam-diam ikut default false/true.
+        val mitraArea = setOf(
+            StartDestination.MITRA_DASHBOARD,
+            StartDestination.MITRA_NO_PROFILE,
+            StartDestination.MITRA_LOAD_ERROR,
+        )
+        for (destination in StartDestination.entries) {
+            assertEquals(
+                "isMitraArea untuk $destination",
+                destination in mitraArea,
+                destination.isMitraArea,
+            )
+        }
+        assertEquals(setOf(StartDestination.LOGIN, StartDestination.HOME), StartDestination.entries.toSet() - mitraArea)
+    }
 }
