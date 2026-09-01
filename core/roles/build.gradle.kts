@@ -33,6 +33,7 @@ dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("com.google.dagger:hilt-android:2.51")
     kapt("com.google.dagger:hilt-compiler:2.51")
+    testImplementation("junit:junit:4.13.2")
 }
 
 
