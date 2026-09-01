@@ -182,7 +182,11 @@ private fun MitraMessageScreen(
                 Button(
                     onClick = onPrimary,
                     enabled = !primaryLoading,
-                    colors = ButtonDefaults.buttonColors(containerColor = SukaOrange),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = SukaOrange,
+                        disabledContainerColor = SukaOrange.copy(alpha = 0.5f),
+                        disabledContentColor = Color.White,
+                    ),
                 ) {
                     if (primaryLoading) {
                         CircularProgressIndicator(
