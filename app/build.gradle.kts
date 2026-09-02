@@ -133,6 +133,7 @@ dependencies {
     implementation(project(":feature:absensi"))
     implementation(project(":feature:stok"))
     implementation(project(":feature:distribusi"))
+    implementation(project(":feature:mitra"))
     implementation("com.google.dagger:hilt-android:2.51")
     kapt("com.google.dagger:hilt-compiler:2.51")
 }
@@ -152,6 +153,7 @@ dependencies {
     implementation(project(":feature:absensi"))
     implementation(project(":feature:stok"))
     implementation(project(":feature:distribusi"))
+    implementation(project(":feature:mitra"))
     implementation("com.google.dagger:hilt-android:2.51")
     kapt("com.google.dagger:hilt-compiler:2.51")
 }
