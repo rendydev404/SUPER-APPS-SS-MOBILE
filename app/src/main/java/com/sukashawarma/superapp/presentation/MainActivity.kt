@@ -20,6 +20,7 @@ import com.sukashawarma.superapp.domain.session.AppSession
 import com.sukashawarma.superapp.domain.session.StartDestination
 import com.sukashawarma.superapp.domain.session.isMitraArea
 import com.sukashawarma.superapp.domain.session.resolveStartDestination
+import com.sukashawarma.superapp.feature.stok.StokNavGraph
 import com.sukashawarma.superapp.presentation.absensi.AbsensiNavGraph
 import com.sukashawarma.superapp.presentation.home.HomeScreen
 import com.sukashawarma.superapp.presentation.login.LoginScreen
@@ -33,6 +34,7 @@ object Routes {
     const val LOGIN = "login"
     const val HOME = "home"
     const val ABSENSI = "absensi"
+    const val STOK = "stok"
     const val MITRA = "mitra"
     const val MITRA_NO_PROFILE = "mitra_no_profile"
     const val MITRA_LOAD_ERROR = "mitra_load_error"
@@ -63,6 +65,8 @@ private fun RootNav() {
         AppSession.tryAutoLogin()
     }
 
+    LocationPermissionGate(staff != null)
+
     if (loading) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         return
@@ -82,8 +86,8 @@ private fun RootNav() {
         }
 
         if (isMitra) {
-            // HOME & ABSENSI sengaja TIDAK didaftarkan untuk mitra — tak ada jalan ke sana
-            // lewat Back maupun deep link. Cermin route-guard web (RoleContext.tsx).
+            // HOME, ABSENSI & STOK sengaja TIDAK didaftarkan untuk mitra — tak ada jalan ke
+            // sana lewat Back maupun deep link. Cermin route-guard web (RoleContext.tsx).
             composable(Routes.MITRA) {
                 MitraDashboardScaffold(onLoggedOut = {
                     navController.navigate(Routes.LOGIN) { popUpTo(0) }
@@ -106,11 +110,15 @@ private fun RootNav() {
             composable(Routes.HOME) {
                 HomeScreen(
                     onOpenAbsensi = { navController.navigate(Routes.ABSENSI) },
+                    onOpenStok = { navController.navigate(Routes.STOK) },
                     onLoggedOut = { navController.navigate(Routes.LOGIN) { popUpTo(0) } }
                 )
             }
             composable(Routes.ABSENSI) {
                 AbsensiNavGraph(onExit = { navController.popBackStack() })
+            }
+            composable(Routes.STOK) {
+                StokNavGraph(onExit = { navController.popBackStack() })
             }
         }
     }
