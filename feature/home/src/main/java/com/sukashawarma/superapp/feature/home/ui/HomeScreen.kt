@@ -1,6 +1,5 @@
 package com.sukashawarma.superapp.presentation.home
 
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -8,170 +7,188 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Fingerprint
+import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Logout
-import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.WatchLater
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.sukashawarma.superapp.presentation.theme.SukaOnSurface
-import com.sukashawarma.superapp.presentation.theme.SukaOnSurfaceVariant
-import com.sukashawarma.superapp.presentation.theme.SukaOrange
-import com.sukashawarma.superapp.presentation.theme.SukaPrimaryContainer
-import com.sukashawarma.superapp.presentation.theme.SukaSurface
-import com.sukashawarma.superapp.presentation.theme.SukaSurfaceContainer
-import com.sukashawarma.superapp.presentation.theme.SukaSurfaceContainerLowest
-import com.sukashawarma.superapp.presentation.theme.StatusAmber
-import com.sukashawarma.superapp.presentation.theme.StatusEmerald
-import com.sukashawarma.superapp.presentation.theme.StatusRed
+import com.sukashawarma.superapp.presentation.theme.*
 
-/** Satu kartu modul di daftar aplikasi. Sekarang cuma Absensi yang aktif — tile lain
- *  ditambah begitu modulnya dibangun (POS, stok, distribusi), bukan sebelumnya. */
 private data class ModuleTile(
     val label: String,
     val desc: String,
     val icon: ImageVector,
-    val enabled: Boolean,
     val onClick: () -> Unit,
+    val stats: List<Triple<String, String, Color>>,
 )
 
 /**
- * Daftar aplikasi — mengikuti desain Stitch (project 16991912726833518585, screen
- * cffd26a704054786b84ea57283554d18, "Updated Dashboard"): hero gradient dengan status
- * absen hari ini, lalu grid kartu modul dengan ikon berwarna & micro-interaction saat ditekan.
+ * Role yang boleh membuka modul Stok — cermin `isLeaderOrSPV` di `BottomNav.tsx` web,
+ * dikurangi `spv` yang sudah tidak dipakai lagi (digantikan `regional_manager`).
+ *
+ * Perbedaan antar role ini hanya pada cakupan outlet, bukan pada fitur: leader dan
+ * area manager memegang beberapa outlet binaan lewat `staff_outlets`, regional manager
+ * memegang seluruh outlet, dan crew hanya outletnya sendiri. Pembedaan itu sudah
+ * ditangani `accessible_outlet_ids()` di database, jadi tidak ada cabang role di sini.
  */
+private val STOK_ROLES = setOf(
+    com.sukashawarma.superapp.domain.model.Role.CREW,
+    com.sukashawarma.superapp.domain.model.Role.LEADER,
+    com.sukashawarma.superapp.domain.model.Role.AREA_MANAGER,
+    com.sukashawarma.superapp.domain.model.Role.REGIONAL_MANAGER,
+)
+
 @Composable
 fun HomeScreen(
     onOpenAbsensi: () -> Unit,
+    onOpenStok: () -> Unit,
     onLoggedOut: () -> Unit,
     viewModel: HomeViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
     val staff = state.staff
-
-    Column(modifier = Modifier.fillMaxSize().background(SukaSurface)) {
-        HomeHero(state = state, staff = staff, onLoggedOut = { viewModel.logout(); onLoggedOut() })
-
-        Spacer(Modifier.height(20.dp))
-        Text(
-            "Aplikasi Anda",
-            modifier = Modifier.padding(horizontal = 20.dp),
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold,
-            color = SukaOnSurface,
-        )
-        Spacer(Modifier.height(12.dp))
-
-        val tiles = listOf(
-            ModuleTile("Absensi", "Presensi wajah, checklist, cuti & kasbon", Icons.Default.Schedule, true, onOpenAbsensi),
-        )
-
-        ModuleGrid(tiles)
-    }
-}
-
-@Composable
-private fun HomeHero(state: HomeUiState, staff: com.sukashawarma.superapp.domain.model.StaffProfile?, onLoggedOut: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp))
-            .background(Brush.linearGradient(colors = listOf(SukaOrange, SukaPrimaryContainer)))
-    ) {
-        // Aksen dekoratif — lingkaran lembut di pojok, meniru "blur" pada desain tanpa
-        // biaya render blur sungguhan (cukup gradient radial pudar).
-        Box(
-            modifier = Modifier
-                .size(140.dp)
-                .align(Alignment.TopEnd)
-                .offset(x = 40.dp, y = (-40).dp)
-                .background(
-                    Brush.radialGradient(colors = listOf(Color.White.copy(alpha = 0.22f), Color.Transparent)),
-                    CircleShape,
+    Column(Modifier.fillMaxSize().background(SukaSurface).verticalScroll(rememberScrollState())) {
+        HomeHero(state, staff, { viewModel.logout(); onLoggedOut() })
+        AttendanceSummaryCard(state)
+        Column(Modifier.padding(horizontal = 20.dp)) {
+            Spacer(Modifier.height(24.dp))
+            Text("Aplikasi Anda", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = SukaOnSurface)
+            Spacer(Modifier.height(4.dp))
+            Text("Semua kebutuhan operasional dalam satu tempat", fontSize = 12.sp, color = SukaOnSurfaceVariant)
+            Spacer(Modifier.height(14.dp))
+            ModuleCard(
+                ModuleTile(
+                    "Absensi",
+                    "Presensi wajah, checklist, cuti & kasbon",
+                    Icons.Default.Fingerprint,
+                    onOpenAbsensi,
+                    listOf(
+                        Triple("PRESENSI", "Biometrik", SukaOnSurface),
+                        Triple("CHECKLIST", "Tersedia", Color(0xFFEA580C)),
+                        Triple("CUTI", "Tersedia", Color(0xFF168451)),
+                    ),
                 )
-        )
-
-        Column(modifier = Modifier.padding(20.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier.size(56.dp).clip(CircleShape).background(Color.White),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        staff?.name?.firstOrNull()?.uppercase() ?: "?",
-                        color = SukaOrange,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 22.sp,
+            )
+            if (staff?.role in STOK_ROLES) {
+                Spacer(Modifier.height(14.dp))
+                ModuleCard(
+                    ModuleTile(
+                        "Stok",
+                        "Pantau saldo bahan, riwayat mutasi & estimasi produksi",
+                        Icons.Default.Inventory2,
+                        onOpenStok,
+                        listOf(
+                            Triple("MONITORING", "Realtime", SukaOnSurface),
+                            Triple("RIWAYAT", "Tersedia", Color(0xFFEA580C)),
+                            Triple("PRODUKSI", "Estimasi", Color(0xFF168451)),
+                        ),
                     )
-                }
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("${state.greeting}, ${staff?.name ?: ""}", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                    Spacer(Modifier.height(2.dp))
-                    Text(staff?.outletName ?: "Semua Outlet", color = Color.White.copy(alpha = 0.85f), fontSize = 13.sp)
-                }
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.2f)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    IconButton(onClick = onLoggedOut) {
-                        Icon(Icons.Default.Logout, contentDescription = "Keluar", tint = Color.White)
-                    }
-                }
+                )
             }
-
-            Spacer(Modifier.height(16.dp))
-            Text(state.dateLabel, color = Color.White.copy(alpha = 0.85f), fontSize = 13.sp)
-            Spacer(Modifier.height(10.dp))
-            AttendanceStatusPill(state)
+            Spacer(Modifier.height(28.dp))
         }
     }
 }
 
 @Composable
-private fun AttendanceStatusPill(state: HomeUiState) {
-    val att = state.todayAttendance
-    val (bg, icon, label) = when {
-        state.loadingAttendance -> Triple(Color.White.copy(alpha = 0.22f), Icons.Default.WatchLater, "Memuat status absen...")
-        att == null -> Triple(StatusRed, Icons.Default.ErrorOutline, "Belum Absen Masuk")
-        att.type == "in" -> Triple(StatusEmerald, Icons.Default.CheckCircle, "Absen Masuk tercatat")
-        else -> Triple(StatusAmber, Icons.Default.CheckCircle, "Absen Pulang tercatat")
-    }
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(bg.copy(alpha = 0.9f))
-            .padding(horizontal = 14.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-        Spacer(Modifier.width(6.dp))
-        Text(label, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+private fun HomeHero(state: HomeUiState, staff: com.sukashawarma.superapp.domain.model.StaffProfile?, onLoggedOut: () -> Unit) {
+    Box(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Color(0xFFEA580C), Color(0xFFF97316), SukaSurface)))) {
+        Box(Modifier.size(220.dp).align(Alignment.TopEnd).offset(x = 72.dp, y = (-78).dp).background(Color.White.copy(alpha = 0.10f), CircleShape))
+        Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 24.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(shape = RoundedCornerShape(50), color = Color.White.copy(alpha = 0.22f)) {
+                    Row(Modifier.padding(start = 6.dp, end = 10.dp, top = 5.dp, bottom = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("SUKA", Modifier.background(Color.White, RoundedCornerShape(50)).padding(horizontal = 10.dp, vertical = 4.dp), color = Color(0xFFEA580C), fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 0.8.sp)
+                        Spacer(Modifier.width(6.dp))
+                        Box(Modifier.size(6.dp).background(Color(0xFF34D399), CircleShape))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Online", color = Color.White.copy(alpha = 0.92f), fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+                Spacer(Modifier.weight(1f))
+                Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.18f)) {
+                    IconButton(onClick = onLoggedOut) { Icon(Icons.Default.Logout, "Keluar", tint = Color.White, modifier = Modifier.size(17.dp)) }
+                }
+            }
+            Spacer(Modifier.height(18.dp))
+            Surface(shape = RoundedCornerShape(18.dp), color = Color.White.copy(alpha = 0.12f), border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f))) {
+                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(54.dp).background(Color.White, RoundedCornerShape(15.dp)), contentAlignment = Alignment.Center) {
+                        Text(staff?.name?.firstOrNull()?.uppercase() ?: "?", color = Color(0xFFEA580C), fontSize = 23.sp, fontWeight = FontWeight.ExtraBold)
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("${state.greeting},", color = Color(0xFFFFEDD5), fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                        Text(staff?.name ?: "Pengguna", color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.LocationOn, null, tint = Color(0xFFFFD5B5), modifier = Modifier.size(12.dp))
+                            Spacer(Modifier.width(3.dp))
+                            Text(staff?.outletName ?: "Semua Outlet", color = Color(0xFFFFEDD5), fontSize = 11.sp)
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
 @Composable
-private fun ModuleGrid(tiles: List<ModuleTile>) {
-    Column(modifier = Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        tiles.forEach { tile -> ModuleCard(tile) }
+private fun AttendanceSummaryCard(state: HomeUiState) {
+    val att = state.todayAttendance
+    val status = when {
+        state.loadingAttendance -> Triple(Icons.Default.WatchLater, Color(0xFF64748B), "Memuat status")
+        att == null -> Triple(Icons.Default.ErrorOutline, Color(0xFFDC2626), "Belum absen masuk")
+        att.type == "in" -> Triple(Icons.Default.CheckCircle, Color(0xFF168451), "Absen masuk")
+        else -> Triple(Icons.Default.CheckCircle, Color(0xFFC27A12), "Absen pulang")
+    }
+    Surface(Modifier.padding(horizontal = 20.dp).offset(y = (-8).dp), shape = RoundedCornerShape(24.dp), color = Color.White, border = BorderStroke(1.dp, Color(0xFFF1F5F9)), shadowElevation = 5.dp) {
+        Column(Modifier.padding(16.dp)) {
+            Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.CalendarToday, null, tint = Color(0xFFF97316), modifier = Modifier.size(15.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(state.dateLabel, Modifier.weight(1f), color = SukaOnSurface, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Surface(shape = RoundedCornerShape(8.dp), color = Color(0xFFFFF7ED), border = BorderStroke(1.dp, Color(0xFFFFEDD5))) {
+                    Text("Hari ini", Modifier.padding(horizontal = 9.dp, vertical = 5.dp), color = Color(0xFFC2410C), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+            HorizontalDivider(color = Color(0xFFF1F5F9))
+            Spacer(Modifier.height(14.dp))
+            Row(verticalAlignment = Alignment.Top) {
+                Box(Modifier.size(40.dp).background(status.second.copy(alpha = 0.10f), RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
+                    Icon(status.first, null, tint = status.second, modifier = Modifier.size(20.dp))
+                }
+                Spacer(Modifier.width(11.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(status.third, color = SukaOnSurface, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold)
+                    Text(if (att == null) "Jangan lupa catat kehadiranmu hari ini" else "Kehadiranmu hari ini sudah tercatat", color = SukaOnSurfaceVariant, fontSize = 11.sp, lineHeight = 16.sp)
+                }
+            }
+            Spacer(Modifier.height(13.dp))
+            Text("Jaga kedisiplinan dan tetap semangat hari ini.", Modifier.fillMaxWidth().background(Color(0xFFF8FAFC), RoundedCornerShape(12.dp)).padding(11.dp), color = Color(0xFF64748B), fontSize = 10.sp, lineHeight = 15.sp)
+        }
     }
 }
 
@@ -179,40 +196,36 @@ private fun ModuleGrid(tiles: List<ModuleTile>) {
 private fun ModuleCard(tile: ModuleTile) {
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
-    // Micro-interaction: kartu sedikit mengecil saat ditekan — sentuhan modern yang sama
-    // dipakai di elemen interaktif lain (mesh wajah, bingkai kamera) di app ini.
-    val scale by animateFloatAsState(if (pressed) 0.98f else 1f, tween(120), label = "moduleCardScale")
-    val borderColor by animateColorAsState(
-        if (pressed) SukaOrange.copy(alpha = 0.4f) else SukaSurfaceContainer,
-        tween(120),
-        label = "moduleCardBorder",
-    )
-
-    Card(
-        onClick = tile.onClick,
-        enabled = tile.enabled,
-        modifier = Modifier
-            .fillMaxWidth()
-            .scale(scale),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = SukaSurfaceContainerLowest),
-        border = BorderStroke(1.dp, borderColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-        interactionSource = interactionSource,
-    ) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(SukaSurfaceContainer),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(tile.icon, contentDescription = null, tint = SukaOrange)
+    val scale by animateFloatAsState(if (pressed) 0.975f else 1f, tween(120), label = "moduleCardScale")
+    Card(onClick = tile.onClick, Modifier.fillMaxWidth().graphicsLayer(scaleX = scale, scaleY = scale), shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = Color.White), border = BorderStroke(1.dp, Color(0xFFF1F5F9)), elevation = CardDefaults.cardElevation(defaultElevation = 3.dp), interactionSource = interactionSource) {
+        Column(Modifier.padding(18.dp)) {
+            Row(Modifier.fillMaxWidth().padding(bottom = 15.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(56.dp).background(Brush.linearGradient(listOf(Color(0xFFFFF7ED), Color(0xFFFFEDD5))), RoundedCornerShape(17.dp)), contentAlignment = Alignment.Center) {
+                    Icon(tile.icon, null, tint = Color(0xFFEA580C), modifier = Modifier.size(29.dp))
+                }
+                Spacer(Modifier.width(13.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(tile.label, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = SukaOnSurface)
+                    Spacer(Modifier.height(3.dp))
+                    Text(tile.desc, fontSize = 11.sp, lineHeight = 15.sp, color = Color(0xFF64748B))
+                }
+                Surface(shape = CircleShape, color = Color(0xFFF8FAFC), border = BorderStroke(1.dp, Color(0xFFF1F5F9)), modifier = Modifier.size(36.dp)) {
+                    Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.ArrowForward, "Buka ${tile.label}", tint = Color(0xFF94A3B8), modifier = Modifier.size(17.dp)) }
+                }
             }
-            Spacer(Modifier.width(14.dp))
-            Column {
-                Text(tile.label, fontWeight = FontWeight.Bold, color = SukaOnSurface, fontSize = 15.sp)
-                Spacer(Modifier.height(2.dp))
-                Text(tile.desc, fontSize = 13.sp, color = SukaOnSurfaceVariant)
+            HorizontalDivider(color = Color(0xFFF1F5F9))
+            Row(Modifier.fillMaxWidth().padding(top = 13.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+                tile.stats.forEach { (label, value, color) -> LauncherStat(label, value, color) }
             }
         }
+    }
+}
+
+@Composable
+private fun LauncherStat(label: String, value: String, color: Color) {
+    Column(Modifier.widthIn(min = 72.dp), horizontalAlignment = Alignment.Start) {
+        Text(label, color = Color(0xFF94A3B8), fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.7.sp)
+        Spacer(Modifier.height(3.dp))
+        Text(value, color = color, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
     }
 }
