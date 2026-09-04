@@ -1,5 +1,6 @@
 package com.sukashawarma.superapp.feature.stok.data.model
 
+import com.sukashawarma.superapp.feature.stok.domain.StatusTopUp
 import com.sukashawarma.superapp.feature.stok.domain.UnitMeta
 
 // ------------------------------------------------------------------- ledger
@@ -226,6 +227,25 @@ data class BudgetStatus(
     val sisa: Double,
     val hasConfig: Boolean,
     val customDays: Int?,
+)
+
+/**
+ * Satu pengajuan top-up saldo outlet — cermin baris `outlet_budget_topup_requests`.
+ * Alurnya dua tahap: diajukan (`pending_am`) → disetujui AM (`pending_finance`) →
+ * disetujui Finance (`approved`), atau ditolak di tahap mana pun.
+ */
+data class TopUpRequest(
+    val id: String,
+    val outletId: String,
+    val nominal: Double,
+    /** `weekday` atau `weekend`. */
+    val kategoriPeriode: String,
+    val status: StatusTopUp,
+    val pemohonNama: String?,
+    val amNama: String?,
+    val financeNama: String?,
+    val catatan: String?,
+    val createdAt: String?,
 )
 
 /**
