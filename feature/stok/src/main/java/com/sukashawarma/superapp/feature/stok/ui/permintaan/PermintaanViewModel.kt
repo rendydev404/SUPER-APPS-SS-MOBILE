@@ -6,15 +6,24 @@ import com.sukashawarma.superapp.domain.session.AppSession
 import com.sukashawarma.superapp.feature.stok.data.PermintaanRepository
 import com.sukashawarma.superapp.feature.stok.data.StokRepository
 import com.sukashawarma.superapp.feature.stok.data.model.BahanBaku
+import com.sukashawarma.superapp.feature.stok.data.model.BudgetStatus
 import com.sukashawarma.superapp.feature.stok.data.model.CrosscheckSaldo
+import com.sukashawarma.superapp.feature.stok.data.model.EstimasiKeranjang
 import com.sukashawarma.superapp.feature.stok.data.model.OutletRingkas
 import com.sukashawarma.superapp.feature.stok.data.model.Permintaan
 import com.sukashawarma.superapp.feature.stok.data.model.SaranPermintaan
 import com.sukashawarma.superapp.feature.stok.data.model.StatusPermintaan
 import com.sukashawarma.superapp.feature.stok.domain.Approver
+import com.sukashawarma.superapp.feature.stok.domain.Budget
 import com.sukashawarma.superapp.feature.stok.domain.DistribusiUnit
 import com.sukashawarma.superapp.feature.stok.domain.KatalogPermintaan
+import com.sukashawarma.superapp.feature.stok.domain.formatRupiah
 import com.sukashawarma.superapp.feature.stok.domain.stokErrorMessage
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -25,13 +34,6 @@ enum class TabPermintaan(val label: String) { BUAT("Buat Baru"), RIWAYAT("Riwaya
 
 /** Satu baris keranjang yang sudah diresolusikan ke master bahannya. */
 data class BarisKeranjang(val bahan: BahanBaku, val qty: Long)
-
-/** Rincian estimasi nilai keranjang — padanan `estimateCartValue` web, dihitung lokal. */
-data class EstimasiKeranjang(
-    val totalNilai: Double = 0.0,
-    val itemTanpaHarga: List<String> = emptyList(),
-    val kategoriNilai: Map<String, Double> = emptyMap(),
-)
 
 data class PermintaanUiState(
     val memuat: Boolean = true,
@@ -52,8 +54,19 @@ data class PermintaanUiState(
     val saran: List<SaranPermintaan> = emptyList(),
     val daftarOutlet: List<Permintaan> = emptyList(),
     val daftarReview: List<Permintaan> = emptyList(),
-    /** Kosong bila RLS menolak (role tanpa hak harga) — estimasi disembunyikan. */
-    val hargaBeli: Map<String, Double> = emptyMap(),
+    // ---- nilai & budget (semua dihitung di database; null/kosong = tak tersedia)
+    /** Estimasi keranjang saat ini, diperbarui dengan debounce seperti web. */
+    val estimasi: EstimasiKeranjang = EstimasiKeranjang(),
+    /** Budget outlet terpilih (mode outlet). */
+    val budget: BudgetStatus? = null,
+    /** Budget per outlet untuk kartu antrean & layar persetujuan (mode pengawas). */
+    val budgetPerOutlet: Map<String, BudgetStatus> = emptyMap(),
+    /** permintaanId -> estimasi nilai item yang diminta, untuk badge ringkas kartu antrean. */
+    val estimasiPerPermintaan: Map<String, Double> = emptyMap(),
+    /** Estimasi hidup dari qty yang sedang disetujui di layar persetujuan. */
+    val estimasiSetuju: EstimasiKeranjang = EstimasiKeranjang(),
+    val topUpTerbuka: Boolean = false,
+    val mengajukanTopUp: Boolean = false,
     // ---- katalog (tab Buat)
     val tab: TabPermintaan = TabPermintaan.BUAT,
     val cari: String = "",
@@ -140,27 +153,6 @@ data class PermintaanUiState(
                 .mapNotNull { (id, qty) -> peta[id]?.let { BarisKeranjang(it, qty) } }
         }
 
-    /** Estimasi Rupiah keranjang: qty distribusi × harga beli, seperti web. */
-    val estimasi: EstimasiKeranjang
-        get() {
-            if (hargaBeli.isEmpty()) return EstimasiKeranjang()
-            var total = 0.0
-            val tanpaHarga = mutableListOf<String>()
-            val perKategori = LinkedHashMap<String, Double>()
-            keranjangItems.forEach { baris ->
-                val harga = hargaBeli[baris.bahan.id]
-                if (harga == null) {
-                    tanpaHarga += baris.bahan.id
-                } else {
-                    val sub = harga * baris.qty
-                    total += sub
-                    val kat = baris.bahan.kategori ?: "LAIN-LAIN"
-                    perKategori[kat] = (perKategori[kat] ?: 0.0) + sub
-                }
-            }
-            return EstimasiKeranjang(total, tanpaHarga, perKategori)
-        }
-
     val riwayatTerfilter: List<Permintaan>
         get() = daftarOutlet.filter { p ->
             if (filterStatus != null && p.status != filterStatus) return@filter false
@@ -221,6 +213,7 @@ class PermintaanViewModel : ViewModel() {
         _state.value = _state.value.copy(
             outletTerpilih = outlet, daftarOutlet = emptyList(),
             saran = emptyList(), keranjang = emptyMap(),
+            estimasi = EstimasiKeranjang(), budget = null,
         )
         viewModelScope.launch { muatData() }
     }
@@ -239,28 +232,147 @@ class PermintaanViewModel : ViewModel() {
         _state.value = s.copy(memuat = true, error = null)
         try {
             val katalog = PermintaanRepository.bahanBaku()
-            // Harga beli hanya terbuka untuk role tertentu; kegagalan = fitur estimasi
-            // tidak tersedia, bukan error layar.
-            val harga = runCatching { PermintaanRepository.hargaBeli() }.getOrDefault(emptyMap())
             if (s.modeAntrean) {
+                val antrean = PermintaanRepository.menunggu(s.outlets.map { it.id })
                 _state.value = _state.value.copy(
-                    memuat = false, katalog = katalog, hargaBeli = harga,
-                    daftarReview = PermintaanRepository.menunggu(s.outlets.map { it.id }),
+                    memuat = false, katalog = katalog, daftarReview = antrean,
                 )
+                muatBudgetAntrean(antrean, katalog.associateBy { it.id })
             } else {
                 _state.value = _state.value.copy(
-                    memuat = false, katalog = katalog, hargaBeli = harga,
+                    memuat = false, katalog = katalog,
                     saran = PermintaanRepository.saran(outlet.id),
                     daftarOutlet = PermintaanRepository.daftarOutlet(outlet.id),
                 )
+                muatBudgetOutlet(outlet.id)
             }
         } catch (e: Exception) {
             _state.value = _state.value.copy(memuat = false, error = stokErrorMessage(e))
         }
     }
 
-    fun muatUlang() {
-        viewModelScope.launch { muatData() }
+    // ------------------------------------------------------------ nilai & budget
+    //
+    // Budget dan estimasi adalah lapisan visual di atas data utama — web menandainya
+    // "Tahap Developer (Bisa Diabaikan)". Kegagalannya (RPC belum ada, outlet tanpa
+    // plafon) tidak boleh menggagalkan layar, jadi semuanya dibungkus runCatching dan
+    // ketiadaan data berarti badge disembunyikan.
+
+    private suspend fun muatBudgetOutlet(outletId: String) {
+        val budget = runCatching { PermintaanRepository.budgetStatus(outletId) }.getOrNull()
+        if (_state.value.outletTerpilih?.id == outletId) {
+            _state.value = _state.value.copy(budget = budget)
+        }
+    }
+
+    /**
+     * Budget tiap outlet yang punya antrean, lalu estimasi nilai item yang diminta per
+     * permintaan — hanya untuk outlet ber-plafon, sama seperti `ApprovalCardBudget` web.
+     */
+    private suspend fun muatBudgetAntrean(antrean: List<Permintaan>, bahanMap: Map<String, BahanBaku>) {
+        // Paralel, bukan berurutan: antrean lintas outlet bisa berisi puluhan permintaan
+        // dan versi berurutan membuat badge baru lengkap belasan detik setelah daftar tampil.
+        val perOutlet = coroutineScope {
+            antrean.map { it.outletId }.distinct()
+                .map { id -> async { runCatching { PermintaanRepository.budgetStatus(id) }.getOrNull()?.let { id to it } } }
+                .awaitAll()
+        }.filterNotNull().toMap()
+        _state.value = _state.value.copy(budgetPerOutlet = perOutlet)
+
+        val estimasi = coroutineScope {
+            antrean
+                .filter { perOutlet[it.outletId]?.hasConfig == true && it.items.isNotEmpty() }
+                .map { p ->
+                    async {
+                        val items = p.items.map { item ->
+                            item.bahanBakuId to qtyDistribusiBulat(item.qtyDiminta, bahanMap[item.bahanBakuId])
+                        }
+                        runCatching { PermintaanRepository.estimasiNilai(items) }.getOrNull()
+                            ?.let { p.id to it.totalNilai }
+                    }
+                }
+                .awaitAll()
+        }.filterNotNull().toMap()
+        _state.value = _state.value.copy(estimasiPerPermintaan = estimasi)
+    }
+
+    /** qty satuan besar -> satuan distribusi dibulatkan ke atas, seperti tampilan web. */
+    private fun qtyDistribusiBulat(qtyBase: Double, bahan: BahanBaku?): Double =
+        if (bahan != null) ceil(DistribusiUnit.keDistribusi(qtyBase, bahan.faktorDistribusi))
+        else qtyBase
+
+    private var estimasiJob: Job? = null
+
+    /** Estimasi keranjang dengan debounce 500 ms — cermin efek di PermintaanForm. */
+    private fun jadwalkanEstimasi() {
+        estimasiJob?.cancel()
+        val items = _state.value.keranjangItems.map { it.bahan.id to it.qty.toDouble() }
+        if (items.isEmpty()) {
+            _state.value = _state.value.copy(estimasi = EstimasiKeranjang())
+            return
+        }
+        estimasiJob = viewModelScope.launch {
+            delay(500)
+            val hasil = runCatching { PermintaanRepository.estimasiNilai(items) }.getOrNull() ?: return@launch
+            _state.value = _state.value.copy(estimasi = hasil)
+        }
+    }
+
+    private var estimasiSetujuJob: Job? = null
+
+    /** Estimasi hidup qty disetujui dengan debounce 400 ms — cermin efek di ApprovalModal. */
+    private fun jadwalkanEstimasiSetuju() {
+        estimasiSetujuJob?.cancel()
+        val p = _state.value.approveUntuk ?: return
+        val items = p.items
+            .map { it.bahanBakuId to (_state.value.qtySetuju[it.bahanBakuId] ?: 0L).toDouble() }
+            .filter { it.second > 0.0 }
+        if (items.isEmpty()) {
+            _state.value = _state.value.copy(estimasiSetuju = EstimasiKeranjang())
+            return
+        }
+        estimasiSetujuJob = viewModelScope.launch {
+            delay(400)
+            val hasil = runCatching { PermintaanRepository.estimasiNilai(items) }.getOrNull() ?: return@launch
+            if (_state.value.approveUntuk?.id == p.id) {
+                _state.value = _state.value.copy(estimasiSetuju = hasil)
+            }
+        }
+    }
+
+    fun bukaTopUp() { _state.value = _state.value.copy(topUpTerbuka = true) }
+    fun tutupTopUp() { _state.value = _state.value.copy(topUpTerbuka = false) }
+
+    /**
+     * Ajukan top-up plafon. Validasi nominal & batas maksimal mengikuti
+     * `RequestTopUpModal` web; database mengulang pemeriksaan yang sama.
+     */
+    fun ajukanTopUp(nominal: Long, kategoriPeriode: String) {
+        val s = _state.value
+        val outlet = s.outletTerpilih ?: return
+        val budget = s.budget ?: return
+        if (nominal <= 0L) {
+            _state.value = s.copy(pesan = "Nominal tidak valid.")
+            return
+        }
+        val maks = Budget.maksTopUp(budget.nominal, budget.sisa)
+        if (nominal > maks) {
+            _state.value = s.copy(pesan = "Maksimal top-up adalah ${formatRupiah(maks)}.")
+            return
+        }
+        viewModelScope.launch {
+            _state.value = _state.value.copy(mengajukanTopUp = true, error = null, pesan = null)
+            try {
+                PermintaanRepository.ajukanTopUp(outlet.id, nominal.toDouble(), kategoriPeriode)
+                _state.value = _state.value.copy(
+                    mengajukanTopUp = false, topUpTerbuka = false,
+                    pesan = "Permintaan top-up berhasil diajukan.",
+                )
+                muatBudgetOutlet(outlet.id)
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(mengajukanTopUp = false, error = stokErrorMessage(e))
+            }
+        }
     }
 
     // ------------------------------------------------------------------ katalog
@@ -283,6 +395,7 @@ class PermintaanViewModel : ViewModel() {
         val baru = (k[bahanBakuId] ?: 0L) + delta
         if (baru <= 0L) k.remove(bahanBakuId) else k[bahanBakuId] = baru
         _state.value = _state.value.copy(keranjang = k)
+        jadwalkanEstimasi()
     }
 
     fun setKeranjang(bahanBakuId: String, nilai: String) {
@@ -291,6 +404,7 @@ class PermintaanViewModel : ViewModel() {
         val qty = nilai.toLongOrNull() ?: 0L
         if (qty <= 0L) k.remove(bahanBakuId) else k[bahanBakuId] = qty
         _state.value = _state.value.copy(keranjang = k)
+        jadwalkanEstimasi()
     }
 
     /** Masukkan bahan kritis dengan qty rekomendasi (kekurangan menuju threshold). */
@@ -301,6 +415,7 @@ class PermintaanViewModel : ViewModel() {
         _state.value = _state.value.copy(
             keranjang = _state.value.keranjang + (s.bahanBakuId to qty)
         )
+        jadwalkanEstimasi()
     }
 
     /** 1 klik: semua bahan kritis yang belum ada di keranjang — cermin `addAllCriticalItems`. */
@@ -315,6 +430,7 @@ class PermintaanViewModel : ViewModel() {
             k[saran.bahanBakuId] = KatalogPermintaan.saranQtyDistribusi(kurang, bahan.faktorDistribusi)
         }
         _state.value = s.copy(keranjang = k)
+        jadwalkanEstimasi()
     }
 
     fun bukaTinjau() { _state.value = _state.value.copy(tinjauTerbuka = true) }
@@ -364,9 +480,10 @@ class PermintaanViewModel : ViewModel() {
                         )
                     },
                 )
+                estimasiJob?.cancel()
                 _state.value = _state.value.copy(
                     mengirim = false, konfirmasiTerbuka = false, tinjauTerbuka = false,
-                    keranjang = emptyMap(), tab = TabPermintaan.RIWAYAT,
+                    keranjang = emptyMap(), estimasi = EstimasiKeranjang(), tab = TabPermintaan.RIWAYAT,
                     pesan = "Permintaan berhasil dikirim (${items.size} item bahan baku). Menunggu persetujuan.",
                 )
                 muatData()
@@ -407,7 +524,9 @@ class PermintaanViewModel : ViewModel() {
         _state.value = s.copy(
             approveUntuk = p, qtySetuju = awal, memuatCrosscheck = true,
             stokOutlet = emptyMap(), stokGudang = emptyMap(), kebutuhanTarget = emptyMap(),
+            estimasiSetuju = EstimasiKeranjang(),
         )
+        jadwalkanEstimasiSetuju()
         viewModelScope.launch {
             // Gudang Pusat dicari dari daftar outlet accessible — approver memegang
             // semua outlet. Bila tak ketemu, kolom stok gudang tidak ditampilkan.
@@ -433,9 +552,11 @@ class PermintaanViewModel : ViewModel() {
     }
 
     fun tutupApprove() {
+        estimasiSetujuJob?.cancel()
         _state.value = _state.value.copy(
             approveUntuk = null, qtySetuju = emptyMap(),
             stokOutlet = emptyMap(), stokGudang = emptyMap(), kebutuhanTarget = emptyMap(),
+            estimasiSetuju = EstimasiKeranjang(),
         )
     }
 
@@ -443,6 +564,7 @@ class PermintaanViewModel : ViewModel() {
         val q = _state.value.qtySetuju.toMutableMap()
         q[bahanBakuId] = ((q[bahanBakuId] ?: 0L) + delta).coerceAtLeast(0L)
         _state.value = _state.value.copy(qtySetuju = q)
+        jadwalkanEstimasiSetuju()
     }
 
     fun setQtySetuju(bahanBakuId: String, nilai: String) {
@@ -450,6 +572,7 @@ class PermintaanViewModel : ViewModel() {
         _state.value = _state.value.copy(
             qtySetuju = _state.value.qtySetuju + (bahanBakuId to (nilai.toLongOrNull() ?: 0L))
         )
+        jadwalkanEstimasiSetuju()
     }
 
     /** Qty disetujui satu bahan pada satuan besar — untuk banding stok gudang & kirim RPC. */
@@ -498,8 +621,10 @@ class PermintaanViewModel : ViewModel() {
             _state.value = _state.value.copy(mengirim = true, error = null, pesan = null)
             try {
                 PermintaanRepository.setujui(p.id, items)
+                estimasiSetujuJob?.cancel()
                 _state.value = _state.value.copy(
                     mengirim = false, approveUntuk = null, qtySetuju = emptyMap(),
+                    estimasiSetuju = EstimasiKeranjang(),
                     pesan = "Permintaan disetujui dan surat jalan dibuat.",
                 )
                 muatData()
@@ -519,8 +644,10 @@ class PermintaanViewModel : ViewModel() {
             _state.value = _state.value.copy(mengirim = true, error = null, pesan = null)
             try {
                 PermintaanRepository.tolak(p.id, alasan.trim())
+                estimasiSetujuJob?.cancel()
                 _state.value = _state.value.copy(
                     mengirim = false, approveUntuk = null, qtySetuju = emptyMap(),
+                    estimasiSetuju = EstimasiKeranjang(),
                     pesan = "Permintaan ditolak.",
                 )
                 muatData()
