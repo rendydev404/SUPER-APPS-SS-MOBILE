@@ -131,7 +131,7 @@ feature/distribusi/src/main/java/…/feature/distribusi/
     model/DistribusiModels.kt  SuratJalan, SuratJalanItem, TandaTangan, OutletRingkas
     SuratJalanRepository.kt    baca daftar & detail, tulis verifikasi, panggil RPC
     FotoBuktiStore.kt          kompres, unggah, dan ambil kembali foto bukti
-    VerifikasiDraftStore.kt    DataStore: draft verifikasi + status unlock QR
+    VerifikasiDraftStore.kt    Simpanan lokal: draft verifikasi + status unlock QR
   domain/
     DistribusiAkses.kt         role -> kemampuan (tabel di §3)
     SatuanDistribusi.kt        konversi satuan dasar <-> satuan distribusi
@@ -154,7 +154,7 @@ Dependensi baru pada `feature/distribusi/build.gradle.kts`:
 ```
 com.google.mlkit:barcode-scanning:17.2.0     gerbang QR
 androidx.camera:camera-*                     pratinjau kamera (versi sama dengan :core:camera)
-androidx.datastore:datastore-preferences:1.0.0   draft verifikasi
+SharedPreferences (android.content)             draft verifikasi & penanda unlock — pola sama dengan AuthPrefs
 project(":core:storage")                     unggah foto bukti
 project(":core:network")                     Postgrest, SupabaseClient
 project(":core:roles")                       AppSession, Role
@@ -257,7 +257,7 @@ Penolakan yang harus ditangani:
 | Izin kamera ditolak | Layar tetap berguna: sembunyikan pratinjau, tonjolkan kode manual |
 | Perangkat tanpa kamera belakang | Sama dengan di atas |
 
-Sukses menyimpan penanda unlock ke DataStore
+Sukses menyimpan penanda unlock ke simpanan lokal terenkripsi
 (`unlock_verifikasi_<surat_jalan_id> = true`) lalu membuka layar verifikasi.
 Penanda ini bertahan setelah app ditutup, sama seperti `localStorage` di web, dan
 dihapus setelah finalisasi berhasil.
@@ -306,7 +306,7 @@ Karena bucket privat, menampilkan foto memakai
 `SupabaseClient.okHttpClient`, yang interseptornya sudah menyisipkan token
 pengguna. Tidak perlu signed URL dan tidak perlu API baru.
 
-**Draft lokal.** Setiap perubahan menulis ke DataStore: peta `item_id` ke
+**Draft lokal.** Setiap perubahan menulis ke simpanan lokal: peta `item_id` ke
 (qty terima, kondisi, catatan, foto_path), indeks item aktif, langkah aktif, dan
 penanda kondisi terkonfirmasi. Saat layar dibuka ulang, draft dipulihkan dan
 pratinjau foto diambil ulang dari `foto_path` yang tersimpan. Foto tidak
@@ -431,7 +431,7 @@ Tiga saja, semuanya di lapisan tampilan dan tidak satu pun mengubah data:
 2. **Daftar bergulir, bukan paginasi bertombol.** Paginasi 8 baris milik web
    adalah pola desktop.
 3. **Draft bertahan lebih baik.** Web menyimpan draft di `localStorage` yang bisa
-   hilang bersama tab; native menyimpannya di DataStore yang bertahan sampai
+   hilang bersama tab; native menyimpannya di simpanan lokal yang bertahan sampai
    finalisasi berhasil.
 
 ## 10. Di luar lingkup Fase 1
