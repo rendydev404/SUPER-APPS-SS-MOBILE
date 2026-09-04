@@ -13,7 +13,10 @@ import com.sukashawarma.superapp.feature.stok.data.model.OutletRingkas
 import com.sukashawarma.superapp.feature.stok.data.model.Permintaan
 import com.sukashawarma.superapp.feature.stok.data.model.SaranPermintaan
 import com.sukashawarma.superapp.feature.stok.data.model.StatusPermintaan
+import com.sukashawarma.superapp.feature.stok.data.model.TopUpRequest
 import com.sukashawarma.superapp.feature.stok.domain.Approver
+import com.sukashawarma.superapp.feature.stok.domain.Budget
+import com.sukashawarma.superapp.feature.stok.domain.formatRupiah
 import com.sukashawarma.superapp.feature.stok.domain.DistribusiUnit
 import com.sukashawarma.superapp.feature.stok.domain.KatalogPermintaan
 import com.sukashawarma.superapp.feature.stok.domain.stokErrorMessage
@@ -63,6 +66,12 @@ data class PermintaanUiState(
     val estimasiPerPermintaan: Map<String, Double> = emptyMap(),
     /** Estimasi hidup dari qty yang sedang disetujui di layar persetujuan. */
     val estimasiSetuju: EstimasiKeranjang = EstimasiKeranjang(),
+    // ---- top-up saldo
+    val topUpTerbuka: Boolean = false,
+    val daftarTopUp: List<TopUpRequest> = emptyList(),
+    val memprosesTopUp: Boolean = false,
+    val bolehApproveAm: Boolean = false,
+    val bolehApproveFinance: Boolean = false,
     // ---- katalog (tab Buat)
     val tab: TabPermintaan = TabPermintaan.BUAT,
     val cari: String = "",
@@ -186,6 +195,8 @@ class PermintaanViewModel : ViewModel() {
                 modeAntrean = Approver.bolehReviewPermintaan(role) || Approver.bolehApprovePermintaan(role),
                 bolehApprove = Approver.bolehApprovePermintaan(role),
                 katalogPenuh = KatalogPermintaan.katalogPenuh(role),
+                bolehApproveAm = Budget.bolehApproveAm(role),
+                bolehApproveFinance = Budget.bolehApproveFinance(role),
             )
             try {
                 val outlets = StokRepository.accessibleOutlets()
@@ -256,8 +267,15 @@ class PermintaanViewModel : ViewModel() {
 
     private suspend fun muatBudgetOutlet(outletId: String) {
         val budget = runCatching { PermintaanRepository.budgetStatus(outletId) }.getOrNull()
+        // Riwayat top-up hanya relevan bila outlet punya plafon — sama seperti
+        // OutletTopUpRequests web yang tidak dirender saat hasConfig false.
+        val topUp = if (budget?.hasConfig == true) {
+            runCatching { PermintaanRepository.daftarTopUp(outletId) }.getOrDefault(emptyList())
+        } else {
+            emptyList()
+        }
         if (_state.value.outletTerpilih?.id == outletId) {
-            _state.value = _state.value.copy(budget = budget)
+            _state.value = _state.value.copy(budget = budget, daftarTopUp = topUp)
         }
     }
 
@@ -392,6 +410,65 @@ class PermintaanViewModel : ViewModel() {
         _state.value = s.copy(keranjang = k)
         jadwalkanEstimasi()
     }
+
+    // ------------------------------------------------------------ top-up saldo
+
+    fun bukaTopUp() { _state.value = _state.value.copy(topUpTerbuka = true) }
+    fun tutupTopUp() { _state.value = _state.value.copy(topUpTerbuka = false) }
+
+    /**
+     * Ajukan top-up plafon — cermin `RequestTopUpModal` web. Nominal dan batas
+     * maksimal divalidasi di sini agar pengguna tidak menerima pesan error mentah
+     * dari database, yang mengulang pemeriksaan yang sama.
+     */
+    fun ajukanTopUp(nominal: Long, kategoriPeriode: String) {
+        val s = _state.value
+        val outlet = s.outletTerpilih ?: return
+        val budget = s.budget ?: return
+        if (nominal <= 0L) {
+            _state.value = s.copy(pesan = "Nominal tidak valid.")
+            return
+        }
+        val maks = Budget.maksTopUp(budget.nominal, budget.sisa)
+        if (nominal > maks) {
+            _state.value = s.copy(pesan = "Maksimal top-up adalah ${formatRupiah(maks)}.")
+            return
+        }
+        viewModelScope.launch {
+            _state.value = _state.value.copy(memprosesTopUp = true, error = null, pesan = null)
+            try {
+                PermintaanRepository.ajukanTopUp(outlet.id, nominal.toDouble(), kategoriPeriode)
+                _state.value = _state.value.copy(
+                    memprosesTopUp = false, topUpTerbuka = false,
+                    pesan = "Permintaan top-up berhasil diajukan.",
+                )
+                muatBudgetOutlet(outlet.id)
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(memprosesTopUp = false, error = stokErrorMessage(e))
+            }
+        }
+    }
+
+    /** `aksi`: `approve_am`, `approve_finance`, atau `reject`. */
+    fun prosesTopUp(requestId: String, aksi: String) {
+        val outlet = _state.value.outletTerpilih ?: return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(memprosesTopUp = true, error = null, pesan = null)
+            try {
+                PermintaanRepository.prosesTopUp(requestId, aksi)
+                _state.value = _state.value.copy(
+                    memprosesTopUp = false,
+                    pesan = if (aksi == "reject") "Pengajuan top-up ditolak."
+                    else "Pengajuan top-up disetujui.",
+                )
+                muatBudgetOutlet(outlet.id)
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(memprosesTopUp = false, error = stokErrorMessage(e))
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------ katalog
 
     fun bukaTinjau() { _state.value = _state.value.copy(tinjauTerbuka = true) }
     fun tutupTinjau() { _state.value = _state.value.copy(tinjauTerbuka = false) }
