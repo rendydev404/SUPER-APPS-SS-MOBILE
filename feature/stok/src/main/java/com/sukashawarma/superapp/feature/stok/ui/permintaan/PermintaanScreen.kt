@@ -64,7 +64,6 @@ import com.sukashawarma.superapp.feature.stok.data.model.SaranPermintaan
 import com.sukashawarma.superapp.feature.stok.data.model.StatusPermintaan
 import com.sukashawarma.superapp.feature.stok.domain.Budget
 import com.sukashawarma.superapp.feature.stok.domain.BudgetVarian
-import com.sukashawarma.superapp.feature.stok.domain.DistribusiUnit
 import com.sukashawarma.superapp.feature.stok.domain.formatAngkaStok
 import com.sukashawarma.superapp.feature.stok.domain.formatRupiah as formatRp
 import com.sukashawarma.superapp.feature.stok.domain.formatSatuan
@@ -81,7 +80,6 @@ import com.sukashawarma.superapp.presentation.theme.SukaOnSurface
 import com.sukashawarma.superapp.presentation.theme.SukaOnSurfaceVariant
 import com.sukashawarma.superapp.presentation.theme.SukaSurface
 import kotlin.math.ceil
-import kotlin.math.roundToLong
 
 private val Oranye = Color(0xFFEA580C)
 private val Merah = Color(0xFFDC2626)
@@ -181,10 +179,14 @@ private fun BadgeBudget(
     }
 }
 
-/** qty satuan besar -> teks satuan distribusi bulat ke atas, cermin tampilan web. */
-private fun qtyDistTeks(qtyBase: Double, bahan: BahanBaku?): String {
-    if (bahan == null) return formatAngkaStok(qtyBase)
-    return ceil(DistribusiUnit.keDistribusi(qtyBase, bahan.faktorDistribusi)).toLong().toString()
+/**
+ * Qty permintaan yang TERSIMPAN, siap tampil. Nilainya selalu pada satuan besar dan
+ * bisa pecahan bila permintaan dibuat dari web (0,2083 Dus = 5 Pack), jadi ditampilkan
+ * berjenjang — bukan dibulatkan jadi "1 Dus" yang menyesatkan.
+ */
+private fun qtyTersimpanTeks(qtyBase: Double, bahan: BahanBaku?, satuanCadangan: String?): String {
+    val meta = bahan?.meta ?: return "${formatAngkaStok(qtyBase)} ${formatSatuan(satuanCadangan)}".trim()
+    return formatTriUnitAdaptif(qtyBase, saldoIsGram = false, meta = meta)
 }
 
 @Composable
@@ -902,9 +904,8 @@ private fun KartuRiwayat(p: Permintaan, bahanMap: Map<String, BahanBaku>) {
                     Spacer(Modifier.height(4.dp))
                     p.items.forEach { item ->
                         val bahan = bahanMap[item.bahanBakuId]
-                        val satuan = formatSatuan(bahan?.satuanPesan ?: item.satuan)
-                        val diminta = qtyDistTeks(item.qtyDiminta, bahan)
-                        val disetujui = item.qtyDisetujui?.let { qtyDistTeks(it, bahan) }
+                        val diminta = qtyTersimpanTeks(item.qtyDiminta, bahan, item.satuan)
+                        val disetujui = item.qtyDisetujui?.let { qtyTersimpanTeks(it, bahan, item.satuan) }
                         Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
                             Text(
                                 item.namaBahan ?: item.bahanBakuId,
@@ -914,9 +915,9 @@ private fun KartuRiwayat(p: Permintaan, bahanMap: Map<String, BahanBaku>) {
                             )
                             Text(
                                 buildString {
-                                    append("$diminta $satuan")
+                                    append(diminta)
                                     if (disetujui != null && disetujui != diminta) {
-                                        append(" → $disetujui $satuan")
+                                        append(" → $disetujui")
                                     }
                                 },
                                 color = if (disetujui != null && disetujui != diminta) Oranye else SukaOnSurface,
@@ -1075,7 +1076,7 @@ private fun KartuAntrean(
                         maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        "${qtyDistTeks(item.qtyDiminta, bahan)} ${formatSatuan(bahan?.satuanPesan ?: item.satuan)}",
+                        qtyTersimpanTeks(item.qtyDiminta, bahan, item.satuan),
                         color = SukaOnSurface, fontSize = 11.sp, fontWeight = FontWeight.Black,
                     )
                 }
@@ -1174,7 +1175,7 @@ private fun LayarPersetujuan(
                             )
                         }
                         Text(
-                            "Diminta: ${qtyDistTeks(item.qtyDiminta, bahan)} $satuan",
+                            "Diminta: ${qtyTersimpanTeks(item.qtyDiminta, bahan, item.satuan)}",
                             color = Color(0xFF701604), fontSize = 11.sp, fontWeight = FontWeight.Bold,
                         )
                         val ccOutlet = state.stokOutlet[item.bahanBakuId]
@@ -1261,6 +1262,28 @@ private fun LayarPersetujuan(
                         status = state.budgetPerOutlet[p.outletId],
                         proyeksi = state.estimasiSetuju.totalNilai,
                     )
+                }
+            }
+
+            val pecahan = viewModel.bahanDimintaPecahan()
+            if (pecahan.isNotEmpty()) {
+                item(key = "peringatan-pecahan") {
+                    Surface(
+                        Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color(0xFFFFFBEB),
+                        border = BorderStroke(1.dp, Color(0xFFFDE68A)),
+                    ) {
+                        Text(
+                            "⚠️ ${pecahan.joinToString(", ")} diminta dalam satuan lebih kecil " +
+                                "(dibuat dari web). Aplikasi ini hanya bisa menyetujui satuan besar penuh, " +
+                                "jadi jumlah di atas LEBIH BANYAK dari yang diminta. Proses lewat web bila " +
+                                "ingin mengirim persis sejumlah permintaannya.",
+                            Modifier.padding(11.dp),
+                            color = Color(0xFF92400E), fontSize = 11.sp, lineHeight = 15.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
                 }
             }
 
