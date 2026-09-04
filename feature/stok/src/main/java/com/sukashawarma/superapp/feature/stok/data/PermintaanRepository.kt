@@ -18,6 +18,8 @@ import com.sukashawarma.superapp.feature.stok.data.model.PermintaanItem
 import com.sukashawarma.superapp.feature.stok.data.model.SaranPermintaan
 import com.sukashawarma.superapp.feature.stok.data.model.StatusPermintaan
 import com.sukashawarma.superapp.feature.stok.data.model.TargetJual
+import com.sukashawarma.superapp.feature.stok.data.model.TopUpRequest
+import com.sukashawarma.superapp.feature.stok.domain.StatusTopUp
 
 /**
  * Permintaan bahan — cermin `app/actions/permintaan.ts` dan `hooks/usePermintaan.ts`.
@@ -330,6 +332,57 @@ object PermintaanRepository {
             val id = o.optString("bahan_baku_id") ?: return@mapNotNull null
             id to (o.optDouble("kebutuhan") ?: return@mapNotNull null)
         }.toMap()
+    }
+
+    // -------------------------------------------------------------- top-up saldo
+    //
+    // Cermin `getOutletTopupRequestsAction` / `requestBudgetTopupAction` /
+    // `approveBudgetTopupAction` di web. Pembacaan lewat RLS `ob_topup_select`
+    // (outlet accessible); penulisan lewat RPC berpagar dari plan/topup-saldo-outlet.sql.
+
+    /** Riwayat pengajuan top-up satu outlet, terbaru dulu. */
+    suspend fun daftarTopUp(outletId: String): List<TopUpRequest> = Postgrest.select(
+        "outlet_budget_topup_requests",
+        listOf(
+            "select" to "id,outlet_id,requested_amount,period_category,status,notes,created_at," +
+                "pemohon:outlet_staff!created_by(name)," +
+                "am:outlet_staff!am_approved_by(name)," +
+                "finance:outlet_staff!finance_approved_by(name)",
+            "outlet_id" to "eq.$outletId",
+            "order" to "created_at.desc",
+        ),
+    ).mapNotNull { el ->
+        val o = el.asJsonObject
+        TopUpRequest(
+            id = o.optString("id") ?: return@mapNotNull null,
+            outletId = o.optString("outlet_id") ?: return@mapNotNull null,
+            nominal = o.optDouble("requested_amount") ?: 0.0,
+            kategoriPeriode = o.optString("period_category") ?: "weekday",
+            status = StatusTopUp.dari(o.optString("status")),
+            pemohonNama = o.optJsonObject("pemohon")?.optString("name"),
+            amNama = o.optJsonObject("am")?.optString("name"),
+            financeNama = o.optJsonObject("finance")?.optString("name"),
+            catatan = o.optString("notes"),
+            createdAt = o.optString("created_at"),
+        )
+    }
+
+    /** Ajukan top-up. Batas maksimal dijaga database dan diulang di UI. */
+    suspend fun ajukanTopUp(outletId: String, nominal: Double, kategoriPeriode: String) {
+        Postgrest.rpc("request_budget_topup_scoped", JsonObject().apply {
+            addProperty("p_outlet_id", outletId)
+            addProperty("p_requested_amount", nominal)
+            addProperty("p_period_category", kategoriPeriode)
+        })
+    }
+
+    /** `aksi`: `approve_am`, `approve_finance`, atau `reject`. */
+    suspend fun prosesTopUp(requestId: String, aksi: String, catatan: String? = null) {
+        Postgrest.rpc("approve_budget_topup_scoped", JsonObject().apply {
+            addProperty("p_request_id", requestId)
+            addProperty("p_action", aksi)
+            if (!catatan.isNullOrBlank()) addProperty("p_notes", catatan)
+        })
     }
 
     // -------------------------------------------------------------- penulisan
