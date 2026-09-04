@@ -44,4 +44,8 @@ class InboxViewModel : ViewModel() {
             }
         }
     }
+
+    fun bersihkanPesan() {
+        _state.value = _state.value.copy(error = null)
+    }
 }
