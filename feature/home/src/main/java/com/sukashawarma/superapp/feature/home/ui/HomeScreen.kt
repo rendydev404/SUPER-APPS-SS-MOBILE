@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Settings
@@ -62,10 +63,26 @@ private val STOK_ROLES = setOf(
     com.sukashawarma.superapp.domain.model.Role.REGIONAL_MANAGER,
 )
 
+/**
+ * Role yang boleh membuka modul Distribusi. Sama persis dengan
+ * `DistribusiAkses.ROLE_MODUL`, disalin ke sini supaya `:feature:home` tidak
+ * perlu bergantung pada `:feature:distribusi` hanya untuk satu himpunan.
+ *
+ * `kitchen` dan `admin` sengaja tidak masuk: penerbitan surat jalan tetap di web,
+ * dan database memang hanya mengizinkan mereka menerbitkannya.
+ */
+private val DISTRIBUSI_ROLES = setOf(
+    com.sukashawarma.superapp.domain.model.Role.CREW,
+    com.sukashawarma.superapp.domain.model.Role.LEADER,
+    com.sukashawarma.superapp.domain.model.Role.AREA_MANAGER,
+    com.sukashawarma.superapp.domain.model.Role.REGIONAL_MANAGER,
+)
+
 @Composable
 fun HomeScreen(
     onOpenAbsensi: () -> Unit,
     onOpenStok: () -> Unit,
+    onOpenDistribusi: () -> Unit,
     onLoggedOut: () -> Unit,
     onOpenSettings: () -> Unit,
     viewModel: HomeViewModel = viewModel(),
@@ -106,6 +123,22 @@ fun HomeScreen(
                             Triple("MONITORING", "Realtime", SukaOnSurface),
                             Triple("RIWAYAT", "Tersedia", Color(0xFFEA580C)),
                             Triple("PRODUKSI", "Estimasi", Color(0xFF168451)),
+                        ),
+                    )
+                )
+            }
+            if (staff?.role in DISTRIBUSI_ROLES) {
+                Spacer(Modifier.height(14.dp))
+                ModuleCard(
+                    ModuleTile(
+                        "Distribusi",
+                        "Terima kiriman, verifikasi barang & riwayat surat jalan",
+                        Icons.Default.LocalShipping,
+                        onOpenDistribusi,
+                        listOf(
+                            Triple("PENERIMAAN", "Scan QR", SukaOnSurface),
+                            Triple("VERIFIKASI", "Per Item", Color(0xFFEA580C)),
+                            Triple("RIWAYAT", "Tersedia", Color(0xFF168451)),
                         ),
                     )
                 )
