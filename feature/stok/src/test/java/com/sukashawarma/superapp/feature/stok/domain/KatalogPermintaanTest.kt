@@ -67,11 +67,13 @@ class KatalogPermintaanTest {
     }
 
     @Test
-    fun `saran qty dibulatkan ke atas pada satuan besar`() {
-        assertEquals(2L, KatalogPermintaan.saranQty(1.2))
-        assertEquals(2L, KatalogPermintaan.saranQty(2.0))
-        // Kekurangan sangat kecil tetap menghasilkan satu satuan besar penuh.
-        assertEquals(1L, KatalogPermintaan.saranQty(0.05))
+    fun `saran qty dibulatkan ke atas pada satuan pesan`() {
+        // Kurang 2 Bal, 1 Bal = 20 kg satuan pesan -> saran 40 kg.
+        assertEquals(40L, KatalogPermintaan.saranQtyDistribusi(2.0, 20.0))
+        // Satuan pesan sama dengan satuan besar -> tinggal dibulatkan ke atas.
+        assertEquals(2L, KatalogPermintaan.saranQtyDistribusi(1.2, 1.0))
+        // Kekurangan sangat kecil tetap menghasilkan minimal satu satuan pesan.
+        assertEquals(1L, KatalogPermintaan.saranQtyDistribusi(0.05, 1.0))
     }
 
     @Test

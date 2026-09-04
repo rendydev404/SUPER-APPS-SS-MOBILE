@@ -4,13 +4,52 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * Normalisasi skala saldo — nilai harapan dari `convertGramToBesar` di
+ * Konversi satuan pesan dan normalisasi skala saldo — nilai harapan dari
+ * `getDistribusiFactor`/`convertToBaseUnit`/`convertGramToBesar` di
  * `apps/stok/src/lib/format/compositeUnit.ts`.
- *
- * Konversi satuan distribusi sudah tidak ada di sini: native memesan pada satuan besar
- * (lihat `BahanBaku.satuanPesan`), jadi tidak ada faktor yang perlu diterapkan.
  */
 class DistribusiUnitTest {
+
+    /**
+     * Faktor bahan nyata di produksi, dipakai dua arah: qty pesanan -> qty tersimpan,
+     * dan qty pesanan -> skala harga. `harga_beli` berharga per satuan BESAR, jadi
+     * BAWANG 1 kg bernilai 650.000 / 20 = 32.500, bukan 650.000.
+     */
+    @Test
+    fun `faktor dan skala harga bahan produksi`() {
+        // BAWANG: besar Bal, tengah Kg (20 per Bal), pesan kg, harga 650.000 per Bal.
+        val bawang = DistribusiUnit.faktor("Bal", "Kg", 20.0, "Gram", 20000.0, "kg")
+        assertEquals(20.0, bawang, 0.0001)
+        assertEquals(0.05, DistribusiUnit.keBase(1.0, bawang), 0.0001)
+        assertEquals(32_500.0, DistribusiUnit.keBase(1.0, bawang) * 650_000.0, 0.01)
+
+        // KEJU: besar Dus, tengah Pack (24 per Dus), pesan pack, harga 289.056 per Dus.
+        val keju = DistribusiUnit.faktor("Dus", "Pack", 24.0, "Lembar", 240.0, "pack")
+        assertEquals(24.0, keju, 0.0001)
+        assertEquals(12_044.0, DistribusiUnit.keBase(1.0, keju) * 289_056.0, 0.01)
+
+        // KERTAS STRUK: besar pack, kecil Roll (10 per pack), pesan roll.
+        assertEquals(10.0, DistribusiUnit.faktor("pack", null, null, "Roll", 10.0, "roll"), 0.0001)
+
+        // AYAM: satuan pesan sama dengan satuan besar — tanpa konversi.
+        val ayam = DistribusiUnit.faktor("Kg", null, null, "Gram", 1000.0, "kg")
+        assertEquals(1.0, ayam, 0.0001)
+        assertEquals(53_500.0, DistribusiUnit.keBase(1.0, ayam) * 53_500.0, 0.01)
+    }
+
+    @Test
+    fun `tanpa satuan pesan faktornya satu`() {
+        assertEquals(1.0, DistribusiUnit.faktor("Dus", "Pack", 20.0, "Lembar", 400.0, null), 0.0001)
+        assertEquals(1.0, DistribusiUnit.faktor("Dus", "Pack", 20.0, "Lembar", 400.0, "dus"), 0.0001)
+    }
+
+    @Test
+    fun `pemetaan implisit kg atas gram`() {
+        // SAOS CABE: besar Karton, 1 Karton = 6000 Gram; pesan kg -> faktor 6.
+        val f = DistribusiUnit.faktor("Karton", null, null, "Gram", 6000.0, "kg")
+        assertEquals(6.0, f, 0.0001)
+        assertEquals(2.0, DistribusiUnit.keBase(12.0, f), 0.0001)
+    }
 
     @Test
     fun `gram ke besar membagi faktor tampilan`() {
