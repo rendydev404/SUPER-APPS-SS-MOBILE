@@ -5,11 +5,14 @@ import com.google.gson.JsonObject
 import com.sukashawarma.superapp.data.remote.Postgrest
 import com.sukashawarma.superapp.data.remote.optBoolean
 import com.sukashawarma.superapp.data.remote.optDouble
+import com.sukashawarma.superapp.data.remote.optInt
 import com.sukashawarma.superapp.data.remote.optJsonArray
 import com.sukashawarma.superapp.data.remote.optJsonObject
 import com.sukashawarma.superapp.data.remote.optString
 import com.sukashawarma.superapp.feature.stok.data.model.BahanBaku
+import com.sukashawarma.superapp.feature.stok.data.model.BudgetStatus
 import com.sukashawarma.superapp.feature.stok.data.model.CrosscheckSaldo
+import com.sukashawarma.superapp.feature.stok.data.model.EstimasiKeranjang
 import com.sukashawarma.superapp.feature.stok.data.model.Permintaan
 import com.sukashawarma.superapp.feature.stok.data.model.PermintaanItem
 import com.sukashawarma.superapp.feature.stok.data.model.SaranPermintaan
@@ -226,24 +229,75 @@ object PermintaanRepository {
         return hasil
     }
 
+    // ------------------------------------------------------------ nilai & budget
+    //
+    // Web menghitung ketiganya di Server Action ber-service-role
+    // (`estimateCartValue`, `getOutletBudgetStatus`, `requestBudgetTopupAction` di
+    // app/actions/budget.ts). Native memakai RPC pembungkus ber-scope dari migration
+    // 20300126000001 yang memasang pagar yang sama (staff aktif / outlet accessible)
+    // lalu mendelegasikan ke fungsi aslinya. Harga beli per bahan tetap tidak pernah
+    // sampai ke klien — hanya agregatnya.
+
     /**
-     * Harga beli per bahan dari `bahan_baku_harga` untuk estimasi nilai keranjang —
-     * padanan `estimateCartValue` web. RLS hanya membuka harga untuk
-     * admin/owner/kitchen/purchasing/admin_finance; role lain akan gagal atau
-     * kosong, dan PEMANGGIL WAJIB memperlakukan itu sebagai "estimasi tidak
-     * tersedia", bukan error. (Web menampilkannya ke semua role karena membaca
-     * lewat service-role — fitur ini pun masih ditandai "Tahap Developer".)
+     * Estimasi Rupiah untuk item pada satuan distribusi — cermin `estimateCartValue`.
+     * `items`: bahanBakuId -> qty distribusi.
      */
-    suspend fun hargaBeli(): Map<String, Double> {
-        return Postgrest.select(
-            "bahan_baku_harga",
-            listOf("select" to "bahan_baku_id,harga_beli"),
-        ).mapNotNull { el ->
-            val o = el.asJsonObject
-            val id = o.optString("bahan_baku_id") ?: return@mapNotNull null
-            val harga = o.optDouble("harga_beli") ?: return@mapNotNull null
-            id to harga
-        }.toMap()
+    suspend fun estimasiNilai(items: List<Pair<String, Double>>): EstimasiKeranjang {
+        if (items.isEmpty()) return EstimasiKeranjang()
+        val arr = JsonArray()
+        items.forEach { (id, qty) ->
+            arr.add(JsonObject().apply {
+                addProperty("bahan_baku_id", id)
+                addProperty("qty", qty)
+            })
+        }
+        val hasil = Postgrest.rpc("estimasi_nilai_keranjang", JsonObject().apply { add("p_items", arr) })
+        if (!hasil.isJsonObject) return EstimasiKeranjang()
+        val o = hasil.asJsonObject
+        val kategori = o.optJsonObject("kategori_nilai")?.entrySet()
+            ?.mapNotNull { (k, v) -> if (v.isJsonPrimitive) k to v.asDouble else null }
+            ?.toMap().orEmpty()
+        return EstimasiKeranjang(
+            totalNilai = o.optDouble("total_nilai") ?: 0.0,
+            itemTanpaHarga = (o.optJsonArray("item_tanpa_harga") ?: JsonArray())
+                .mapNotNull { if (it.isJsonPrimitive) it.asString else null },
+            kategoriNilai = kategori,
+        )
+    }
+
+    /** Status plafon satu outlet — cermin `getOutletBudgetStatus`. */
+    suspend fun budgetStatus(outletId: String): BudgetStatus {
+        val hasil = Postgrest.rpc("get_outlet_budget_status_scoped", JsonObject().apply {
+            addProperty("p_outlet_id", outletId)
+        })
+        val row = when {
+            hasil.isJsonArray && hasil.asJsonArray.size() > 0 -> hasil.asJsonArray[0].asJsonObject
+            hasil.isJsonObject -> hasil.asJsonObject
+            else -> JsonObject()
+        }
+        return BudgetStatus(
+            outletId = outletId,
+            nominal = row.optDouble("nominal") ?: 0.0,
+            periodType = row.optString("period_type"),
+            periodStart = row.optString("period_start"),
+            periodEnd = row.optString("period_end"),
+            terpakai = row.optDouble("terpakai") ?: 0.0,
+            sisa = row.optDouble("sisa") ?: 0.0,
+            hasConfig = row.optBoolean("has_config"),
+            customDays = row.optInt("custom_days"),
+        )
+    }
+
+    /**
+     * Ajukan top-up plafon — cermin `requestBudgetTopupAction`. Batas maksimal
+     * dijaga di database (`request_budget_topup_svc`) dan diulang di UI.
+     */
+    suspend fun ajukanTopUp(outletId: String, nominal: Double, kategoriPeriode: String) {
+        Postgrest.rpc("request_budget_topup_scoped", JsonObject().apply {
+            addProperty("p_outlet_id", outletId)
+            addProperty("p_requested_amount", nominal)
+            addProperty("p_period_category", kategoriPeriode)
+        })
     }
 
     /**
