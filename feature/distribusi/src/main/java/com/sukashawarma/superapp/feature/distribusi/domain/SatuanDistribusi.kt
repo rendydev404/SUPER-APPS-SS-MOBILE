@@ -25,24 +25,35 @@ data class BahanBakuMeta(
  */
 object SatuanDistribusi {
 
+    /**
+     * Hitung faktor konversi satuan dasar → satuan distribusi.
+     *
+     * Faktor yang bernilai nol atau negatif diperlakukan sebagai "tidak tersetel",
+     * serupa dengan truthiness JavaScript di web (`getDistribusiFactor` di
+     * `SuratJalanForm.tsx`). Hal ini mencegah pembagian dengan nol di `keDasar()`
+     * yang akan menghasilkan `Infinity` atau `NaN` di ledger_stok produksi.
+     */
     fun faktor(b: BahanBakuMeta): Double {
         val dist = b.satuanDistribusi ?: return 1.0
         if (dist.equals(b.satuan, ignoreCase = true)) return 1.0
 
-        if (dist.equals(b.satuanTengah, ignoreCase = true) && b.faktorTengah != null) {
-            return b.faktorTengah
+        val tengah = b.faktorTengah?.takeIf { it > 0.0 }
+        if (dist.equals(b.satuanTengah, ignoreCase = true) && tengah != null) {
+            return tengah
         }
-        if (dist.equals(b.satuanKecil, ignoreCase = true) && b.faktorTampilan != null) {
-            return b.faktorTampilan
+        val kecil = b.faktorTampilan?.takeIf { it > 0.0 }
+        if (dist.equals(b.satuanKecil, ignoreCase = true) && kecil != null) {
+            return kecil
         }
         // Pemetaan implisit yang ada di web: satuan distribusi "kg" sementara
         // satuan kecilnya "gram". Faktor tampilan dinyatakan dalam gram, jadi
         // harus dibagi seribu dulu untuk mendapatkan faktor per kilogram.
+        val implisit = b.faktorTampilan?.takeIf { it > 0.0 }
         if (dist.equals("kg", ignoreCase = true) &&
             b.satuanKecil.equals("gram", ignoreCase = true) &&
-            b.faktorTampilan != null
+            implisit != null
         ) {
-            return b.faktorTampilan / 1000.0
+            return implisit / 1000.0
         }
         return 1.0
     }
