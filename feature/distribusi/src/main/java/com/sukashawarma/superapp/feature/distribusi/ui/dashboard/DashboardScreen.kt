@@ -22,10 +22,14 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,6 +44,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sukashawarma.superapp.feature.distribusi.data.model.RentangTanggal
 import com.sukashawarma.superapp.feature.distribusi.data.model.SuratJalanRingkas
+import com.sukashawarma.superapp.feature.distribusi.domain.bolehDitutup
 import com.sukashawarma.superapp.feature.distribusi.ui.KartuSuratJalan
 import com.sukashawarma.superapp.feature.distribusi.ui.LayarGalat
 import com.sukashawarma.superapp.feature.distribusi.ui.LayarKosong
@@ -59,6 +64,7 @@ fun DashboardScreen(
 ) {
     val state by viewModel.state.collectAsState()
     var konfirmasiTutup by remember { mutableStateOf<SuratJalanRingkas?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
 
     if (state.memuat && state.semua.isEmpty()) { LayarMemuat(); return }
     if (state.error != null && state.semua.isEmpty()) {
@@ -66,7 +72,18 @@ fun DashboardScreen(
         return
     }
 
-    Column(Modifier.fillMaxSize().background(SukaSurface)) {
+    // Setelah daftar terisi, galat/pesan lewat snackbar — bukan LayarGalat layar
+    // penuh, yang hanya dipakai untuk kegagalan pemuatan awal di atas.
+    LaunchedEffect(state.pesan, state.error) {
+        val teks = state.pesan ?: state.error
+        if (teks != null) {
+            snackbarHostState.showSnackbar(teks)
+            viewModel.bersihkanPesan()
+        }
+    }
+
+    Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { paddingValues ->
+    Column(Modifier.fillMaxSize().padding(paddingValues).background(SukaSurface)) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -141,17 +158,18 @@ fun DashboardScreen(
                 }
             } else {
                 items(state.terlihat, key = { it.id }) { baris ->
-                    val bolehTutup = state.bolehTutupDokumen &&
-                        baris.status?.let { st -> st.nilai.startsWith("diterima") } == true
+                    val bolehTutup = state.bolehTutupDokumen && baris.status?.bolehDitutup == true
+                    val sedangDiproses = state.sedangMenutup == baris.id
                     KartuSuratJalan(
                         baris = baris,
-                        aksiLabel = if (bolehTutup) "Tutup Dokumen" else null,
+                        aksiLabel = if (!bolehTutup) null else if (sedangDiproses) "Menutup..." else "Tutup Dokumen",
                         onKlik = { onBukaDetail(baris.id) },
-                        onAksi = if (bolehTutup) ({ konfirmasiTutup = baris }) else null,
+                        onAksi = if (bolehTutup && !sedangDiproses) ({ konfirmasiTutup = baris }) else null,
                     )
                 }
             }
         }
+    }
     }
 
     konfirmasiTutup?.let { baris ->
