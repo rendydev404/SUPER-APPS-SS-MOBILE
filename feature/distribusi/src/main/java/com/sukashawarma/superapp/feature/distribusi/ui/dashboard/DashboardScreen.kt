@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Inbox
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -49,6 +50,7 @@ import com.sukashawarma.superapp.feature.distribusi.ui.KartuSuratJalan
 import com.sukashawarma.superapp.feature.distribusi.ui.LayarGalat
 import com.sukashawarma.superapp.feature.distribusi.ui.LayarKosong
 import com.sukashawarma.superapp.feature.distribusi.ui.LayarMemuat
+import com.sukashawarma.superapp.feature.distribusi.ui.SegarkanSaatAktif
 import com.sukashawarma.superapp.presentation.theme.SukaGray500
 import com.sukashawarma.superapp.presentation.theme.SukaOnSurface
 import com.sukashawarma.superapp.presentation.theme.SukaOrange
@@ -65,6 +67,8 @@ fun DashboardScreen(
     val state by viewModel.state.collectAsState()
     var konfirmasiTutup by remember { mutableStateOf<SuratJalanRingkas?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
+
+    SegarkanSaatAktif { viewModel.muat(paksa = true) }
 
     if (state.memuat && state.semua.isEmpty()) { LayarMemuat(); return }
     if (state.error != null && state.semua.isEmpty()) {
@@ -92,6 +96,9 @@ fun DashboardScreen(
             Column(Modifier.weight(1f)) {
                 Text("Distribusi", color = SukaOnSurface, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
                 Text(state.namaPengguna, color = SukaGray500, fontSize = 11.sp)
+            }
+            IconButton(onClick = { viewModel.muat(paksa = true) }) {
+                Icon(Icons.Default.Refresh, "Segarkan")
             }
             IconButton(onClick = onBukaInbox) { Icon(Icons.Default.Inbox, "Inbox penerimaan") }
             IconButton(onClick = onBukaRiwayat) { Icon(Icons.Default.History, "Riwayat") }
