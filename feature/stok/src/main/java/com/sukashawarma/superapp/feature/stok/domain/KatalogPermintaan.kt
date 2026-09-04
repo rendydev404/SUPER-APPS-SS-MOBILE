@@ -66,9 +66,9 @@ object KatalogPermintaan {
         return max(1.0, ceil(threshold - saldoBesar))
     }
 
-    /** Saran jumlah pesan pada satuan distribusi, dibulatkan ke atas seperti web. */
-    fun saranQtyDistribusi(kekuranganBesar: Double, faktorDistribusi: Double): Long =
-        ceil(DistribusiUnit.keDistribusi(kekuranganBesar, faktorDistribusi)).toLong().coerceAtLeast(1L)
+    /** Saran jumlah pesan pada satuan besar, dibulatkan ke atas, minimal 1. */
+    fun saranQty(kekuranganBesar: Double): Long =
+        ceil(kekuranganBesar).toLong().coerceAtLeast(1L)
 
     /** Masih dalam jendela sembunyi 12 jam? `createdAtMs` null dianggap masih. */
     fun masihMenunggu(createdAtMs: Long?, nowMs: Long): Boolean {
