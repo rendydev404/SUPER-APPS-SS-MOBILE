@@ -30,7 +30,12 @@ class ScanQrViewModel : ViewModel() {
     val state: StateFlow<ScanUiState> = _state
 
     fun ubahKodeManual(teks: String) {
-        _state.value = _state.value.copy(kodeManual = teks.uppercase())
+        // Ketikan baru membatalkan pesan penolakan lama supaya tidak terlihat
+        // masih berlaku untuk kode yang sedang diketik pengguna sekarang.
+        _state.value = _state.value.copy(
+            kodeManual = teks.uppercase(),
+            hasil = HasilPindai.Menunggu,
+        )
     }
 
     fun kirimKodeManual() {
@@ -46,10 +51,6 @@ class ScanQrViewModel : ViewModel() {
 
     fun tandaiKameraGagal(pesan: String) {
         _state.value = _state.value.copy(kameraGagal = pesan)
-    }
-
-    fun reset() {
-        _state.value = _state.value.copy(hasil = HasilPindai.Menunggu)
     }
 
     /**
