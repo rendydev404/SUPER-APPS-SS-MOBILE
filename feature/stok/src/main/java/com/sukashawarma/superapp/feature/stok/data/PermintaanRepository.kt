@@ -243,22 +243,19 @@ object PermintaanRepository {
     // tombol top-up di web pun error di sana. Lihat catatan di file SQL tersebut.
 
     /**
-     * Estimasi Rupiah sekumpulan item — cermin `estimateCartValue`.
-     * `items`: bahanBakuId -> qty pada **satuan distribusi**, sama seperti web.
+     * Estimasi Rupiah sekumpulan item. `items`: bahanBakuId -> qty pada **satuan besar**.
      *
-     * Catatan skala (keputusan 2026-09-04): `harga_beli` sebenarnya berharga per SATUAN
-     * BESAR — dipastikan `get_outlet_budget_status` yang menghitung
-     * `terpakai = SUM(qty_disetujui * harga_snapshot)` dengan `qty_disetujui` tersimpan
-     * pada satuan besar. Web mengalikannya dengan qty satuan DISTRIBUSI, sehingga untuk
-     * bahan yang satuan pesannya bukan satuan besar angkanya membengkak sebesar faktor
-     * distribusi (BAWANG 1 kg terbaca Rp 650.000, yaitu harga 1 Bal = 20 kg).
+     * `harga_beli` berharga per satuan besar — dipastikan `get_outlet_budget_status` yang
+     * menghitung `terpakai = SUM(qty_disetujui * harga_snapshot)` dengan `qty_disetujui`
+     * tersimpan pada satuan besar. Karena native memesan pada satuan besar juga (lihat
+     * `BahanBaku.satuanPesan`), qty keranjang bisa dikirim apa adanya.
      *
-     * Native SENGAJA mengikuti web supaya kedua aplikasi menampilkan angka yang sama —
-     * estimasi ini pun masih ditandai "Tahap Developer (Bisa Diabaikan)" di web. JANGAN
-     * "memperbaiki" sepihak di sini: itu membuat HP dan browser berbeda untuk keranjang
-     * yang sama. Perbaikan yang benar dilakukan di dua tempat sekaligus — `estimateCartValue`
-     * (dan `getOutletSpendingHistory`) di web, lalu pemanggil di sini dikonversi dengan
-     * [DistribusiUnit.keBase].
+     * Web memakai skala berbeda: `estimateCartValue` mengalikan harga itu dengan qty satuan
+     * distribusi, sehingga untuk 19 bahan yang satuan pesannya bukan satuan besar angkanya
+     * membengkak sebesar faktor distribusi (BAWANG 1 kg terbaca Rp 650.000 — itu harga
+     * 1 Bal = 20 kg). Perbedaan itu diketahui dan dibiarkan: memperbaikinya menuntut
+     * perubahan data produksi yang dipakai bersama, dan estimasi ini masih ditandai
+     * "Tahap Developer (Bisa Diabaikan)" di web.
      */
     suspend fun estimasiNilai(items: List<Pair<String, Double>>): EstimasiKeranjang {
         if (items.isEmpty()) return EstimasiKeranjang()

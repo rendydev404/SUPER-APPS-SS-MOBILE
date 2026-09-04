@@ -1,6 +1,5 @@
 package com.sukashawarma.superapp.feature.stok.data.model
 
-import com.sukashawarma.superapp.feature.stok.domain.DistribusiUnit
 import com.sukashawarma.superapp.feature.stok.domain.UnitMeta
 
 // ------------------------------------------------------------------- ledger
@@ -191,18 +190,22 @@ data class BahanBaku(
             faktorTampilan = faktorTampilan,
         )
 
-    /** Label satuan pesan; jatuh ke satuan besar bila distribusi tidak diset. */
-    val satuanPesan: String get() = satuanDistribusi ?: satuan ?: ""
-
-    val faktorDistribusi: Double
-        get() = DistribusiUnit.faktor(
-            satuan = satuan,
-            satuanTengah = satuanTengah,
-            faktorTengah = faktorTengah,
-            satuanKecil = satuanKecil,
-            faktorTampilan = faktorTampilan,
-            satuanDistribusi = satuanDistribusi,
-        )
+    /**
+     * Satuan yang dipakai saat memesan di aplikasi ini: SELALU satuan besar.
+     *
+     * Kolom `satuan_distribusi` sengaja diabaikan (keputusan 2026-09-04). Untuk 19
+     * bahan, kolom itu berisi satuan tengah/kecil — mis. BAWANG besar "Bal" tetapi
+     * `satuan_distribusi` "kg" — sedangkan `bahan_baku_harga.harga_beli` berharga per
+     * satuan besar (BAWANG Rp 650.000 = 1 Bal = 20 kg). Menampilkan satuan pesan "kg"
+     * bersama harga per Bal membuat layar berbohong: "1 kg = Rp 650.000".
+     *
+     * Memesan dalam satuan besar membuat qty, harga, dan `terpakai` di budget berada
+     * pada skala yang sama, tanpa mengubah data produksi yang dipakai bersama web.
+     * Konsekuensinya pesanan minimum adalah 1 satuan besar penuh, dan web tetap boleh
+     * memesan pecahan — qty tersimpan sama-sama pada satuan besar, jadi keduanya tetap
+     * bisa saling membaca.
+     */
+    val satuanPesan: String get() = satuan ?: satuanDistribusi ?: ""
 }
 
 /** Saldo satu bahan pada satu outlet untuk crosscheck di layar persetujuan. */
