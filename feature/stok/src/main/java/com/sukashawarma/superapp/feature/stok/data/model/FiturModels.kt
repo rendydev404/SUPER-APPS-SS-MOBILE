@@ -208,6 +208,33 @@ data class BahanBaku(
 /** Saldo satu bahan pada satu outlet untuk crosscheck di layar persetujuan. */
 data class CrosscheckSaldo(val currentQty: Double, val saldoIsGram: Boolean)
 
+/**
+ * Status plafon budget satu outlet — cermin `BudgetStatus` di `lib/stok/budget.ts`
+ * web, hasil RPC `get_outlet_budget_status` (lewat pembungkus ber-scope).
+ */
+data class BudgetStatus(
+    val outletId: String,
+    val nominal: Double,
+    /** `harian` | `mingguan` | `bulanan` | `custom`; null bila belum dikonfigurasi. */
+    val periodType: String?,
+    val periodStart: String?,
+    val periodEnd: String?,
+    val terpakai: Double,
+    val sisa: Double,
+    val hasConfig: Boolean,
+    val customDays: Int?,
+)
+
+/**
+ * Estimasi nilai Rupiah sekumpulan item — cermin `CartEstimateResult` web.
+ * Dihitung di database supaya harga beli per bahan tidak perlu terbuka ke klien.
+ */
+data class EstimasiKeranjang(
+    val totalNilai: Double = 0.0,
+    val itemTanpaHarga: List<String> = emptyList(),
+    val kategoriNilai: Map<String, Double> = emptyMap(),
+)
+
 /** Bahan berstatus tidak aman yang disarankan untuk diminta. */
 data class SaranPermintaan(
     val bahanBakuId: String,
