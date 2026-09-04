@@ -36,12 +36,15 @@
 --    p_items: [{"bahan_baku_id": uuid, "qty": numeric}]
 --    Hasil:   {"total_nilai": n, "item_tanpa_harga": [uuid], "kategori_nilai": {kat: n}}
 --
---    PENTING: qty WAJIB pada SATUAN BESAR, bukan satuan pesan/distribusi.
---    harga_beli berharga per satuan besar — dipastikan oleh get_outlet_budget_status
---    yang menghitung terpakai = SUM(qty_disetujui * harga_snapshot) dengan
---    qty_disetujui tersimpan pada satuan besar. Web mengalikannya dengan qty satuan
---    distribusi sehingga BAWANG 1 kg terbaca Rp 650.000 (itu harga 1 Bal = 20 kg)
---    alih-alih Rp 32.500; klien native mengonversi dulu sebelum memanggil ini.
+--    Catatan skala: qty dikirim pada SATUAN PESAN (distribusi), sama seperti web.
+--    harga_beli sebenarnya berharga per satuan besar — dipastikan
+--    get_outlet_budget_status yang menghitung terpakai = SUM(qty_disetujui *
+--    harga_snapshot) dengan qty_disetujui tersimpan pada satuan besar — sehingga untuk
+--    bahan yang satuan pesannya bukan satuan besar, estimasi membengkak sebesar faktor
+--    distribusi (BAWANG 1 kg terbaca Rp 650.000, yaitu harga 1 Bal = 20 kg). Native
+--    sengaja mengikuti web agar angkanya sama di HP dan browser; kalau nanti diperbaiki,
+--    perbaiki di estimateCartValue + getOutletSpendingHistory (web) DAN pemanggil native
+--    sekaligus, bukan salah satu saja.
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.estimasi_nilai_keranjang(p_items jsonb)
 RETURNS jsonb

@@ -243,18 +243,22 @@ object PermintaanRepository {
     // tombol top-up di web pun error di sana. Lihat catatan di file SQL tersebut.
 
     /**
-     * Estimasi Rupiah sekumpulan item. `items`: bahanBakuId -> qty pada **satuan besar**.
+     * Estimasi Rupiah sekumpulan item — cermin `estimateCartValue`.
+     * `items`: bahanBakuId -> qty pada **satuan distribusi**, sama seperti web.
      *
-     * PENTING: `bahan_baku_harga.harga_beli` berharga per SATUAN BESAR, bukan per satuan
-     * pesan. Itu dipastikan oleh database sendiri — `get_outlet_budget_status` menghitung
-     * `terpakai = SUM(qty_disetujui * harga_snapshot)` sedangkan `qty_disetujui` tersimpan
-     * pada satuan besar, dan `harga_snapshot` disalin dari `harga_beli`.
+     * Catatan skala (keputusan 2026-09-04): `harga_beli` sebenarnya berharga per SATUAN
+     * BESAR — dipastikan `get_outlet_budget_status` yang menghitung
+     * `terpakai = SUM(qty_disetujui * harga_snapshot)` dengan `qty_disetujui` tersimpan
+     * pada satuan besar. Web mengalikannya dengan qty satuan DISTRIBUSI, sehingga untuk
+     * bahan yang satuan pesannya bukan satuan besar angkanya membengkak sebesar faktor
+     * distribusi (BAWANG 1 kg terbaca Rp 650.000, yaitu harga 1 Bal = 20 kg).
      *
-     * Web (`estimateCartValue`) mengalikan harga itu dengan qty satuan DISTRIBUSI, jadi
-     * nilainya membengkak sebesar faktor distribusi untuk bahan yang satuan pesannya bukan
-     * satuan besar — BAWANG 1 kg terbaca Rp 650.000 (harga 1 Bal = 20 kg) alih-alih
-     * Rp 32.500. Bug itu sengaja TIDAK diikuti: pemanggil di sini wajib mengonversi ke
-     * satuan besar lebih dulu lewat [DistribusiUnit.keBase].
+     * Native SENGAJA mengikuti web supaya kedua aplikasi menampilkan angka yang sama —
+     * estimasi ini pun masih ditandai "Tahap Developer (Bisa Diabaikan)" di web. JANGAN
+     * "memperbaiki" sepihak di sini: itu membuat HP dan browser berbeda untuk keranjang
+     * yang sama. Perbaikan yang benar dilakukan di dua tempat sekaligus — `estimateCartValue`
+     * (dan `getOutletSpendingHistory`) di web, lalu pemanggil di sini dikonversi dengan
+     * [DistribusiUnit.keBase].
      */
     suspend fun estimasiNilai(items: List<Pair<String, Double>>): EstimasiKeranjang {
         if (items.isEmpty()) return EstimasiKeranjang()

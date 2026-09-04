@@ -280,13 +280,10 @@ class PermintaanViewModel : ViewModel() {
                 .filter { perOutlet[it.outletId]?.hasConfig == true && it.items.isNotEmpty() }
                 .map { p ->
                     async {
-                        // Proyeksi memakai qty yang benar-benar akan dikirim: satuan pesan
-                        // dibulatkan ke atas, lalu dikembalikan ke satuan besar (skala harga).
+                        // qty satuan distribusi dibulatkan ke atas — sama seperti
+                        // ApprovalCardBudget di web.
                         val items = p.items.map { item ->
-                            val bahan = bahanMap[item.bahanBakuId]
-                            val dist = qtyDistribusiBulat(item.qtyDiminta, bahan)
-                            val base = if (bahan != null) DistribusiUnit.keBase(dist, bahan.faktorDistribusi) else dist
-                            item.bahanBakuId to base
+                            item.bahanBakuId to qtyDistribusiBulat(item.qtyDiminta, bahanMap[item.bahanBakuId])
                         }
                         runCatching { PermintaanRepository.estimasiNilai(items) }.getOrNull()
                             ?.let { p.id to it.totalNilai }
@@ -307,11 +304,9 @@ class PermintaanViewModel : ViewModel() {
     /** Estimasi keranjang dengan debounce 500 ms — cermin efek di PermintaanForm. */
     private fun jadwalkanEstimasi() {
         estimasiJob?.cancel()
-        // Harga per satuan besar, keranjang pada satuan distribusi — wajib dikonversi
-        // dulu (lihat catatan di PermintaanRepository.estimasiNilai).
-        val items = _state.value.keranjangItems.map {
-            it.bahan.id to DistribusiUnit.keBase(it.qty.toDouble(), it.bahan.faktorDistribusi)
-        }
+        // qty satuan distribusi apa adanya — skala yang sama dengan web (lihat catatan
+        // skala di PermintaanRepository.estimasiNilai).
+        val items = _state.value.keranjangItems.map { it.bahan.id to it.qty.toDouble() }
         if (items.isEmpty()) {
             _state.value = _state.value.copy(estimasi = EstimasiKeranjang())
             return
@@ -329,9 +324,9 @@ class PermintaanViewModel : ViewModel() {
     private fun jadwalkanEstimasiSetuju() {
         estimasiSetujuJob?.cancel()
         val p = _state.value.approveUntuk ?: return
-        // qtySetujuBase() sudah mengembalikan satuan besar, skala yang sama dengan harga.
+        // qty satuan distribusi, sama seperti ApprovalModal web.
         val items = p.items
-            .map { it.bahanBakuId to qtySetujuBase(it.bahanBakuId) }
+            .map { it.bahanBakuId to (_state.value.qtySetuju[it.bahanBakuId] ?: 0L).toDouble() }
             .filter { it.second > 0.0 }
         if (items.isEmpty()) {
             _state.value = _state.value.copy(estimasiSetuju = EstimasiKeranjang())
