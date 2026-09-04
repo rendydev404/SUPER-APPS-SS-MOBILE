@@ -8,10 +8,13 @@ import com.sukashawarma.superapp.data.remote.optDouble
 import com.sukashawarma.superapp.data.remote.optJsonArray
 import com.sukashawarma.superapp.data.remote.optJsonObject
 import com.sukashawarma.superapp.data.remote.optString
+import com.sukashawarma.superapp.feature.stok.data.model.BahanBaku
+import com.sukashawarma.superapp.feature.stok.data.model.CrosscheckSaldo
 import com.sukashawarma.superapp.feature.stok.data.model.Permintaan
 import com.sukashawarma.superapp.feature.stok.data.model.PermintaanItem
 import com.sukashawarma.superapp.feature.stok.data.model.SaranPermintaan
 import com.sukashawarma.superapp.feature.stok.data.model.StatusPermintaan
+import com.sukashawarma.superapp.feature.stok.data.model.TargetJual
 
 /**
  * Permintaan bahan — cermin `app/actions/permintaan.ts` dan `hooks/usePermintaan.ts`.
@@ -90,6 +93,18 @@ object PermintaanRepository {
                 hargaSnapshot = o.optDouble("harga_snapshot"),
             )
         }
+        // `target_metadata` diisi array {nama, qty, harga_jual} bila permintaan lahir
+        // dari target penjualan; bentuk lain diabaikan diam-diam seperti web.
+        val target = (optJsonArray("target_metadata") ?: JsonArray()).mapNotNull { el ->
+            if (!el.isJsonObject) return@mapNotNull null
+            val o = el.asJsonObject
+            TargetJual(
+                resepId = o.optString("id"),
+                nama = o.optString("nama") ?: return@mapNotNull null,
+                qty = o.optDouble("qty") ?: 0.0,
+                hargaJual = o.optDouble("harga_jual") ?: 0.0,
+            )
+        }
         return Permintaan(
             id = id,
             outletId = outletId,
@@ -98,8 +113,9 @@ object PermintaanRepository {
             createdAt = optString("created_at"),
             dibuatOleh = optString("dibuat_oleh"),
             pembuatNama = null,
-            alasanPenolakan = optString("alasan_penolakan"),
+            catatanKitchen = optString("catatan_kitchen"),
             suratJalanId = optString("surat_jalan_id"),
+            targetJual = target,
             items = items,
         )
     }
@@ -130,6 +146,128 @@ object PermintaanRepository {
             threshold = o.optDouble("threshold") ?: 0.0,
             status = status,
         )
+    }
+
+    // ---------------------------------------------------------------- katalog
+
+    private var katalogCache: Pair<Long, List<BahanBaku>>? = null
+    private const val KATALOG_TTL_MS = 5 * 60_000L
+
+    /**
+     * Master bahan baku aktif untuk katalog form — cermin `useBahanBaku` web
+     * (staleTime 5 menit). RLS `bahan_baku` mengizinkan baca untuk authenticated.
+     */
+    suspend fun bahanBaku(): List<BahanBaku> {
+        katalogCache?.let { (saat, data) ->
+            if (System.currentTimeMillis() - saat < KATALOG_TTL_MS) return data
+        }
+        val hasil = Postgrest.select(
+            "bahan_baku",
+            listOf(
+                "select" to "id,nama,kategori,satuan,satuan_tengah,satuan_kecil," +
+                    "faktor_tengah,faktor_tampilan,satuan_distribusi",
+                "is_active" to "eq.true",
+                "order" to "nama.asc",
+            ),
+        ).mapNotNull { el ->
+            val o = el.asJsonObject
+            BahanBaku(
+                id = o.optString("id") ?: return@mapNotNull null,
+                nama = o.optString("nama") ?: "(tanpa nama)",
+                kategori = o.optString("kategori"),
+                satuan = o.optString("satuan"),
+                satuanTengah = o.optString("satuan_tengah"),
+                satuanKecil = o.optString("satuan_kecil"),
+                faktorTengah = o.optDouble("faktor_tengah"),
+                faktorTampilan = o.optDouble("faktor_tampilan"),
+                satuanDistribusi = o.optString("satuan_distribusi"),
+            )
+        }
+        katalogCache = System.currentTimeMillis() to hasil
+        return hasil
+    }
+
+    /**
+     * Saldo bahan-bahan tertentu pada beberapa outlet sekaligus, untuk crosscheck
+     * "Stok Outlet | Stok Gudang" di layar persetujuan — padanan `fetchCrosscheckStok`
+     * web. Web membaca `stok_balance` lewat service-role; native memakai
+     * `monitoring_view_crew` (SECURITY DEFINER) yang menyajikan saldo yang sama
+     * tanpa perlu melewati RLS `stok_balance`.
+     *
+     * Hasil: outletId -> (bahanBakuId -> saldo).
+     */
+    suspend fun crosscheck(
+        outletIds: List<String>,
+        bahanBakuIds: List<String>,
+    ): Map<String, Map<String, CrosscheckSaldo>> {
+        if (outletIds.isEmpty() || bahanBakuIds.isEmpty()) return emptyMap()
+        val hasil = HashMap<String, MutableMap<String, CrosscheckSaldo>>()
+        Postgrest.select(
+            "monitoring_view_crew",
+            listOf(
+                "select" to "outlet_id,bahan_baku_id,current_qty,saldo_is_gram",
+                "outlet_id" to "in.(${outletIds.joinToString(",")})",
+                "bahan_baku_id" to "in.(${bahanBakuIds.joinToString(",")})",
+            ),
+        ).forEach { el ->
+            val o = el.asJsonObject
+            val outletId = o.optString("outlet_id") ?: return@forEach
+            val bahanId = o.optString("bahan_baku_id") ?: return@forEach
+            hasil.getOrPut(outletId) { HashMap() }[bahanId] = CrosscheckSaldo(
+                currentQty = o.optDouble("current_qty") ?: 0.0,
+                saldoIsGram = o.optBoolean("saldo_is_gram"),
+            )
+        }
+        return hasil
+    }
+
+    /**
+     * Harga beli per bahan dari `bahan_baku_harga` untuk estimasi nilai keranjang —
+     * padanan `estimateCartValue` web. RLS hanya membuka harga untuk
+     * admin/owner/kitchen/purchasing/admin_finance; role lain akan gagal atau
+     * kosong, dan PEMANGGIL WAJIB memperlakukan itu sebagai "estimasi tidak
+     * tersedia", bukan error. (Web menampilkannya ke semua role karena membaca
+     * lewat service-role — fitur ini pun masih ditandai "Tahap Developer".)
+     */
+    suspend fun hargaBeli(): Map<String, Double> {
+        return Postgrest.select(
+            "bahan_baku_harga",
+            listOf("select" to "bahan_baku_id,harga_beli"),
+        ).mapNotNull { el ->
+            val o = el.asJsonObject
+            val id = o.optString("bahan_baku_id") ?: return@mapNotNull null
+            val harga = o.optDouble("harga_beli") ?: return@mapNotNull null
+            id to harga
+        }.toMap()
+    }
+
+    /**
+     * Kebutuhan bahan (HPP penggunaan) untuk permintaan bertarget penjualan —
+     * RPC `calculate_bahan_baku_request`, sama dengan `calculateBahanBakuRequest` web.
+     * Hasil: bahanBakuId -> kebutuhan.
+     */
+    suspend fun kebutuhanTarget(
+        outletId: String,
+        targets: List<Pair<String, Double>>,
+    ): Map<String, Double> {
+        if (targets.isEmpty()) return emptyMap()
+        val arr = JsonArray()
+        targets.forEach { (resepId, qty) ->
+            arr.add(JsonObject().apply {
+                addProperty("resep_id", resepId)
+                addProperty("qty_target", qty)
+            })
+        }
+        val hasil = Postgrest.rpc("calculate_bahan_baku_request", JsonObject().apply {
+            addProperty("p_outlet_id", outletId)
+            add("p_targets", arr)
+        })
+        if (!hasil.isJsonArray) return emptyMap()
+        return hasil.asJsonArray.mapNotNull { el ->
+            val o = el.asJsonObject
+            val id = o.optString("bahan_baku_id") ?: return@mapNotNull null
+            id to (o.optDouble("kebutuhan") ?: return@mapNotNull null)
+        }.toMap()
     }
 
     // -------------------------------------------------------------- penulisan
