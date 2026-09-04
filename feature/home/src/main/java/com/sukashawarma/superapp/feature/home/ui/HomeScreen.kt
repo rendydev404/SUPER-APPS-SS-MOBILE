@@ -18,8 +18,10 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.WatchLater
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -61,17 +63,34 @@ private val STOK_ROLES = setOf(
     com.sukashawarma.superapp.domain.model.Role.REGIONAL_MANAGER,
 )
 
+/**
+ * Role yang boleh membuka modul Distribusi. Sama persis dengan
+ * `DistribusiAkses.ROLE_MODUL`, disalin ke sini supaya `:feature:home` tidak
+ * perlu bergantung pada `:feature:distribusi` hanya untuk satu himpunan.
+ *
+ * `kitchen` dan `admin` sengaja tidak masuk: penerbitan surat jalan tetap di web,
+ * dan database memang hanya mengizinkan mereka menerbitkannya.
+ */
+private val DISTRIBUSI_ROLES = setOf(
+    com.sukashawarma.superapp.domain.model.Role.CREW,
+    com.sukashawarma.superapp.domain.model.Role.LEADER,
+    com.sukashawarma.superapp.domain.model.Role.AREA_MANAGER,
+    com.sukashawarma.superapp.domain.model.Role.REGIONAL_MANAGER,
+)
+
 @Composable
 fun HomeScreen(
     onOpenAbsensi: () -> Unit,
     onOpenStok: () -> Unit,
+    onOpenDistribusi: () -> Unit,
     onLoggedOut: () -> Unit,
+    onOpenSettings: () -> Unit,
     viewModel: HomeViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
     val staff = state.staff
     Column(Modifier.fillMaxSize().background(SukaSurface).verticalScroll(rememberScrollState())) {
-        HomeHero(state, staff, { viewModel.logout(); onLoggedOut() })
+        HomeHero(state, staff, { viewModel.logout(); onLoggedOut() }, onOpenSettings)
         AttendanceSummaryCard(state)
         Column(Modifier.padding(horizontal = 20.dp)) {
             Spacer(Modifier.height(24.dp))
@@ -108,17 +127,33 @@ fun HomeScreen(
                     )
                 )
             }
+            if (staff?.role in DISTRIBUSI_ROLES) {
+                Spacer(Modifier.height(14.dp))
+                ModuleCard(
+                    ModuleTile(
+                        "Distribusi",
+                        "Terima kiriman, verifikasi barang & riwayat surat jalan",
+                        Icons.Default.LocalShipping,
+                        onOpenDistribusi,
+                        listOf(
+                            Triple("PENERIMAAN", "Scan QR", SukaOnSurface),
+                            Triple("VERIFIKASI", "Per Item", Color(0xFFEA580C)),
+                            Triple("RIWAYAT", "Tersedia", Color(0xFF168451)),
+                        ),
+                    )
+                )
+            }
             Spacer(Modifier.height(28.dp))
         }
     }
 }
 
 @Composable
-private fun HomeHero(state: HomeUiState, staff: com.sukashawarma.superapp.domain.model.StaffProfile?, onLoggedOut: () -> Unit) {
+private fun HomeHero(state: HomeUiState, staff: com.sukashawarma.superapp.domain.model.StaffProfile?, onLoggedOut: () -> Unit, onOpenSettings: () -> Unit) {
     Box(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Color(0xFFEA580C), Color(0xFFF97316), SukaSurface)))) {
         Box(Modifier.size(220.dp).align(Alignment.TopEnd).offset(x = 72.dp, y = (-78).dp).background(Color.White.copy(alpha = 0.10f), CircleShape))
         Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 24.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Surface(shape = RoundedCornerShape(50), color = Color.White.copy(alpha = 0.22f)) {
                     Row(Modifier.padding(start = 6.dp, end = 10.dp, top = 5.dp, bottom = 5.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text("SUKA", Modifier.background(Color.White, RoundedCornerShape(50)).padding(horizontal = 10.dp, vertical = 4.dp), color = Color(0xFFEA580C), fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 0.8.sp)
@@ -129,6 +164,10 @@ private fun HomeHero(state: HomeUiState, staff: com.sukashawarma.superapp.domain
                     }
                 }
                 Spacer(Modifier.weight(1f))
+                Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.18f)) {
+                    IconButton(onClick = onOpenSettings) { Icon(Icons.Default.Settings, "Pengaturan", tint = Color.White, modifier = Modifier.size(17.dp)) }
+                }
+                Spacer(Modifier.width(8.dp))
                 Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.18f)) {
                     IconButton(onClick = onLoggedOut) { Icon(Icons.Default.Logout, "Keluar", tint = Color.White, modifier = Modifier.size(17.dp)) }
                 }
