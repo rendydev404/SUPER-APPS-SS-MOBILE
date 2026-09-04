@@ -60,29 +60,31 @@ class DistribusiUnitTest {
     }
 
     /**
-     * Regresi harga (2026-09-04). `bahan_baku_harga.harga_beli` berharga per SATUAN
-     * BESAR, sedangkan keranjang berada pada satuan pesan. Web mengalikan keduanya
-     * mentah-mentah sehingga BAWANG 1 kg tampil Rp 650.000 — itu harga 1 Bal (20 kg).
-     * Angka di bawah diambil dari data produksi.
+     * Faktor distribusi untuk bahan nyata di produksi (2026-09-04), dipakai saat
+     * mengubah qty keranjang menjadi qty tersimpan — cermin `convertToBaseUnit` web.
+     *
+     * Perhatikan: faktor ini SENGAJA tidak dipakai pada estimasi harga. Web mengalikan
+     * `harga_beli` dengan qty satuan pesan, dan native mengikutinya supaya angka di HP
+     * sama dengan di browser — lihat catatan skala di `PermintaanRepository.estimasiNilai`.
      */
     @Test
-    fun `harga per satuan besar dikonversi ke satuan pesan`() {
-        // BAWANG: besar Bal, tengah Kg (20 per Bal), pesan kg, harga 650.000 per Bal.
+    fun `faktor distribusi bahan produksi`() {
+        // BAWANG: besar Bal, tengah Kg (20 per Bal), pesan kg.
         val bawang = DistribusiUnit.faktor("Bal", "Kg", 20.0, "Gram", 20000.0, "kg")
         assertEquals(20.0, bawang, 0.0001)
-        assertEquals(32_500.0, DistribusiUnit.keBase(1.0, bawang) * 650_000.0, 0.01)
+        assertEquals(0.05, DistribusiUnit.keBase(1.0, bawang), 0.0001)
 
-        // KEJU: besar Dus, tengah Pack (24 per Dus), pesan pack, harga 289.056 per Dus.
+        // KEJU: besar Dus, tengah Pack (24 per Dus), pesan pack.
         val keju = DistribusiUnit.faktor("Dus", "Pack", 24.0, "Lembar", 240.0, "pack")
-        assertEquals(12_044.0, DistribusiUnit.keBase(1.0, keju) * 289_056.0, 0.01)
+        assertEquals(24.0, keju, 0.0001)
 
-        // KERTAS STRUK: besar pack, kecil Roll (10 per pack), pesan roll, harga 16.000 per pack.
+        // KERTAS STRUK: besar pack, kecil Roll (10 per pack), pesan roll.
         val struk = DistribusiUnit.faktor("pack", null, null, "Roll", 10.0, "roll")
-        assertEquals(1_600.0, DistribusiUnit.keBase(1.0, struk) * 16_000.0, 0.01)
+        assertEquals(10.0, struk, 0.0001)
 
-        // AYAM: satuan pesan sama dengan satuan besar — harga dipakai apa adanya.
+        // AYAM: satuan pesan sama dengan satuan besar — tanpa konversi.
         val ayam = DistribusiUnit.faktor("Kg", null, null, "Gram", 1000.0, "kg")
-        assertEquals(53_500.0, DistribusiUnit.keBase(1.0, ayam) * 53_500.0, 0.01)
+        assertEquals(1.0, ayam, 0.0001)
     }
 
     @Test
