@@ -304,6 +304,10 @@ object SuratJalanRepository {
             listOf("id" to "eq.$itemId"),
             patchVerifikasi(qtyTerimaDasar, qtyDikirimDasar, kondisi, catatan, fotoPath, waktu),
         )
+        // Wajib dibuang walau alur normal langsung disusul finalisasi() yang juga
+        // membuang cache: fungsi ini juga dipakai untuk menyimpan sebagian verifikasi
+        // tanpa langsung memfinalisasi, jadi tidak boleh bergantung pada pemanggil lain.
+        invalidate()
     }
 
     /**
