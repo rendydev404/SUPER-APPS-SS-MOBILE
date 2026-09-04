@@ -17,10 +17,14 @@ import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -43,8 +47,21 @@ fun InboxScreen(
     viewModel: InboxViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Galat pemuatan pertama memakai LayarGalat layar penuh di bawah. Galat
+    // yang muncul saat daftar sudah terisi (mis. penyegaran gagal) tidak
+    // boleh diam-diam hilang — crew harus tahu datanya mungkin tidak mutakhir.
+    LaunchedEffect(state.error) {
+        val teks = state.error
+        if (teks != null && state.daftar.isNotEmpty()) {
+            snackbarHostState.showSnackbar(teks)
+            viewModel.bersihkanPesan()
+        }
+    }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             // Tombol pindai hanya untuk yang berhak memverifikasi. Pengawas
             // membuka layar ini untuk memantau, bukan untuk menerima barang.
