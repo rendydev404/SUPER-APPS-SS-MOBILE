@@ -7,6 +7,7 @@ import com.sukashawarma.superapp.data.remote.SupabaseClient
 import com.sukashawarma.superapp.data.remote.AuthSessionManager
 import com.sukashawarma.superapp.data.location.LocationTracking
 import com.sukashawarma.superapp.domain.session.AppSession
+import com.sukashawarma.superapp.feature.distribusi.data.VerifikasiDraftStore
 import dagger.hilt.android.HiltAndroidApp
 
 @HiltAndroidApp
@@ -14,6 +15,7 @@ class SuperappApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         AuthPrefs.init(this)
+        VerifikasiDraftStore.init(this)
         SupabaseClient.onRefreshNeeded = { AuthSessionManager.refresh() }
         NetworkMonitor.init(this)
         // Sesi habis / logout: pelacakan lokasi kehilangan `outlet_staff_id` tujuannya,
