@@ -30,6 +30,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -93,6 +94,30 @@ fun ScanQrScreen(
         if (hasil is HasilPindai.Terbuka) onTerbuka(hasil.suratJalanId)
     }
 
+    // Pemindai dan executor-nya diangkat ke luar AndroidView supaya bisa
+    // dilepas di DisposableEffect di bawah, bukan dibuat ulang setiap kali
+    // factory AndroidView dipanggil.
+    val pemindai = remember { BarcodeScanning.getClient() }
+    val pelaksana = remember { Executors.newSingleThreadExecutor() }
+
+    // bindToLifecycle di bawah terikat ke LocalLifecycleOwner, yang di aplikasi
+    // satu-Activity ini adalah daur hidup Activity, BUKAN daur hidup layar ini.
+    // Berpindah dari layar pindai tidak menghancurkan Activity, jadi tanpa
+    // pelepasan eksplisit ini kamera tetap terkunci (mematikan kamera di layar
+    // verifikasi Task 16), executor terus memanggil pindai() tanpa henti, dan
+    // pemindai ML Kit (Closeable) bocor. Jangan hapus blok ini.
+    DisposableEffect(Unit) {
+        onDispose {
+            try {
+                ProcessCameraProvider.getInstance(konteks).get().unbindAll()
+            } catch (e: Exception) {
+                // Melepas kamera saat layar ditutup tidak boleh menjatuhkan aplikasi.
+            }
+            pelaksana.shutdown()
+            pemindai.close()
+        }
+    }
+
     Column(Modifier.fillMaxSize().background(SukaSurface)) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
@@ -130,13 +155,12 @@ fun ScanQrScreen(
                                 val pratinjau = Preview.Builder().build().also {
                                     it.setSurfaceProvider(tampilan.surfaceProvider)
                                 }
-                                val pemindai = BarcodeScanning.getClient()
                                 val analisis = ImageAnalysis.Builder()
                                     .setBackpressureStrategy(
                                         ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST
                                     )
                                     .build()
-                                analisis.setAnalyzer(Executors.newSingleThreadExecutor()) { bingkai ->
+                                analisis.setAnalyzer(pelaksana) { bingkai ->
                                     val gambar = bingkai.image
                                     if (gambar == null) {
                                         bingkai.close()
