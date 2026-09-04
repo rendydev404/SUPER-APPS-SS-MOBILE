@@ -7,6 +7,7 @@ import com.sukashawarma.superapp.data.remote.optDouble
 import com.sukashawarma.superapp.data.remote.optJsonArray
 import com.sukashawarma.superapp.data.remote.optJsonObject
 import com.sukashawarma.superapp.data.remote.optString
+import com.sukashawarma.superapp.domain.session.AppSession
 import com.sukashawarma.superapp.feature.distribusi.data.model.RentangTanggal
 import com.sukashawarma.superapp.feature.distribusi.data.model.SuratJalanDetail
 import com.sukashawarma.superapp.feature.distribusi.data.model.SuratJalanItem
@@ -46,13 +47,17 @@ object SuratJalanRepository {
     private val cache = HashMap<String, Pair<Long, Any>>()
 
     private suspend fun <T : Any> cached(key: String, load: suspend () -> T): T {
-        val hit = cache[key]
+        // Kunci cache diikat pada staf yang sedang masuk. Tablet outlet dipakai
+        // bergantian: tanpa ini, staf berikutnya memakai cakupan outlet staf
+        // sebelumnya selama sisa TTL, dan melihat daftar yang salah secara diam-diam.
+        val kunci = "${AppSession.staff.value?.id ?: "anonim"}:$key"
+        val hit = cache[kunci]
         if (hit != null && System.currentTimeMillis() - hit.first < TTL_MS) {
             @Suppress("UNCHECKED_CAST")
             return hit.second as T
         }
         val value = load()
-        cache[key] = System.currentTimeMillis() to value
+        cache[kunci] = System.currentTimeMillis() to value
         return value
     }
 
