@@ -39,10 +39,16 @@ dependencies {
     implementation(project(":core:ui"))
     implementation(project(":core:roles"))
     implementation(project(":core:network"))
+    implementation(project(":core:storage"))
+    implementation(project(":core:camera"))
     implementation("androidx.navigation:navigation-compose:2.7.7")
     implementation("androidx.core:core-ktx:1.12.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
+    implementation("com.google.mlkit:barcode-scanning:17.2.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
     implementation("com.google.dagger:hilt-android:2.51")
     kapt("com.google.dagger:hilt-compiler:2.51")
+    testImplementation("junit:junit:4.13.2")
 }
 
 
