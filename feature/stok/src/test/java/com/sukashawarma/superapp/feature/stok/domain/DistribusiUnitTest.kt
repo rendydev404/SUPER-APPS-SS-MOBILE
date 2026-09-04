@@ -59,6 +59,32 @@ class DistribusiUnitTest {
         assertEquals(7.0, DistribusiUnit.gramKeBesar(7.0, null, null), 0.0001)
     }
 
+    /**
+     * Regresi harga (2026-09-04). `bahan_baku_harga.harga_beli` berharga per SATUAN
+     * BESAR, sedangkan keranjang berada pada satuan pesan. Web mengalikan keduanya
+     * mentah-mentah sehingga BAWANG 1 kg tampil Rp 650.000 — itu harga 1 Bal (20 kg).
+     * Angka di bawah diambil dari data produksi.
+     */
+    @Test
+    fun `harga per satuan besar dikonversi ke satuan pesan`() {
+        // BAWANG: besar Bal, tengah Kg (20 per Bal), pesan kg, harga 650.000 per Bal.
+        val bawang = DistribusiUnit.faktor("Bal", "Kg", 20.0, "Gram", 20000.0, "kg")
+        assertEquals(20.0, bawang, 0.0001)
+        assertEquals(32_500.0, DistribusiUnit.keBase(1.0, bawang) * 650_000.0, 0.01)
+
+        // KEJU: besar Dus, tengah Pack (24 per Dus), pesan pack, harga 289.056 per Dus.
+        val keju = DistribusiUnit.faktor("Dus", "Pack", 24.0, "Lembar", 240.0, "pack")
+        assertEquals(12_044.0, DistribusiUnit.keBase(1.0, keju) * 289_056.0, 0.01)
+
+        // KERTAS STRUK: besar pack, kecil Roll (10 per pack), pesan roll, harga 16.000 per pack.
+        val struk = DistribusiUnit.faktor("pack", null, null, "Roll", 10.0, "roll")
+        assertEquals(1_600.0, DistribusiUnit.keBase(1.0, struk) * 16_000.0, 0.01)
+
+        // AYAM: satuan pesan sama dengan satuan besar — harga dipakai apa adanya.
+        val ayam = DistribusiUnit.faktor("Kg", null, null, "Gram", 1000.0, "kg")
+        assertEquals(53_500.0, DistribusiUnit.keBase(1.0, ayam) * 53_500.0, 0.01)
+    }
+
     @Test
     fun `saldo ke besar menghormati penanda skala baris`() {
         val meta = UnitMeta(satuan = "Kg", satuanKecil = "Gram", faktorTampilan = 1000.0)
