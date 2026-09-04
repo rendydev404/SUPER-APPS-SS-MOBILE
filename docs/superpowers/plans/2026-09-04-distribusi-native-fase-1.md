@@ -490,20 +490,28 @@ object SatuanDistribusi {
         val dist = b.satuanDistribusi ?: return 1.0
         if (dist.equals(b.satuan, ignoreCase = true)) return 1.0
 
-        if (dist.equals(b.satuanTengah, ignoreCase = true) && b.faktorTengah != null) {
-            return b.faktorTengah
+        // Faktor nol atau negatif diperlakukan sebagai TIDAK TERSETEL, bukan
+        // sebagai faktor sungguhan. Web memakai truthiness JavaScript
+        // (`&& b.faktor_tengah`), dan di JavaScript `0` itu falsy, jadi baris
+        // berfaktor nol jatuh ke 1 di sana. Menerjemahkannya jadi `!= null`
+        // membuat keDasar() membagi dengan nol dan menulis NaN ke ledger_stok.
+        val tengah = b.faktorTengah?.takeIf { it > 0.0 }
+        if (dist.equals(b.satuanTengah, ignoreCase = true) && tengah != null) {
+            return tengah
         }
-        if (dist.equals(b.satuanKecil, ignoreCase = true) && b.faktorTampilan != null) {
-            return b.faktorTampilan
+        val kecil = b.faktorTampilan?.takeIf { it > 0.0 }
+        if (dist.equals(b.satuanKecil, ignoreCase = true) && kecil != null) {
+            return kecil
         }
         // Pemetaan implisit yang ada di web: satuan distribusi "kg" sementara
         // satuan kecilnya "gram". Faktor tampilan dinyatakan dalam gram, jadi
         // harus dibagi seribu dulu untuk mendapatkan faktor per kilogram.
+        val implisit = b.faktorTampilan?.takeIf { it > 0.0 }
         if (dist.equals("kg", ignoreCase = true) &&
             b.satuanKecil.equals("gram", ignoreCase = true) &&
-            b.faktorTampilan != null
+            implisit != null
         ) {
-            return b.faktorTampilan / 1000.0
+            return implisit / 1000.0
         }
         return 1.0
     }
@@ -531,7 +539,7 @@ object SatuanDistribusi {
 .\gradlew.bat :feature:distribusi:testDebugUnitTest --tests "*SatuanDistribusiTest*"
 ```
 
-Diharapkan: LULUS, 12 test.
+Diharapkan: LULUS, 16 test.
 
 - [ ] **Step 5: Commit**
 
