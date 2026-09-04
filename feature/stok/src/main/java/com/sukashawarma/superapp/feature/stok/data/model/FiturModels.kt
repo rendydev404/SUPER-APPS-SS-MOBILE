@@ -1,5 +1,6 @@
 package com.sukashawarma.superapp.feature.stok.data.model
 
+import com.sukashawarma.superapp.feature.stok.domain.DistribusiUnit
 import com.sukashawarma.superapp.feature.stok.domain.UnitMeta
 
 // ------------------------------------------------------------------- ledger
@@ -139,10 +140,73 @@ data class Permintaan(
     val createdAt: String?,
     val dibuatOleh: String?,
     val pembuatNama: String?,
-    val alasanPenolakan: String?,
+    /**
+     * Nama kolomnya di database memang `catatan_kitchen` — diisi alasan penolakan
+     * saat ditolak, atau catatan otomatis saat dibatalkan sistem (stale >12 jam).
+     */
+    val catatanKitchen: String?,
     val suratJalanId: String?,
+    /** `target_metadata` — target penjualan yang melatarbelakangi permintaan, bila ada. */
+    val targetJual: List<TargetJual> = emptyList(),
     val items: List<PermintaanItem>,
-)
+) {
+    /** Kode ringkas ala web: `#REQ-XXXX` dari 4 karakter pertama id. */
+    val kodeReq: String get() = "#REQ-${id.take(4).uppercase()}"
+
+    val omzetTarget: Double get() = targetJual.sumOf { it.omzet }
+}
+
+/** Satu baris `target_metadata` pada permintaan; `resepId` dipakai kalkulasi kebutuhan. */
+data class TargetJual(
+    val resepId: String?,
+    val nama: String,
+    val qty: Double,
+    val hargaJual: Double,
+) {
+    val omzet: Double get() = qty * hargaJual
+}
+
+/**
+ * Satu baris master `bahan_baku` untuk katalog permintaan — cermin `useBahanBaku` web.
+ * Hanya kolom yang dipakai form yang ditarik.
+ */
+data class BahanBaku(
+    val id: String,
+    val nama: String,
+    val kategori: String?,
+    val satuan: String?,
+    val satuanTengah: String?,
+    val satuanKecil: String?,
+    val faktorTengah: Double?,
+    val faktorTampilan: Double?,
+    /** Satuan yang dipakai orang saat memesan; null = sama dengan satuan besar. */
+    val satuanDistribusi: String?,
+) {
+    val meta: UnitMeta
+        get() = UnitMeta(
+            satuan = satuan,
+            satuanTengah = satuanTengah,
+            satuanKecil = satuanKecil,
+            faktorTengah = faktorTengah,
+            faktorTampilan = faktorTampilan,
+        )
+
+    /** Label satuan pesan; jatuh ke satuan besar bila distribusi tidak diset. */
+    val satuanPesan: String get() = satuanDistribusi ?: satuan ?: ""
+
+    val faktorDistribusi: Double
+        get() = DistribusiUnit.faktor(
+            satuan = satuan,
+            satuanTengah = satuanTengah,
+            faktorTengah = faktorTengah,
+            satuanKecil = satuanKecil,
+            faktorTampilan = faktorTampilan,
+            satuanDistribusi = satuanDistribusi,
+        )
+}
+
+/** Saldo satu bahan pada satu outlet untuk crosscheck di layar persetujuan. */
+data class CrosscheckSaldo(val currentQty: Double, val saldoIsGram: Boolean)
 
 /** Bahan berstatus tidak aman yang disarankan untuk diminta. */
 data class SaranPermintaan(
