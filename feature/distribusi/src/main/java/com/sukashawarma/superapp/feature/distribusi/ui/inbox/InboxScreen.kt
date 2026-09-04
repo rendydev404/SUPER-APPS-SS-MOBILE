@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -13,6 +14,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -35,6 +37,7 @@ import com.sukashawarma.superapp.feature.distribusi.ui.KartuSuratJalan
 import com.sukashawarma.superapp.feature.distribusi.ui.LayarGalat
 import com.sukashawarma.superapp.feature.distribusi.ui.LayarKosong
 import com.sukashawarma.superapp.feature.distribusi.ui.LayarMemuat
+import com.sukashawarma.superapp.feature.distribusi.ui.SegarkanSaatAktif
 import com.sukashawarma.superapp.presentation.theme.SukaGray500
 import com.sukashawarma.superapp.presentation.theme.SukaOnSurface
 import com.sukashawarma.superapp.presentation.theme.SukaSurface
@@ -48,6 +51,8 @@ fun InboxScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    SegarkanSaatAktif { viewModel.muat(paksa = true) }
 
     // Galat pemuatan pertama memakai LayarGalat layar penuh di bawah. Galat
     // yang muncul saat daftar sudah terisi (mis. penyegaran gagal) tidak
@@ -88,6 +93,10 @@ fun InboxScreen(
                         fontWeight = FontWeight.ExtraBold,
                     )
                     Text(state.namaOutlet, color = SukaGray500, fontSize = 11.sp)
+                }
+                Spacer(Modifier.weight(1f))
+                IconButton(onClick = { viewModel.muat(paksa = true) }) {
+                    Icon(Icons.Default.Refresh, "Segarkan")
                 }
             }
 
