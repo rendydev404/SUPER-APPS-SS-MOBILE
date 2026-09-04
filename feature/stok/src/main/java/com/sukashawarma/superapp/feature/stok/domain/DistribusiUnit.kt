@@ -1,15 +1,48 @@
 package com.sukashawarma.superapp.feature.stok.domain
 
 /**
- * Normalisasi skala saldo untuk modul stok.
+ * Konversi satuan distribusi — port `getDistribusiFactor`, `convertToDistribusiUnit`,
+ * dan `convertToBaseUnit` dari `apps/stok/src/lib/format/compositeUnit.ts`.
  *
- * Catatan sejarah (2026-09-04): di sini dulu ada konversi satuan distribusi
- * (`faktor`/`keDistribusi`/`keBase`, port `getDistribusiFactor` web). Konversi itu
- * dibuang setelah diputuskan native memesan dalam SATUAN BESAR — lihat
- * `BahanBaku.satuanPesan`. Yang tersisa hanya normalisasi saldo, yang memang tidak
- * ada hubungannya dengan satuan pesan.
+ * `permintaan_bahan_item.qty_diminta`/`qty_disetujui` SELALU tersimpan pada satuan
+ * besar (base), tetapi orang lapangan memesan dalam satuan distribusi (mis. "kg"
+ * padahal satuan besarnya "Bal"). Faktor di sini = berapa satuan distribusi dalam
+ * satu satuan besar.
+ *
+ * Perhatikan makna `faktorTengah` mengikuti web: berapa satuan TENGAH dalam satu
+ * satuan besar (bukan satuan kecil per tengah) — lihat catatan di [decomposeTriUnit].
  */
 object DistribusiUnit {
+
+    fun faktor(
+        satuan: String?,
+        satuanTengah: String?,
+        faktorTengah: Double?,
+        satuanKecil: String?,
+        faktorTampilan: Double?,
+        satuanDistribusi: String?,
+    ): Double {
+        val dist = satuanDistribusi?.trim()?.lowercase().orEmpty()
+        if (dist.isEmpty() || dist == satuan?.trim()?.lowercase()) return 1.0
+        if (dist == satuanTengah?.trim()?.lowercase() && (faktorTengah ?: 0.0) > 0.0) {
+            return faktorTengah!!
+        }
+        if (dist == satuanKecil?.trim()?.lowercase() && (faktorTampilan ?: 0.0) > 0.0) {
+            return faktorTampilan!!
+        }
+        // Pemetaan implisit web: distribusi "kg" atas satuan kecil "gram".
+        if (dist == "kg" && satuanKecil?.trim()?.lowercase() == "gram" && (faktorTampilan ?: 0.0) > 0.0) {
+            return faktorTampilan!! / 1000.0
+        }
+        return 1.0
+    }
+
+    /** Satuan besar (base) -> satuan distribusi. */
+    fun keDistribusi(qtyBase: Double, faktor: Double): Double = qtyBase * faktor
+
+    /** Satuan distribusi -> satuan besar (base) — dipakai saat mengirim ke database. */
+    fun keBase(qtyDistribusi: Double, faktor: Double): Double =
+        if (faktor > 0.0) qtyDistribusi / faktor else qtyDistribusi
 
     /**
      * Saldo gram-scale -> satuan besar — cermin `convertGramToBesar` web. Tanpa

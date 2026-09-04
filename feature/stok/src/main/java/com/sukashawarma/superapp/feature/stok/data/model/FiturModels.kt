@@ -1,5 +1,6 @@
 package com.sukashawarma.superapp.feature.stok.data.model
 
+import com.sukashawarma.superapp.feature.stok.domain.DistribusiUnit
 import com.sukashawarma.superapp.feature.stok.domain.StatusTopUp
 import com.sukashawarma.superapp.feature.stok.domain.UnitMeta
 
@@ -192,21 +193,27 @@ data class BahanBaku(
         )
 
     /**
-     * Satuan yang dipakai saat memesan di aplikasi ini: SELALU satuan besar.
+     * Satuan yang dipakai saat memesan, mengikuti `satuan_distribusi` seperti web —
+     * mis. BAWANG dipesan per "kg" walau satuan besarnya "Bal".
      *
-     * Kolom `satuan_distribusi` sengaja diabaikan (keputusan 2026-09-04). Untuk 19
-     * bahan, kolom itu berisi satuan tengah/kecil — mis. BAWANG besar "Bal" tetapi
-     * `satuan_distribusi` "kg" — sedangkan `bahan_baku_harga.harga_beli` berharga per
-     * satuan besar (BAWANG Rp 650.000 = 1 Bal = 20 kg). Menampilkan satuan pesan "kg"
-     * bersama harga per Bal membuat layar berbohong: "1 kg = Rp 650.000".
-     *
-     * Memesan dalam satuan besar membuat qty, harga, dan `terpakai` di budget berada
-     * pada skala yang sama, tanpa mengubah data produksi yang dipakai bersama web.
-     * Konsekuensinya pesanan minimum adalah 1 satuan besar penuh, dan web tetap boleh
-     * memesan pecahan — qty tersimpan sama-sama pada satuan besar, jadi keduanya tetap
-     * bisa saling membaca.
+     * Harga `bahan_baku_harga.harga_beli` berharga per SATUAN BESAR, jadi qty pesanan
+     * WAJIB dikonversi lewat [faktorDistribusi] sebelum dikalikan harga — lihat
+     * `PermintaanRepository.estimasiNilai`. Web sempat melewatkan konversi itu
+     * sehingga 1 kg bawang terbaca Rp 650.000 (harga 1 Bal), dan kini sudah diperbaiki
+     * di sisi web juga.
      */
-    val satuanPesan: String get() = satuan ?: satuanDistribusi ?: ""
+    val satuanPesan: String get() = satuanDistribusi ?: satuan ?: ""
+
+    /** Berapa satuan pesan dalam satu satuan besar; 1.0 bila keduanya sama. */
+    val faktorDistribusi: Double
+        get() = DistribusiUnit.faktor(
+            satuan = satuan,
+            satuanTengah = satuanTengah,
+            faktorTengah = faktorTengah,
+            satuanKecil = satuanKecil,
+            faktorTampilan = faktorTampilan,
+            satuanDistribusi = satuanDistribusi,
+        )
 }
 
 /** Saldo satu bahan pada satu outlet untuk crosscheck di layar persetujuan. */
