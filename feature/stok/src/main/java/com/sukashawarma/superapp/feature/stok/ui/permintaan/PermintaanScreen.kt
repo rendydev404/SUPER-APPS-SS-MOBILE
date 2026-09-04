@@ -584,7 +584,7 @@ private fun StepperQty(
                 androidx.compose.foundation.text.BasicTextField(
                     value = if (qty > 0L) qty.toString() else "",
                     onValueChange = onSet,
-                    modifier = Modifier.width(36.dp),
+                    modifier = Modifier.width(30.dp),
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     textStyle = androidx.compose.ui.text.TextStyle(
@@ -594,7 +594,14 @@ private fun StepperQty(
                         textAlign = TextAlign.Center,
                     ),
                 )
-                Text(satuan, color = SukaOnSurfaceVariant, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                // softWrap dimatikan: label satuan pernah terpotong jadi dua baris ("Ba"/"l")
+                // ketika kolomnya sempit, dan satuan yang terbelah lebih buruk daripada
+                // satuan yang terpangkas.
+                Text(
+                    satuan,
+                    color = SukaOnSurfaceVariant, fontSize = 10.sp, fontWeight = FontWeight.SemiBold,
+                    maxLines = 1, softWrap = false, overflow = TextOverflow.Visible,
+                )
             }
             Surface(
                 onClick = onPlus,
