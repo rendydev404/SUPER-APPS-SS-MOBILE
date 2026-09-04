@@ -64,6 +64,7 @@ import com.sukashawarma.superapp.feature.stok.data.model.SaranPermintaan
 import com.sukashawarma.superapp.feature.stok.data.model.StatusPermintaan
 import com.sukashawarma.superapp.feature.stok.domain.Budget
 import com.sukashawarma.superapp.feature.stok.domain.BudgetVarian
+import com.sukashawarma.superapp.feature.stok.domain.DistribusiUnit
 import com.sukashawarma.superapp.feature.stok.domain.StatusTopUp
 import com.sukashawarma.superapp.feature.stok.domain.formatAngkaStok
 import com.sukashawarma.superapp.feature.stok.domain.formatRupiah as formatRp
@@ -197,13 +198,14 @@ private fun BadgeBudget(
 }
 
 /**
- * Qty permintaan yang TERSIMPAN, siap tampil. Nilainya selalu pada satuan besar dan
- * bisa pecahan bila permintaan dibuat dari web (0,2083 Dus = 5 Pack), jadi ditampilkan
- * berjenjang — bukan dibulatkan jadi "1 Dus" yang menyesatkan.
+ * Qty permintaan yang TERSIMPAN (selalu satuan besar) menjadi teks pada satuan pesan,
+ * dibulatkan ke atas — cermin tampilan web.
  */
 private fun qtyTersimpanTeks(qtyBase: Double, bahan: BahanBaku?, satuanCadangan: String?): String {
-    val meta = bahan?.meta ?: return "${formatAngkaStok(qtyBase)} ${formatSatuan(satuanCadangan)}".trim()
-    return formatTriUnitAdaptif(qtyBase, saldoIsGram = false, meta = meta)
+    val satuan = formatSatuan(bahan?.satuanPesan ?: satuanCadangan)
+    if (bahan == null) return "${formatAngkaStok(qtyBase)} $satuan".trim()
+    val dist = ceil(DistribusiUnit.keDistribusi(qtyBase, bahan.faktorDistribusi)).toLong()
+    return "$dist $satuan".trim()
 }
 
 @Composable
@@ -1296,28 +1298,6 @@ private fun LayarPersetujuan(
                         status = state.budgetPerOutlet[p.outletId],
                         proyeksi = state.estimasiSetuju.totalNilai,
                     )
-                }
-            }
-
-            val pecahan = viewModel.bahanDimintaPecahan()
-            if (pecahan.isNotEmpty()) {
-                item(key = "peringatan-pecahan") {
-                    Surface(
-                        Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color(0xFFFFFBEB),
-                        border = BorderStroke(1.dp, Color(0xFFFDE68A)),
-                    ) {
-                        Text(
-                            "⚠️ ${pecahan.joinToString(", ")} diminta dalam satuan lebih kecil " +
-                                "(dibuat dari web). Aplikasi ini hanya bisa menyetujui satuan besar penuh, " +
-                                "jadi jumlah di atas LEBIH BANYAK dari yang diminta. Proses lewat web bila " +
-                                "ingin mengirim persis sejumlah permintaannya.",
-                            Modifier.padding(11.dp),
-                            color = Color(0xFF92400E), fontSize = 11.sp, lineHeight = 15.sp,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
                 }
             }
 

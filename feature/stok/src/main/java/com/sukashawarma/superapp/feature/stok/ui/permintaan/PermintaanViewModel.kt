@@ -244,7 +244,7 @@ class PermintaanViewModel : ViewModel() {
                 _state.value = _state.value.copy(
                     memuat = false, katalog = katalog, daftarReview = antrean,
                 )
-                muatBudgetAntrean(antrean)
+                muatBudgetAntrean(antrean, katalog.associateBy { it.id })
             } else {
                 _state.value = _state.value.copy(
                     memuat = false, katalog = katalog,
@@ -283,7 +283,7 @@ class PermintaanViewModel : ViewModel() {
      * Budget tiap outlet yang punya antrean, lalu estimasi nilai item yang diminta per
      * permintaan — hanya untuk outlet ber-plafon, sama seperti `ApprovalCardBudget` web.
      */
-    private suspend fun muatBudgetAntrean(antrean: List<Permintaan>) {
+    private suspend fun muatBudgetAntrean(antrean: List<Permintaan>, bahanMap: Map<String, BahanBaku>) {
         // Paralel, bukan berurutan: antrean lintas outlet bisa berisi puluhan permintaan
         // dan versi berurutan membuat badge baru lengkap belasan detik setelah daftar tampil.
         val perOutlet = coroutineScope {
@@ -298,11 +298,15 @@ class PermintaanViewModel : ViewModel() {
                 .filter { perOutlet[it.outletId]?.hasConfig == true && it.items.isNotEmpty() }
                 .map { p ->
                     async {
-                        // Nilai yang DIMINTA apa adanya — jangan dibulatkan ke atas.
-                        // Permintaan dari web tersimpan pecahan (0,2083 Dus = 5 Pack); membulatkannya
-                        // menjadi 1 Dus membuat badge budget menuduh outlet memakai jauh lebih banyak
-                        // daripada yang sebenarnya diminta.
-                        val items = p.items.map { item -> item.bahanBakuId to item.qtyDiminta }
+                        // Harga berskala satuan besar, jadi qty dikirim pada satuan besar juga.
+                        // Dibulatkan lewat satuan pesan dulu supaya cocok dengan jumlah yang
+                        // benar-benar akan dikirim saat disetujui.
+                        val items = p.items.map { item ->
+                            val bahan = bahanMap[item.bahanBakuId]
+                            val faktor = bahan?.faktorDistribusi ?: 1.0
+                            val dist = ceil(DistribusiUnit.keDistribusi(item.qtyDiminta, faktor))
+                            item.bahanBakuId to DistribusiUnit.keBase(dist, faktor)
+                        }
                         runCatching { PermintaanRepository.estimasiNilai(items) }.getOrNull()
                             ?.let { p.id to it.totalNilai }
                     }
@@ -317,8 +321,10 @@ class PermintaanViewModel : ViewModel() {
     /** Estimasi keranjang dengan debounce 500 ms — cermin efek di PermintaanForm. */
     private fun jadwalkanEstimasi() {
         estimasiJob?.cancel()
-        // Keranjang sudah pada satuan besar, skala yang sama dengan harga_beli.
-        val items = _state.value.keranjangItems.map { it.bahan.id to it.qty.toDouble() }
+        // Keranjang berada pada satuan pesan, harga berskala satuan besar — konversi dulu.
+        val items = _state.value.keranjangItems.map {
+            it.bahan.id to DistribusiUnit.keBase(it.qty.toDouble(), it.bahan.faktorDistribusi)
+        }
         if (items.isEmpty()) {
             _state.value = _state.value.copy(estimasi = EstimasiKeranjang())
             return
@@ -336,9 +342,9 @@ class PermintaanViewModel : ViewModel() {
     private fun jadwalkanEstimasiSetuju() {
         estimasiSetujuJob?.cancel()
         val p = _state.value.approveUntuk ?: return
-        // qty disetujui sudah pada satuan besar.
+        // qtySetujuBase() sudah mengembalikan satuan besar, skala yang sama dengan harga.
         val items = p.items
-            .map { it.bahanBakuId to (_state.value.qtySetuju[it.bahanBakuId] ?: 0L).toDouble() }
+            .map { it.bahanBakuId to qtySetujuBase(it.bahanBakuId) }
             .filter { it.second > 0.0 }
         if (items.isEmpty()) {
             _state.value = _state.value.copy(estimasiSetuju = EstimasiKeranjang())
@@ -389,7 +395,7 @@ class PermintaanViewModel : ViewModel() {
     fun tambahKritis(s: SaranPermintaan) {
         val bahan = _state.value.bahanMap[s.bahanBakuId] ?: return
         val kurang = KatalogPermintaan.kekuranganBesar(s.threshold, s.currentQty, s.saldoIsGram, bahan.meta)
-        val qty = KatalogPermintaan.saranQty(kurang)
+        val qty = KatalogPermintaan.saranQtyDistribusi(kurang, bahan.faktorDistribusi)
         _state.value = _state.value.copy(
             keranjang = _state.value.keranjang + (s.bahanBakuId to qty)
         )
@@ -405,7 +411,7 @@ class PermintaanViewModel : ViewModel() {
             val kurang = KatalogPermintaan.kekuranganBesar(
                 saran.threshold, saran.currentQty, saran.saldoIsGram, bahan.meta,
             )
-            k[saran.bahanBakuId] = KatalogPermintaan.saranQty(kurang)
+            k[saran.bahanBakuId] = KatalogPermintaan.saranQtyDistribusi(kurang, bahan.faktorDistribusi)
         }
         _state.value = s.copy(keranjang = k)
         jadwalkanEstimasi()
@@ -509,9 +515,12 @@ class PermintaanViewModel : ViewModel() {
                 PermintaanRepository.buat(
                     outletId = outlet.id,
                     dibuatOleh = staffId,
-                    // Keranjang dan kolom qty_diminta sama-sama pada satuan besar.
+                    // qty_diminta tersimpan pada satuan besar; keranjang pada satuan pesan.
                     items = items.map { baris ->
-                        PermintaanRepository.ItemDiminta(baris.bahan.id, baris.qty.toDouble())
+                        PermintaanRepository.ItemDiminta(
+                            baris.bahan.id,
+                            DistribusiUnit.keBase(baris.qty.toDouble(), baris.bahan.faktorDistribusi),
+                        )
                     },
                 )
                 estimasiJob?.cancel()
@@ -546,11 +555,16 @@ class PermintaanViewModel : ViewModel() {
      */
     fun bukaApprove(p: Permintaan) {
         val s = _state.value
-        // Stepper bekerja pada bilangan bulat satuan besar. Permintaan dari web bisa
-        // tersimpan pecahan (0,2083 Dus = 5 Pack), jadi dibulatkan ke atas — layarnya
-        // tetap menampilkan jumlah yang diminta apa adanya supaya selisihnya terlihat.
+        // Default jumlah disetujui = jumlah diminta pada satuan pesan, dibulatkan ke
+        // atas seperti ApprovalModal web.
         val awal = p.items.associate { item ->
-            item.bahanBakuId to ceil(item.qtyDiminta).toLong()
+            val bahan = s.bahanMap[item.bahanBakuId]
+            val qty = if (bahan != null) {
+                ceil(DistribusiUnit.keDistribusi(item.qtyDiminta, bahan.faktorDistribusi)).toLong()
+            } else {
+                ceil(item.qtyDiminta).toLong()
+            }
+            item.bahanBakuId to qty
         }
         _state.value = s.copy(
             approveUntuk = p, qtySetuju = awal, memuatCrosscheck = true,
@@ -607,20 +621,11 @@ class PermintaanViewModel : ViewModel() {
     }
 
     /** Qty disetujui satu bahan pada satuan besar — untuk banding stok gudang & kirim RPC. */
-    fun qtySetujuBase(bahanBakuId: String): Double =
-        (_state.value.qtySetuju[bahanBakuId] ?: 0L).toDouble()
-
-    /**
-     * Bahan yang jumlah dimintanya pecahan, yaitu permintaan yang dibuat dari web dengan
-     * satuan pesan lebih kecil (5 Pack = 0,2083 Dus). Stepper di sini hanya menerima
-     * bilangan bulat satuan besar, jadi menyetujuinya berarti mengirim LEBIH BANYAK
-     * daripada yang diminta — approver wajib diberi tahu, bukan dibiarkan menebak.
-     */
-    fun bahanDimintaPecahan(): List<String> {
-        val p = _state.value.approveUntuk ?: return emptyList()
-        return p.items
-            .filter { it.qtyDiminta % 1.0 != 0.0 }
-            .mapNotNull { it.namaBahan ?: _state.value.bahanMap[it.bahanBakuId]?.nama }
+    fun qtySetujuBase(bahanBakuId: String): Double {
+        val s = _state.value
+        val qty = (s.qtySetuju[bahanBakuId] ?: 0L).toDouble()
+        val bahan = s.bahanMap[bahanBakuId] ?: return qty
+        return DistribusiUnit.keBase(qty, bahan.faktorDistribusi)
     }
 
     /** Stok gudang satu bahan pada satuan besar, atau null bila tak termuat. */
