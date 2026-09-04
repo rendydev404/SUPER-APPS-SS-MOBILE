@@ -111,6 +111,13 @@ fun formatAngkaStok(nilai: Double): String {
     return String.format(java.util.Locale.US, "%.1f", nilai)
 }
 
+/** Rupiah bulat bergaya Indonesia, mis. "Rp 922.215" — cermin `formatRp` web. */
+fun formatRupiah(nilai: Double): String {
+    if (!nilai.isFinite()) return "Rp 0"
+    val bulat = Math.round(nilai)
+    return "Rp " + java.text.NumberFormat.getIntegerInstance(java.util.Locale("id", "ID")).format(bulat)
+}
+
 /** Penyeragaman label satuan — cermin `formatUnit` di `CrewList.tsx`. */
 fun formatSatuan(satuan: String?): String {
     val u = satuan?.trim().orEmpty()
