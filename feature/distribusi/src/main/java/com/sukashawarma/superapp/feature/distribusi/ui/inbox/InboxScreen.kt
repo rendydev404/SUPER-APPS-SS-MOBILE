@@ -37,6 +37,8 @@ import com.sukashawarma.superapp.feature.distribusi.ui.KartuSuratJalan
 import com.sukashawarma.superapp.feature.distribusi.ui.LayarGalat
 import com.sukashawarma.superapp.feature.distribusi.ui.LayarKosong
 import com.sukashawarma.superapp.feature.distribusi.ui.LayarMemuat
+import com.sukashawarma.superapp.feature.distribusi.ui.NavBawah
+import com.sukashawarma.superapp.feature.distribusi.ui.TabBawah
 import com.sukashawarma.superapp.feature.distribusi.ui.SegarkanSaatAktif
 import com.sukashawarma.superapp.presentation.theme.SukaGray500
 import com.sukashawarma.superapp.presentation.theme.SukaOnSurface
@@ -47,6 +49,8 @@ fun InboxScreen(
     onKeluar: () -> Unit,
     onBukaScan: () -> Unit,
     onBukaDetail: (String) -> Unit,
+    onBukaDashboard: () -> Unit,
+    onBukaRiwayat: () -> Unit,
     viewModel: InboxViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
@@ -67,6 +71,15 @@ fun InboxScreen(
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
+        bottomBar = {
+            NavBawah(
+                aktif = TabBawah.SCAN,
+                bolehVerifikasi = state.bolehVerifikasi,
+                onDashboard = onBukaDashboard,
+                onScan = onBukaScan,
+                onRiwayat = onBukaRiwayat,
+            )
+        },
         floatingActionButton = {
             // Tombol pindai hanya untuk yang berhak memverifikasi. Pengawas
             // membuka layar ini untuk memantau, bukan untuk menerima barang.
