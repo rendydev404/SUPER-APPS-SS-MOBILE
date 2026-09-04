@@ -1,7 +1,5 @@
 package com.sukashawarma.superapp.feature.stok.domain
 
-import kotlin.math.max
-
 /** Warna badge budget — cermin `BudgetBadgeVariant` web. */
 enum class BudgetVarian { TERSEMBUNYI, HIJAU, ORANYE, MERAH }
 
@@ -40,7 +38,4 @@ object Budget {
         "custom" -> if (customDays != null && customDays > 0) "$customDays Hari Ini" else "Periode Ini"
         else -> periodType
     }
-
-    /** Batas nominal top-up yang boleh diajukan — cermin `maxRequest` di RequestTopUpModal. */
-    fun maksTopUp(plafon: Double, sisa: Double): Double = max(0.0, plafon - max(0.0, sisa))
 }

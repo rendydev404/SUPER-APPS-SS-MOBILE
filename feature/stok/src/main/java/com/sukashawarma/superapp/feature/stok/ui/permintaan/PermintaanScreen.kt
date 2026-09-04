@@ -114,7 +114,6 @@ private fun BadgeBudget(
     status: BudgetStatus?,
     proyeksi: Double = 0.0,
     ringkas: Boolean = false,
-    onTopUp: (() -> Unit)? = null,
 ) {
     if (status == null) return
     val varian = Budget.varian(status.hasConfig, status.nominal, status.terpakai, proyeksi)
@@ -155,33 +154,15 @@ private fun BadgeBudget(
         border = BorderStroke(1.dp, warna.copy(alpha = 0.25f)),
     ) {
         Column(Modifier.padding(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        "Sisa Budget ${Budget.labelPeriode(status.periodType, status.customDays)}: " +
-                            formatRp(maxOf(0.0, sisaProyeksi)) + " dari ${formatRp(status.nominal)}",
-                        color = warna, fontSize = 11.sp, fontWeight = FontWeight.Bold, lineHeight = 15.sp,
-                    )
-                    Text(
-                        "Tahap Developer (Bisa Diabaikan)",
-                        color = Color(0xFF92400E), fontSize = 8.sp, fontWeight = FontWeight.Black,
-                    )
-                }
-                if (onTopUp != null) {
-                    Spacer(Modifier.width(8.dp))
-                    Surface(
-                        onClick = onTopUp,
-                        shape = RoundedCornerShape(10.dp),
-                        color = Oranye,
-                    ) {
-                        Text(
-                            "＋ Top-Up",
-                            Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
-                            color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold,
-                        )
-                    }
-                }
-            }
+            Text(
+                "Sisa Budget ${Budget.labelPeriode(status.periodType, status.customDays)}: " +
+                    formatRp(maxOf(0.0, sisaProyeksi)) + " dari ${formatRp(status.nominal)}",
+                color = warna, fontSize = 11.sp, fontWeight = FontWeight.Bold, lineHeight = 15.sp,
+            )
+            Text(
+                "Tahap Developer (Bisa Diabaikan)",
+                color = Color(0xFF92400E), fontSize = 8.sp, fontWeight = FontWeight.Black,
+            )
             if (proyeksi > 0) {
                 Text(
                     "(Termasuk estimasi keranjang saat ini: -${formatRp(proyeksi)})",
@@ -218,7 +199,6 @@ fun PermintaanScreen(viewModel: PermintaanViewModel = viewModel()) {
 
     if (state.nudgeTerbuka) DialogNudge(state, viewModel)
     if (state.konfirmasiTerbuka) DialogKonfirmasi(state, viewModel)
-    if (state.topUpTerbuka) DialogTopUp(state, viewModel)
 }
 
 // ============================================================== layar utama
@@ -304,12 +284,10 @@ private fun KontenKatalog(state: PermintaanUiState, viewModel: PermintaanViewMod
                 }
             }
 
-            item(key = "budget") {
-                BadgeBudget(
-                    status = state.budget,
-                    proyeksi = state.estimasi.totalNilai,
-                    onTopUp = viewModel::bukaTopUp,
-                )
+            if (state.budget != null) {
+                item(key = "budget") {
+                    BadgeBudget(status = state.budget, proyeksi = state.estimasi.totalNilai)
+                }
             }
 
             item(key = "cari") {
@@ -694,12 +672,10 @@ private fun LayarTinjau(state: PermintaanUiState, viewModel: PermintaanViewModel
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(9.dp),
             ) {
-                item(key = "tinjau-budget") {
-                    BadgeBudget(
-                        status = state.budget,
-                        proyeksi = estimasi.totalNilai,
-                        onTopUp = viewModel::bukaTopUp,
-                    )
+                if (state.budget != null) {
+                    item(key = "tinjau-budget") {
+                        BadgeBudget(status = state.budget, proyeksi = estimasi.totalNilai)
+                    }
                 }
                 val perKategori = items.groupBy { kategoriTampil(it.bahan.kategori) }
                 perKategori.forEach { (kategori, baris) ->
@@ -1272,11 +1248,13 @@ private fun LayarPersetujuan(
                 }
             }
 
-            item(key = "budget-approve") {
-                BadgeBudget(
-                    status = state.budgetPerOutlet[p.outletId],
-                    proyeksi = state.estimasiSetuju.totalNilai,
-                )
+            if (state.budgetPerOutlet[p.outletId] != null) {
+                item(key = "budget-approve") {
+                    BadgeBudget(
+                        status = state.budgetPerOutlet[p.outletId],
+                        proyeksi = state.estimasiSetuju.totalNilai,
+                    )
+                }
             }
 
             if (adaLebih) {
@@ -1394,112 +1372,6 @@ private fun DialogNudge(state: PermintaanUiState, viewModel: PermintaanViewModel
             ) { Text("Tambah Dulu", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = SukaOnSurfaceVariant) }
         },
     )
-}
-
-/**
- * Form pengajuan top-up plafon — cermin `RequestTopUpModal` web, termasuk batas
- * maksimal (plafon - sisa) dan pilihan kategori weekday/weekend.
- */
-@Composable
-private fun DialogTopUp(state: PermintaanUiState, viewModel: PermintaanViewModel) {
-    val budget = state.budget
-    if (budget == null) return
-    val maks = Budget.maksTopUp(budget.nominal, budget.sisa)
-    var nominal by remember { mutableStateOf("") }
-    var kategori by remember { mutableStateOf("weekday") }
-
-    AlertDialog(
-        onDismissRequest = { if (!state.mengajukanTopUp) viewModel.tutupTopUp() },
-        title = { Text("Form Pengajuan Top-Up", fontSize = 15.sp, fontWeight = FontWeight.Black) },
-        text = {
-            Column {
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .background(Color(0xFFF8FAFC), RoundedCornerShape(12.dp))
-                        .padding(11.dp),
-                ) {
-                    BarisNilai("Plafon Maksimal", formatRp(budget.nominal))
-                    BarisNilai("Sisa Saldo", formatRp(budget.sisa))
-                    Spacer(Modifier.height(4.dp))
-                    BarisNilai("Maksimal Pengajuan", formatRp(maks), tebal = true)
-                }
-                Spacer(Modifier.height(11.dp))
-                OutlinedTextField(
-                    value = nominal,
-                    onValueChange = { masukan ->
-                        // Hanya digit, lalu dijepit ke batas maksimal seperti web.
-                        val bersih = masukan.filter { it.isDigit() }.take(12)
-                        val angka = bersih.toLongOrNull()
-                        nominal = when {
-                            bersih.isEmpty() -> ""
-                            angka != null && angka > maks.toLong() -> maks.toLong().toString()
-                            else -> bersih
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("Masukkan nominal…", fontSize = 12.sp) },
-                    prefix = { Text("Rp ", fontSize = 13.sp, fontWeight = FontWeight.Bold) },
-                    singleLine = true,
-                    enabled = !state.mengajukanTopUp,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    shape = RoundedCornerShape(12.dp),
-                )
-                Spacer(Modifier.height(9.dp))
-                Text(
-                    "Kategori Periode",
-                    color = SukaOnSurfaceVariant, fontSize = 11.sp, fontWeight = FontWeight.Bold,
-                )
-                Spacer(Modifier.height(5.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("weekday" to "Weekday", "weekend" to "Weekend").forEach { (nilai, label) ->
-                        ChipKategori(
-                            label = label,
-                            aktif = kategori == nilai,
-                            warnaAktif = Oranye,
-                        ) { kategori = nilai }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { viewModel.ajukanTopUp(nominal.toLongOrNull() ?: 0L, kategori) },
-                enabled = !state.mengajukanTopUp && nominal.isNotEmpty(),
-                colors = ButtonDefaults.buttonColors(containerColor = Oranye),
-                shape = RoundedCornerShape(11.dp),
-            ) {
-                Text(
-                    if (state.mengajukanTopUp) "Memproses…" else "Kirim",
-                    fontSize = 12.sp, fontWeight = FontWeight.Bold,
-                )
-            }
-        },
-        dismissButton = {
-            OutlinedButton(
-                onClick = viewModel::tutupTopUp,
-                enabled = !state.mengajukanTopUp,
-                shape = RoundedCornerShape(11.dp),
-            ) { Text("Batal", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = SukaOnSurfaceVariant) }
-        },
-    )
-}
-
-@Composable
-private fun BarisNilai(label: String, nilai: String, tebal: Boolean = false) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
-        Text(
-            label,
-            Modifier.weight(1f),
-            color = SukaOnSurfaceVariant, fontSize = 11.sp,
-            fontWeight = if (tebal) FontWeight.ExtraBold else FontWeight.Medium,
-        )
-        Text(
-            nilai,
-            color = if (tebal) Oranye else SukaOnSurface,
-            fontSize = 11.sp, fontWeight = FontWeight.Black,
-        )
-    }
 }
 
 @Composable

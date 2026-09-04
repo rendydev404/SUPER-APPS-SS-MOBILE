@@ -231,12 +231,16 @@ object PermintaanRepository {
 
     // ------------------------------------------------------------ nilai & budget
     //
-    // Web menghitung ketiganya di Server Action ber-service-role
-    // (`estimateCartValue`, `getOutletBudgetStatus`, `requestBudgetTopupAction` di
-    // app/actions/budget.ts). Native memakai RPC pembungkus ber-scope dari migration
-    // 20300126000001 yang memasang pagar yang sama (staff aktif / outlet accessible)
-    // lalu mendelegasikan ke fungsi aslinya. Harga beli per bahan tetap tidak pernah
-    // sampai ke klien — hanya agregatnya.
+    // Web menghitung keduanya di Server Action ber-service-role (`estimateCartValue`,
+    // `getOutletBudgetStatus` di app/actions/budget.ts). Native memakai RPC pembungkus
+    // ber-scope dari plan/permintaan-estimasi-budget-scoped-rpcs.sql yang memasang pagar
+    // yang sama (staff aktif / outlet accessible) lalu mendelegasikan ke fungsi aslinya.
+    // Harga beli per bahan tetap tidak pernah sampai ke klien — hanya agregatnya.
+    //
+    // Top-up plafon (`requestBudgetTopupAction` web) sengaja TIDAK diport: tabel
+    // `outlet_budget_topup_requests` dan RPC `request_budget_topup_svc` tidak ada di
+    // database produksi (migration 20260820110001 tak pernah ter-apply), sehingga
+    // tombol top-up di web pun error di sana. Lihat catatan di file SQL tersebut.
 
     /**
      * Estimasi Rupiah untuk item pada satuan distribusi — cermin `estimateCartValue`.
@@ -286,18 +290,6 @@ object PermintaanRepository {
             hasConfig = row.optBoolean("has_config"),
             customDays = row.optInt("custom_days"),
         )
-    }
-
-    /**
-     * Ajukan top-up plafon — cermin `requestBudgetTopupAction`. Batas maksimal
-     * dijaga di database (`request_budget_topup_svc`) dan diulang di UI.
-     */
-    suspend fun ajukanTopUp(outletId: String, nominal: Double, kategoriPeriode: String) {
-        Postgrest.rpc("request_budget_topup_scoped", JsonObject().apply {
-            addProperty("p_outlet_id", outletId)
-            addProperty("p_requested_amount", nominal)
-            addProperty("p_period_category", kategoriPeriode)
-        })
     }
 
     /**

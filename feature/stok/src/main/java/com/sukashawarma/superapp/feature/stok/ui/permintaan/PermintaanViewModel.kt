@@ -14,10 +14,8 @@ import com.sukashawarma.superapp.feature.stok.data.model.Permintaan
 import com.sukashawarma.superapp.feature.stok.data.model.SaranPermintaan
 import com.sukashawarma.superapp.feature.stok.data.model.StatusPermintaan
 import com.sukashawarma.superapp.feature.stok.domain.Approver
-import com.sukashawarma.superapp.feature.stok.domain.Budget
 import com.sukashawarma.superapp.feature.stok.domain.DistribusiUnit
 import com.sukashawarma.superapp.feature.stok.domain.KatalogPermintaan
-import com.sukashawarma.superapp.feature.stok.domain.formatRupiah
 import com.sukashawarma.superapp.feature.stok.domain.stokErrorMessage
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -65,8 +63,6 @@ data class PermintaanUiState(
     val estimasiPerPermintaan: Map<String, Double> = emptyMap(),
     /** Estimasi hidup dari qty yang sedang disetujui di layar persetujuan. */
     val estimasiSetuju: EstimasiKeranjang = EstimasiKeranjang(),
-    val topUpTerbuka: Boolean = false,
-    val mengajukanTopUp: Boolean = false,
     // ---- katalog (tab Buat)
     val tab: TabPermintaan = TabPermintaan.BUAT,
     val cari: String = "",
@@ -336,41 +332,6 @@ class PermintaanViewModel : ViewModel() {
             val hasil = runCatching { PermintaanRepository.estimasiNilai(items) }.getOrNull() ?: return@launch
             if (_state.value.approveUntuk?.id == p.id) {
                 _state.value = _state.value.copy(estimasiSetuju = hasil)
-            }
-        }
-    }
-
-    fun bukaTopUp() { _state.value = _state.value.copy(topUpTerbuka = true) }
-    fun tutupTopUp() { _state.value = _state.value.copy(topUpTerbuka = false) }
-
-    /**
-     * Ajukan top-up plafon. Validasi nominal & batas maksimal mengikuti
-     * `RequestTopUpModal` web; database mengulang pemeriksaan yang sama.
-     */
-    fun ajukanTopUp(nominal: Long, kategoriPeriode: String) {
-        val s = _state.value
-        val outlet = s.outletTerpilih ?: return
-        val budget = s.budget ?: return
-        if (nominal <= 0L) {
-            _state.value = s.copy(pesan = "Nominal tidak valid.")
-            return
-        }
-        val maks = Budget.maksTopUp(budget.nominal, budget.sisa)
-        if (nominal > maks) {
-            _state.value = s.copy(pesan = "Maksimal top-up adalah ${formatRupiah(maks)}.")
-            return
-        }
-        viewModelScope.launch {
-            _state.value = _state.value.copy(mengajukanTopUp = true, error = null, pesan = null)
-            try {
-                PermintaanRepository.ajukanTopUp(outlet.id, nominal.toDouble(), kategoriPeriode)
-                _state.value = _state.value.copy(
-                    mengajukanTopUp = false, topUpTerbuka = false,
-                    pesan = "Permintaan top-up berhasil diajukan.",
-                )
-                muatBudgetOutlet(outlet.id)
-            } catch (e: Exception) {
-                _state.value = _state.value.copy(mengajukanTopUp = false, error = stokErrorMessage(e))
             }
         }
     }

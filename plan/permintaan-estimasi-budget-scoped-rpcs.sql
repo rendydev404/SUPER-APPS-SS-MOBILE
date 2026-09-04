@@ -2,23 +2,34 @@
 -- supabase/migrations/20300126000001_permintaan_estimasi_budget_scoped_rpcs.sql
 -- supaya riwayat migration tetap konsisten.
 --
--- Tiga RPC berpagar untuk klien yang memakai JWT user (aplikasi native), padanan
+-- Dua RPC berpagar untuk klien yang memakai JWT user (aplikasi native), padanan
 -- Server Action ber-service-role di apps/stok/src/app/actions/budget.ts:
 --
---   estimateCartValue        -> estimasi_nilai_keranjang(p_items)
---   getOutletBudgetStatus    -> get_outlet_budget_status_scoped(p_outlet_id)
---   requestBudgetTopupAction -> request_budget_topup_scoped(p_outlet_id, ...)
+--   estimateCartValue     -> estimasi_nilai_keranjang(p_items)
+--   getOutletBudgetStatus -> get_outlet_budget_status_scoped(p_outlet_id)
 --
--- Kenapa pembungkus, bukan GRANT langsung: fungsi aslinya SECURITY DEFINER TANPA
--- pemeriksaan pemanggil (web memagarinya di Server Action lewat
--- assertOutletAccessible / requireActiveStaff). Membuka GRANT berarti siapa pun
--- yang punya sesi bisa membaca budget atau mengajukan top-up untuk outlet mana
--- pun. Pembungkus ini memasang pagar yang sama, lalu mendelegasikan.
+-- Kenapa pembungkus, bukan GRANT langsung ke fungsi aslinya: fungsi asli
+-- SECURITY DEFINER TANPA pemeriksaan pemanggil (web memagarinya di Server Action
+-- lewat assertOutletAccessible / requireActiveStaff). Membuka GRANT berarti siapa
+-- pun yang punya sesi bisa membaca budget outlet mana pun. Pembungkus ini
+-- memasang pagar yang sama, lalu mendelegasikan.
 --
 -- Kenapa estimasi lewat RPC, bukan melonggarkan RLS bahan_baku_harga: web
 -- menampilkan TOTAL estimasi ke semua staf aktif, tetapi harga beli per bahan
 -- tetap hanya untuk admin/owner/kitchen/purchasing/admin_finance (policy
 -- bbh_read). RPC ini menjaga pemisahan itu — yang keluar hanya agregat.
+--
+-- CATATAN (2026-09-04): versi pertama file ini juga membuat
+-- request_budget_topup_scoped, dan GAGAL dengan
+--   ERROR 42704: type "public.outlet_budget_topup_requests" does not exist
+-- Ternyata migration 20260820110001_outlet_budget_topup_ledger.sql tidak pernah
+-- ter-apply ke remote — sama seperti policy RLS permintaan. Artinya tabel
+-- top-up, request_budget_topup_svc, DAN versi get_outlet_budget_status berbasis
+-- outlet_balance semuanya tidak ada di produksi; yang aktif adalah versi
+-- 20260819150000 (periode custom, terpakai = qty_disetujui x harga_snapshot).
+-- Tombol "Ajukan Top-Up" di web karena itu juga error di produksi. Fitur top-up
+-- sengaja TIDAK diikutkan di sini supaya tidak diam-diam mengubah cara budget
+-- web dihitung.
 
 -- ---------------------------------------------------------------------------
 -- 1. Estimasi nilai keranjang — cermin estimateCartValue.
@@ -95,7 +106,8 @@ GRANT  EXECUTE ON FUNCTION public.estimasi_nilai_keranjang(jsonb) TO authenticat
 
 -- ---------------------------------------------------------------------------
 -- 2. Status budget outlet, dibatasi outlet yang boleh diakses pemanggil
---    (cermin assertOutletAccessible). Bentuk hasil = get_outlet_budget_status.
+--    (cermin assertOutletAccessible). Bentuk hasil mengikuti apa pun versi
+--    get_outlet_budget_status yang aktif di database.
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.get_outlet_budget_status_scoped(p_outlet_id uuid)
 RETURNS TABLE (
@@ -123,37 +135,3 @@ $$;
 
 REVOKE EXECUTE ON FUNCTION public.get_outlet_budget_status_scoped(uuid) FROM PUBLIC, anon;
 GRANT  EXECUTE ON FUNCTION public.get_outlet_budget_status_scoped(uuid) TO authenticated, service_role;
-
--- ---------------------------------------------------------------------------
--- 3. Ajukan top-up, dibatasi outlet yang boleh diakses pemanggil
---    (cermin requestBudgetTopupAction). Mengembalikan id request yang dibuat.
--- ---------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.request_budget_topup_scoped(
-  p_outlet_id        uuid,
-  p_requested_amount numeric,
-  p_period_category  text
-)
-RETURNS uuid
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_req public.outlet_budget_topup_requests;
-BEGIN
-  IF NOT (p_outlet_id IN (SELECT accessible_outlet_ids())) THEN
-    RAISE EXCEPTION 'Forbidden: tidak punya akses ke outlet %', p_outlet_id;
-  END IF;
-  IF p_period_category NOT IN ('weekday', 'weekend') THEN
-    RAISE EXCEPTION 'Kategori periode tidak valid: %', p_period_category;
-  END IF;
-  IF p_requested_amount IS NULL OR p_requested_amount <= 0 THEN
-    RAISE EXCEPTION 'Nominal tidak valid';
-  END IF;
-  v_req := public.request_budget_topup_svc(p_outlet_id, p_requested_amount, p_period_category);
-  RETURN v_req.id;
-END;
-$$;
-
-REVOKE EXECUTE ON FUNCTION public.request_budget_topup_scoped(uuid, numeric, text) FROM PUBLIC, anon;
-GRANT  EXECUTE ON FUNCTION public.request_budget_topup_scoped(uuid, numeric, text) TO authenticated, service_role;

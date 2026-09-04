@@ -38,11 +38,4 @@ class BudgetTest {
         assertEquals("Periode Ini", Budget.labelPeriode("custom", null))
         assertEquals("", Budget.labelPeriode(null, 3))
     }
-
-    @Test
-    fun `maksimal top-up tidak pernah negatif`() {
-        assertEquals(1_000_000.0, Budget.maksTopUp(5_000_000.0, 4_000_000.0), 0.0001)
-        assertEquals(5_000_000.0, Budget.maksTopUp(5_000_000.0, -200.0), 0.0001)
-        assertEquals(0.0, Budget.maksTopUp(1_000.0, 5_000.0), 0.0001)
-    }
 }
