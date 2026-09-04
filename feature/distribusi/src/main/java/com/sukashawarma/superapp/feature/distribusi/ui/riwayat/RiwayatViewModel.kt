@@ -2,7 +2,9 @@ package com.sukashawarma.superapp.feature.distribusi.ui.riwayat
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.sukashawarma.superapp.domain.session.AppSession
 import com.sukashawarma.superapp.feature.distribusi.data.SuratJalanRepository
+import com.sukashawarma.superapp.feature.distribusi.domain.DistribusiAkses
 import com.sukashawarma.superapp.feature.distribusi.data.model.SuratJalanRingkas
 import com.sukashawarma.superapp.feature.distribusi.domain.distribusiErrorMessage
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,6 +15,8 @@ data class RiwayatUiState(
     val memuat: Boolean = true,
     val error: String? = null,
     val daftar: List<SuratJalanRingkas> = emptyList(),
+    /** Menentukan apakah tombol Scan QR di nav bawah ditampilkan. */
+    val bolehVerifikasi: Boolean = false,
 )
 
 class RiwayatViewModel : ViewModel() {
@@ -20,14 +24,23 @@ class RiwayatViewModel : ViewModel() {
     private val _state = MutableStateFlow(RiwayatUiState())
     val state: StateFlow<RiwayatUiState> = _state
 
-    init { muat() }
+    init {
+        _state.value = _state.value.copy(
+            bolehVerifikasi = DistribusiAkses.bolehVerifikasi(AppSession.staff.value?.role),
+        )
+        muat()
+    }
 
     fun muat(paksa: Boolean = false) {
         viewModelScope.launch {
             _state.value = _state.value.copy(memuat = true, error = null)
             if (paksa) SuratJalanRepository.invalidate()
             try {
-                _state.value = RiwayatUiState(memuat = false, daftar = SuratJalanRepository.riwayat())
+                _state.value = _state.value.copy(
+                    memuat = false,
+                    error = null,
+                    daftar = SuratJalanRepository.riwayat(),
+                )
             } catch (e: Exception) {
                 _state.value = _state.value.copy(memuat = false, error = distribusiErrorMessage(e))
             }
