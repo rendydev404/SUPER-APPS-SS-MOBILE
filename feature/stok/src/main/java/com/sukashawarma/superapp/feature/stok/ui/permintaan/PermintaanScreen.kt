@@ -582,7 +582,7 @@ private fun StepperQty(
                 androidx.compose.foundation.text.BasicTextField(
                     value = if (qty > 0L) qty.toString() else "",
                     onValueChange = onSet,
-                    modifier = Modifier.width(44.dp),
+                    modifier = Modifier.width(36.dp),
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     textStyle = androidx.compose.ui.text.TextStyle(
@@ -710,12 +710,19 @@ private fun LayarTinjau(state: PermintaanUiState, viewModel: PermintaanViewModel
                                         color = SukaOnSurface, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold,
                                         maxLines = 1, overflow = TextOverflow.Ellipsis,
                                     )
+                                    // Satuan pesan ditulis terpisah di sini: di dalam stepper
+                                    // labelnya terjepit dan sempat tak terbaca sama sekali,
+                                    // padahal ini satu-satunya penanda "1 ini maksudnya apa".
+                                    Text(
+                                        "Satuan pesan: ${formatSatuan(b.bahan.satuanPesan)}",
+                                        color = SukaOnSurfaceVariant, fontSize = 10.sp,
+                                    )
                                     if (estimasi.itemTanpaHarga.contains(b.bahan.id)) {
                                         Text("Harga belum diset", color = Color(0xFF94A3B8), fontSize = 9.sp)
                                     }
                                 }
                                 Spacer(Modifier.width(10.dp))
-                                Box(Modifier.width(140.dp)) {
+                                Box(Modifier.width(152.dp)) {
                                     StepperQty(
                                         qty = b.qty,
                                         satuan = formatSatuan(b.bahan.satuanPesan),
