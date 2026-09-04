@@ -5,17 +5,33 @@ import androidx.lifecycle.viewModelScope
 import com.sukashawarma.superapp.domain.session.AppSession
 import com.sukashawarma.superapp.feature.stok.data.PermintaanRepository
 import com.sukashawarma.superapp.feature.stok.data.StokRepository
+import com.sukashawarma.superapp.feature.stok.data.model.BahanBaku
+import com.sukashawarma.superapp.feature.stok.data.model.CrosscheckSaldo
 import com.sukashawarma.superapp.feature.stok.data.model.OutletRingkas
 import com.sukashawarma.superapp.feature.stok.data.model.Permintaan
 import com.sukashawarma.superapp.feature.stok.data.model.SaranPermintaan
+import com.sukashawarma.superapp.feature.stok.data.model.StatusPermintaan
 import com.sukashawarma.superapp.feature.stok.domain.Approver
+import com.sukashawarma.superapp.feature.stok.domain.DistribusiUnit
+import com.sukashawarma.superapp.feature.stok.domain.KatalogPermintaan
 import com.sukashawarma.superapp.feature.stok.domain.stokErrorMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlin.math.ceil
 
-enum class TabPermintaan(val label: String) { OUTLET("Outlet Saya"), REVIEW("Perlu Review") }
+/** Tab utama untuk role outlet — cermin `mainTab` ('buat' | 'riwayat') di web. */
+enum class TabPermintaan(val label: String) { BUAT("Buat Baru"), RIWAYAT("Riwayat") }
+
+/** Satu baris keranjang yang sudah diresolusikan ke master bahannya. */
+data class BarisKeranjang(val bahan: BahanBaku, val qty: Long)
+
+/** Rincian estimasi nilai keranjang — padanan `estimateCartValue` web, dihitung lokal. */
+data class EstimasiKeranjang(
+    val totalNilai: Double = 0.0,
+    val itemTanpaHarga: List<String> = emptyList(),
+    val kategoriNilai: Map<String, Double> = emptyMap(),
+)
 
 data class PermintaanUiState(
     val memuat: Boolean = true,
@@ -24,27 +40,147 @@ data class PermintaanUiState(
     val tidakBerhak: Boolean = false,
     val outlets: List<OutletRingkas> = emptyList(),
     val outletTerpilih: OutletRingkas? = null,
-    val tab: TabPermintaan = TabPermintaan.OUTLET,
+    /**
+     * Role pengawas/dapur langsung masuk antrean persetujuan dan tidak membuat
+     * permintaan — cermin `isKitchen` di `permintaan/page.tsx`.
+     */
+    val modeAntrean: Boolean = false,
+    val bolehApprove: Boolean = false,
+    val katalogPenuh: Boolean = false,
+    // ---- data bersama
+    val katalog: List<BahanBaku> = emptyList(),
+    val saran: List<SaranPermintaan> = emptyList(),
     val daftarOutlet: List<Permintaan> = emptyList(),
     val daftarReview: List<Permintaan> = emptyList(),
-    val bolehReview: Boolean = false,
-    val bolehApprove: Boolean = false,
-    // Formulir pengajuan
-    val formTerbuka: Boolean = false,
-    val memuatSaran: Boolean = false,
-    val saran: List<SaranPermintaan> = emptyList(),
-    /** Jumlah yang diminta per bahan, sebagai teks agar bisa dikosongkan. */
-    val jumlah: Map<String, String> = emptyMap(),
+    /** Kosong bila RLS menolak (role tanpa hak harga) — estimasi disembunyikan. */
+    val hargaBeli: Map<String, Double> = emptyMap(),
+    // ---- katalog (tab Buat)
+    val tab: TabPermintaan = TabPermintaan.BUAT,
+    val cari: String = "",
+    /** "all", "kritis", atau nama kategori persis. */
+    val kategoriTerpilih: String = "all",
+    /** bahanBakuId -> qty pada satuan distribusi. */
+    val keranjang: Map<String, Long> = emptyMap(),
+    val tinjauTerbuka: Boolean = false,
+    val nudgeTerbuka: Boolean = false,
+    val konfirmasiTerbuka: Boolean = false,
     val mengirim: Boolean = false,
-    // Formulir persetujuan
+    // ---- riwayat
+    val filterStatus: StatusPermintaan? = null,
+    val cariRiwayat: String = "",
+    // ---- persetujuan
     val approveUntuk: Permintaan? = null,
-    val qtySetuju: Map<String, String> = emptyMap(),
+    /** bahanBakuId -> qty disetujui pada satuan distribusi. */
+    val qtySetuju: Map<String, Long> = emptyMap(),
+    val memuatCrosscheck: Boolean = false,
+    val stokOutlet: Map<String, CrosscheckSaldo> = emptyMap(),
+    val stokGudang: Map<String, CrosscheckSaldo> = emptyMap(),
+    /** bahanBakuId -> kebutuhan HPP dari target penjualan, bila ada. */
+    val kebutuhanTarget: Map<String, Double> = emptyMap(),
 ) {
-    val terpilihUntukDiminta: List<Pair<SaranPermintaan, Double>>
-        get() = saran.mapNotNull { s ->
-            val q = jumlah[s.bahanBakuId]?.toDoubleOrNull() ?: return@mapNotNull null
-            if (q > 0) s to q else null
+    val bahanMap: Map<String, BahanBaku> get() = katalog.associateBy { it.id }
+
+    /**
+     * Bahan pada permintaan `menunggu` yang belum lewat 12 jam — disembunyikan dari
+     * katalog agar tidak terduplikasi, cermin `pendingItemIds` web.
+     */
+    val pendingItemIds: Set<String>
+        get() {
+            val now = System.currentTimeMillis()
+            return daftarOutlet
+                .filter { it.status == StatusPermintaan.MENUNGGU }
+                .filter { KatalogPermintaan.masihMenunggu(parseIsoMs(it.createdAt), now) }
+                .flatMap { p -> p.items.map { it.bahanBakuId } }
+                .toSet()
         }
+
+    /** Katalog setelah aturan kategori/role — cermin `allowedBahanBaku`. */
+    val katalogBoleh: List<BahanBaku>
+        get() = katalog.filter { KatalogPermintaan.bolehDiminta(it.kategori, it.nama, katalogPenuh) }
+
+    /** Bahan kritis/menipis yang boleh diminta dan belum tersembunyi pending. */
+    val saranBoleh: List<SaranPermintaan>
+        get() {
+            val pending = pendingItemIds
+            val boleh = katalogBoleh.associateBy { it.id }
+            return saran.filter { it.bahanBakuId in boleh && it.bahanBakuId !in pending }
+        }
+
+    val kategoriList: List<String>
+        get() = katalogBoleh.mapNotNull { it.kategori }.distinct()
+
+    /** Katalog setelah pending-hide + filter kategori + pencarian — cermin `filteredItems`. */
+    val katalogTerfilter: List<BahanBaku>
+        get() {
+            val pending = pendingItemIds
+            val q = cari.trim().lowercase()
+            val idKritis = saranBoleh.map { it.bahanBakuId }.toSet()
+            return katalogBoleh.filter { b ->
+                if (b.id in pending) return@filter false
+                when (kategoriTerpilih) {
+                    "kritis" -> if (b.id !in idKritis) return@filter false
+                    "all" -> Unit
+                    else -> if (b.kategori != kategoriTerpilih) return@filter false
+                }
+                if (q.isNotEmpty()) {
+                    val cocokNama = b.nama.lowercase().contains(q)
+                    val cocokKategori = b.kategori?.lowercase()?.contains(q) == true
+                    if (!cocokNama && !cocokKategori) return@filter false
+                }
+                true
+            }
+        }
+
+    val keranjangItems: List<BarisKeranjang>
+        get() {
+            val pending = pendingItemIds
+            val peta = bahanMap
+            return keranjang.entries
+                .filter { it.value > 0 && it.key !in pending }
+                .mapNotNull { (id, qty) -> peta[id]?.let { BarisKeranjang(it, qty) } }
+        }
+
+    /** Estimasi Rupiah keranjang: qty distribusi × harga beli, seperti web. */
+    val estimasi: EstimasiKeranjang
+        get() {
+            if (hargaBeli.isEmpty()) return EstimasiKeranjang()
+            var total = 0.0
+            val tanpaHarga = mutableListOf<String>()
+            val perKategori = LinkedHashMap<String, Double>()
+            keranjangItems.forEach { baris ->
+                val harga = hargaBeli[baris.bahan.id]
+                if (harga == null) {
+                    tanpaHarga += baris.bahan.id
+                } else {
+                    val sub = harga * baris.qty
+                    total += sub
+                    val kat = baris.bahan.kategori ?: "LAIN-LAIN"
+                    perKategori[kat] = (perKategori[kat] ?: 0.0) + sub
+                }
+            }
+            return EstimasiKeranjang(total, tanpaHarga, perKategori)
+        }
+
+    val riwayatTerfilter: List<Permintaan>
+        get() = daftarOutlet.filter { p ->
+            if (filterStatus != null && p.status != filterStatus) return@filter false
+            val q = cariRiwayat.trim().lowercase()
+            if (q.isNotEmpty()) {
+                val cocokKode = p.kodeReq.lowercase().contains(q)
+                val cocokStaf = p.pembuatNama?.lowercase()?.contains(q) == true
+                val cocokBahan = p.items.any { it.namaBahan?.lowercase()?.contains(q) == true }
+                if (!cocokKode && !cocokStaf && !cocokBahan) return@filter false
+            }
+            true
+        }
+
+    companion object {
+        fun parseIsoMs(iso: String?): Long? = try {
+            java.time.OffsetDateTime.parse(iso).toInstant().toEpochMilli()
+        } catch (_: Exception) {
+            null
+        }
+    }
 }
 
 class PermintaanViewModel : ViewModel() {
@@ -59,8 +195,9 @@ class PermintaanViewModel : ViewModel() {
             val role = AppSession.staff.value?.role
             _state.value = _state.value.copy(
                 memuat = true, error = null, tidakBerhak = false,
-                bolehReview = Approver.bolehReviewPermintaan(role),
+                modeAntrean = Approver.bolehReviewPermintaan(role) || Approver.bolehApprovePermintaan(role),
                 bolehApprove = Approver.bolehApprovePermintaan(role),
+                katalogPenuh = KatalogPermintaan.katalogPenuh(role),
             )
             try {
                 val outlets = StokRepository.accessibleOutlets()
@@ -72,7 +209,7 @@ class PermintaanViewModel : ViewModel() {
                     outlets.firstOrNull { it.id == lama.id }
                 } ?: outlets.first()
                 _state.value = _state.value.copy(outlets = outlets, outletTerpilih = terpilih)
-                muatDaftar()
+                muatData()
             } catch (e: Exception) {
                 _state.value = _state.value.copy(memuat = false, error = stokErrorMessage(e))
             }
@@ -81,29 +218,40 @@ class PermintaanViewModel : ViewModel() {
 
     fun pilihOutlet(outlet: OutletRingkas) {
         if (outlet.id == _state.value.outletTerpilih?.id) return
-        _state.value = _state.value.copy(outletTerpilih = outlet, daftarOutlet = emptyList())
-        viewModelScope.launch { muatDaftar() }
+        _state.value = _state.value.copy(
+            outletTerpilih = outlet, daftarOutlet = emptyList(),
+            saran = emptyList(), keranjang = emptyMap(),
+        )
+        viewModelScope.launch { muatData() }
     }
 
     fun pilihTab(tab: TabPermintaan) {
         _state.value = _state.value.copy(tab = tab)
-        viewModelScope.launch { muatDaftar() }
     }
 
-    private suspend fun muatDaftar() {
+    /**
+     * Muat semua data layar sekaligus. Katalog + harga dipakai kedua mode; saran dan
+     * riwayat hanya untuk mode outlet, antrean hanya untuk mode pengawas.
+     */
+    private suspend fun muatData() {
         val s = _state.value
         val outlet = s.outletTerpilih ?: return
-        _state.value = _state.value.copy(memuat = true, error = null)
+        _state.value = s.copy(memuat = true, error = null)
         try {
-            if (s.tab == TabPermintaan.OUTLET) {
+            val katalog = PermintaanRepository.bahanBaku()
+            // Harga beli hanya terbuka untuk role tertentu; kegagalan = fitur estimasi
+            // tidak tersedia, bukan error layar.
+            val harga = runCatching { PermintaanRepository.hargaBeli() }.getOrDefault(emptyMap())
+            if (s.modeAntrean) {
                 _state.value = _state.value.copy(
-                    memuat = false,
-                    daftarOutlet = PermintaanRepository.daftarOutlet(outlet.id),
+                    memuat = false, katalog = katalog, hargaBeli = harga,
+                    daftarReview = PermintaanRepository.menunggu(s.outlets.map { it.id }),
                 )
             } else {
                 _state.value = _state.value.copy(
-                    memuat = false,
-                    daftarReview = PermintaanRepository.menunggu(s.outlets.map { it.id }),
+                    memuat = false, katalog = katalog, hargaBeli = harga,
+                    saran = PermintaanRepository.saran(outlet.id),
+                    daftarOutlet = PermintaanRepository.daftarOutlet(outlet.id),
                 )
             }
         } catch (e: Exception) {
@@ -111,42 +259,95 @@ class PermintaanViewModel : ViewModel() {
         }
     }
 
-    // ------------------------------------------------------------- pengajuan
+    fun muatUlang() {
+        viewModelScope.launch { muatData() }
+    }
 
-    fun bukaForm() {
-        val outlet = _state.value.outletTerpilih ?: return
-        viewModelScope.launch {
-            _state.value = _state.value.copy(formTerbuka = true, memuatSaran = true, error = null, pesan = null)
-            try {
-                val saran = PermintaanRepository.saran(outlet.id)
-                // Saran jumlah = kekurangan menuju threshold, minimal 1 dan dibulatkan
-                // ke atas — cermin `shortage base = max(1, ceil(threshold - saldo))` di web.
-                val awal = saran.associate { s ->
-                    val kurang = s.threshold - s.currentQty
-                    s.bahanBakuId to maxOf(1.0, ceil(kurang)).toLong().toString()
-                }
-                _state.value = _state.value.copy(memuatSaran = false, saran = saran, jumlah = awal)
-            } catch (e: Exception) {
-                _state.value = _state.value.copy(memuatSaran = false, error = stokErrorMessage(e))
-            }
+    // ------------------------------------------------------------------ katalog
+
+    fun ubahCari(nilai: String) {
+        _state.value = _state.value.copy(cari = nilai)
+    }
+
+    fun pilihKategori(kategori: String) {
+        _state.value = _state.value.copy(kategoriTerpilih = kategori)
+    }
+
+    fun resetFilter() {
+        _state.value = _state.value.copy(cari = "", kategoriTerpilih = "all")
+    }
+
+    /** Ubah qty keranjang sebesar delta; qty <= 0 menghapus baris — cermin `updateManualBahan`. */
+    fun ubahKeranjang(bahanBakuId: String, delta: Long) {
+        val k = _state.value.keranjang.toMutableMap()
+        val baru = (k[bahanBakuId] ?: 0L) + delta
+        if (baru <= 0L) k.remove(bahanBakuId) else k[bahanBakuId] = baru
+        _state.value = _state.value.copy(keranjang = k)
+    }
+
+    fun setKeranjang(bahanBakuId: String, nilai: String) {
+        if (nilai.isNotEmpty() && !nilai.matches(Regex("^\\d{1,5}$"))) return
+        val k = _state.value.keranjang.toMutableMap()
+        val qty = nilai.toLongOrNull() ?: 0L
+        if (qty <= 0L) k.remove(bahanBakuId) else k[bahanBakuId] = qty
+        _state.value = _state.value.copy(keranjang = k)
+    }
+
+    /** Masukkan bahan kritis dengan qty rekomendasi (kekurangan menuju threshold). */
+    fun tambahKritis(s: SaranPermintaan) {
+        val bahan = _state.value.bahanMap[s.bahanBakuId] ?: return
+        val kurang = KatalogPermintaan.kekuranganBesar(s.threshold, s.currentQty, s.saldoIsGram, bahan.meta)
+        val qty = KatalogPermintaan.saranQtyDistribusi(kurang, bahan.faktorDistribusi)
+        _state.value = _state.value.copy(
+            keranjang = _state.value.keranjang + (s.bahanBakuId to qty)
+        )
+    }
+
+    /** 1 klik: semua bahan kritis yang belum ada di keranjang — cermin `addAllCriticalItems`. */
+    fun tambahSemuaKritis() {
+        val s = _state.value
+        val k = s.keranjang.toMutableMap()
+        s.saranBoleh.filter { (k[it.bahanBakuId] ?: 0L) <= 0L }.forEach { saran ->
+            val bahan = s.bahanMap[saran.bahanBakuId] ?: return@forEach
+            val kurang = KatalogPermintaan.kekuranganBesar(
+                saran.threshold, saran.currentQty, saran.saldoIsGram, bahan.meta,
+            )
+            k[saran.bahanBakuId] = KatalogPermintaan.saranQtyDistribusi(kurang, bahan.faktorDistribusi)
+        }
+        _state.value = s.copy(keranjang = k)
+    }
+
+    fun bukaTinjau() { _state.value = _state.value.copy(tinjauTerbuka = true) }
+    fun tutupTinjau() { _state.value = _state.value.copy(tinjauTerbuka = false) }
+    fun tutupNudge() { _state.value = _state.value.copy(nudgeTerbuka = false) }
+    fun tutupKonfirmasi() { _state.value = _state.value.copy(konfirmasiTerbuka = false) }
+
+    /** Guard sebelum kirim: tawarkan menggabung bila keranjang 1 item & masih ada pending. */
+    fun mulaiKirim() {
+        val s = _state.value
+        if (s.keranjangItems.isEmpty()) return
+        if (s.keranjangItems.size == 1 && s.pendingItemIds.isNotEmpty()) {
+            _state.value = s.copy(nudgeTerbuka = true)
+        } else {
+            _state.value = s.copy(konfirmasiTerbuka = true)
         }
     }
 
-    fun tutupForm() {
-        _state.value = _state.value.copy(formTerbuka = false, saran = emptyList(), jumlah = emptyMap())
+    fun lanjutKirimDariNudge() {
+        _state.value = _state.value.copy(nudgeTerbuka = false, konfirmasiTerbuka = true)
     }
 
-    fun ubahJumlah(bahanBakuId: String, nilai: String) {
-        if (nilai.isNotEmpty() && !nilai.matches(Regex("^\\d*\\.?\\d*$"))) return
-        _state.value = _state.value.copy(jumlah = _state.value.jumlah + (bahanBakuId to nilai))
+    fun tambahDuluDariNudge() {
+        _state.value = _state.value.copy(nudgeTerbuka = false, tinjauTerbuka = false)
     }
 
     fun kirimPermintaan() {
-        val outlet = _state.value.outletTerpilih ?: return
+        val s = _state.value
+        val outlet = s.outletTerpilih ?: return
         val staffId = AppSession.staff.value?.id ?: return
-        val items = _state.value.terpilihUntukDiminta
+        val items = s.keranjangItems
         if (items.isEmpty()) {
-            _state.value = _state.value.copy(pesan = "Isi jumlah minimal satu bahan.")
+            _state.value = s.copy(konfirmasiTerbuka = false, pesan = "Tidak ada bahan baku yang perlu diminta.")
             return
         }
         viewModelScope.launch {
@@ -155,39 +356,126 @@ class PermintaanViewModel : ViewModel() {
                 PermintaanRepository.buat(
                     outletId = outlet.id,
                     dibuatOleh = staffId,
-                    items = items.map { (s, q) -> PermintaanRepository.ItemDiminta(s.bahanBakuId, q) },
+                    // qty tersimpan pada satuan besar; keranjang berada di satuan distribusi.
+                    items = items.map { baris ->
+                        PermintaanRepository.ItemDiminta(
+                            baris.bahan.id,
+                            DistribusiUnit.keBase(baris.qty.toDouble(), baris.bahan.faktorDistribusi),
+                        )
+                    },
                 )
                 _state.value = _state.value.copy(
-                    mengirim = false,
-                    formTerbuka = false,
-                    saran = emptyList(),
-                    jumlah = emptyMap(),
-                    pesan = "Permintaan terkirim (${items.size} bahan).",
+                    mengirim = false, konfirmasiTerbuka = false, tinjauTerbuka = false,
+                    keranjang = emptyMap(), tab = TabPermintaan.RIWAYAT,
+                    pesan = "Permintaan berhasil dikirim (${items.size} item bahan baku). Menunggu persetujuan.",
                 )
-                muatDaftar()
+                muatData()
             } catch (e: Exception) {
                 _state.value = _state.value.copy(mengirim = false, error = stokErrorMessage(e))
             }
         }
     }
 
-    // ------------------------------------------------------------ persetujuan
+    // ------------------------------------------------------------------ riwayat
 
-    /** Default jumlah disetujui = jumlah diminta, dibulatkan ke atas seperti web. */
+    fun ubahCariRiwayat(nilai: String) {
+        _state.value = _state.value.copy(cariRiwayat = nilai)
+    }
+
+    fun pilihFilterStatus(status: StatusPermintaan?) {
+        _state.value = _state.value.copy(filterStatus = status)
+    }
+
+    // -------------------------------------------------------------- persetujuan
+
+    /**
+     * Buka layar persetujuan: default qty disetujui = qty diminta pada satuan
+     * distribusi (dibulatkan ke atas), lalu muat crosscheck stok outlet+gudang dan
+     * kebutuhan target di belakang.
+     */
     fun bukaApprove(p: Permintaan) {
-        _state.value = _state.value.copy(
-            approveUntuk = p,
-            qtySetuju = p.items.associate { it.bahanBakuId to ceil(it.qtyDiminta).toLong().toString() },
+        val s = _state.value
+        val awal = p.items.associate { item ->
+            val bahan = s.bahanMap[item.bahanBakuId]
+            val qty = if (bahan != null) {
+                ceil(DistribusiUnit.keDistribusi(item.qtyDiminta, bahan.faktorDistribusi)).toLong()
+            } else {
+                ceil(item.qtyDiminta).toLong()
+            }
+            item.bahanBakuId to qty
+        }
+        _state.value = s.copy(
+            approveUntuk = p, qtySetuju = awal, memuatCrosscheck = true,
+            stokOutlet = emptyMap(), stokGudang = emptyMap(), kebutuhanTarget = emptyMap(),
         )
+        viewModelScope.launch {
+            // Gudang Pusat dicari dari daftar outlet accessible — approver memegang
+            // semua outlet. Bila tak ketemu, kolom stok gudang tidak ditampilkan.
+            val gudangId = s.outlets.firstOrNull { it.name.uppercase().contains("GUDANG PUSAT") }?.id
+            val bahanIds = p.items.map { it.bahanBakuId }
+            val cc = runCatching {
+                PermintaanRepository.crosscheck(listOfNotNull(p.outletId, gudangId), bahanIds)
+            }.getOrDefault(emptyMap())
+            val kebutuhan = runCatching {
+                PermintaanRepository.kebutuhanTarget(
+                    p.outletId,
+                    p.targetJual.mapNotNull { t -> t.resepId?.let { it to t.qty } },
+                )
+            }.getOrDefault(emptyMap())
+            if (_state.value.approveUntuk?.id != p.id) return@launch
+            _state.value = _state.value.copy(
+                memuatCrosscheck = false,
+                stokOutlet = cc[p.outletId].orEmpty(),
+                stokGudang = gudangId?.let { cc[it] }.orEmpty(),
+                kebutuhanTarget = kebutuhan,
+            )
+        }
     }
 
     fun tutupApprove() {
-        _state.value = _state.value.copy(approveUntuk = null, qtySetuju = emptyMap())
+        _state.value = _state.value.copy(
+            approveUntuk = null, qtySetuju = emptyMap(),
+            stokOutlet = emptyMap(), stokGudang = emptyMap(), kebutuhanTarget = emptyMap(),
+        )
     }
 
-    fun ubahQtySetuju(bahanBakuId: String, nilai: String) {
-        if (nilai.isNotEmpty() && !nilai.matches(Regex("^\\d*\\.?\\d*$"))) return
-        _state.value = _state.value.copy(qtySetuju = _state.value.qtySetuju + (bahanBakuId to nilai))
+    fun ubahQtySetuju(bahanBakuId: String, delta: Long) {
+        val q = _state.value.qtySetuju.toMutableMap()
+        q[bahanBakuId] = ((q[bahanBakuId] ?: 0L) + delta).coerceAtLeast(0L)
+        _state.value = _state.value.copy(qtySetuju = q)
+    }
+
+    fun setQtySetuju(bahanBakuId: String, nilai: String) {
+        if (nilai.isNotEmpty() && !nilai.matches(Regex("^\\d{1,5}$"))) return
+        _state.value = _state.value.copy(
+            qtySetuju = _state.value.qtySetuju + (bahanBakuId to (nilai.toLongOrNull() ?: 0L))
+        )
+    }
+
+    /** Qty disetujui satu bahan pada satuan besar — untuk banding stok gudang & kirim RPC. */
+    fun qtySetujuBase(bahanBakuId: String): Double {
+        val s = _state.value
+        val qty = (s.qtySetuju[bahanBakuId] ?: 0L).toDouble()
+        val bahan = s.bahanMap[bahanBakuId] ?: return qty
+        return DistribusiUnit.keBase(qty, bahan.faktorDistribusi)
+    }
+
+    /** Stok gudang satu bahan pada satuan besar, atau null bila tak termuat. */
+    fun stokGudangBesar(bahanBakuId: String): Double? {
+        val s = _state.value
+        val cc = s.stokGudang[bahanBakuId] ?: return null
+        val bahan = s.bahanMap[bahanBakuId]
+        return if (bahan != null) DistribusiUnit.saldoKeBesar(cc.currentQty, cc.saldoIsGram, bahan.meta)
+        else cc.currentQty
+    }
+
+    /** Ada item yang melebihi stok gudang? Peringatan visual, tidak memblokir. */
+    fun adaLebihStokGudang(): Boolean {
+        val p = _state.value.approveUntuk ?: return false
+        return p.items.any { item ->
+            val gudang = stokGudangBesar(item.bahanBakuId) ?: return@any false
+            qtySetujuBase(item.bahanBakuId) > gudang
+        }
     }
 
     fun setujui() {
@@ -195,7 +483,7 @@ class PermintaanViewModel : ViewModel() {
         val items = p.items.map { item ->
             PermintaanRepository.ItemDisetujui(
                 bahanBakuId = item.bahanBakuId,
-                qtyDisetujui = _state.value.qtySetuju[item.bahanBakuId]?.toDoubleOrNull() ?: 0.0,
+                qtyDisetujui = qtySetujuBase(item.bahanBakuId),
             )
         }
         // RPC menolak bila semua item nol dan menyuruh memakai jalur tolak; dicegat di
@@ -214,7 +502,7 @@ class PermintaanViewModel : ViewModel() {
                     mengirim = false, approveUntuk = null, qtySetuju = emptyMap(),
                     pesan = "Permintaan disetujui dan surat jalan dibuat.",
                 )
-                muatDaftar()
+                muatData()
             } catch (e: Exception) {
                 _state.value = _state.value.copy(mengirim = false, error = stokErrorMessage(e))
             }
@@ -230,12 +518,12 @@ class PermintaanViewModel : ViewModel() {
         viewModelScope.launch {
             _state.value = _state.value.copy(mengirim = true, error = null, pesan = null)
             try {
-                PermintaanRepository.tolak(p.id, alasan)
+                PermintaanRepository.tolak(p.id, alasan.trim())
                 _state.value = _state.value.copy(
                     mengirim = false, approveUntuk = null, qtySetuju = emptyMap(),
                     pesan = "Permintaan ditolak.",
                 )
-                muatDaftar()
+                muatData()
             } catch (e: Exception) {
                 _state.value = _state.value.copy(mengirim = false, error = stokErrorMessage(e))
             }
