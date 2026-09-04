@@ -1,6 +1,7 @@
 package com.sukashawarma.superapp.feature.distribusi.domain
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Test
 
 class SatuanDistribusiTest {
@@ -101,5 +102,32 @@ class SatuanDistribusiTest {
     fun `satuan tampil memakai satuan distribusi bila ada`() {
         assertEquals("Pack", SatuanDistribusi.satuanTampil(meta("Dus", satuanDistribusi = "Pack")))
         assertEquals("Dus", SatuanDistribusi.satuanTampil(meta("Dus")))
+    }
+
+    @Test
+    fun `faktor tengah nol diperlakukan sebagai tidak tersetel`() {
+        val b = meta("Dus", satuanDistribusi = "Pack", satuanTengah = "Pack", faktorTengah = 0.0)
+        assertEquals(1.0, SatuanDistribusi.faktor(b), 0.0001)
+    }
+
+    @Test
+    fun `faktor tampilan nol diperlakukan sebagai tidak tersetel`() {
+        val b = meta("Dus", satuanDistribusi = "Lembar", satuanKecil = "Lembar", faktorTampilan = 0.0)
+        assertEquals(1.0, SatuanDistribusi.faktor(b), 0.0001)
+    }
+
+    @Test
+    fun `faktor nol tidak membuat ke dasar menghasilkan NaN`() {
+        val b = meta("Dus", satuanDistribusi = "Pack", satuanTengah = "Pack", faktorTengah = 0.0)
+        val hasil = SatuanDistribusi.keDasar(10.0, b)
+        assertEquals(10.0, hasil, 0.0001)
+        assertFalse(hasil.isNaN())
+        assertFalse(hasil.isInfinite())
+    }
+
+    @Test
+    fun `faktor negatif juga diperlakukan sebagai tidak tersetel`() {
+        val b = meta("Dus", satuanDistribusi = "Pack", satuanTengah = "Pack", faktorTengah = -5.0)
+        assertEquals(1.0, SatuanDistribusi.faktor(b), 0.0001)
     }
 }
