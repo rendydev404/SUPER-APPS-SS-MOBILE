@@ -1,13 +1,12 @@
 package com.sukashawarma.superapp.presentation
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.fragment.app.FragmentActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
@@ -20,10 +19,12 @@ import com.sukashawarma.superapp.domain.session.AppSession
 import com.sukashawarma.superapp.domain.session.StartDestination
 import com.sukashawarma.superapp.domain.session.isMitraArea
 import com.sukashawarma.superapp.domain.session.resolveStartDestination
+import com.sukashawarma.superapp.feature.distribusi.DistribusiNavGraph
 import com.sukashawarma.superapp.feature.stok.StokNavGraph
 import com.sukashawarma.superapp.presentation.absensi.AbsensiNavGraph
 import com.sukashawarma.superapp.presentation.home.HomeScreen
 import com.sukashawarma.superapp.presentation.login.LoginScreen
+import com.sukashawarma.superapp.presentation.settings.SettingsScreen
 import com.sukashawarma.superapp.presentation.mitra.MitraDashboardScaffold
 import com.sukashawarma.superapp.presentation.mitra.MitraLoadErrorScreen
 import com.sukashawarma.superapp.presentation.mitra.MitraNoProfileScreen
@@ -35,13 +36,15 @@ object Routes {
     const val HOME = "home"
     const val ABSENSI = "absensi"
     const val STOK = "stok"
+    const val DISTRIBUSI = "distribusi"
     const val MITRA = "mitra"
     const val MITRA_NO_PROFILE = "mitra_no_profile"
     const val MITRA_LOAD_ERROR = "mitra_load_error"
+    const val SETTINGS = "settings"
 }
 
 @dagger.hilt.android.AndroidEntryPoint
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -49,6 +52,16 @@ class MainActivity : ComponentActivity() {
                 RootNav()
             }
         }
+    }
+
+    /** Mengunci ulang aplikasi ketika Activity benar-benar ditutup, termasuk saat task
+     * dihapus dari Recent Apps. Credential biometrik tetap dipertahankan oleh AuthPrefs;
+     * recreate karena rotasi tidak dianggap logout. */
+    override fun onDestroy() {
+        if (isFinishing && !isChangingConfigurations) {
+            AppSession.signOut()
+        }
+        super.onDestroy()
     }
 }
 
@@ -60,10 +73,6 @@ private fun RootNav() {
     val mitraProfile by AppSession.mitraProfile.collectAsState()
     val mitraLoadFailed by AppSession.mitraLoadFailed.collectAsState()
     val scope = rememberCoroutineScope()
-
-    LaunchedEffect(Unit) {
-        AppSession.tryAutoLogin()
-    }
 
     LocationPermissionGate(staff != null)
 
@@ -111,14 +120,22 @@ private fun RootNav() {
                 HomeScreen(
                     onOpenAbsensi = { navController.navigate(Routes.ABSENSI) },
                     onOpenStok = { navController.navigate(Routes.STOK) },
+                    onOpenDistribusi = { navController.navigate(Routes.DISTRIBUSI) },
+                    onOpenSettings = { navController.navigate(Routes.SETTINGS) },
                     onLoggedOut = { navController.navigate(Routes.LOGIN) { popUpTo(0) } }
                 )
+            }
+            composable(Routes.SETTINGS) {
+                SettingsScreen(onBack = { navController.popBackStack() })
             }
             composable(Routes.ABSENSI) {
                 AbsensiNavGraph(onExit = { navController.popBackStack() })
             }
             composable(Routes.STOK) {
                 StokNavGraph(onExit = { navController.popBackStack() })
+            }
+            composable(Routes.DISTRIBUSI) {
+                DistribusiNavGraph(onExit = { navController.popBackStack() })
             }
         }
     }
