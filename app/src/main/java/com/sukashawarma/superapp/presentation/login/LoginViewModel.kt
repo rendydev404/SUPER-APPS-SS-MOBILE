@@ -2,6 +2,7 @@ package com.sukashawarma.superapp.presentation.login
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.sukashawarma.superapp.data.local.AuthPrefs
 import com.sukashawarma.superapp.domain.session.AppSession
 import com.sukashawarma.superapp.domain.session.LoginResult
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -9,8 +10,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 data class LoginUiState(
-    val identifier: String = "",
-    val password: String = "",
+    val identifier: String = AuthPrefs.getLoginIdentifier().orEmpty(),
+    val password: String = AuthPrefs.getLoginPassword().orEmpty(),
     val loading: Boolean = false,
     val error: String? = null,
 )

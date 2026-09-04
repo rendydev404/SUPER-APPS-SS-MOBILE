@@ -2,6 +2,7 @@ package com.sukashawarma.superapp.presentation.absensi.profil
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.sukashawarma.superapp.data.local.AuthPrefs
 import com.sukashawarma.superapp.data.remote.SessionTokenHolder
 import com.sukashawarma.superapp.data.remote.UpdatePasswordPayload
 import com.sukashawarma.superapp.data.remote.authApi
@@ -48,6 +49,7 @@ class ProfilViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 val res = authApi.updatePassword("Bearer $token", UpdatePasswordPayload(newPassword))
+                if (res.isSuccessful) AuthPrefs.updateSavedPassword(newPassword)
                 _state.value = _state.value.copy(
                     changing = false,
                     result = if (res.isSuccessful) PasswordChangeResult.Success

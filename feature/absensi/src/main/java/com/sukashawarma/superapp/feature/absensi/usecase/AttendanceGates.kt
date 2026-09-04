@@ -10,12 +10,15 @@ enum class NextAction { IN, OUT, DONE }
 private const val GLOBAL_OUTLET_ID = "00000000-0000-0000-0000-000000000000"
 
 /**
- * Cermin `decideAction`/`isClosingChecklistDone`/`isShiftClosed` di useClockKiosk.ts
- * (web). Gate "unfinished_orders" SENGAJA tidak dicek di sini — itu server-only di web
- * (dicek ulang saat submit), jadi klien tidak perlu query tambahan yang hasilnya
- * dibuang begitu server tetap memutuskan.
+ * Cermin gate clock-out di useClockKiosk.ts (web).
+ *
+ * Gate di client ini hanya untuk memberi feedback lebih awal dan pesan yang jelas.
+ * RPC `submit_attendance` tetap menjadi penjaga otoritatif saat data berubah di
+ * antara pengecekan client dan submit.
  */
 object AttendanceGates {
+
+    private val UNFINISHED_ORDER_STATUSES = setOf("pending", "preparing", "ready")
 
     suspend fun decideAction(staffId: String): NextAction {
         val rows = Postgrest.select(
@@ -77,5 +80,31 @@ object AttendanceGates {
     suspend fun isShiftClosed(outletId: String): Boolean {
         val open = Postgrest.selectOne("shifts", listOf("outlet_id" to "eq.$outletId", "status" to "eq.open", "select" to "id"))
         return open == null
+    }
+
+    /**
+     * True bila POS Native masih memiliki order berjalan di outlet ini.
+     *
+     * `cancellation_status = approved` diperlakukan sebagai batal, walaupun
+     * beberapa row lama masih menyimpan `status` pending/preparing/ready.
+     */
+    suspend fun hasUnfinishedOrders(outletId: String): Boolean {
+        val rows = Postgrest.select(
+            "orders",
+            listOf(
+                "outlet_id" to "eq.$outletId",
+                "status" to "in.(${UNFINISHED_ORDER_STATUSES.joinToString(",")})",
+                "select" to "status,cancellation_status",
+                // Satu outlet normalnya jauh di bawah angka ini; tetap batasi
+                // agar gate tidak menarik histori order yang tidak relevan.
+                "limit" to "1000",
+            ),
+        )
+        return rows.any { row ->
+            val obj = row.asJsonObject
+            val status = obj.optString("status")?.lowercase()
+            val cancellationStatus = obj.optString("cancellation_status")?.lowercase()
+            status != null && status in UNFINISHED_ORDER_STATUSES && cancellationStatus != "approved"
+        }
     }
 }

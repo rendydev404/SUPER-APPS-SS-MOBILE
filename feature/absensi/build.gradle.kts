@@ -50,8 +50,8 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.5.0")
     implementation("com.google.dagger:hilt-android:2.51")
     kapt("com.google.dagger:hilt-compiler:2.51")
+    testImplementation("junit:junit:4.13.2")
 }
-
 
 
 

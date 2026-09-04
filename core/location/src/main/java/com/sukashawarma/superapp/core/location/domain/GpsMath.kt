@@ -28,10 +28,15 @@ object GpsMath {
     fun isGpsAccuracyAcceptable(accuracyM: Float): Boolean = accuracyM <= MAX_GPS_ACCURACY_M
 
     /** True bila dalam radius geofence, dengan toleransi akurasi (dist - accuracy <= radius). */
-    fun isWithinGeofence(outlet: LatLng, device: LatLng, accuracyM: Float): Boolean {
+    fun isWithinGeofence(
+        outlet: LatLng,
+        device: LatLng,
+        accuracyM: Float,
+        radiusM: Double = GEOFENCE_RADIUS_M,
+    ): Boolean {
         val dist = haversineMeters(outlet, device)
         val adjusted = (dist - accuracyM).coerceAtLeast(0.0)
-        return adjusted <= GEOFENCE_RADIUS_M
+        return adjusted <= radiusM
     }
 
     /** Cermin calculateSpeedKmH web — deteksi teleportasi dibandingkan absen terakhir. */

@@ -33,6 +33,15 @@ if "%OS%"=="Windows_NT" setlocal
 
 set DIRNAME=%~dp0
 if "%DIRNAME%"=="" set DIRNAME=.
+@rem Keep Java NIO/Gradle loopback sockets under Windows' short AF_UNIX path limit.
+@rem Set GRADLE_TEMP_DIR to override this location when needed.
+if not defined GRADLE_TEMP_DIR set "GRADLE_TEMP_DIR=%SystemDrive%\jtmp"
+if not exist "%GRADLE_TEMP_DIR%\." mkdir "%GRADLE_TEMP_DIR%" >NUL 2>&1
+if exist "%GRADLE_TEMP_DIR%\." (
+    set "TEMP=%GRADLE_TEMP_DIR%"
+    set "TMP=%GRADLE_TEMP_DIR%"
+)
+
 @rem This is normally unused
 set APP_BASE_NAME=%~n0
 set APP_HOME=%DIRNAME%

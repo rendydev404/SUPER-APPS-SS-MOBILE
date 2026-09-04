@@ -31,9 +31,9 @@ val SPV_TIER_ROLES = setOf(
     Role.REGIONAL_MANAGER, Role.AREA_MANAGER
 )
 
-/** Cermin `isAdminOrHR` — akses Pengaturan Absensi. */
+/** Role yang boleh mengakses Pengaturan Absensi: admin, HR, dan regional manager. */
 val ADMIN_OR_HR_ROLES = setOf(
-    Role.ADMIN, Role.ADMIN_HR, Role.OWNER, Role.REGIONAL_MANAGER, Role.AREA_MANAGER
+    Role.ADMIN, Role.ADMIN_HR, Role.REGIONAL_MANAGER
 )
 
 /** Role yang boleh mengoperasikan halaman Enrollment — cermin SPV_ROLES di api/enroll/route.ts. */

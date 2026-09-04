@@ -1,55 +1,111 @@
 package com.sukashawarma.superapp.presentation.absensi.papan
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Login
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.PriorityHigh
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Storefront
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
+import com.sukashawarma.superapp.domain.util.JakartaTime
 import com.sukashawarma.superapp.presentation.absensi.AbsensiBottomNav
-import com.sukashawarma.superapp.presentation.theme.StatusAmber
-import com.sukashawarma.superapp.presentation.theme.StatusEmerald
-import com.sukashawarma.superapp.presentation.theme.StatusRed
-import com.sukashawarma.superapp.presentation.theme.SukaOnSurface
-import com.sukashawarma.superapp.presentation.theme.SukaOnSurfaceVariant
-import com.sukashawarma.superapp.presentation.theme.SukaOrange
-import com.sukashawarma.superapp.presentation.theme.SukaSurface
-import com.sukashawarma.superapp.presentation.theme.SukaSurfaceContainer
-import com.sukashawarma.superapp.presentation.theme.SukaSurfaceContainerHighest
-import com.sukashawarma.superapp.presentation.theme.SukaSurfaceContainerLowest
-import java.time.Instant
-import java.time.ZoneId
+import com.sukashawarma.superapp.presentation.absensi.rekap.selfiePublicUrl
+import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
-private val timeFmt = DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.of("Asia/Jakarta"))
-private fun fmtTime(iso: String?): String? = iso?.let { runCatching { timeFmt.format(Instant.parse(it)) }.getOrNull() }
+// Stitch Suka Culinary Design Tokens (samakan dengan layar Absensi lainnya)
+private val StitchPrimary = Color(0xFF450700)
+private val StitchSecondaryContainer = Color(0xFFFE8438)
+private val StitchSurface = Color(0xFFF8F9FF)
+private val StitchSurfaceContainerLowest = Color(0xFFFFFFFF)
+private val StitchSurfaceContainerLow = Color(0xFFEFF4FF)
+private val StitchSurfaceContainer = Color(0xFFE5EEFF)
+private val StitchSurfaceContainerHigh = Color(0xFFDCE9FF)
+private val StitchOnSurface = Color(0xFF0B1C30)
+private val StitchOnSurfaceVariant = Color(0xFF57423D)
+private val StitchOutlineVariant = Color(0xFFDEC0B9)
+private val StitchError = Color(0xFFBA1A1A)
+private val StitchErrorContainer = Color(0xFFFFDAD6)
 
-private enum class BoardTab(val label: String) { SEMUA("Semua"), HADIR("Hadir"), BELUM("Belum") }
+// Warna status — dipetakan dari kelas Tailwind di halaman web.
+private val DotGreen = Color(0xFF059669)
+private val DotYellow = Color(0xFFFACC15)
+private val DotAmber = Color(0xFFF59E0B)
+private val DotGray = Color(0xFFD1D5DB)
+private val DotRed = Color(0xFFEF4444)
+private val DotIndigo = Color(0xFF6366F1)
 
-/**
- * Papan Kehadiran — mengikuti desain Stitch "Attendance Board - Grouped List Variant"
- * (project 16991912726833518585, screen c42414a3112345a7ba8e2123aa5d4272): kartu ringkasan
- * dengan progress bar, pencarian karyawan, tab filter Semua/Hadir/Belum, dan daftar
- * dikelompokkan dalam satu kartu (bukan kartu terpisah per baris).
- */
+private val TextGreen = Color(0xFF15803D)
+private val BgGreen = Color(0xFFECFDF5)
+private val TextYellow = Color(0xFFA16207)
+private val BgYellow = Color(0xFFFEFCE8)
+private val TextAmber = Color(0xFFB45309)
+private val BgAmber = Color(0xFFFFFBEB)
+private val TextGray = Color(0xFF374151)
+private val BgGray = Color(0xFFF9FAFB)
+private val TextRed = Color(0xFFB91C1C)
+private val BgRed = Color(0xFFFEF2F2)
+private val TextIndigo = Color(0xFF4338CA)
+private val BgIndigo = Color(0xFFEEF2FF)
+
+private val ID_LOCALE = Locale("id", "ID")
+private val DateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMMM yyyy", ID_LOCALE)
+
+/** (titik, teks, latar) per status — dipakai bareng oleh pil, dot avatar, dan legenda. */
+private fun stateColors(state: BoardState): Triple<Color, Color, Color> = when (state) {
+    BoardState.MASUK, BoardState.KELUAR -> Triple(DotGreen, TextGreen, BgGreen)
+    BoardState.TELAT_TOLERANSI -> Triple(DotYellow, TextYellow, BgYellow)
+    BoardState.TELAT, BoardState.PULANG_TELAT, BoardState.LEBIH_AWAL -> Triple(DotAmber, TextAmber, BgAmber)
+    BoardState.ALPHA -> Triple(DotRed, TextRed, BgRed)
+    BoardState.BELUM -> Triple(DotGray, TextGray, BgGray)
+}
+
+private fun stateIcon(state: BoardState): ImageVector = when (state) {
+    BoardState.MASUK -> Icons.AutoMirrored.Filled.Login
+    BoardState.TELAT, BoardState.TELAT_TOLERANSI, BoardState.PULANG_TELAT -> Icons.Filled.Schedule
+    BoardState.KELUAR, BoardState.LEBIH_AWAL -> Icons.AutoMirrored.Filled.Logout
+    BoardState.BELUM, BoardState.ALPHA -> Icons.Filled.MoreHoriz
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PapanKehadiranScreen(
@@ -58,89 +114,187 @@ fun PapanKehadiranScreen(
     viewModel: PapanKehadiranViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
-    var query by remember { mutableStateOf("") }
-    var tab by remember { mutableStateOf(BoardTab.SEMUA) }
+    var previewUrl by remember { mutableStateOf<String?>(null) }
 
     Scaffold(
-        containerColor = SukaSurface,
+        containerColor = StitchSurface,
         topBar = {
             TopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White),
-                title = { Text("Papan Kehadiran", fontWeight = FontWeight.Bold, color = SukaOrange) },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = StitchSurface,
+                    titleContentColor = StitchPrimary,
+                    navigationIconContentColor = StitchOnSurface,
+                    actionIconContentColor = StitchOnSurface,
+                ),
                 navigationIcon = {
-                    IconButton(onClick = onExit) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali") }
+                    IconButton(onClick = onExit) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali")
+                    }
                 },
-                actions = {
-                    IconButton(onClick = { viewModel.load() }) { Icon(Icons.Filled.Refresh, contentDescription = "Muat ulang") }
-                }
+                title = {
+                    Text("Papan Kehadiran", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = StitchPrimary)
+                },
             )
         },
         // Papan Kehadiran diakses dari tab "More" (index 3) — bottom nav tetap tampil supaya
         // user bisa lompat tab tanpa balik dulu, sama seperti Cuti & Kasbon.
         bottomBar = { AbsensiBottomNav(selectedIndex = 3, onSelect = onNavigateTab) },
     ) { padding ->
-        Box(Modifier.padding(padding).fillMaxSize().background(SukaSurface)) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            item(key = "header") {
+                PapanHeader(
+                    outletName = state.selectedOutletName,
+                    lastRefresh = state.lastRefresh,
+                    refreshing = state.refreshing,
+                    showRefresh = state.selectedOutletId != null,
+                    onRefresh = { viewModel.refresh() },
+                )
+            }
+
+            if (state.canChooseOutlet) {
+                item(key = "outlet_picker") {
+                    OutletPickerCard(
+                        outlets = state.outlets,
+                        loading = state.loadingOutlets,
+                        selectedId = state.selectedOutletId,
+                        onSelect = { viewModel.selectOutlet(it) },
+                    )
+                }
+            }
+
+            if (state.awaitingOutletChoice) {
+                item(key = "choose_outlet") {
+                    EmptyCard(
+                        icon = { Icon(Icons.Filled.Storefront, null, tint = StitchPrimary, modifier = Modifier.size(26.dp)) },
+                        title = "Pilih Outlet Dulu",
+                        message = "Anda memantau seluruh outlet. Pilih salah satu di atas untuk melihat papan kehadirannya.",
+                    )
+                }
+                return@LazyColumn
+            }
+
             when {
-                state.loading -> CircularProgressIndicator(Modifier.align(Alignment.Center))
-                state.error != null -> Text(
-                    state.error ?: "",
-                    modifier = Modifier.align(Alignment.Center).padding(24.dp),
-                    color = MaterialTheme.colorScheme.error,
-                )
-                state.rows.isEmpty() -> Text(
-                    "Belum ada staff aktif di outlet ini.",
-                    modifier = Modifier.align(Alignment.Center),
-                    color = SukaOnSurfaceVariant,
-                )
+                state.loading -> item(key = "loading") {
+                    Column(
+                        Modifier.fillMaxWidth().padding(vertical = 60.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        CircularProgressIndicator(color = StitchPrimary, strokeWidth = 3.dp)
+                        Spacer(Modifier.height(14.dp))
+                        Text("Memuat data kehadiran...", fontSize = 13.sp, color = StitchOnSurfaceVariant)
+                    }
+                }
+
+                state.error != null -> item(key = "error") {
+                    PapanErrorCard(message = state.error.orEmpty(), onRetry = { viewModel.load() })
+                }
+
                 else -> {
-                    val filtered = state.rows
-                        .filter { row ->
-                            when (tab) {
-                                BoardTab.SEMUA -> true
-                                BoardTab.HADIR -> row.state != StaffAttendanceState.BELUM_ABSEN
-                                BoardTab.BELUM -> row.state == StaffAttendanceState.BELUM_ABSEN
-                            }
-                        }
-                        .filter { it.name.contains(query, ignoreCase = true) }
+                    if (state.canSeeAlerts && state.alerts.isNotEmpty()) {
+                        item(key = "alerts") { SecurityAlertCard(state.alerts) }
+                    }
 
-                    Column(Modifier.fillMaxSize()) {
-                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                            SummaryCard(state.rows)
-                            SearchField(query = query, onQueryChange = { query = it })
-                            BoardTabs(selected = tab, onSelect = { tab = it })
-                        }
+                    item(key = "summary") { AttendanceRateCard(state.summary) }
 
-                        LazyColumn(Modifier.weight(1f)) {
-                            if (filtered.isEmpty()) {
-                                item {
-                                    Text(
-                                        "Tidak ada karyawan yang cocok.",
-                                        modifier = Modifier.fillMaxWidth().padding(32.dp),
-                                        color = SukaOnSurfaceVariant,
-                                        textAlign = TextAlign.Center,
-                                    )
-                                }
-                            } else {
-                                item {
-                                    Surface(
-                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = SukaSurfaceContainerLowest,
-                                        border = BorderStroke(1.dp, SukaSurfaceContainerHighest),
-                                    ) {
-                                        Column {
-                                            filtered.forEachIndexed { index, row ->
-                                                StaffBoardItem(row)
-                                                if (index != filtered.lastIndex) {
-                                                    HorizontalDivider(color = SukaSurfaceContainerHighest)
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            item { Spacer(Modifier.height(24.dp)) }
+                    item(key = "list_header") {
+                        ListHeader(
+                            shown = state.filteredRows.size,
+                            total = state.summary.total,
+                            filter = state.filter,
+                            onFilter = { viewModel.setFilter(it) },
+                        )
+                    }
+
+                    item(key = "search") {
+                        StaffSearchField(query = state.query, onQueryChange = { viewModel.setQuery(it) })
+                    }
+
+                    if (state.filteredRows.isEmpty()) {
+                        item(key = "empty") {
+                            EmptyCard(
+                                icon = { Icon(Icons.Filled.Group, null, tint = StitchPrimary, modifier = Modifier.size(26.dp)) },
+                                title = "Tidak Ada Data Staf",
+                                message = if (state.query.isBlank()) "Tidak ada staf yang sesuai dengan filter yang dipilih."
+                                else "Tidak ada staf bernama \"${state.query.trim()}\" pada filter ini.",
+                            )
                         }
+                    } else {
+                        items(state.filteredRows, key = { it.staffId }) { row ->
+                            StaffBoardCard(row = row, onPreview = { previewUrl = it })
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    previewUrl?.let { url ->
+        PhotoPreviewDialog(url = url, onDismiss = { previewUrl = null })
+    }
+}
+
+/* ---------------------------------------------------------------- Header */
+
+@Composable
+private fun PapanHeader(
+    outletName: String?,
+    lastRefresh: String,
+    refreshing: Boolean,
+    showRefresh: Boolean,
+    onRefresh: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Surface(shape = RoundedCornerShape(14.dp), color = StitchSurfaceContainer, modifier = Modifier.size(42.dp)) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(Icons.Filled.Group, contentDescription = null, tint = StitchPrimary, modifier = Modifier.size(21.dp))
+            }
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                LocalDate.now(JakartaTime.ZONE).format(DateFormatter),
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = StitchOnSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                outletName ?: "Pantau kehadiran tim hari ini",
+                fontSize = 12.5.sp,
+                color = StitchOnSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (showRefresh) {
+            Spacer(Modifier.width(8.dp))
+            Surface(
+                onClick = onRefresh,
+                enabled = !refreshing,
+                shape = RoundedCornerShape(12.dp),
+                color = StitchSurfaceContainerLowest,
+                border = BorderStroke(1.dp, StitchOutlineVariant.copy(alpha = 0.5f)),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    if (refreshing) {
+                        CircularProgressIndicator(color = StitchPrimary, strokeWidth = 2.dp, modifier = Modifier.size(14.dp))
+                    } else {
+                        Icon(Icons.Filled.Refresh, contentDescription = "Muat ulang", tint = StitchOnSurfaceVariant, modifier = Modifier.size(15.dp))
+                    }
+                    if (lastRefresh.isNotBlank()) {
+                        Text(lastRefresh, fontSize = 11.5.sp, color = StitchOnSurfaceVariant, fontWeight = FontWeight.Medium)
                     }
                 }
             }
@@ -148,130 +302,580 @@ fun PapanKehadiranScreen(
     }
 }
 
+/* --------------------------------------------------------- Security alert */
+
 @Composable
-private fun SummaryCard(rows: List<StaffBoardRow>) {
-    val hadir = rows.count { it.state != StaffAttendanceState.BELUM_ABSEN }
-    val total = rows.size
-    val progress = if (total > 0) hadir.toFloat() / total.toFloat() else 0f
-    val animatedProgress by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = progress,
-        animationSpec = androidx.compose.animation.core.tween(700, easing = androidx.compose.animation.core.FastOutSlowInEasing),
-        label = "boardProgress",
+private fun SecurityAlertCard(alerts: List<SecurityAlert>) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = BgRed,
+        border = BorderStroke(1.dp, DotRed.copy(alpha = 0.35f)),
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Filled.Warning, contentDescription = null, tint = DotRed, modifier = Modifier.size(18.dp))
+                Text(
+                    "Peringatan Keamanan: ${alerts.size} percobaan manipulasi lokasi",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextRed,
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+            alerts.forEach { alert ->
+                Surface(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 7.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    color = StitchSurfaceContainerLowest,
+                    border = BorderStroke(1.dp, DotRed.copy(alpha = 0.18f)),
+                ) {
+                    Column(Modifier.padding(horizontal = 11.dp, vertical = 9.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(
+                                alert.staffName,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = StitchOnSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Text(alert.time, fontSize = 10.5.sp, color = StitchOnSurfaceVariant)
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Text(alert.label, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = TextRed)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/* -------------------------------------------------------- Attendance rate */
+
+@Composable
+private fun AttendanceRateCard(summary: BoardSummary) {
+    val anim by animateFloatAsState(
+        targetValue = if (summary.total > 0) 1f else 0f,
+        animationSpec = tween(durationMillis = 800),
+        label = "papan-bar",
     )
 
     Surface(
-        shape = RoundedCornerShape(16.dp),
-        color = SukaSurfaceContainerLowest,
-        border = BorderStroke(1.dp, SukaSurfaceContainerHighest),
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = StitchSurfaceContainerLowest,
+        border = BorderStroke(1.dp, StitchSurfaceContainerHigh.copy(alpha = 0.7f)),
+        shadowElevation = 0.5.dp,
     ) {
-        Row(
-            Modifier.fillMaxWidth().padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column {
-                Text("Kehadiran Hari Ini", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = SukaOnSurfaceVariant)
-                Spacer(Modifier.height(4.dp))
+        Column(Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Tingkat Kehadiran", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = StitchOnSurface)
+                    Text("Persentase staf yang sudah hadir hari ini", fontSize = 12.sp, color = StitchOnSurfaceVariant)
+                }
                 Row(verticalAlignment = Alignment.Bottom) {
-                    Text(hadir.toString(), fontSize = 26.sp, fontWeight = FontWeight.Bold, color = SukaOrange)
-                    Spacer(Modifier.width(4.dp))
-                    Text("/ $total hadir", fontSize = 14.sp, color = SukaOnSurfaceVariant)
+                    Text("${summary.percent}", fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, color = StitchOnSurface)
+                    Text("%", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = StitchOnSurfaceVariant, modifier = Modifier.padding(bottom = 4.dp))
                 }
             }
-            Box(
-                modifier = Modifier
-                    .width(110.dp)
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(50))
-                    .background(SukaSurfaceContainerHighest)
+
+            Spacer(Modifier.height(12.dp))
+
+            // Bar bertumpuk: hadir → telat toleransi → telat → alpha, sisanya track kosong.
+            val segments = listOf(
+                summary.fraction(summary.hadir) * anim to DotGreen,
+                summary.fraction(summary.telatToleransi) * anim to DotYellow,
+                summary.fraction(summary.telat) * anim to DotAmber,
+                summary.fraction(summary.alpha) * anim to DotRed,
+            )
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .height(12.dp)
+                    .clip(CircleShape)
+                    .background(StitchSurfaceContainerLow),
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .fillMaxWidth(animatedProgress.coerceIn(0f, 1f))
-                        .clip(RoundedCornerShape(50))
-                        .background(SukaOrange)
-                )
+                var used = 0f
+                segments.forEach { (fraction, color) ->
+                    if (fraction > 0.001f) {
+                        used += fraction
+                        Box(Modifier.fillMaxHeight().weight(fraction).background(color))
+                    }
+                }
+                val rest = 1f - used
+                if (rest > 0.001f) Spacer(Modifier.weight(rest))
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                LegendTile(Modifier.weight(1f), "Hadir", summary.hadir, DotGreen, TextGreen, BgGreen)
+                LegendTile(Modifier.weight(1f), "Telat (Tol)", summary.telatToleransi, DotYellow, TextYellow, BgYellow)
+                LegendTile(Modifier.weight(1f), "Telat", summary.telat, DotAmber, TextAmber, BgAmber)
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                LegendTile(Modifier.weight(1f), "Belum", summary.belum, DotGray, TextGray, BgGray)
+                LegendTile(Modifier.weight(1f), "Alpha", summary.alpha, DotRed, TextRed, BgRed)
+                LegendTile(Modifier.weight(1f), "Total Staf", summary.total, DotIndigo, TextIndigo, BgIndigo)
             }
         }
     }
 }
 
 @Composable
-private fun SearchField(query: String, onQueryChange: (String) -> Unit) {
+private fun LegendTile(modifier: Modifier, label: String, value: Int, dot: Color, fg: Color, bg: Color) {
+    Surface(modifier = modifier, shape = RoundedCornerShape(14.dp), color = bg, border = BorderStroke(1.dp, dot.copy(alpha = 0.25f))) {
+        Column(Modifier.padding(horizontal = 10.dp, vertical = 9.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Box(Modifier.size(8.dp).clip(CircleShape).background(dot))
+                Text("$value", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = StitchOnSurface)
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(label, fontSize = 10.5.sp, fontWeight = FontWeight.SemiBold, color = fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+/* ------------------------------------------------------------ List header */
+
+@Composable
+private fun ListHeader(shown: Int, total: Int, filter: BoardState?, onFilter: (BoardState?) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Surface(shape = RoundedCornerShape(11.dp), color = StitchSurfaceContainer, modifier = Modifier.size(36.dp)) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(Icons.Filled.Group, contentDescription = null, tint = StitchPrimary, modifier = Modifier.size(18.dp))
+            }
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text("Daftar Staf", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = StitchOnSurface)
+            Text("$shown dari $total staf", fontSize = 11.5.sp, color = StitchOnSurfaceVariant)
+        }
+        StatusFilterMenu(selected = filter, onSelect = onFilter)
+    }
+}
+
+@Composable
+private fun StaffSearchField(query: String, onQueryChange: (String) -> Unit) {
     OutlinedTextField(
         value = query,
         onValueChange = onQueryChange,
-        placeholder = { Text("Cari karyawan...", color = SukaOnSurfaceVariant) },
-        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, tint = SukaOnSurfaceVariant) },
+        modifier = Modifier.fillMaxWidth(),
         singleLine = true,
-        keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
-        modifier = Modifier.fillMaxWidth().height(52.dp),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(14.dp),
+        textStyle = LocalTextStyle.current.copy(fontSize = 14.sp),
+        placeholder = { Text("Cari nama staf", fontSize = 14.sp, color = StitchOnSurfaceVariant) },
+        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, tint = StitchOnSurfaceVariant, modifier = Modifier.size(19.dp)) },
+        trailingIcon = {
+            if (query.isNotEmpty()) {
+                IconButton(onClick = { onQueryChange("") }) {
+                    Icon(Icons.Filled.Clear, contentDescription = "Hapus pencarian", tint = StitchOnSurfaceVariant)
+                }
+            }
+        },
         colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = SukaOrange,
-            unfocusedBorderColor = SukaSurfaceContainerHighest,
-            focusedContainerColor = SukaSurfaceContainerLowest,
-            unfocusedContainerColor = SukaSurfaceContainerLowest,
-            cursorColor = SukaOrange,
+            focusedBorderColor = StitchSecondaryContainer,
+            unfocusedBorderColor = StitchSurfaceContainerHigh,
+            focusedContainerColor = StitchSurfaceContainerLowest,
+            unfocusedContainerColor = StitchSurfaceContainerLowest,
         ),
     )
 }
 
 @Composable
-private fun BoardTabs(selected: BoardTab, onSelect: (BoardTab) -> Unit) {
-    Row(Modifier.fillMaxWidth()) {
-        BoardTab.entries.forEach { t ->
-            val isSelected = t == selected
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(8.dp))
-                    .clickable { onSelect(t) },
-                horizontalAlignment = Alignment.CenterHorizontally,
+private fun StatusFilterMenu(selected: BoardState?, onSelect: (BoardState?) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box {
+        Surface(
+            onClick = { expanded = true },
+            shape = RoundedCornerShape(11.dp),
+            color = StitchSurfaceContainerLowest,
+            border = BorderStroke(1.dp, StitchSurfaceContainerHigh),
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
+                Icon(Icons.Filled.Tune, contentDescription = null, tint = StitchOnSurfaceVariant, modifier = Modifier.size(15.dp))
                 Text(
-                    t.label,
-                    fontSize = 14.sp,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                    color = if (isSelected) SukaOrange else SukaOnSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 8.dp),
+                    selected?.filterLabel ?: "Semua Status",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = StitchOnSurface,
+                    maxLines = 1,
                 )
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(2.dp)
-                        .background(if (isSelected) SukaOrange else Color.Transparent)
+                Icon(Icons.Filled.ExpandMore, contentDescription = null, tint = StitchOnSurfaceVariant, modifier = Modifier.size(16.dp))
+            }
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(
+                text = {
+                    Text(
+                        "Semua Status",
+                        fontSize = 14.sp,
+                        fontWeight = if (selected == null) FontWeight.Bold else FontWeight.Normal,
+                        color = if (selected == null) StitchPrimary else StitchOnSurface,
+                    )
+                },
+                onClick = { onSelect(null); expanded = false },
+            )
+            BoardState.entries.forEach { boardState ->
+                val (dot, _, _) = stateColors(boardState)
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            boardState.filterLabel,
+                            fontSize = 14.sp,
+                            fontWeight = if (boardState == selected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (boardState == selected) StitchPrimary else StitchOnSurface,
+                        )
+                    },
+                    leadingIcon = { Box(Modifier.size(9.dp).clip(CircleShape).background(dot)) },
+                    onClick = { onSelect(boardState); expanded = false },
                 )
             }
         }
     }
 }
 
+/* -------------------------------------------------------------- Staff row */
+
 @Composable
-private fun StaffBoardItem(row: StaffBoardRow) {
-    val (color, label) = when (row.state) {
-        StaffAttendanceState.BELUM_ABSEN -> StatusRed to "Belum Absen"
-        StaffAttendanceState.SUDAH_MASUK -> StatusEmerald to "Masuk ${fmtTime(row.inTime) ?: ""}"
-        StaffAttendanceState.SUDAH_PULANG -> StatusAmber to "Pulang ${fmtTime(row.outTime) ?: ""}"
-    }
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
+private fun StaffBoardCard(row: StaffBoardRow, onPreview: (String) -> Unit) {
+    val (dot, fg, bg) = stateColors(row.state)
+    val url = remember(row.selfiePath) { selfiePublicUrl(row.selfiePath) }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = StitchSurfaceContainerLowest,
+        border = BorderStroke(1.dp, StitchSurfaceContainerHigh.copy(alpha = 0.7f)),
+        shadowElevation = 0.5.dp,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier.size(40.dp).clip(CircleShape).background(color.copy(alpha = 0.15f)),
-                contentAlignment = Alignment.Center,
-            ) { Text(row.name.firstOrNull()?.uppercase() ?: "?", color = color, fontWeight = FontWeight.Bold) }
-            Spacer(Modifier.width(12.dp))
-            Text(row.name, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = SukaOnSurface)
-        }
-        Box(
-            Modifier.clip(RoundedCornerShape(8.dp)).background(color.copy(alpha = 0.15f)).padding(horizontal = 10.dp, vertical = 6.dp)
+        Row(
+            modifier = Modifier.padding(horizontal = 13.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(label, color = color, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Box {
+                Box(
+                    modifier = Modifier
+                        .size(46.dp)
+                        .clip(RoundedCornerShape(15.dp))
+                        .background(StitchSecondaryContainer.copy(alpha = 0.18f))
+                        .then(if (url != null) Modifier.clickable { onPreview(url) } else Modifier),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (url != null) {
+                        AsyncImage(
+                            model = url,
+                            contentDescription = "Selfie ${row.name}",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop,
+                        )
+                    } else {
+                        Text(
+                            row.name.trim().take(1).uppercase(ID_LOCALE).ifBlank { "?" },
+                            color = StitchPrimary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                        )
+                    }
+                }
+                // Titik status di pojok avatar — penanda cepat sebelum membaca pil.
+                Box(
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .offset(x = 3.dp, y = 3.dp)
+                        .size(14.dp)
+                        .clip(CircleShape)
+                        .background(StitchSurfaceContainerLowest)
+                        .padding(2.dp)
+                        .clip(CircleShape)
+                        .background(dot)
+                )
+            }
+
+            Spacer(Modifier.width(12.dp))
+
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        row.name,
+                        fontSize = 14.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = StitchOnSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    if (row.isManual) {
+                        Surface(shape = RoundedCornerShape(6.dp), color = BgAmber, border = BorderStroke(1.dp, DotAmber.copy(alpha = 0.4f))) {
+                            Text(
+                                "Manual",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextAmber,
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(3.dp))
+                Text(row.roleLabel, fontSize = 11.5.sp, color = StitchOnSurfaceVariant, maxLines = 1)
+                Spacer(Modifier.height(7.dp))
+                Surface(shape = RoundedCornerShape(9.dp), color = bg, border = BorderStroke(1.dp, dot.copy(alpha = 0.3f))) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    ) {
+                        Icon(stateIcon(row.state), contentDescription = null, tint = fg, modifier = Modifier.size(13.dp))
+                        Text(
+                            boardPillLabel(row.state, row.time, row.delayMinutes),
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = fg,
+                            maxLines = 1,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/* ---------------------------------------------------------- Outlet picker */
+
+@Composable
+private fun OutletPickerCard(
+    outlets: List<PapanOutletOption>,
+    loading: Boolean,
+    selectedId: String?,
+    onSelect: (String) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
+    val selected = outlets.find { it.id == selectedId }
+    val filtered = outlets.filter { it.name.contains(query.trim(), ignoreCase = true) }
+
+    LaunchedEffect(expanded) { if (!expanded) query = "" }
+
+    Box {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(enabled = !loading && outlets.isNotEmpty()) { expanded = true },
+            shape = RoundedCornerShape(14.dp),
+            color = StitchSurfaceContainerLowest,
+            border = BorderStroke(1.dp, if (selected == null) StitchSecondaryContainer.copy(alpha = 0.55f) else StitchSurfaceContainerHigh),
+            shadowElevation = 0.5.dp,
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Icon(Icons.Filled.Storefront, contentDescription = null, tint = StitchSecondaryContainer, modifier = Modifier.size(21.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = when {
+                            loading -> "Memuat outlet..."
+                            selected != null -> selected.name
+                            else -> "Pilih outlet"
+                        },
+                        color = StitchOnSurface,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = if (outlets.isEmpty() && !loading) "Tidak ada outlet yang bisa dilihat" else "Ketuk untuk ganti outlet",
+                        color = StitchOnSurfaceVariant,
+                        fontSize = 11.5.sp,
+                        maxLines = 1,
+                    )
+                }
+                Icon(
+                    if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = "Pilih outlet",
+                    tint = StitchOnSurfaceVariant,
+                )
+            }
+        }
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.width(290.dp).heightIn(max = 430.dp),
+        ) {
+            Column(Modifier.padding(horizontal = 8.dp, vertical = 6.dp)) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    placeholder = { Text("Cari outlet", fontSize = 13.sp) },
+                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                    trailingIcon = {
+                        if (query.isNotEmpty()) {
+                            IconButton(onClick = { query = "" }) {
+                                Icon(Icons.Filled.Clear, contentDescription = "Hapus pencarian")
+                            }
+                        }
+                    },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = StitchSecondaryContainer,
+                        unfocusedBorderColor = StitchSurfaceContainerHigh,
+                        focusedContainerColor = StitchSurfaceContainerLowest,
+                        unfocusedContainerColor = StitchSurfaceContainerLowest,
+                    ),
+                )
+                Spacer(Modifier.height(6.dp))
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 330.dp)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    if (filtered.isEmpty()) {
+                        Text(
+                            "Outlet tidak ditemukan",
+                            color = StitchOnSurfaceVariant,
+                            fontSize = 13.sp,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 18.dp),
+                        )
+                    } else filtered.forEach { outlet ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    outlet.name,
+                                    fontSize = 14.sp,
+                                    fontWeight = if (outlet.id == selectedId) FontWeight.Bold else FontWeight.SemiBold,
+                                    color = if (outlet.id == selectedId) StitchSecondaryContainer else StitchOnSurface,
+                                )
+                            },
+                            leadingIcon = { Icon(Icons.Filled.Storefront, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                            onClick = { onSelect(outlet.id); expanded = false },
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/* --------------------------------------------------------- Preview/states */
+
+@Composable
+private fun PhotoPreviewDialog(url: String, onDismiss: () -> Unit) {
+    Dialog(onDismissRequest = onDismiss) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(24.dp))
+                .background(Color.Black)
+                .clickable(onClick = onDismiss),
+            contentAlignment = Alignment.Center,
+        ) {
+            AsyncImage(
+                model = url,
+                contentDescription = "Selfie ukuran penuh",
+                modifier = Modifier.fillMaxWidth(),
+                contentScale = ContentScale.Fit,
+            )
+        }
+    }
+}
+
+@Composable
+private fun EmptyCard(icon: @Composable () -> Unit, title: String, message: String) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+        shape = RoundedCornerShape(18.dp),
+        color = StitchSurfaceContainerLow,
+        border = BorderStroke(1.dp, StitchSurfaceContainerHigh),
+    ) {
+        Column(
+            modifier = Modifier.padding(28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Surface(shape = CircleShape, color = StitchSurfaceContainer, modifier = Modifier.size(48.dp)) {
+                Box(contentAlignment = Alignment.Center) { icon() }
+            }
+            Text(title, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = StitchOnSurface, textAlign = TextAlign.Center)
+            Text(message, fontSize = 13.sp, color = StitchOnSurfaceVariant, textAlign = TextAlign.Center)
+        }
+    }
+}
+
+@Composable
+private fun PapanErrorCard(message: String, onRetry: () -> Unit) {
+    val noOutlet = message.contains("cabang", ignoreCase = true)
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+        shape = RoundedCornerShape(18.dp),
+        color = StitchSurfaceContainerLow,
+        border = BorderStroke(1.dp, StitchSurfaceContainerHigh),
+    ) {
+        Column(
+            modifier = Modifier.padding(28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = if (noOutlet) StitchSurfaceContainer else StitchErrorContainer,
+                modifier = Modifier.size(52.dp),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        if (noOutlet) Icons.Filled.Storefront else Icons.Filled.PriorityHigh,
+                        contentDescription = null,
+                        tint = if (noOutlet) StitchPrimary else StitchError,
+                        modifier = Modifier.size(26.dp),
+                    )
+                }
+            }
+            if (noOutlet) {
+                Text("Cabang Belum Ditentukan", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = StitchOnSurface)
+            }
+            Text(message, color = StitchOnSurfaceVariant, fontSize = 13.sp, textAlign = TextAlign.Center)
+            if (!noOutlet) {
+                Spacer(Modifier.height(4.dp))
+                Button(
+                    onClick = onRetry,
+                    colors = ButtonDefaults.buttonColors(containerColor = StitchPrimary),
+                    shape = RoundedCornerShape(10.dp),
+                ) {
+                    Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Coba Lagi")
+                }
+            }
         }
     }
 }

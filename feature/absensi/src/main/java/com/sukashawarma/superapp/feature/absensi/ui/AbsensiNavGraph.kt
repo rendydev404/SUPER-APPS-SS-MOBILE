@@ -37,16 +37,19 @@ import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
@@ -76,6 +79,8 @@ import com.sukashawarma.superapp.presentation.absensi.papan.PapanKehadiranScreen
 import com.sukashawarma.superapp.presentation.absensi.pengaturan.PengaturanScreen
 import com.sukashawarma.superapp.presentation.absensi.profil.ProfilScreen
 import com.sukashawarma.superapp.presentation.absensi.rekap.RekapScreen
+import com.sukashawarma.superapp.domain.model.Role
+import com.sukashawarma.superapp.domain.session.AppSession
 import com.sukashawarma.superapp.presentation.components.ComingSoon
 import com.sukashawarma.superapp.presentation.theme.SukaOnSurfaceVariant
 import com.sukashawarma.superapp.presentation.theme.SukaOrange
@@ -175,12 +180,27 @@ fun AbsensiNavGraph(onExit: () -> Unit) {
 /**
  * Kontainer 4 Tab Utama Absensi dengan HorizontalPager swipeable (WhatsApp-style drag & peek).
  */
-private val ABSENSI_BOTTOM_TABS = listOf(
+/** Role yang tab ke-3-nya berisi Enrollment Crew, bukan Profil: mereka yang memang bertugas
+ *  mendaftarkan wajah kru. Crew (dan role lain) tetap mendapat tab Profile seperti biasa. */
+private val ENROLL_TAB_ROLES = setOf(Role.LEADER, Role.AREA_MANAGER, Role.REGIONAL_MANAGER)
+
+/** Sumber tunggal isi bottom nav — jumlah tab tetap 4, hanya slot index 2 yang berganti,
+ *  supaya geometri bubble/notch dan `pendingTab` dari layar sub-route tidak ikut berubah. */
+private fun absensiBottomTabs(enrollTab: Boolean) = listOf(
     Triple("Home", Icons.Default.Home, 0),
     Triple("Checklist", Icons.Default.Checklist, 1),
-    Triple("Profile", Icons.Default.Person, 2),
+    if (enrollTab) Triple("Enroll", Icons.Default.PersonAdd, 2)
+    else Triple("Profile", Icons.Default.Person, 2),
     Triple("More", Icons.Default.MoreHoriz, 3)
 )
+
+/** Dibaca dari sesi aktif, bukan dioper lewat parameter — bottom nav dipakai di banyak
+ *  layar sub-route dan semuanya harus menampilkan tab yang sama. */
+@Composable
+private fun isEnrollTabRole(): Boolean {
+    val staff by AppSession.staff.collectAsState()
+    return staff?.role in ENROLL_TAB_ROLES
+}
 
 /**
  * Bottom nav 4 tab yang sama dipakai di [AbsensiMainPagerScreen] (pager, `selectedIndex`
@@ -191,6 +211,7 @@ private val ABSENSI_BOTTOM_TABS = listOf(
  */
 @Composable
 fun AbsensiBottomNav(selectedIndex: Int, onSelect: (Int) -> Unit) {
+    val tabs = absensiBottomTabs(isEnrollTabRole())
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -209,7 +230,7 @@ fun AbsensiBottomNav(selectedIndex: Int, onSelect: (Int) -> Unit) {
             // Only the tappable item rail is inset. The background itself is full width, which
             // keeps both outer corners and the crescent smooth on Home and More.
             val itemRailInset = 18.dp
-            val tabWidth = (maxWidth - (itemRailInset * 2)) / ABSENSI_BOTTOM_TABS.size
+            val tabWidth = (maxWidth - (itemRailInset * 2)) / tabs.size
             val bubbleX by androidx.compose.animation.core.animateDpAsState(
                 targetValue = itemRailInset + (tabWidth * selectedIndex) + ((tabWidth - bubbleSize) / 2),
                 animationSpec = spring(
@@ -229,7 +250,7 @@ fun AbsensiBottomNav(selectedIndex: Int, onSelect: (Int) -> Unit) {
                     bubbleCenter = bubbleCenter,
                     bubbleSize = bubbleSize,
                     navTopOffset = 24.dp,
-                    isEdgeTab = selectedIndex == 0 || selectedIndex == ABSENSI_BOTTOM_TABS.lastIndex,
+                    isEdgeTab = selectedIndex == 0 || selectedIndex == tabs.lastIndex,
                 ),
                 color = SukaSurfaceContainerLowest,
                 shadowElevation = 10.dp,
@@ -244,7 +265,7 @@ fun AbsensiBottomNav(selectedIndex: Int, onSelect: (Int) -> Unit) {
                     .padding(horizontal = itemRailInset, vertical = 5.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                ABSENSI_BOTTOM_TABS.forEach { (label, icon, index) ->
+                tabs.forEach { (label, icon, index) ->
                     FloatingNavItem(
                         label = label,
                         icon = icon,
@@ -266,8 +287,8 @@ fun AbsensiBottomNav(selectedIndex: Int, onSelect: (Int) -> Unit) {
                 border = BorderStroke(1.dp, SukaOrange.copy(alpha = 0.16f)),
             ) {
                 Icon(
-                    imageVector = ABSENSI_BOTTOM_TABS[selectedIndex].second,
-                    contentDescription = "Tab ${ABSENSI_BOTTOM_TABS[selectedIndex].first}",
+                    imageVector = tabs[selectedIndex].second,
+                    contentDescription = "Tab ${tabs[selectedIndex].first}",
                     tint = SukaOrange,
                     modifier = Modifier.padding(14.dp),
                 )
@@ -425,6 +446,14 @@ fun AbsensiMainPagerScreen(
 ) {
     val pagerState = rememberPagerState(initialPage = 0) { 4 }
     val coroutineScope = rememberCoroutineScope()
+    val enrollTab = isEnrollTabRole()
+    var moreSheetVisible by rememberSaveable { mutableStateOf(false) }
+
+    // More adalah quick action, bukan tab pager. Jadi sheet dibuka di atas
+    // halaman aktif agar konten di belakangnya tidak ikut bergeser.
+    BackHandler(enabled = moreSheetVisible) {
+        moreSheetVisible = false
+    }
 
     // Jika pengguna berada di tab 1, 2, atau 3, tombol back akan mengembalikan ke Tab 0 (Home).
     // Jika sudah di Tab 0, tombol back akan memanggil onExit() (keluar modul).
@@ -440,6 +469,7 @@ fun AbsensiMainPagerScreen(
     // Konsumsi permintaan pindah tab dari layar sub-route (mis. bottom nav CutiScreen).
     LaunchedEffect(pendingTab) {
         if (pendingTab != null) {
+            moreSheetVisible = false
             pagerState.scrollToPage(pendingTab)
             onPendingTabConsumed()
         }
@@ -448,9 +478,12 @@ fun AbsensiMainPagerScreen(
     Scaffold(
         bottomBar = {
             AbsensiBottomNav(
-                selectedIndex = pagerState.currentPage,
+                selectedIndex = if (moreSheetVisible) 3 else pagerState.currentPage,
                 onSelect = { index ->
-                    if (pagerState.currentPage != index) {
+                    if (index == 3) {
+                        moreSheetVisible = true
+                    } else if (pagerState.currentPage != index) {
+                        moreSheetVisible = false
                         coroutineScope.launch {
                             pagerState.animateScrollToPage(
                                 page = index,
@@ -462,30 +495,66 @@ fun AbsensiMainPagerScreen(
             )
         }
     ) { innerPadding ->
-        HorizontalPager(
-            state = pagerState,
+        Box(
             modifier = Modifier
                 .padding(innerPadding)
                 .fillMaxSize(),
-            userScrollEnabled = true,
-            beyondBoundsPageCount = 1
-        ) { page ->
-            when (page) {
-                0 -> ClockScreen(
-                    isActive = pagerState.currentPage == 0 || pagerState.targetPage == 0,
-                    onExit = onExit
-                )
-                1 -> ChecklistScreen(onExit = {
-                    coroutineScope.launch { pagerState.animateScrollToPage(0) }
-                })
-                2 -> ProfilScreen(onExit = {
-                    coroutineScope.launch { pagerState.animateScrollToPage(0) }
-                })
-                3 -> AbsensiHubScreen(
-                    onNavigate = onNavigateToSubRoute,
-                    onExit = {
+        ) {
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize(),
+                userScrollEnabled = true,
+                beyondBoundsPageCount = 1
+            ) { page ->
+                when (page) {
+                    0 -> ClockScreen(
+                        isActive = !moreSheetVisible &&
+                            (pagerState.currentPage == 0 || pagerState.targetPage == 0),
+                        onExit = onExit
+                    )
+                    1 -> ChecklistScreen(onExit = {
                         coroutineScope.launch { pagerState.animateScrollToPage(0) }
+                    })
+                    // Slot yang sama dengan tab index 2 di bottom nav — ikut berganti isi
+                    // supaya label tab dan halaman yang muncul selalu cocok.
+                    2 -> if (enrollTab) {
+                        EnrollScreen(onExit = {
+                            coroutineScope.launch { pagerState.animateScrollToPage(0) }
+                        })
+                    } else {
+                        ProfilScreen(onExit = {
+                            coroutineScope.launch { pagerState.animateScrollToPage(0) }
+                        })
                     }
+                    3 -> AbsensiHubScreen(
+                        onNavigate = onNavigateToSubRoute,
+                        isSheetVisible = pagerState.currentPage == 3,
+                        onDismiss = {
+                            coroutineScope.launch {
+                                pagerState.animateScrollToPage(0)
+                            }
+                        },
+                        onExit = {
+                            coroutineScope.launch { pagerState.animateScrollToPage(0) }
+                        }
+                    )
+                }
+            }
+
+            if (moreSheetVisible && pagerState.currentPage != 3) {
+                AbsensiHubScreen(
+                    onNavigate = { route ->
+                        moreSheetVisible = false
+                        onNavigateToSubRoute(route)
+                    },
+                    onExit = {
+                        moreSheetVisible = false
+                    },
+                    isSheetVisible = true,
+                    showBackground = false,
+                    onDismiss = {
+                        moreSheetVisible = false
+                    },
                 )
             }
         }

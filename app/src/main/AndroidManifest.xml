@@ -6,6 +6,18 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Pelacakan lokasi kerja (SOP): dijalankan sebagai foreground service dengan
+         notifikasi persisten, hanya setelah user menyetujui consent screen di app. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Menyalakan ulang pelacakan setelah HP restart / app di-update, tanpa staff harus
+         membuka aplikasi lebih dulu. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Alarm jaring pengaman yang membangunkan service bila dibunuh OEM. Alarm persis
+         dipakai HANYA bila sistem mengizinkan; kalau tidak, kode jatuh ke alarm biasa. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application
@@ -27,5 +39,38 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- stopWithTask=false: menggeser app dari Recent Apps tidak boleh ikut mematikan
+             pelacakan. Service tetap hidup, dan bila OEM memaksa membunuh prosesnya,
+             onTaskRemoved sudah menjadwalkan alarm restart. -->
+        <service
+            android:name="com.sukashawarma.superapp.data.location.LocationTrackingService"
+            android:exported="false"
+            android:stopWithTask="false"
+            android:foregroundServiceType="location" />
+
+        <receiver
+            android:name="com.sukashawarma.superapp.data.location.LocationRestartReceiver"
+            android:exported="false"
+            android:directBootAware="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <!-- Broadcast non-standar yang dipakai ROM HTC/Xiaomi lama untuk fast boot. -->
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Export CSV rekap: file ditulis ke cache lalu dibagikan lewat sheet sistem. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 </manifest>

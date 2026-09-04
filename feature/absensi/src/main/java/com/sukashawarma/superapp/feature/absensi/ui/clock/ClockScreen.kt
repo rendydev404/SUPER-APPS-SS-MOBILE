@@ -28,6 +28,7 @@ import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -45,6 +46,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.sp
@@ -52,8 +54,11 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sukashawarma.superapp.data.face.NormalizedFaceContours
 import com.sukashawarma.superapp.data.face.NormalizedPoint
+import com.sukashawarma.superapp.data.remote.Postgrest
+import com.sukashawarma.superapp.data.remote.optString
 import com.sukashawarma.superapp.domain.util.JakartaTime
 import com.sukashawarma.superapp.domain.model.ClockPhase
+import com.sukashawarma.superapp.domain.model.Role
 import com.sukashawarma.superapp.domain.session.AppSession
 import com.sukashawarma.superapp.presentation.components.FaceCameraPreview
 import com.sukashawarma.superapp.presentation.theme.*
@@ -72,8 +77,31 @@ import androidx.compose.material.icons.filled.NotificationsNone
 fun ClockScreen(isActive: Boolean = true, onExit: () -> Unit) {
     val context = LocalContext.current
     val staff by AppSession.staff.collectAsState()
-    val outletId = staff?.outletId
+
+    // Outlet mana yang boleh dipakai absen ditentukan oleh penempatan user, bukan role
+    // semata — lihat [AttendanceOutletsViewModel]. ViewModel-nya terpisah karena
+    // ClockViewModel di-recreate setiap outlet berganti.
+    val outletsViewModel: AttendanceOutletsViewModel = viewModel(
+        key = "attendance-outlets-${staff?.id}",
+        factory = AttendanceOutletsViewModelFactory(context.applicationContext as android.app.Application),
+    )
+    val outletsState by outletsViewModel.state.collectAsState()
+    var outletMenuExpanded by remember { mutableStateOf(false) }
+
+    val outletId = outletsState.selectedId
+    val selectedOutletName = outletsState.selected?.name ?: staff?.outletName
     val allowManual = staff?.allowManualButton == true
+
+    // Selama daftar outlet masih dimuat, jangan tampilkan kartu "belum terhubung" — itu
+    // bukan kesimpulan yang bisa diambil sebelum datanya masuk.
+    if (outletId == null && outletsState.loading) {
+        Scaffold(containerColor = SukaSurface) { padding ->
+            Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = SukaOrange, strokeWidth = 3.dp)
+            }
+        }
+        return
+    }
 
     if (outletId == null) {
         Scaffold(containerColor = SukaSurface) { padding ->
@@ -124,6 +152,7 @@ fun ClockScreen(isActive: Boolean = true, onExit: () -> Unit) {
     }
 
     val viewModel: ClockViewModel = viewModel(
+        key = "clock-${staff?.id}-$outletId",
         factory = ClockViewModelFactory(
             application = context.applicationContext as android.app.Application,
             outletId = outletId,
@@ -221,8 +250,19 @@ fun ClockScreen(isActive: Boolean = true, onExit: () -> Unit) {
                         .padding(horizontal = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(24.dp)
                 ) {
+                    if (outletsState.hasChoice || outletsState.error != null) {
+                        AttendanceOutletSelector(
+                            state = outletsState,
+                            expanded = outletMenuExpanded,
+                            onExpandedChange = { outletMenuExpanded = it },
+                            onSelect = { outletsViewModel.selectOutlet(it) },
+                            onRedetect = { outletsViewModel.redetect() },
+                            onRetry = { outletsViewModel.load() },
+                        )
+                    }
+
                     // Greeting
-                    GreetingSection(staff?.name, staff?.outletName)
+                    GreetingSection(staff?.name, selectedOutletName)
 
                     // Camera Action Area
                     ActionArea(
@@ -249,6 +289,232 @@ fun ClockScreen(isActive: Boolean = true, onExit: () -> Unit) {
 
                     Spacer(Modifier.height(32.dp))
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Pemilih outlet absen. Tampil untuk siapa pun yang terhubung ke lebih dari satu outlet —
+ * leader, area manager, regional manager, atau kru yang punya baris `staff_outlets`
+ * tambahan. Outlet terdekat sudah dikunci otomatis oleh [AttendanceOutletsViewModel];
+ * daftar ini untuk mengoreksi manual saat dua outlet berdekatan atau GPS meleset.
+ */
+@Composable
+private fun AttendanceOutletSelector(
+    state: AttendanceOutletsUiState,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    onSelect: (String) -> Unit,
+    onRedetect: () -> Unit,
+    onRetry: () -> Unit,
+) {
+    var searchQuery by remember { mutableStateOf("") }
+    val filteredOutlets = state.outlets.filter { it.name.contains(searchQuery.trim(), ignoreCase = true) }
+    val selected = state.selected
+    val nearestId = state.outlets.firstOrNull { it.distanceM != null }?.id
+
+    LaunchedEffect(expanded) {
+        if (!expanded) searchQuery = ""
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "Lokasi absen",
+                color = SukaOnSurfaceVariant,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f),
+            )
+            if (state.hasChoice && !state.autoDetected && !state.locating) {
+                TextButton(
+                    onClick = onRedetect,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                ) {
+                    Text("Deteksi ulang", fontSize = 12.sp, color = SukaOrange, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        Box {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = state.outlets.isNotEmpty()) { onExpandedChange(true) },
+                shape = RoundedCornerShape(16.dp),
+                color = SukaSurfaceContainerLowest,
+                border = BorderStroke(1.dp, SukaSurfaceContainerHighest),
+                shadowElevation = 1.dp,
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Storefront,
+                        contentDescription = null,
+                        tint = SukaOrange,
+                        modifier = Modifier.size(22.dp),
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = selected?.name ?: if (state.loading) "Memuat outlet..." else "Pilih outlet",
+                            color = SukaOnSurface,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        val selectedDistance = selected?.distanceM
+                        Text(
+                            text = when {
+                                state.loading -> "Menyiapkan daftar outlet"
+                                state.locating -> "Mendeteksi outlet terdekat..."
+                                state.autoDetected && selectedDistance != null ->
+                                    "Terdeteksi otomatis · " + formatDistanceShort(selectedDistance) + " dari Anda"
+                                selectedDistance != null ->
+                                    formatDistanceShort(selectedDistance) + " dari Anda"
+                                else -> state.outlets.size.toString() + " outlet terhubung ke akun Anda"
+                            },
+                            color = SukaOnSurfaceVariant,
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    if (state.loading || state.locating) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = SukaOrange,
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowDown,
+                            contentDescription = "Ganti outlet",
+                            tint = SukaOnSurfaceVariant,
+                        )
+                    }
+                }
+            }
+
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { onExpandedChange(false) },
+                modifier = Modifier
+                    .width(300.dp)
+                    .heightIn(max = 430.dp),
+            ) {
+                Column(Modifier.padding(horizontal = 8.dp, vertical = 6.dp)) {
+                    if (state.outlets.size > 6) {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp),
+                            placeholder = { Text("Cari outlet", fontSize = 13.sp) },
+                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                            trailingIcon = {
+                                if (searchQuery.isNotEmpty()) {
+                                    IconButton(onClick = { searchQuery = "" }) {
+                                        Icon(Icons.Default.Clear, contentDescription = "Hapus pencarian")
+                                    }
+                                }
+                            },
+                        )
+                        Spacer(Modifier.height(6.dp))
+                    }
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 340.dp)
+                            .verticalScroll(rememberScrollState()),
+                    ) {
+                        if (filteredOutlets.isEmpty()) {
+                            Text(
+                                "Outlet tidak ditemukan",
+                                color = SukaOnSurfaceVariant,
+                                fontSize = 13.sp,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 18.dp),
+                            )
+                        } else filteredOutlets.forEach { outlet ->
+                            val isSelected = outlet.id == state.selectedId
+                            val outletDistance = outlet.distanceM
+                            DropdownMenuItem(
+                                text = {
+                                    Column {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        ) {
+                                            Text(
+                                                outlet.name,
+                                                fontSize = 14.sp,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                                                color = if (isSelected) SukaOrange else SukaOnSurface,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                modifier = Modifier.weight(1f, fill = false),
+                                            )
+                                            if (outlet.id == nearestId) {
+                                                Surface(
+                                                    shape = RoundedCornerShape(6.dp),
+                                                    color = SukaOrange.copy(alpha = 0.14f),
+                                                ) {
+                                                    Text(
+                                                        "Terdekat",
+                                                        fontSize = 9.5.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = SukaOrange,
+                                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        Text(
+                                            text = if (outletDistance != null) {
+                                                formatDistanceShort(outletDistance) + " dari Anda"
+                                            } else {
+                                                "Jarak belum terukur"
+                                            },
+                                            fontSize = 11.sp,
+                                            color = SukaOnSurfaceVariant,
+                                        )
+                                    }
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Default.Storefront,
+                                        contentDescription = null,
+                                        tint = if (isSelected) SukaOrange else SukaOnSurfaceVariant,
+                                        modifier = Modifier.size(20.dp),
+                                    )
+                                },
+                                onClick = { onSelect(outlet.id); onExpandedChange(false) },
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        if (state.error != null) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = state.error,
+                    color = MaterialTheme.colorScheme.error,
+                    fontSize = 12.sp,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = onRetry) { Text("Coba lagi") }
             }
         }
     }

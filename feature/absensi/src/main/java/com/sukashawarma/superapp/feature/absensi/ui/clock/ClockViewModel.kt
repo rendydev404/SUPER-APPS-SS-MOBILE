@@ -11,6 +11,7 @@ import com.sukashawarma.superapp.data.location.LocationRepository
 import com.sukashawarma.superapp.data.remote.AbsensiWebApi
 import com.sukashawarma.superapp.data.remote.NetworkMonitor
 import com.sukashawarma.superapp.data.remote.Postgrest
+import com.sukashawarma.superapp.data.remote.optInt
 import com.sukashawarma.superapp.data.remote.optString
 import com.sukashawarma.superapp.core.storage.StorageUtil
 import com.sukashawarma.superapp.domain.face.FaceEmbeddingExtractor
@@ -22,7 +23,6 @@ import com.sukashawarma.superapp.domain.liveness.LivenessDetector
 import com.sukashawarma.superapp.domain.liveness.pickChallenge
 import com.sukashawarma.superapp.domain.model.ClockPhase
 import com.sukashawarma.superapp.domain.model.ClockResult
-import com.sukashawarma.superapp.domain.session.AppSession
 import com.sukashawarma.superapp.domain.usecase.AttendanceGates
 import com.sukashawarma.superapp.domain.usecase.NextAction
 import kotlinx.coroutines.delay
@@ -62,6 +62,7 @@ class ClockViewModel(
 
     private var livenessDetector: LivenessDetector? = null
     private var pendingManualButton = false
+    private var geofenceRadiusM = GpsMath.GEOFENCE_RADIUS_M
 
     init {
         checkLocation()
@@ -150,9 +151,32 @@ class ClockViewModel(
                 return@launch
             }
             val outletCoords = LatLng(lat, lng)
+            geofenceRadiusM = loadGeofenceRadius()
             _state.value = _state.value.copy(outletCoords = outletCoords)
             validateDeviceLocation(outletCoords)
         }
+    }
+
+    private suspend fun loadGeofenceRadius(): Double {
+        val outletConfig = runCatching {
+            Postgrest.selectOne(
+                "outlet_attendance_config",
+                listOf("outlet_id" to "eq.$outletId", "select" to "radius_m"),
+            )
+        }.getOrNull()
+        val outletRadius = outletConfig?.optInt("radius_m")?.toDouble()?.takeIf { it > 0 }
+        if (outletRadius != null) return outletRadius
+
+        // Fallback untuk outlet baru yang belum memiliki row exception. Pengaturan
+        // pusat disimpan di global_settings dan berlaku ke seluruh outlet.
+        val globalConfig = runCatching {
+            Postgrest.selectOne(
+                "global_settings",
+                listOf("key" to "eq.global_attendance_config", "select" to "value"),
+            )
+        }.getOrNull()?.get("value")?.takeIf { it.isJsonObject }?.asJsonObject
+        return globalConfig?.optInt("radius_m")?.toDouble()?.takeIf { it > 0 }
+            ?: GpsMath.GEOFENCE_RADIUS_M
     }
 
     private suspend fun validateDeviceLocation(outletCoords: LatLng) {
@@ -174,7 +198,7 @@ class ClockViewModel(
         }
         val dist = GpsMath.haversineMeters(outletCoords, deviceCoords)
         _state.value = _state.value.copy(gpsDistanceM = dist)
-        if (!GpsMath.isWithinGeofence(outletCoords, deviceCoords, fix.accuracyM)) {
+        if (!GpsMath.isWithinGeofence(outletCoords, deviceCoords, fix.accuracyM, geofenceRadiusM)) {
             setResult(false, "Di luar jangkauan (jarak ${dist.toInt()} m). Silakan mendekat ke area kasir.", ClockPhase.LOCATION_INVALID)
             return
         }
@@ -255,16 +279,12 @@ class ClockViewModel(
             scheduleReset(2500)
             return
         }
-        val staffOutletId = AppSession.staff.value?.outletId ?: outletId
-        if (next == NextAction.OUT && !AttendanceGates.isClosingChecklistDone(staffOutletId)) {
-            setResult(false, "Checklist penutupan belum selesai. Tidak bisa absen pulang.", ClockPhase.RESULT)
-            scheduleReset(3500)
-            return
-        }
-        if (next == NextAction.OUT && !AttendanceGates.isShiftClosed(staffOutletId)) {
-            setResult(false, "Shift kasir outlet ini belum ditutup. Tidak bisa absen pulang.", ClockPhase.RESULT)
-            scheduleReset(3500)
-            return
+        if (next == NextAction.OUT) {
+            checkoutBlockMessage()?.let { message ->
+                setResult(false, message, ClockPhase.RESULT)
+                scheduleReset(3500)
+                return
+            }
         }
         val challenge = pickChallenge()
         livenessDetector = LivenessDetector(challenge)
@@ -329,16 +349,12 @@ class ClockViewModel(
             scheduleReset(2500)
             return
         }
-        val staffOutletId = AppSession.staff.value?.outletId ?: outletId
-        if (next == NextAction.OUT && !AttendanceGates.isClosingChecklistDone(staffOutletId)) {
-            setResult(false, "Checklist penutupan belum selesai. Tidak bisa absen pulang.", ClockPhase.RESULT)
-            scheduleReset(3500)
-            return
-        }
-        if (next == NextAction.OUT && !AttendanceGates.isShiftClosed(staffOutletId)) {
-            setResult(false, "Shift kasir outlet ini belum ditutup. Tidak bisa absen pulang.", ClockPhase.RESULT)
-            scheduleReset(3500)
-            return
+        if (next == NextAction.OUT) {
+            checkoutBlockMessage()?.let { message ->
+                setResult(false, message, ClockPhase.RESULT)
+                scheduleReset(3500)
+                return
+            }
         }
         _state.value = _state.value.copy(whoId = staffId, whoName = staffName, action = if (next == NextAction.OUT) "out" else "in")
         requestAttendanceSubmission(isManualButton = true)
@@ -364,6 +380,16 @@ class ClockViewModel(
         val s = _state.value
         val staffId = s.whoId ?: return
         _state.value = s.copy(phase = ClockPhase.SUBMITTING)
+
+        // Order baru dapat masuk setelah liveness selesai. Cek ulang sebelum
+        // mengirim absen pulang agar gate tetap konsisten dengan kondisi POS terbaru.
+        if (s.action == "out" && NetworkMonitor.isOnline.value) {
+            checkoutBlockMessage()?.let { message ->
+                setResult(false, message, ClockPhase.RESULT)
+                scheduleReset(3500)
+                return
+            }
+        }
 
         val id = UUID.randomUUID().toString()
         val nowIso = Instant.now().toString()
@@ -429,12 +455,31 @@ class ClockViewModel(
         "too_early_in" -> "Belum waktunya absen masuk"
         "too_early_out" -> "Belum waktunya absen pulang"
         "gps_accuracy_low" -> "Akurasi GPS terlalu rendah — aktifkan Lokasi Akurat"
-        "shift_not_closed" -> "Shift kasir belum ditutup"
-        "unfinished_orders" -> "Masih ada pesanan yang belum selesai di outlet ini"
+        "shift_not_closed" -> "Shift di POS Native masih terbuka. Tutup shift terlebih dahulu sebelum absen pulang."
+        "unfinished_orders" -> "Masih ada pesanan di POS Native yang belum selesai. Selesaikan atau batalkan pesanan terlebih dahulu sebelum absen pulang."
         "fake_gps_detected" -> "Lokasi tidak dapat diverifikasi. Matikan Mock Location."
         "teleportation_detected" -> "Perpindahan lokasi instan tidak wajar terdeteksi."
         null -> "Gagal: tidak diketahui"
         else -> "Gagal: $reason"
+    }
+
+    /**
+     * Urutan gate mengikuti aturan clock-out: checklist tutup, shift POS, lalu
+     * order berjalan. Jika query gagal, blokir dengan pesan koneksi agar tidak
+     * ada absen pulang yang lolos tanpa verifikasi status POS.
+     */
+    private suspend fun checkoutBlockMessage(): String? = try {
+        when {
+            !AttendanceGates.isClosingChecklistDone(outletId) ->
+                "Checklist penutupan belum selesai. Selesaikan checklist tutup terlebih dahulu sebelum absen pulang."
+            !AttendanceGates.isShiftClosed(outletId) ->
+                "Shift di POS Native masih terbuka. Tutup shift terlebih dahulu sebelum absen pulang."
+            AttendanceGates.hasUnfinishedOrders(outletId) ->
+                "Masih ada pesanan di POS Native yang belum selesai. Selesaikan atau batalkan pesanan terlebih dahulu sebelum absen pulang."
+            else -> null
+        }
+    } catch (_: Exception) {
+        "Status shift dan pesanan POS Native belum dapat diverifikasi. Periksa koneksi internet lalu coba lagi."
     }
 
     private suspend fun flushQueue() {

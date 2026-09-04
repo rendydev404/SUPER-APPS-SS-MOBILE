@@ -28,6 +28,10 @@ android {
 }
 
 dependencies {
+    // Service pelacakan menulis langsung ke Supabase dan membaca sesi staff; kedua modul
+    // ini tidak mengenal core:location sehingga tidak ada siklus dependensi.
+    implementation(project(":core:network"))
+    implementation(project(":core:roles"))
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
