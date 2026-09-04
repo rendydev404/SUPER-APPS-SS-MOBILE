@@ -243,8 +243,18 @@ object PermintaanRepository {
     // tombol top-up di web pun error di sana. Lihat catatan di file SQL tersebut.
 
     /**
-     * Estimasi Rupiah untuk item pada satuan distribusi — cermin `estimateCartValue`.
-     * `items`: bahanBakuId -> qty distribusi.
+     * Estimasi Rupiah sekumpulan item. `items`: bahanBakuId -> qty pada **satuan besar**.
+     *
+     * PENTING: `bahan_baku_harga.harga_beli` berharga per SATUAN BESAR, bukan per satuan
+     * pesan. Itu dipastikan oleh database sendiri — `get_outlet_budget_status` menghitung
+     * `terpakai = SUM(qty_disetujui * harga_snapshot)` sedangkan `qty_disetujui` tersimpan
+     * pada satuan besar, dan `harga_snapshot` disalin dari `harga_beli`.
+     *
+     * Web (`estimateCartValue`) mengalikan harga itu dengan qty satuan DISTRIBUSI, jadi
+     * nilainya membengkak sebesar faktor distribusi untuk bahan yang satuan pesannya bukan
+     * satuan besar — BAWANG 1 kg terbaca Rp 650.000 (harga 1 Bal = 20 kg) alih-alih
+     * Rp 32.500. Bug itu sengaja TIDAK diikuti: pemanggil di sini wajib mengonversi ke
+     * satuan besar lebih dulu lewat [DistribusiUnit.keBase].
      */
     suspend fun estimasiNilai(items: List<Pair<String, Double>>): EstimasiKeranjang {
         if (items.isEmpty()) return EstimasiKeranjang()
