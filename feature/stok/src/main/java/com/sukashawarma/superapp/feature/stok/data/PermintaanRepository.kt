@@ -19,9 +19,14 @@ import com.sukashawarma.superapp.feature.stok.data.model.TargetJual
 /**
  * Permintaan bahan — cermin `app/actions/permintaan.ts` dan `hooks/usePermintaan.ts`.
  *
- * Web membaca lewat service-role, tetapi RLS `select_permintaan_bahan_accessible_outlets`
- * sudah mengizinkan pembacaan yang sama untuk user terautentikasi, jadi native memakai
- * JWT pengguna dan hasilnya identik tanpa perlu melewati RLS.
+ * Web membaca lewat service-role; native memakai JWT pengguna dan bergantung pada RLS
+ * `select_permintaan_bahan_accessible_outlets`.
+ *
+ * Catatan lapangan (2026-09-04): policy SELECT itu ternyata TIDAK ADA di remote walau
+ * migration 20260615000200 mendefinisikannya — akibatnya daftar selalu kosong padahal
+ * penulisan sukses. Tak pernah ketahuan dari web karena web tak pernah membaca tabel ini
+ * dengan sesi user. Dipulihkan oleh migration 20300126000000 di repo web. Kalau layar
+ * riwayat kembali kosong sementara pengiriman sukses, curigai policy ini lebih dulu.
  *
  * Seluruh penulisan lewat RPC SECURITY DEFINER yang sama persis dengan web:
  * `buat_permintaan_svc`, `approve_permintaan_svc`, dan `tolak_permintaan_svc`.
