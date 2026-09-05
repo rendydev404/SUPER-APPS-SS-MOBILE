@@ -120,6 +120,8 @@ private val FILTER = listOf(
 @Composable
 fun OverviewScreen(
     onExit: () -> Unit,
+    onBukaWaste: () -> Unit,
+    onBukaLaporan: () -> Unit,
     viewModel: OverviewViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
@@ -145,6 +147,9 @@ fun OverviewScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onBukaLaporan) {
+                        Icon(Icons.Default.BarChart, "Laporan", tint = SukaBrown)
+                    }
                     IconButton(onClick = viewModel::muatUlang) {
                         Icon(Icons.Default.Refresh, "Muat ulang", tint = SukaBrown)
                     }
@@ -167,7 +172,7 @@ fun OverviewScreen(
             item { KartuOmzet(state.ringkasan) }
             item { KartuTransaksi(state.ringkasan) }
             item { KartuPorsi(state.ringkasan) }
-            item { KartuWaste(state.ringkasan) }
+            item { KartuWaste(state.ringkasan, onBukaWaste) }
             item { KartuBonus(state.ringkasan) }
 
             if (ManagerAkses.melihatPerformaZona(state.role)) {
@@ -376,7 +381,7 @@ private fun KartuPorsi(r: RingkasanArea) = KartuKpi(
 ) { PilKeterangan("Total produk pada periode ini") }
 
 @Composable
-private fun KartuWaste(r: RingkasanArea) = KartuKpi(
+private fun KartuWaste(r: RingkasanArea, onBuka: () -> Unit) = KartuKpi(
     judul = "Kerugian Waste",
     nilai = rupiah(r.kerugianWaste),
     ikon = Icons.Default.Delete,
@@ -388,6 +393,7 @@ private fun KartuWaste(r: RingkasanArea) = KartuKpi(
             shape = RoundedCornerShape(50),
             color = Color(0xFFFEF3C7),
             border = BorderStroke(1.dp, Color(0xFFFCD34D)),
+            modifier = Modifier.clickable(onClick = onBuka),
         ) {
             Text(
                 "${r.wasteMenungguPersetujuan} butuh approval",
@@ -398,7 +404,20 @@ private fun KartuWaste(r: RingkasanArea) = KartuKpi(
             )
         }
     } else {
-        PilKeterangan("Tidak ada waste menunggu persetujuan")
+        Surface(
+            shape = RoundedCornerShape(50),
+            color = SukaBrown.copy(alpha = 0.05f),
+            border = BorderStroke(1.dp, GarisKartu),
+            modifier = Modifier.clickable(onClick = onBuka),
+        ) {
+            Text(
+                "Lihat detail waste →",
+                Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                color = SukaBrown.copy(alpha = 0.7f),
+                fontSize = 10.sp,
+                fontWeight = FontWeight.ExtraBold,
+            )
+        }
     }
 }
 
