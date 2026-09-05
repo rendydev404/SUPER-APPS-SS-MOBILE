@@ -9,16 +9,19 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.sukashawarma.superapp.domain.session.AppSession
 import com.sukashawarma.superapp.feature.manager.domain.ManagerAkses
+import com.sukashawarma.superapp.feature.manager.ui.laporan.LaporanScreen
 import com.sukashawarma.superapp.feature.manager.ui.overview.OverviewScreen
+import com.sukashawarma.superapp.feature.manager.ui.waste.WasteScreen
 
 object ManagerRoutes {
     const val OVERVIEW = "manager_overview"
+    const val WASTE = "manager_waste"
+    const val LAPORAN = "manager_laporan"
 }
 
 /**
- * Graph modul Manager. Baru berisi satu layar; NavHost tetap dipakai sejak awal
- * supaya layar berikutnya (Laporan, Persetujuan, Waste, Tim, Petty Cash) cukup
- * ditambahkan sebagai composable, bukan memicu penataan ulang navigasi.
+ * Graph modul Manager. Layar berikutnya (Persetujuan, Sidak Inventaris, Resep &
+ * HPP, Tim, Petty Cash) cukup ditambahkan sebagai composable di sini.
  */
 @Composable
 fun ManagerNavGraph(onExit: () -> Unit) {
@@ -34,7 +37,17 @@ fun ManagerNavGraph(onExit: () -> Unit) {
     val navController = rememberNavController()
     NavHost(navController = navController, startDestination = ManagerRoutes.OVERVIEW) {
         composable(ManagerRoutes.OVERVIEW) {
-            OverviewScreen(onExit = onExit)
+            OverviewScreen(
+                onExit = onExit,
+                onBukaWaste = { navController.navigate(ManagerRoutes.WASTE) },
+                onBukaLaporan = { navController.navigate(ManagerRoutes.LAPORAN) },
+            )
+        }
+        composable(ManagerRoutes.WASTE) {
+            WasteScreen(onExit = { navController.popBackStack() })
+        }
+        composable(ManagerRoutes.LAPORAN) {
+            LaporanScreen(onExit = { navController.popBackStack() })
         }
     }
 }
