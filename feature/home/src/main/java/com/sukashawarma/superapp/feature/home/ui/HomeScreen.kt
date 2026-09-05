@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Fingerprint
+import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.LocationOn
@@ -78,11 +79,25 @@ private val DISTRIBUSI_ROLES = setOf(
     com.sukashawarma.superapp.domain.model.Role.REGIONAL_MANAGER,
 )
 
+/**
+ * Role yang boleh membuka modul Manager. Sama persis dengan `ManagerAkses.ROLE_MODUL`,
+ * disalin ke sini supaya `:feature:home` tidak perlu bergantung pada `:feature:manager`
+ * hanya untuk satu himpunan — pola yang sama dipakai STOK_ROLES dan DISTRIBUSI_ROLES.
+ *
+ * Daftarnya sempit karena memang begitu di web: `middleware.ts` app manager menolak
+ * siapa pun selain kedua role ini, termasuk owner dan admin.
+ */
+private val MANAGER_ROLES = setOf(
+    com.sukashawarma.superapp.domain.model.Role.AREA_MANAGER,
+    com.sukashawarma.superapp.domain.model.Role.REGIONAL_MANAGER,
+)
+
 @Composable
 fun HomeScreen(
     onOpenAbsensi: () -> Unit,
     onOpenStok: () -> Unit,
     onOpenDistribusi: () -> Unit,
+    onOpenManager: () -> Unit,
     onLoggedOut: () -> Unit,
     onOpenSettings: () -> Unit,
     viewModel: HomeViewModel = viewModel(),
@@ -139,6 +154,22 @@ fun HomeScreen(
                             Triple("PENERIMAAN", "Scan QR", SukaOnSurface),
                             Triple("VERIFIKASI", "Per Item", Color(0xFFEA580C)),
                             Triple("RIWAYAT", "Tersedia", Color(0xFF168451)),
+                        ),
+                    )
+                )
+            }
+            if (staff?.role in MANAGER_ROLES) {
+                Spacer(Modifier.height(14.dp))
+                ModuleCard(
+                    ModuleTile(
+                        "Manager",
+                        "Ringkasan area, performa zona & peringkat outlet",
+                        Icons.Default.Insights,
+                        onOpenManager,
+                        listOf(
+                            Triple("OMZET", "Realtime", SukaOnSurface),
+                            Triple("ZONA AM", "Peringkat", Color(0xFFEA580C)),
+                            Triple("STATUS", "Per Outlet", Color(0xFF168451)),
                         ),
                     )
                 )
