@@ -9,8 +9,12 @@ import kotlinx.coroutines.sync.withLock
 
 object AuthSessionManager {
     private val mutex = Mutex()
-    private var lastRefreshAt = 0L
 
+    /**
+     * Memastikan sesi aktif. Token yang tersimpan di disk tidak pernah dipakai
+     * oleh jalur refresh API biasa; hanya login biometrik yang memasukkannya ke
+     * [SessionTokenHolder] setelah BiometricPrompt berhasil.
+     */
     suspend fun ensureAuthenticated(): Boolean {
         if (isUsable(SessionTokenHolder.accessToken)) return true
         return refresh()
@@ -18,22 +22,26 @@ object AuthSessionManager {
 
     suspend fun refresh(): Boolean = mutex.withLock {
         if (isUsable(SessionTokenHolder.accessToken)) return@withLock true
-        if (System.currentTimeMillis() - lastRefreshAt < 60_000) {
-            return@withLock SessionTokenHolder.accessToken != null
-        }
 
+        // Hanya token sesi aktif di memory yang boleh dipakai di sini. Refresh
+        // token terenkripsi di disk dimasukkan oleh login biometrik setelah
+        // autentikasi perangkat berhasil. Ini mencegah service/background
+        // request membuka sesi kembali setelah user logout.
         val refreshToken = SessionTokenHolder.refreshToken
-            ?: AuthPrefs.getRefreshToken()
             ?: return@withLock false
 
         try {
-            lastRefreshAt = System.currentTimeMillis()
             val res = authApi.refreshSession(payload = RefreshTokenPayload(refreshToken))
             val body = res.body()
             if (res.isSuccessful && body != null) {
                 SessionTokenHolder.accessToken = body.access_token
                 SessionTokenHolder.refreshToken = body.refresh_token
-                AuthPrefs.setRefreshToken(body.refresh_token)
+                // Token hasil refresh hanya menetap di disk untuk akun yang
+                // mengaktifkan biometrik; AuthPrefs yang memutuskan.
+                AuthPrefs.setRefreshTokenForUser(
+                    AuthPrefs.getBiometricUserId(),
+                    body.refresh_token,
+                )
                 true
             } else {
                 false
@@ -66,4 +74,3 @@ object AuthSessionManager {
 
 
 val authApi: AuthApi by lazy { com.sukashawarma.superapp.data.remote.SupabaseClient.retrofit.create(AuthApi::class.java) }
-
