@@ -1,7 +1,9 @@
 package com.sukashawarma.superapp.feature.stok.ui.opname
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,6 +36,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -69,7 +74,16 @@ fun OpnameScreen(viewModel: OpnameViewModel = viewModel()) {
     val state by viewModel.state.collectAsState()
     RealtimeRefresh(RealtimeTables.OPNAME, RealtimeTables.OPNAME_ITEM) { viewModel.muatAwal() }
 
-    if (state.formTerbuka) {
+    // Detail ditampilkan menukar isi layar, bukan lewat rute tersendiri: OpnameScreen
+    // dirender langsung oleh StokShell sebagai tab, sehingga menambah rute berarti
+    // menjahit callback menembus dua lapis untuk keuntungan yang tidak ada.
+    var detailId by rememberSaveable { mutableStateOf<String?>(null) }
+    BackHandler(enabled = detailId != null) { detailId = null }
+
+    val detailTerbuka = detailId
+    if (detailTerbuka != null) {
+        DetailOpnameScreen(opnameId = detailTerbuka, onKembali = { detailId = null })
+    } else if (state.formTerbuka) {
         FormOpname(state, viewModel)
     } else {
     Column(Modifier.fillMaxSize().background(SukaSurface)) {
@@ -104,7 +118,9 @@ fun OpnameScreen(viewModel: OpnameViewModel = viewModel()) {
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(9.dp),
             ) {
-                items(state.riwayat, key = { it.id }) { KartuRiwayat(it) }
+                items(state.riwayat, key = { it.id }) { h ->
+                    KartuRiwayat(h, onKlik = { detailId = h.id })
+                }
             }
         }
     }
@@ -112,7 +128,7 @@ fun OpnameScreen(viewModel: OpnameViewModel = viewModel()) {
 }
 
 @Composable
-private fun KartuRiwayat(h: OpnameHeader) {
+private fun KartuRiwayat(h: OpnameHeader, onKlik: () -> Unit) {
     val warna = when (h.status) {
         StatusOpname.FINALIZED, StatusOpname.APPROVED -> Color(0xFF168451)
         StatusOpname.PENDING_APPROVAL -> Color(0xFFC27A12)
@@ -120,7 +136,7 @@ private fun KartuRiwayat(h: OpnameHeader) {
         StatusOpname.DRAFT -> Color(0xFF64748B)
     }
     Surface(
-        Modifier.fillMaxWidth(),
+        Modifier.fillMaxWidth().clickable(onClick = onKlik),
         shape = RoundedCornerShape(16.dp),
         color = Color.White,
         border = BorderStroke(1.dp, Color(0xFFF1F5F9)),
