@@ -19,6 +19,16 @@ data class AuthTokenResponse(
 )
 data class UpdatePasswordPayload(val password: String)
 
+/** Body kosong; endpoint SSO mengambil identitas dari access token pemanggil,
+ *  bukan dari parameter, supaya tidak ada cara meminta token atas nama orang lain. */
+class PosSsoPayload
+
+data class PosSsoResponse(
+    val ok: Boolean = false,
+    val token_hash: String? = null,
+    val error: String? = null,
+)
+
 interface AuthApi {
     @POST("auth/v1/token")
     suspend fun signInWithPassword(
@@ -41,4 +51,10 @@ interface AuthApi {
         @Header("Authorization") bearerToken: String,
         @Body payload: UpdatePasswordPayload
     ): Response<AuthUserDto>
+
+    /** Menerbitkan token sekali pakai untuk membuka sesi POS. Lihat Edge Function
+     *  `pos-sso-handoff`: POS menukarnya jadi sesi terpisah miliknya sendiri,
+     *  jadi sesi superapp tidak ikut terpakai/terotasi. */
+    @POST("functions/v1/pos-sso-handoff")
+    suspend fun mintPosSsoToken(@Body payload: PosSsoPayload = PosSsoPayload()): Response<PosSsoResponse>
 }
