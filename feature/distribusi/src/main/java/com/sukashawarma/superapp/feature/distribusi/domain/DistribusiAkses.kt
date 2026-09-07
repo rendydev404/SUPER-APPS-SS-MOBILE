@@ -5,10 +5,8 @@ import com.sukashawarma.superapp.domain.model.Role
 /**
  * Satu-satunya tempat role dibedakan di modul Distribusi.
  *
- * CAKUPAN OUTLET TIDAK DIPUTUSKAN DI SINI. Outlet mana yang terlihat oleh
- * seorang pengguna ditentukan RPC `accessible_outlet_ids()` di database, supaya
- * perubahan kebijakan tidak menuntut rilis APK baru. Yang ada di file ini hanya
- * kemampuan — dua hal saja, dan keduanya betul-betul berbeda antar role.
+ * Mengikuti `isPusat` di BottomNav.tsx dan SuratJalanDetail.tsx web:
+ * AM adalah penerima outlet, sedangkan RM adalah pengelola pusat.
  */
 object DistribusiAkses {
 
@@ -23,15 +21,14 @@ object DistribusiAkses {
 
     fun bolehMembuka(role: Role?): Boolean = role in ROLE_MODUL
 
-    /** Menerima barang adalah pekerjaan orang yang berdiri di outlet. */
+    /** Varian penerima web mencakup AM, crew, dan leader. */
     fun bolehVerifikasi(role: Role?): Boolean =
-        role == Role.CREW || role == Role.LEADER
+        role == Role.CREW || role == Role.LEADER || role == Role.AREA_MANAGER
 
-    /** Menutup dokumen jadi `selesai` adalah pekerjaan pengawas. */
+    /** Dari role native, hanya RM masuk daftar `isPusat` web. */
     fun bolehTutupDokumen(role: Role?): Boolean =
-        role == Role.AREA_MANAGER || role == Role.REGIONAL_MANAGER
+        role == Role.REGIONAL_MANAGER
 
-    /** Kode/QR verifikasi hanya boleh dilihat pengawas — lihat komentar
-     *  gerbang QR di spec §3. */
+    /** AM tidak melihat kode pengirim; penerimaan tetap melewati scan fisik. */
     fun bolehLihatKodeVerifikasi(role: Role?): Boolean = bolehTutupDokumen(role)
 }
