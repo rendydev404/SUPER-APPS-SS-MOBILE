@@ -54,6 +54,8 @@ import com.sukashawarma.superapp.feature.stok.data.ThresholdRepository
 import com.sukashawarma.superapp.feature.stok.data.model.OutletRingkas
 import com.sukashawarma.superapp.feature.stok.domain.formatAngkaStok
 import com.sukashawarma.superapp.feature.stok.domain.stokErrorMessage
+import com.sukashawarma.superapp.core.ui.RealtimeRefresh
+import com.sukashawarma.superapp.core.ui.RealtimeTables
 import com.sukashawarma.superapp.feature.stok.ui.HeaderStok
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -211,6 +213,11 @@ fun ThresholdScreen(
     viewModel: ThresholdViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+
+    // Bahan baku baru atau nilai bawaan yang diubah dari web harus terlihat di sini
+    // tanpa keluar-masuk layar — angka di sini menentukan bahan mana yang tampil
+    // kritis di monitoring, jadi daftar basi menyesatkan.
+    RealtimeRefresh(RealtimeTables.BAHAN_BAKU) { viewModel.muatAwal() }
 
     Column(Modifier.fillMaxSize().background(Color(0xFFF8FAFC))) {
         HeaderStok(
