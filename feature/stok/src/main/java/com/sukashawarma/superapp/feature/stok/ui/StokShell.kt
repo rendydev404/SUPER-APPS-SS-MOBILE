@@ -1,6 +1,7 @@
 package com.sukashawarma.superapp.feature.stok.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -15,6 +16,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Assignment
@@ -34,15 +37,18 @@ import androidx.compose.material.icons.filled.Sell
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -51,8 +57,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 import com.sukashawarma.superapp.domain.session.AppSession
 import com.sukashawarma.superapp.feature.stok.data.WasteApprovalAccess
 import com.sukashawarma.superapp.feature.stok.domain.StokAkses
@@ -235,9 +243,40 @@ fun StokShell(
     }
 }
 
+/**
+ * Kelompok pada lembar "Lainnya", urut seperti `AppSidebar.tsx` web.
+ *
+ * Daftar ini hanya menata tampilan — bukan gerbang akses. Yang menentukan sebuah
+ * tujuan muncul tetap `tujuanUntukPeran`; di sini isinya cuma disaring menurut apa
+ * yang sudah lolos ke `overflow`.
+ */
+private val KELOMPOK_MENU_STOK = listOf(
+    "Operasional" to listOf(
+        TabStok.LEDGER,
+        TabStok.MUTASI,
+        TabStok.ENTRI,
+        TabStok.RIWAYAT_WASTE,
+        TabStok.WASTE,
+        TabStok.TERIMA_PO,
+        TabStok.PERSETUJUAN_OPNAME,
+    ),
+    "Analisis & Laporan" to listOf(
+        TabStok.HARGA,
+        TabStok.NILAI_PERSEDIAAN,
+        TabStok.HPP_MENU,
+        TabStok.LAPORAN_PENJUALAN,
+        TabStok.PLAFON,
+        TabStok.ARUS_BARANG,
+        TabStok.THRESHOLD,
+    ),
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun BottomNavStok(aktif: TabStok, tabs: List<TabStok>, onPilih: (TabStok) -> Unit) {
     var moreOpen by rememberSaveable { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState()
+    val scope = rememberCoroutineScope()
     val primary = if (tabs.size > 5) tabs.take(4) else tabs
     val overflow = if (tabs.size > 5) tabs.drop(4) else emptyList()
     Column {
@@ -285,16 +324,102 @@ private fun BottomNavStok(aktif: TabStok, tabs: List<TabStok>, onPilih: (TabStok
                     Spacer(Modifier.height(3.dp))
                     Text("Lainnya", color = color, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
                 }
-                DropdownMenu(moreOpen, { moreOpen = false }) {
-                    overflow.forEach { destination ->
-                        DropdownMenuItem(
-                            text = { Text(destination.labelPanjang) },
-                            leadingIcon = { Icon(destination.icon, null) },
-                            onClick = { moreOpen = false; onPilih(destination) },
-                        )
-                    }
+            }
+        }
+    }
+
+    // Lembar, bukan DropdownMenu: daftarnya sudah 6-10 tujuan untuk sebagian peran,
+    // dan dropdown menggantung di pojok kanan bawah memotong labelnya sendiri —
+    // terlihat pada tangkapan layar peran pengawas. Bentuknya disamakan dengan
+    // lembar menu modul Manager supaya berpindah modul tidak berarti belajar ulang.
+    if (moreOpen && overflow.isNotEmpty()) {
+        ModalBottomSheet(onDismissRequest = { moreOpen = false }, sheetState = sheetState) {
+            IsiMenuStok(aktif, overflow) { tujuan ->
+                // Lembar ditutup dengan animasinya sendiri lebih dulu; menutup paksa
+                // bersamaan dengan perpindahan tab membuat isinya berkedip.
+                scope.launch { sheetState.hide() }.invokeOnCompletion {
+                    moreOpen = false
+                    onPilih(tujuan)
                 }
             }
+            Spacer(Modifier.height(12.dp))
+        }
+    }
+}
+
+/**
+ * Isi lembar "Lainnya" — tujuan overflow dikelompokkan seperti sidebar web.
+ *
+ * Tujuan yang belum tercatat di [KELOMPOK_MENU_STOK] tidak dibuang diam-diam,
+ * melainkan dikumpulkan di kelompok terakhir. Menambah entri `TabStok` tanpa
+ * mendaftarkannya di sini seharusnya membuat menunya terlihat salah tempat, bukan
+ * membuatnya lenyap dari aplikasi.
+ */
+@Composable
+private fun IsiMenuStok(
+    aktif: TabStok,
+    overflow: List<TabStok>,
+    onPilih: (TabStok) -> Unit,
+) {
+    val terkelompok = KELOMPOK_MENU_STOK.flatMap { it.second }.toSet()
+    val sisa = overflow.filter { it !in terkelompok }
+
+    // Kelompok kosong disaring SEBELUM perulangan, bukan lewat `return@forEach` di
+    // dalamnya: keluar-awal dari lambda inline yang memancarkan composable merusak
+    // tabel slot Compose.
+    val kelompok = KELOMPOK_MENU_STOK
+        .map { (judul, isi) -> judul to isi.filter { it in overflow } }
+        .filter { (_, terlihat) -> terlihat.isNotEmpty() }
+        .plus(if (sisa.isEmpty()) emptyList() else listOf("Lainnya" to sisa))
+
+    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp)) {
+        kelompok.forEach { (judul, terlihat) ->
+            Text(
+                judul.uppercase(),
+                color = Color(0xFF94A3B8),
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 0.9.sp,
+            )
+            Spacer(Modifier.height(10.dp))
+            terlihat.forEach { tujuan ->
+                BarisMenuStok(tujuan, aktif == tujuan) { onPilih(tujuan) }
+                Spacer(Modifier.height(8.dp))
+            }
+            Spacer(Modifier.height(12.dp))
+        }
+    }
+}
+
+@Composable
+private fun BarisMenuStok(tujuan: TabStok, aktif: Boolean, onKlik: () -> Unit) {
+    val oranye = Color(0xFFEA580C)
+    Surface(
+        Modifier.fillMaxWidth().clickable(onClick = onKlik),
+        shape = RoundedCornerShape(16.dp),
+        color = if (aktif) oranye else Color.White,
+        border = BorderStroke(1.dp, if (aktif) oranye else Color(0xFFF1F5F9)),
+    ) {
+        Row(
+            Modifier.padding(horizontal = 14.dp, vertical = 13.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                tujuan.icon,
+                null,
+                tint = if (aktif) Color.White else oranye,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(Modifier.width(12.dp))
+            Text(
+                tujuan.labelPanjang,
+                Modifier.weight(1f),
+                color = if (aktif) Color.White else Color(0xFF701604),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
