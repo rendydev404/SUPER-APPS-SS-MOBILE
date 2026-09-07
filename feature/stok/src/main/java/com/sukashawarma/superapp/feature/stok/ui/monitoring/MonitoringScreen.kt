@@ -72,6 +72,8 @@ import com.sukashawarma.superapp.feature.stok.ui.StatusBadge
 import com.sukashawarma.superapp.presentation.theme.SukaOnSurface
 import com.sukashawarma.superapp.presentation.theme.SukaOnSurfaceVariant
 import com.sukashawarma.superapp.presentation.theme.SukaSurface
+import com.sukashawarma.superapp.core.ui.RealtimeRefresh
+import com.sukashawarma.superapp.core.ui.RealtimeTables
 
 @Composable
 fun MonitoringScreen(
@@ -82,6 +84,7 @@ fun MonitoringScreen(
     viewModel: MonitoringViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+    RealtimeRefresh(RealtimeTables.STOK_BALANCE, RealtimeTables.LEDGER, RealtimeTables.BAHAN_BAKU) { viewModel.muatAwal() }
 
     Column(Modifier.fillMaxSize().background(SukaSurface)) {
         Header(
@@ -97,7 +100,7 @@ fun MonitoringScreen(
             state.tidakBerhak -> KeadaanTidakBerhak(
                 "Akun Anda belum terhubung dengan outlet mana pun. Hubungi admin atau regional manager."
             )
-            state.memuat -> MemuatPenuh()
+            state.memuat && state.outlets.isEmpty() -> MemuatPenuh()
             state.error != null -> KeadaanGagal(state.error!!, viewModel::muatAwal)
             else -> LazyColumn(
                 Modifier.fillMaxSize(),
