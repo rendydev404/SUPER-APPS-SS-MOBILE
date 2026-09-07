@@ -46,10 +46,17 @@ object TransferSuggester {
             Sisi(row, saldo, threshold)
         }
 
+        // Urutan penerima mengikuti web: yang KRITIS lebih dulu, baru dari kekurangan
+        // terbesar. Tanpa peringkat kegentingan, outlet yang cuma menipis tetapi
+        // gapnya besar bisa menghabiskan surplus donor sebelum outlet kritis kebagian.
         val penerima = terpakai
             .filter { it.saldo < it.threshold }
             .map { it to (it.threshold - it.saldo) }
-            .sortedByDescending { it.second }
+            .sortedWith(
+                compareBy<Pair<Sisi, Double>> { (sisi, _) ->
+                    if (sisi.saldo < sisi.threshold / 2.0) 0 else 1
+                }.thenByDescending { it.second }
+            )
             .toMutableList()
 
         val donor = terpakai
@@ -61,25 +68,22 @@ object TransferSuggester {
         if (penerima.isEmpty() || donor.isEmpty()) return emptyList()
 
         val hasil = mutableListOf<SaranTransfer>()
-        var iDonor = 0
-        var sisaDonor = donor.getOrNull(0)?.second ?: 0.0
+        // Sisa surplus tiap donor dilacak terpisah dan dipakai lintas penerima.
+        // Versi sebelumnya memakai satu penunjuk yang hanya maju, sehingga donor yang
+        // dilewati untuk satu penerima ikut hilang untuk penerima berikutnya.
+        val sisaDonor = DoubleArray(donor.size) { donor[it].second }
 
-        for (pasangan in penerima) {
-            var kurang = pasangan.second
-            val target = pasangan.first
-            while (kurang > 0.0 && iDonor < donor.size) {
-                if (sisaDonor <= 0.0) {
-                    iDonor++
-                    sisaDonor = donor.getOrNull(iDonor)?.second ?: 0.0
-                    continue
-                }
-                val sumber = donor[iDonor].first
-                if (sumber.row.outletId == target.row.outletId) {
-                    iDonor++
-                    sisaDonor = donor.getOrNull(iDonor)?.second ?: 0.0
-                    continue
-                }
-                val dipindah = minOf(kurang, sisaDonor)
+        for ((target, kebutuhan) in penerima) {
+            var kurang = kebutuhan
+            for (i in donor.indices) {
+                if (kurang <= 0.0) break
+                if (sisaDonor[i] <= 0.0) continue
+                val sumber = donor[i].first
+                // Satu outlet tidak bisa sekaligus di atas dan di bawah threshold,
+                // jadi cabang ini defensif — tetapi melewatinya tidak boleh membuang
+                // donornya untuk penerima lain.
+                if (sumber.row.outletId == target.row.outletId) continue
+                val dipindah = minOf(kurang, sisaDonor[i])
                 hasil += SaranTransfer(
                     bahanBakuId = target.row.bahanBakuId,
                     bahanNama = target.row.itemName,
@@ -91,9 +95,8 @@ object TransferSuggester {
                     meta = target.row.meta,
                 )
                 kurang -= dipindah
-                sisaDonor -= dipindah
+                sisaDonor[i] -= dipindah
             }
-            if (iDonor >= donor.size) break
         }
         return hasil
     }
