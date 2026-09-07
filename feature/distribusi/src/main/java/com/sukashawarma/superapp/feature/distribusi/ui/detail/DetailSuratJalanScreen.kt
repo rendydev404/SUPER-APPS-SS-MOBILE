@@ -40,6 +40,8 @@ import com.sukashawarma.superapp.feature.distribusi.ui.formatTanggal
 import com.sukashawarma.superapp.presentation.theme.SukaGray500
 import com.sukashawarma.superapp.presentation.theme.SukaOnSurface
 import com.sukashawarma.superapp.presentation.theme.SukaSurface
+import com.sukashawarma.superapp.core.ui.RealtimeRefresh
+import com.sukashawarma.superapp.core.ui.RealtimeTables
 
 private val MerahTeks = Color(0xFFB91C1C)
 
@@ -47,8 +49,9 @@ private val MerahTeks = Color(0xFFB91C1C)
 fun DetailSuratJalanScreen(suratJalanId: String, onKeluar: () -> Unit) {
     val viewModel: DetailViewModel = viewModel(factory = DetailViewModel.Factory(suratJalanId))
     val state by viewModel.state.collectAsState()
+    RealtimeRefresh(RealtimeTables.SURAT_JALAN) { viewModel.muat() }
 
-    if (state.memuat) { LayarMemuat(); return }
+    if (state.memuat && state.detail == null) { LayarMemuat(); return }
     val detail = state.detail
     if (detail == null) {
         LayarGalat(state.error ?: "Dokumen tidak bisa dibuka.") { viewModel.muat() }
