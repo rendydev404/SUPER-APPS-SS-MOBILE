@@ -260,11 +260,15 @@ private fun TombolBulat(
 @Composable
 private fun KartuRingkasan(state: MonitoringUiState, onTekan: (FilterKpi) -> Unit) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        // Angka kritis ikut memakai aturan porsi resep yang tiba belakangan. Sampai
+        // itu siap angkanya ditahan: angka yang naik sendiri setelah dibaca lebih
+        // membingungkan daripada menunggu sebentar.
         KotakRingkasan(
             angka = state.jumlahKritis,
             label = "Kritis",
             warna = Color(0xFFDC2626),
             aktif = state.filter == FilterKpi.KRITIS,
+            memuat = !state.porsiSiap,
             modifier = Modifier.weight(1f),
         ) { onTekan(FilterKpi.KRITIS) }
 
@@ -297,6 +301,7 @@ private fun KotakRingkasan(
     aktif: Boolean,
     modifier: Modifier = Modifier,
     dapatDitekan: Boolean = true,
+    memuat: Boolean = false,
     onTekan: () -> Unit,
 ) {
     val isi: @Composable () -> Unit = {
@@ -306,7 +311,7 @@ private fun KotakRingkasan(
             verticalArrangement = Arrangement.Center,
         ) {
             Text(
-                angka.toString(),
+                if (memuat) "…" else angka.toString(),
                 color = if (aktif) Color.White else warna,
                 fontSize = 21.sp,
                 fontWeight = FontWeight.Black,
