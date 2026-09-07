@@ -48,4 +48,58 @@ object StokAkses {
 
     /** Inbound/Outbound gudang pusat — web membatasinya ke `kitchen` saja. */
     fun melihatInboundOutbound(role: Role?): Boolean = role == Role.KITCHEN
+
+    // ---------------------------------------------------------------------------
+    // Gerbang menu Analisis & Laporan.
+    //
+    // Daftar di bawah disalin baris-per-baris dari `AppSidebar.tsx` web, bukan
+    // disederhanakan jadi pusat/pengawas. Web memang memakai daftar peran yang
+    // berbeda-beda untuk tiap menu — Nilai Persediaan lebih ketat daripada Master
+    // Harga, HPP lebih longgar daripada Laporan Penjualan — dan meringkasnya jadi
+    // dua kelompok akan membuka menu untuk peran yang di web tidak melihatnya.
+    // ---------------------------------------------------------------------------
+
+    /**
+     * Master Harga Bahan Baku — cermin `canViewVendorPrices`.
+     *
+     * Sengaja longgar (pengawas outlet ikut masuk) karena halaman harga di web
+     * memakai Server Action ber-service-role, bukan pembacaan langsung ber-RLS.
+     */
+    private val HARGA_BAHAN = setOf(
+        Role.KITCHEN, Role.PURCHASING, Role.ADMIN_FINANCE, Role.ADMIN, Role.OWNER,
+        Role.SPV, Role.REGIONAL_MANAGER, Role.LEADER, Role.AREA_MANAGER, Role.DEVELOPER,
+    )
+
+    /**
+     * Nilai Persediaan — cermin `canViewNilaiPersediaan`.
+     *
+     * Web menegaskan gerbang ini HARUS sama dengan policy RLS `bbh_read` di
+     * `bahan_baku_harga`: datanya dibaca lewat view `security_invoker`, jadi peran
+     * di luar daftar akan membuka layar lalu melihat total nol dan menyangka
+     * stoknya kosong. Karena itu lebih ketat daripada [HARGA_BAHAN].
+     */
+    private val NILAI_PERSEDIAAN = setOf(
+        Role.ADMIN, Role.OWNER, Role.KITCHEN, Role.PURCHASING, Role.ADMIN_FINANCE,
+    )
+
+    /** HPP Setiap Menu — cermin `canViewHPP`. */
+    private val HPP_MENU = setOf(
+        Role.KITCHEN, Role.PURCHASING, Role.ADMIN_FINANCE, Role.ADMIN, Role.OWNER,
+        Role.SPV, Role.REGIONAL_MANAGER, Role.DEVELOPER,
+    )
+
+    /**
+     * Laporan Penjualan dan Plafon & Belanja Outlet — cermin `canViewSales`.
+     * Web menempatkan keduanya di balik satu gerbang yang sama.
+     */
+    private val PENJUALAN = setOf(
+        Role.KITCHEN, Role.ADMIN, Role.OWNER, Role.ADMIN_FINANCE,
+        Role.DEVELOPER, Role.PURCHASING,
+    )
+
+    fun melihatHargaBahan(role: Role?): Boolean = role != null && role in HARGA_BAHAN
+    fun melihatNilaiPersediaan(role: Role?): Boolean = role != null && role in NILAI_PERSEDIAAN
+    fun melihatHppMenu(role: Role?): Boolean = role != null && role in HPP_MENU
+    fun melihatLaporanPenjualan(role: Role?): Boolean = role != null && role in PENJUALAN
+    fun melihatPlafonBelanja(role: Role?): Boolean = role != null && role in PENJUALAN
 }
