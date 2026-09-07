@@ -82,6 +82,8 @@ import com.sukashawarma.superapp.presentation.theme.SukaOnSurface
 import com.sukashawarma.superapp.presentation.theme.SukaOnSurfaceVariant
 import com.sukashawarma.superapp.presentation.theme.SukaSurface
 import kotlin.math.ceil
+import com.sukashawarma.superapp.core.ui.RealtimeRefresh
+import com.sukashawarma.superapp.core.ui.RealtimeTables
 
 private val Oranye = Color(0xFFEA580C)
 private val Merah = Color(0xFFDC2626)
@@ -211,6 +213,7 @@ private fun qtyTersimpanTeks(qtyBase: Double, bahan: BahanBaku?, satuanCadangan:
 @Composable
 fun PermintaanScreen(viewModel: PermintaanViewModel = viewModel()) {
     val state by viewModel.state.collectAsState()
+    RealtimeRefresh(RealtimeTables.PERMINTAAN, RealtimeTables.STOK_BALANCE) { viewModel.muatAwal() }
 
     when {
         state.approveUntuk != null -> LayarPersetujuan(state, state.approveUntuk!!, viewModel)
@@ -237,7 +240,7 @@ private fun LayarUtama(state: PermintaanUiState, viewModel: PermintaanViewModel)
 
         when {
             state.tidakBerhak -> KeadaanTidakBerhak("Akun Anda belum terhubung dengan outlet mana pun.")
-            state.memuat -> MemuatPenuh()
+            state.memuat && state.outlets.isEmpty() -> MemuatPenuh()
             state.error != null && state.katalog.isEmpty() && state.daftarReview.isEmpty() ->
                 KeadaanGagal(state.error, viewModel::muatAwal)
             state.modeAntrean -> AntreanPersetujuan(state, viewModel)
