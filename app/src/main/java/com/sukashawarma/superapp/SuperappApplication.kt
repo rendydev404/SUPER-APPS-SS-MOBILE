@@ -7,6 +7,7 @@ import com.sukashawarma.superapp.data.remote.SupabaseClient
 import com.sukashawarma.superapp.data.remote.AuthSessionManager
 import com.sukashawarma.superapp.data.location.LocationTracking
 import com.sukashawarma.superapp.domain.session.AppSession
+import com.sukashawarma.superapp.feature.absensi.notif.AbsenReminder
 import com.sukashawarma.superapp.feature.distribusi.data.VerifikasiDraftStore
 import dagger.hilt.android.HiltAndroidApp
 
@@ -21,5 +22,9 @@ class SuperappApplication : Application() {
         // Sesi habis / logout: pelacakan lokasi kehilangan `outlet_staff_id` tujuannya,
         // jadi harus mati bersama sesi, bukan menunggu user mematikannya manual.
         AppSession.onSignOut = { LocationTracking.stop(this) }
+        // Menjadwalkan ulang tiap app dibuka. Alarm yang sudah ada ditimpa lewat
+        // FLAG_UPDATE_CURRENT, jadi ini sekaligus jaring pengaman kalau OEM
+        // membersihkan alarm proses yang lama tidak dipakai.
+        AbsenReminder.schedule(this)
     }
 }
