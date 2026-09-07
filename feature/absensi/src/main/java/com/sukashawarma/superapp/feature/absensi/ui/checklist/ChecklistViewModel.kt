@@ -45,13 +45,17 @@ class ChecklistViewModel : ViewModel() {
         load()
     }
 
-    fun load() {
+    /** Muat senyap dipakai realtime: layar yang sudah berisi data tidak boleh
+     *  berkedip jadi spinner tiap kali server berubah. */
+    fun refresh() = load(silent = true)
+
+    fun load(silent: Boolean = false) {
         val outletId = AppSession.staff.value?.outletId
         if (outletId == null) {
             _state.value = _state.value.copy(loading = false, error = "Akun tidak terhubung ke outlet.")
             return
         }
-        _state.value = _state.value.copy(loading = true, error = null)
+        _state.value = _state.value.copy(loading = !silent, error = null)
         val phase = _state.value.phase
         viewModelScope.launch {
             try {
