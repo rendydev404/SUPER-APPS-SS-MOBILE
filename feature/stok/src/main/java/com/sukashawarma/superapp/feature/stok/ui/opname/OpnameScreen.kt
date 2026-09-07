@@ -61,10 +61,13 @@ import com.sukashawarma.superapp.feature.stok.ui.tanggalSingkat
 import com.sukashawarma.superapp.presentation.theme.SukaOnSurface
 import com.sukashawarma.superapp.presentation.theme.SukaOnSurfaceVariant
 import com.sukashawarma.superapp.presentation.theme.SukaSurface
+import com.sukashawarma.superapp.core.ui.RealtimeRefresh
+import com.sukashawarma.superapp.core.ui.RealtimeTables
 
 @Composable
 fun OpnameScreen(viewModel: OpnameViewModel = viewModel()) {
     val state by viewModel.state.collectAsState()
+    RealtimeRefresh(RealtimeTables.OPNAME, RealtimeTables.OPNAME_ITEM) { viewModel.muatAwal() }
 
     if (state.formTerbuka) {
         FormOpname(state, viewModel)
@@ -93,7 +96,7 @@ fun OpnameScreen(viewModel: OpnameViewModel = viewModel()) {
 
         when {
             state.tidakBerhak -> KeadaanTidakBerhak("Akun Anda belum terhubung dengan outlet mana pun.")
-            state.memuat -> MemuatPenuh()
+            state.memuat && state.outlets.isEmpty() -> MemuatPenuh()
             state.error != null -> KeadaanGagal(state.error!!, viewModel::muatAwal)
             state.riwayat.isEmpty() -> KeadaanKosong("Belum ada riwayat opname di outlet ini.")
             else -> LazyColumn(
