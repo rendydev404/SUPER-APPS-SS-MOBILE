@@ -1,5 +1,6 @@
 package com.sukashawarma.superapp.presentation.home
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sukashawarma.superapp.data.remote.Postgrest
@@ -7,9 +8,13 @@ import com.sukashawarma.superapp.data.remote.optString
 import com.sukashawarma.superapp.domain.model.StaffProfile
 import com.sukashawarma.superapp.domain.session.AppSession
 import com.sukashawarma.superapp.domain.util.JakartaTime
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
+import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -21,11 +26,35 @@ data class HomeUiState(
     val dateLabel: String = "",
     val todayAttendance: TodayAttendance? = null,
     val loadingAttendance: Boolean = true,
-)
+    /** Menahan klik kedua saat token SSO POS sedang diterbitkan. */
+    val membukaPos: Boolean = false,
+    /**
+     * Angka hidup untuk kartu modul. `null` berarti belum termuat atau memang
+     * tidak berlaku untuk role/outlet ini — kartu menampilkan "—", bukan "0",
+     * karena nol adalah kabar baik dan tidak boleh tertukar dengan tidak tahu.
+     */
+    val stokKritis: Int? = null,
+    val stokMenipis: Int? = null,
+    val kirimanMenunggu: Int? = null,
+    val wasteMenunggu: Int? = null,
+    val memuatSorotan: Boolean = true,
+) {
+    /** Jam absen terakhir hari ini dalam WIB, mis. "07:12". */
+    val jamAbsen: String? get() = todayAttendance?.tsServerIso?.let { iso ->
+        runCatching {
+            OffsetDateTime.parse(iso).atZoneSameInstant(JakartaTime.ZONE)
+                .format(DateTimeFormatter.ofPattern("HH:mm"))
+        }.getOrNull()
+    }
+}
 
 class HomeViewModel : ViewModel() {
     private val _state = MutableStateFlow(HomeUiState())
     val state: StateFlow<HomeUiState> = _state
+
+    /** Pesan sekali tayang untuk kartu POS (toast), bukan bagian dari state layar. */
+    private val _pesanPos = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val pesanPos: SharedFlow<String> = _pesanPos
 
     init {
         val staff = AppSession.staff.value
@@ -39,6 +68,74 @@ class HomeViewModel : ViewModel() {
         val dateLabel = now.format(DateTimeFormatter.ofPattern("EEEE, d MMMM yyyy", Locale.forLanguageTag("id-ID")))
         _state.value = HomeUiState(staff = staff, greeting = greeting, dateLabel = dateLabel)
         loadTodayAttendance(staff?.id)
+        muatSorotan(staff)
+    }
+
+    /**
+     * Angka yang tampil di kartu modul. Tiga query ringan (hanya kolom penanda,
+     * tanpa join) dijalankan berbarengan dan masing-masing boleh gagal sendiri —
+     * beranda tidak boleh ikut kosong hanya karena satu modul tidak terbaca.
+     *
+     * Query hanya dijalankan untuk kartu yang memang tampil bagi role ini, jadi
+     * crew tidak pernah menembak tabel waste dan manager tanpa outlet tidak
+     * menembak monitoring stok.
+     */
+    private fun muatSorotan(staff: StaffProfile?) {
+        val role = staff?.role
+        val outletId = staff?.outletId
+        if (role == null) {
+            _state.value = _state.value.copy(memuatSorotan = false)
+            return
+        }
+        viewModelScope.launch {
+            val stok = async {
+                if (outletId == null || role !in STOK_ROLES) null
+                else runCatching {
+                    // Cermin PermintaanRepository.saran(): `monitoring_view_crew` adalah
+                    // view SECURITY DEFINER, jadi saldo tetap terbaca walau RLS
+                    // stok_balance membatasi.
+                    val baris = Postgrest.select(
+                        "monitoring_view_crew",
+                        listOf("select" to "status", "outlet_id" to "eq.$outletId"),
+                    ).map { it.asJsonObject.optString("status") }
+                    baris.count { it == "below" } to baris.count { it == "warning" }
+                }.getOrNull()
+            }
+            val kiriman = async {
+                if (outletId == null || role !in DISTRIBUSI_ROLES) null
+                else runCatching {
+                    // Status yang sama dengan SuratJalanRepository.inbox().
+                    Postgrest.select(
+                        "surat_jalan",
+                        listOf(
+                            "select" to "id",
+                            "outlet_id" to "eq.$outletId",
+                            "status" to "in.(dikirim,dikirim_lengkap,diterima_sebagian)",
+                        ),
+                    ).size()
+                }.getOrNull()
+            }
+            val waste = async {
+                if (role !in MANAGER_ROLES) null
+                else runCatching {
+                    // Cermin ManagerRepository.jumlahWasteMenunggu(): sengaja tanpa
+                    // batas tanggal — laporan yang menggantung sejak minggu lalu
+                    // justru yang paling perlu terlihat.
+                    Postgrest.select(
+                        "stok_waste_reports",
+                        listOf("select" to "id", "status" to "eq.PENDING"),
+                    ).size()
+                }.getOrNull()
+            }
+            val hasilStok = stok.await()
+            _state.value = _state.value.copy(
+                stokKritis = hasilStok?.first,
+                stokMenipis = hasilStok?.second,
+                kirimanMenunggu = kiriman.await(),
+                wasteMenunggu = waste.await(),
+                memuatSorotan = false,
+            )
+        }
     }
 
     private fun loadTodayAttendance(staffId: String?) {
@@ -70,6 +167,37 @@ class HomeViewModel : ViewModel() {
             } catch (e: Exception) {
                 _state.value = _state.value.copy(loadingAttendance = false)
             }
+        }
+    }
+
+    /**
+     * Membuka aplikasi POS dengan sesi yang sudah jadi, tanpa login ulang.
+     *
+     * Token SSO dititipkan lewat extra Intent hanya kalau paket POS terbukti
+     * ditandatangani kunci yang sama. Kalau token gagal terbit (offline, akun
+     * tanpa outlet), POS tetap dibuka — kasir tinggal login manual di sana,
+     * jauh lebih baik daripada kartu yang tidak melakukan apa-apa.
+     */
+    fun bukaPos(context: Context) {
+        if (_state.value.membukaPos) return
+        val intent = intentBukaPos(context)
+        if (intent == null) {
+            _pesanPos.tryEmit("Aplikasi POS belum terpasang di perangkat ini")
+            return
+        }
+        _state.value = _state.value.copy(membukaPos = true)
+        viewModelScope.launch {
+            val token = if (posDitandatanganiSama(context)) {
+                mintTokenSsoPos()
+            } else {
+                // Paket bernama POS tapi bukan build kami: buka saja, jangan
+                // pernah titipkan token sesi ke aplikasi yang tidak dikenal.
+                _pesanPos.tryEmit("Aplikasi POS tidak dikenali, silakan login manual di sana")
+                null
+            }
+            if (token != null) intent.putExtra(EXTRA_SSO_TOKEN_HASH, token)
+            _state.value = _state.value.copy(membukaPos = false)
+            context.startActivity(intent)
         }
     }
 
