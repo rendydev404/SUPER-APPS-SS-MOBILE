@@ -76,4 +76,40 @@ class TransferSuggesterTest {
     fun `satu outlet saja tidak menghasilkan saran`() {
         assertTrue(TransferSuggester.untukBahan(listOf(baris("A", 10.0))).isEmpty())
     }
+
+    /**
+     * Cermin urutan penerima di `transferSuggestion.ts`: `below` sebelum `warning`.
+     *
+     * Sebelum perbaikan ini native hanya mengurutkan dari kekurangan terbesar, sehingga
+     * outlet yang cuma menipis bisa menghabiskan surplus donor lebih dulu.
+     */
+    @Test
+    fun `outlet kritis dilayani sebelum outlet yang sekadar menipis`() {
+        // Threshold 100. C tinggal 10 (kritis, di bawah separuh threshold) dan butuh 90.
+        // B tinggal 55 (menipis) dan butuh 45. Donor A hanya punya surplus 50.
+        val saran = TransferSuggester.untukBahan(
+            listOf(baris("A", 150.0), baris("B", 55.0), baris("C", 10.0)),
+        )
+        assertEquals("C", saran.first().keOutletId)
+        assertEquals(50.0, saran.first().qtyNorm, 0.0001)
+        // Surplus habis di C, jadi B tidak kebagian sama sekali.
+        assertEquals(1, saran.size)
+    }
+
+    /**
+     * Donor yang dilewati untuk satu penerima harus tetap tersedia bagi penerima
+     * berikutnya. Versi lama memakai satu penunjuk yang hanya maju, sehingga donor
+     * bisa hilang di tengah jalan.
+     */
+    @Test
+    fun `sisa surplus donor tetap terpakai untuk penerima berikutnya`() {
+        // A surplus 100. Dua penerima masing-masing butuh 40 dan 30 — keduanya
+        // harus terlayani dari donor yang sama.
+        val saran = TransferSuggester.untukBahan(
+            listOf(baris("A", 200.0), baris("B", 60.0), baris("C", 70.0)),
+        )
+        assertEquals(2, saran.size)
+        assertTrue(saran.all { it.dariOutletId == "A" })
+        assertEquals(70.0, saran.sumOf { it.qtyNorm }, 0.0001)
+    }
 }
