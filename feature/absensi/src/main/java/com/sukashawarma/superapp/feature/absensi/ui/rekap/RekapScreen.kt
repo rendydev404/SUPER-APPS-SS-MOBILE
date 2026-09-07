@@ -55,6 +55,8 @@ import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import com.sukashawarma.superapp.core.ui.RealtimeRefresh
+import com.sukashawarma.superapp.core.ui.RealtimeTables
 
 // Stitch Suka Culinary Design Tokens (samakan dengan layar Absensi lainnya)
 private val StitchPrimary = Color(0xFF450700)
@@ -100,6 +102,7 @@ private fun statusColors(status: String): Pair<Color, Color> = when (status) {
 @Composable
 fun RekapScreen(onExit: () -> Unit, viewModel: RekapViewModel = viewModel()) {
     val state by viewModel.state.collectAsState()
+    RealtimeRefresh(RealtimeTables.ATTENDANCE) { viewModel.refresh() }
     val context = LocalContext.current
 
     var selectedStaff by remember { mutableStateOf<StaffSummary?>(null) }
