@@ -116,12 +116,22 @@ data class PermintaanUiState(
     val katalogBoleh: List<BahanBaku>
         get() = katalog.filter { KatalogPermintaan.bolehDiminta(it.kategori, it.nama, katalogPenuh) }
 
-    /** Bahan kritis/menipis yang boleh diminta dan belum tersembunyi pending. */
+    /**
+     * Bahan kritis/menipis yang boleh diminta dan belum tersembunyi pending.
+     *
+     * Status ditentukan di sini, bukan di repository: metadata satuan yang
+     * dibutuhkan untuk membandingkan saldo dengan threshold secara adil baru
+     * tersedia setelah katalog termuat. Ini pula yang membuat angkanya sejalan
+     * dengan KPI "Kritis" di layar Monitoring, yang memakai perhitungan sama.
+     */
     val saranBoleh: List<SaranPermintaan>
         get() {
             val pending = pendingItemIds
             val boleh = katalogBoleh.associateBy { it.id }
-            return saran.filter { it.bahanBakuId in boleh && it.bahanBakuId !in pending }
+            return saran.filter { s ->
+                val bahan = boleh[s.bahanBakuId] ?: return@filter false
+                s.bahanBakuId !in pending && s.perluDiminta(bahan.meta)
+            }
         }
 
     val kategoriList: List<String>
