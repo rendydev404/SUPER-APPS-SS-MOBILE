@@ -69,6 +69,8 @@ import com.sukashawarma.superapp.feature.distribusi.ui.SegarkanSaatAktif
 import com.sukashawarma.superapp.presentation.theme.SukaGray500
 import com.sukashawarma.superapp.presentation.theme.SukaOnSurface
 import com.sukashawarma.superapp.presentation.theme.SukaOrange
+import com.sukashawarma.superapp.core.ui.RealtimeRefresh
+import com.sukashawarma.superapp.core.ui.RealtimeTables
 
 // Palet banner dan kartu statistik, cermin kelas Tailwind di dashboard web.
 private val KrimLatar = Color(0xFFFFF8F1)
@@ -99,6 +101,7 @@ fun DashboardScreen(
     viewModel: DashboardViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+    RealtimeRefresh(RealtimeTables.SURAT_JALAN) { viewModel.muat(paksa = true) }
     var konfirmasiTutup by remember { mutableStateOf<SuratJalanRingkas?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
 
