@@ -132,8 +132,10 @@ dependencies {
     implementation(project(":feature:home"))
     implementation(project(":feature:absensi"))
     implementation(project(":feature:stok"))
+    implementation("androidx.biometric:biometric:1.1.0")
     implementation(project(":feature:distribusi"))
     implementation(project(":feature:mitra"))
+    implementation(project(":feature:manager"))
     implementation("com.google.dagger:hilt-android:2.51")
     kapt("com.google.dagger:hilt-compiler:2.51")
 }
