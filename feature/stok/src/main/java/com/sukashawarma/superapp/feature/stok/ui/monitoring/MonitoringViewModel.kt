@@ -38,6 +38,14 @@ data class MonitoringUiState(
     val urutan: UrutanStok = UrutanStok.NAMA,
     val filter: FilterKpi = FilterKpi.SEMUA,
     val porsiPerBahan: Map<String, Int> = emptyMap(),
+    /**
+     * Apakah estimasi porsi sudah selesai dihitung.
+     *
+     * [jumlahKritis] ikut memakai aturan porsi, dan porsi baru tiba beberapa saat
+     * setelah daftar tampil. Tanpa penanda ini angka KPI naik sendiri di depan mata
+     * pengguna dan terbaca seperti data yang berubah-ubah.
+     */
+    val porsiSiap: Boolean = false,
 ) {
     val tampilkanPemilihOutlet: Boolean get() = outlets.size > 1
 
@@ -120,7 +128,12 @@ class MonitoringViewModel : ViewModel() {
 
     fun pilihOutlet(outlet: OutletRingkas) {
         if (outlet.id == _state.value.outletTerpilih?.id) return
-        _state.value = _state.value.copy(outletTerpilih = outlet, porsiPerBahan = emptyMap(), semua = emptyList())
+        _state.value = _state.value.copy(
+            outletTerpilih = outlet,
+            porsiPerBahan = emptyMap(),
+            porsiSiap = false,
+            semua = emptyList(),
+        )
         viewModelScope.launch { muatBahan() }
     }
 
@@ -145,7 +158,7 @@ class MonitoringViewModel : ViewModel() {
 
     private suspend fun muatBahan() {
         val outlet = _state.value.outletTerpilih ?: return
-        _state.value = _state.value.copy(memuat = true, error = null)
+        _state.value = _state.value.copy(memuat = true, error = null, porsiSiap = false)
         try {
             val baris = StokRepository.monitoringOutlet(outlet.id)
                 // Bahan milik gudang pusat disembunyikan dari outlet biasa, sama seperti web.
@@ -163,7 +176,12 @@ class MonitoringViewModel : ViewModel() {
      * berdasarkan perbandingan saldo terhadap threshold.
      */
     private fun hitungPorsiLatar() {
-        val outletId = _state.value.outletTerpilih?.id ?: return
+        val outletId = _state.value.outletTerpilih?.id ?: run {
+            // Tanpa outlet tidak ada porsi yang bisa dihitung; KPI tidak boleh
+            // menggantung di keadaan memuat selamanya.
+            _state.value = _state.value.copy(porsiSiap = true)
+            return
+        }
         viewModelScope.launch {
             try {
                 val resep = StokRepository.resep(outletId)
@@ -180,10 +198,12 @@ class MonitoringViewModel : ViewModel() {
                     }
                     hasil
                 }
-                _state.value = _state.value.copy(porsiPerBahan = porsi)
+                _state.value = _state.value.copy(porsiPerBahan = porsi, porsiSiap = true)
             } catch (_: Exception) {
                 // Gagal memuat resep tidak boleh menjatuhkan layar monitoring; status
-                // tetap dihitung dari saldo terhadap threshold saja.
+                // tetap dihitung dari saldo terhadap threshold saja. KPI tetap
+                // ditandai siap supaya angkanya keluar, bukan memuat tanpa akhir.
+                _state.value = _state.value.copy(porsiSiap = true)
             }
         }
     }
