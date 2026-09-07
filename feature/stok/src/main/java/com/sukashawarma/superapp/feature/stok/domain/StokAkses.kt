@@ -97,9 +97,40 @@ object StokAkses {
         Role.DEVELOPER, Role.PURCHASING,
     )
 
+    /**
+     * Kartu analisis selisih dan badge persentase di Detail Opname — cermin
+     * `canViewThresholdAndLoss` di `components/stok/OpnameDetail.tsx`.
+     *
+     * Yang digerbangi hanya penafsirannya, bukan datanya: daftar item beserta qty
+     * sistem, fisik, dan selisihnya tetap terlihat semua peran, persis seperti web.
+     */
+    private val ANALISIS_SELISIH = setOf(
+        Role.KITCHEN, Role.ADMIN, Role.ADMIN_FINANCE, Role.OWNER,
+        Role.DEVELOPER, Role.PURCHASING,
+    )
+
+    /**
+     * Pengaturan Threshold (titik pesan ulang per outlet).
+     *
+     * Dua hal yang wajib diingat sebelum melonggarkan daftar ini:
+     *
+     * 1. `outlet_reorder_point` TIDAK punya satu pun `CREATE POLICY` di seluruh
+     *    migration — tabelnya dibuat manual di luar migration. Database tidak akan
+     *    menolak peran mana pun. Gerbang ini satu-satunya pengaman yang ada, tidak
+     *    seperti gerbang lain di kelas ini yang cuma merapikan tampilan.
+     * 2. `THRESHOLD_EDITOR_ROLES` di `app/actions/threshold.ts` menyebut tujuh peran,
+     *    tetapi Server Action itu tidak dipakai siapa pun — `ThresholdPage` menulis
+     *    lewat client biasa dan halamannya menolak semua kecuali `admin`. Yang
+     *    ditiru di sini adalah perilaku web yang benar-benar berjalan, bukan daftar
+     *    di kode mati.
+     */
+    private val THRESHOLD = setOf(Role.ADMIN)
+
     fun melihatHargaBahan(role: Role?): Boolean = role != null && role in HARGA_BAHAN
     fun melihatNilaiPersediaan(role: Role?): Boolean = role != null && role in NILAI_PERSEDIAAN
     fun melihatHppMenu(role: Role?): Boolean = role != null && role in HPP_MENU
     fun melihatLaporanPenjualan(role: Role?): Boolean = role != null && role in PENJUALAN
     fun melihatPlafonBelanja(role: Role?): Boolean = role != null && role in PENJUALAN
+    fun melihatAnalisisSelisih(role: Role?): Boolean = role != null && role in ANALISIS_SELISIH
+    fun melihatThreshold(role: Role?): Boolean = role != null && role in THRESHOLD
 }
