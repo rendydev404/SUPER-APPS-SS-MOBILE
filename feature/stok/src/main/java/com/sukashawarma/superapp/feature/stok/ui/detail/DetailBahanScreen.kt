@@ -50,6 +50,8 @@ import com.sukashawarma.superapp.feature.stok.ui.StatusBadge
 import com.sukashawarma.superapp.presentation.theme.SukaOnSurface
 import com.sukashawarma.superapp.presentation.theme.SukaOnSurfaceVariant
 import com.sukashawarma.superapp.presentation.theme.SukaSurface
+import com.sukashawarma.superapp.core.ui.RealtimeRefresh
+import com.sukashawarma.superapp.core.ui.RealtimeTables
 
 @Composable
 fun DetailBahanScreen(
@@ -61,6 +63,7 @@ fun DetailBahanScreen(
 ) {
     val state by viewModel.state.collectAsState()
     LaunchedEffect(outletId, bahanId) { viewModel.muat(outletId, bahanId) }
+    RealtimeRefresh(RealtimeTables.LEDGER, RealtimeTables.STOK_BALANCE) { viewModel.muat(outletId, bahanId) }
 
     Column(Modifier.fillMaxSize().background(SukaSurface)) {
         Box(
@@ -88,7 +91,7 @@ fun DetailBahanScreen(
         }
 
         when {
-            state.memuat -> MemuatPenuh()
+            state.memuat && state.baris == null -> MemuatPenuh()
             state.error != null -> KeadaanGagal(state.error!!, viewModel::cobaLagi)
             else -> LazyColumn(
                 Modifier.fillMaxSize(),
