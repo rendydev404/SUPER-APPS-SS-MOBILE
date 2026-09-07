@@ -16,15 +16,19 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Assignment
+import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.FactCheck
+import androidx.compose.material.icons.filled.ImportExport
 import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.Sell
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.DropdownMenu
@@ -47,12 +51,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sukashawarma.superapp.domain.session.AppSession
-import com.sukashawarma.superapp.feature.stok.data.AreaModuleAccess
 import com.sukashawarma.superapp.feature.stok.data.WasteApprovalAccess
 import com.sukashawarma.superapp.feature.stok.domain.StokAkses
 import com.sukashawarma.superapp.feature.stok.ui.area.HargaBahanScreen
 import com.sukashawarma.superapp.feature.stok.ui.area.WasteApprovalScreen
 import com.sukashawarma.superapp.feature.stok.ui.entri.EntriManualScreen
+import com.sukashawarma.superapp.feature.stok.ui.laporan.ArusBarangScreen
+import com.sukashawarma.superapp.feature.stok.ui.laporan.HppMenuScreen
+import com.sukashawarma.superapp.feature.stok.ui.laporan.NilaiPersediaanScreen
+import com.sukashawarma.superapp.feature.stok.ui.laporan.PlafonBelanjaScreen
 import com.sukashawarma.superapp.feature.stok.ui.ledger.LedgerScreen
 import com.sukashawarma.superapp.feature.stok.ui.monitoring.MonitoringScreen
 import com.sukashawarma.superapp.feature.stok.ui.mutasi.MutasiScreen
@@ -81,6 +88,13 @@ private enum class TabStok(
     ENTRI("Entri Manual", "Entri Manual & Lapor Waste", Icons.Default.EditNote),
     PERSETUJUAN_OPNAME("Approval Opname", "Persetujuan Opname", Icons.Default.FactCheck),
     HARGA("Harga Bahan", "Master Harga Bahan Baku", Icons.Default.Sell),
+
+    // Kelompok "ANALISIS & LAPORAN" di AppSidebar.tsx web. Label panjangnya disalin
+    // apa adanya supaya orang yang berpindah dari browser ke HP mencari nama yang sama.
+    NILAI_PERSEDIAAN("Nilai Stok", "Nilai Persediaan", Icons.Default.Savings),
+    HPP_MENU("HPP Menu", "HPP Setiap Menu", Icons.Default.Calculate),
+    PLAFON("Plafon", "Plafon & Belanja Outlet", Icons.Default.AccountBalanceWallet),
+    ARUS_BARANG("In/Out", "Inbound / Outbound", Icons.Default.ImportExport),
 }
 
 /**
@@ -93,7 +107,7 @@ private enum class TabStok(
 private fun tujuanUntukPeran(): List<TabStok> {
     val staff by AppSession.staff.collectAsState()
     val role = staff?.role
-    val bolehHarga = AreaModuleAccess.allowed(role)
+    val bolehHarga = StokAkses.melihatHargaBahan(role)
     val bolehWaste = WasteApprovalAccess.allowed(role)
     val bolehPo = StokAkses.melihatPenerimaanPo(role)
 
@@ -122,6 +136,13 @@ private fun tujuanUntukPeran(): List<TabStok> {
         if (bolehPo && TabStok.TERIMA_PO !in this) add(TabStok.TERIMA_PO)
         add(TabStok.PERSETUJUAN_OPNAME)
         if (bolehHarga) add(TabStok.HARGA)
+
+        // Kelompok "ANALISIS & LAPORAN" web, urutannya mengikuti AppSidebar.tsx.
+        // Tiap menu punya daftar peran sendiri — lihat StokAkses.
+        if (StokAkses.melihatNilaiPersediaan(role)) add(TabStok.NILAI_PERSEDIAAN)
+        if (StokAkses.melihatHppMenu(role)) add(TabStok.HPP_MENU)
+        if (StokAkses.melihatPlafonBelanja(role)) add(TabStok.PLAFON)
+        if (StokAkses.melihatInboundOutbound(role)) add(TabStok.ARUS_BARANG)
     }
 }
 
@@ -134,8 +155,9 @@ fun StokShell(
 ) {
     val tabs = tujuanUntukPeran()
     val staff by AppSession.staff.collectAsState()
-    val areaAccess = AreaModuleAccess.allowed(staff?.role)
-    val wasteAccess = WasteApprovalAccess.allowed(staff?.role)
+    val peran = staff?.role
+    val hargaAccess = StokAkses.melihatHargaBahan(peran)
+    val wasteAccess = WasteApprovalAccess.allowed(peran)
 
     // Tab awal adalah yang pertama tersedia: role pusat tidak punya Dashboard, jadi
     // membukanya di Permintaan, bukan di layar kosong.
@@ -161,10 +183,26 @@ fun StokShell(
                 TabStok.ENTRI -> EntriManualScreen(onBack = { tab = tabs.first() })
                 TabStok.PERSETUJUAN_OPNAME -> PersetujuanOpnameScreen(onBack = { tab = tabs.first() })
                 TabStok.TERIMA_PO -> PenerimaanPoScreen(onBack = { tab = tabs.first() })
-                TabStok.HARGA -> if (areaAccess) HargaBahanScreen(onBack = { tab = tabs.first() })
-                    else KeadaanTidakBerhak("Modul ini hanya untuk pengelola area.")
+                TabStok.HARGA -> if (hargaAccess) HargaBahanScreen(onBack = { tab = tabs.first() })
+                    else KeadaanTidakBerhak("Modul ini hanya untuk pemegang master harga.")
                 TabStok.WASTE -> if (wasteAccess) WasteApprovalScreen(onBack = { tab = tabs.first() })
                     else KeadaanTidakBerhak("Modul ini hanya untuk penyetuju waste.")
+
+                // Gerbang diperiksa ulang di sini, bukan hanya saat menyusun daftar tab:
+                // `tab` dipulihkan dari rememberSaveable dan bisa menunjuk tujuan yang
+                // sudah tidak boleh dibuka kalau peran pengguna berubah.
+                TabStok.NILAI_PERSEDIAAN ->
+                    if (StokAkses.melihatNilaiPersediaan(peran)) NilaiPersediaanScreen(onBack = { tab = tabs.first() })
+                    else KeadaanTidakBerhak("Nilai persediaan hanya untuk kantor dan gudang pusat.")
+                TabStok.HPP_MENU ->
+                    if (StokAkses.melihatHppMenu(peran)) HppMenuScreen(onBack = { tab = tabs.first() })
+                    else KeadaanTidakBerhak("Kalkulator HPP hanya untuk pengelola menu.")
+                TabStok.PLAFON ->
+                    if (StokAkses.melihatPlafonBelanja(peran)) PlafonBelanjaScreen(onBack = { tab = tabs.first() })
+                    else KeadaanTidakBerhak("Plafon belanja hanya untuk kantor dan gudang pusat.")
+                TabStok.ARUS_BARANG ->
+                    if (StokAkses.melihatInboundOutbound(peran)) ArusBarangScreen(onBack = { tab = tabs.first() })
+                    else KeadaanTidakBerhak("Arus barang hanya untuk staff gudang pusat.")
             }
         }
         BottomNavStok(tab, tabs) { tab = it }
