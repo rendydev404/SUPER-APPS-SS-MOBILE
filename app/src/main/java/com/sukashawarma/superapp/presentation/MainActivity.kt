@@ -20,6 +20,7 @@ import com.sukashawarma.superapp.domain.session.StartDestination
 import com.sukashawarma.superapp.domain.session.isMitraArea
 import com.sukashawarma.superapp.domain.session.resolveStartDestination
 import com.sukashawarma.superapp.feature.distribusi.DistribusiNavGraph
+import com.sukashawarma.superapp.feature.manager.ManagerNavGraph
 import com.sukashawarma.superapp.feature.stok.StokNavGraph
 import com.sukashawarma.superapp.presentation.absensi.AbsensiNavGraph
 import com.sukashawarma.superapp.presentation.home.HomeScreen
@@ -37,6 +38,7 @@ object Routes {
     const val ABSENSI = "absensi"
     const val STOK = "stok"
     const val DISTRIBUSI = "distribusi"
+    const val MANAGER = "manager"
     const val MITRA = "mitra"
     const val MITRA_NO_PROFILE = "mitra_no_profile"
     const val MITRA_LOAD_ERROR = "mitra_load_error"
@@ -121,6 +123,7 @@ private fun RootNav() {
                     onOpenAbsensi = { navController.navigate(Routes.ABSENSI) },
                     onOpenStok = { navController.navigate(Routes.STOK) },
                     onOpenDistribusi = { navController.navigate(Routes.DISTRIBUSI) },
+                    onOpenManager = { navController.navigate(Routes.MANAGER) },
                     onOpenSettings = { navController.navigate(Routes.SETTINGS) },
                     onLoggedOut = { navController.navigate(Routes.LOGIN) { popUpTo(0) } }
                 )
@@ -136,6 +139,9 @@ private fun RootNav() {
             }
             composable(Routes.DISTRIBUSI) {
                 DistribusiNavGraph(onExit = { navController.popBackStack() })
+            }
+            composable(Routes.MANAGER) {
+                ManagerNavGraph(onExit = { navController.popBackStack() })
             }
         }
     }
