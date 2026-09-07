@@ -43,6 +43,8 @@ import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import com.sukashawarma.superapp.core.ui.RealtimeRefresh
+import com.sukashawarma.superapp.core.ui.RealtimeTables
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,6 +54,7 @@ fun CutiScreen(
     viewModel: CutiViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+    RealtimeRefresh(RealtimeTables.LEAVE_REQUESTS) { viewModel.refresh() }
     val staff by AppSession.staff.collectAsState()
     var showForm by remember { mutableStateOf(false) }
 
