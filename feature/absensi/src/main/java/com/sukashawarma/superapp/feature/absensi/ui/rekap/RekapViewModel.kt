@@ -313,7 +313,11 @@ class RekapViewModel : ViewModel() {
         return "rekap-${s.startDate}_${s.endDate}.csv"
     }
 
-    fun load() {
+    /** Muat senyap dipakai realtime: layar yang sudah berisi data tidak boleh
+     *  berkedip jadi spinner tiap kali server berubah. */
+    fun refresh() = load(silent = true)
+
+    fun load(silent: Boolean = false) {
         val outletId = _state.value.selectedOutletId
         if (outletId == null) {
             if (_state.value.canChooseOutlet) {
@@ -328,7 +332,7 @@ class RekapViewModel : ViewModel() {
         }
         val start = _state.value.startDate
         val end = _state.value.endDate
-        _state.value = _state.value.copy(loading = true, error = null)
+        _state.value = _state.value.copy(loading = !silent, error = null)
         viewModelScope.launch {
             try {
                 val activeStaff = loadActiveStaff(outletId)

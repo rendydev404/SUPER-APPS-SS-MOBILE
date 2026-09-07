@@ -32,7 +32,20 @@ object Approver {
         Role.ADMIN_FINANCE, Role.ADMIN, Role.OWNER, Role.PURCHASING,
     )
 
+    /**
+     * Cermin `WASTE_APPROVER_ROLES` di `apps/stok/src/app/actions/waste.ts`, ditambah
+     * `area_manager` yang menyetujui tabel yang sama lewat `apps/manager`. Sengaja
+     * dipisah dari gerbang modul Area Manager: RLS `stok_waste_reports` hanya menuntut
+     * outlet masuk `accessible_outlet_ids()`, jadi mempersempit daftar ini akan
+     * menghilangkan kewenangan yang dipunyai role tersebut di web.
+     */
+    private val WASTE_APPROVER = setOf(
+        Role.LEADER, Role.REGIONAL_MANAGER, Role.SPV, Role.KITCHEN,
+        Role.ADMIN, Role.OWNER, Role.PURCHASING, Role.DEVELOPER, Role.AREA_MANAGER,
+    )
+
     fun bolehReviewPermintaan(role: Role?): Boolean = role != null && role in PERMINTAAN_VIEWER
     fun bolehApprovePermintaan(role: Role?): Boolean = role != null && role in PERMINTAAN_APPROVER
     fun bolehApproveOpname(role: Role?): Boolean = role != null && role in OPNAME_APPROVER
+    fun bolehApproveWaste(role: Role?): Boolean = role != null && role in WASTE_APPROVER
 }

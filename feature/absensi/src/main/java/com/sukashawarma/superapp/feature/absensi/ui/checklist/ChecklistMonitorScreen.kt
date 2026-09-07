@@ -52,6 +52,8 @@ import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import com.sukashawarma.superapp.core.ui.RealtimeRefresh
+import com.sukashawarma.superapp.core.ui.RealtimeTables
 
 // Stitch Suka Culinary Design Tokens (samakan dengan ChecklistManageScreen)
 private val StitchPrimary = Color(0xFF450700)
@@ -102,6 +104,7 @@ fun ChecklistMonitorScreen(
     viewModel: ChecklistMonitorViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+    RealtimeRefresh(RealtimeTables.CHECKLIST_RECORDS, RealtimeTables.CHECKLIST_TICKS) { viewModel.refresh() }
     val phase = state.phase
     val summary = remember(state.categories, phase) { state.summaryOf(phase) }
     val phaseCategories = remember(state.categories, phase) { state.categoriesOf(phase) }

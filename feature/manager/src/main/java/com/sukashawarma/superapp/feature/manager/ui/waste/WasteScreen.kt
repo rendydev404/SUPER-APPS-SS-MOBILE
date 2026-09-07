@@ -147,7 +147,7 @@ fun WasteScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text("Waste Stok", fontWeight = FontWeight.Black, fontSize = 17.sp, color = SukaBrown)
+                    Text("Waste Stok", fontWeight = FontWeight.Black, fontSize = 17.sp, color = SukaBrown, maxLines = 1)
                 },
                 navigationIcon = {
                     IconButton(onClick = onExit) {

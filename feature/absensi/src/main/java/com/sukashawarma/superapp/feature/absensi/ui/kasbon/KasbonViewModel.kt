@@ -39,13 +39,17 @@ class KasbonViewModel : ViewModel() {
 
     init { load() }
 
-    fun load() {
+    /** Muat senyap dipakai realtime: layar yang sudah berisi data tidak boleh
+     *  berkedip jadi spinner tiap kali server berubah. */
+    fun refresh() = load(silent = true)
+
+    fun load(silent: Boolean = false) {
         val staffId = AppSession.staff.value?.id
         if (staffId == null) {
             _state.value = KasbonUiState(loading = false, error = "Sesi tidak valid.")
             return
         }
-        _state.value = _state.value.copy(loading = true, error = null)
+        _state.value = _state.value.copy(loading = !silent, error = null)
         viewModelScope.launch {
             try {
                 val rows = Postgrest.select(

@@ -121,7 +121,6 @@ private val FILTER = listOf(
 fun OverviewScreen(
     onExit: () -> Unit,
     onBukaWaste: () -> Unit,
-    onBukaLaporan: () -> Unit,
     viewModel: OverviewViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
@@ -139,7 +138,7 @@ fun OverviewScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text("Ringkasan Area", fontWeight = FontWeight.Black, fontSize = 17.sp, color = SukaBrown)
+                    Text("Ringkasan Area", fontWeight = FontWeight.Black, fontSize = 17.sp, color = SukaBrown, maxLines = 1)
                 },
                 navigationIcon = {
                     IconButton(onClick = onExit) {
@@ -147,9 +146,6 @@ fun OverviewScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = onBukaLaporan) {
-                        Icon(Icons.Default.BarChart, "Laporan", tint = SukaBrown)
-                    }
                     IconButton(onClick = viewModel::muatUlang) {
                         Icon(Icons.Default.Refresh, "Muat ulang", tint = SukaBrown)
                     }

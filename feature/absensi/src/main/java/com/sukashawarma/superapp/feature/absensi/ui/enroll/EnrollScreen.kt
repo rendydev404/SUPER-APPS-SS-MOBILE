@@ -45,7 +45,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.sukashawarma.superapp.domain.model.Role
 import com.sukashawarma.superapp.domain.session.AppSession
 import com.sukashawarma.superapp.presentation.components.FaceCameraPreview
 import com.sukashawarma.superapp.presentation.theme.StatusEmerald
@@ -65,7 +64,6 @@ fun EnrollScreen(onExit: () -> Unit) {
         factory = EnrollViewModelFactory(context.applicationContext as android.app.Application)
     )
     val state by viewModel.state.collectAsState()
-    val isRegionalManager = AppSession.staff.value?.role == Role.REGIONAL_MANAGER
 
     var hasCameraPermission by remember {
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
@@ -138,7 +136,7 @@ fun EnrollScreen(onExit: () -> Unit) {
                 }
 
                 OutletSelectionCard(
-                    isRegionalManager = isRegionalManager,
+                    bisaPilihOutlet = state.canChooseOutlet,
                     outletName = AppSession.staff.value?.outletName,
                     outlets = state.outlets,
                     loading = state.loadingOutlets,
@@ -528,7 +526,7 @@ private fun CameraPermissionCard(onRequest: () -> Unit, modifier: Modifier = Mod
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun OutletSelectionCard(
-    isRegionalManager: Boolean,
+    bisaPilihOutlet: Boolean,
     outletName: String?,
     outlets: List<EnrollOutletOption>,
     loading: Boolean,
@@ -548,7 +546,7 @@ private fun OutletSelectionCard(
         Column(Modifier.padding(12.dp)) {
             Text("Outlet", color = Color(0xFF9A560C), fontSize = 12.sp, fontWeight = FontWeight.Medium)
             Spacer(Modifier.height(5.dp))
-            if (isRegionalManager) {
+            if (bisaPilihOutlet) {
                 Box {
                     Surface(
                         modifier = Modifier

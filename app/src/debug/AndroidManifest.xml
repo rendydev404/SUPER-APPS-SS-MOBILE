@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Hanya untuk build debug.
+
+  Pengingat absen berbunyi sekali sehari pada pukul 12:10, jadi satu-satunya cara
+  mengujinya tanpa menunggu adalah memicu receiver-nya lewat adb. Receiver produksi
+  `exported="false"` sehingga shell tidak boleh mengirim broadcast ke sana — di sini
+  ia dibuka khusus untuk varian debug:
+
+      adb shell am broadcast -n com.sukashawarma.superapp/\
+        com.sukashawarma.superapp.feature.absensi.notif.AbsenReminderReceiver
+
+  Berkas ini tidak ikut ke build release, jadi receiver tetap tertutup di APK yang
+  dibagikan ke staff.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <application>
+        <receiver
+            android:name="com.sukashawarma.superapp.feature.absensi.notif.AbsenReminderReceiver"
+            android:exported="true"
+            tools:replace="android:exported" />
+    </application>
+</manifest>

@@ -37,6 +37,8 @@ import com.sukashawarma.superapp.presentation.theme.SukaSurfaceContainer
 import com.sukashawarma.superapp.presentation.theme.SukaSurfaceContainerLowest
 import java.text.NumberFormat
 import java.util.Locale
+import com.sukashawarma.superapp.core.ui.RealtimeRefresh
+import com.sukashawarma.superapp.core.ui.RealtimeTables
 
 private val rupiahFmt = NumberFormat.getCurrencyInstance(Locale("id", "ID")).apply { maximumFractionDigits = 0 }
 private fun fmtRupiah(v: Double) = rupiahFmt.format(v)
@@ -49,6 +51,7 @@ fun KasbonScreen(
     viewModel: KasbonViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+    RealtimeRefresh(RealtimeTables.CASH_ADVANCES) { viewModel.refresh() }
     var showForm by remember { mutableStateOf(false) }
 
     if (showForm) {

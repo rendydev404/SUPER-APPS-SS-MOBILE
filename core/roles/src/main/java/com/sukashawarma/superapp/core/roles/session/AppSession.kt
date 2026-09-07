@@ -32,7 +32,9 @@ object AppSession {
     private val _mitraLoadFailed = MutableStateFlow(false)
     val mitraLoadFailed: StateFlow<Boolean> = _mitraLoadFailed
 
-    private val _loading = MutableStateFlow(true)
+    /** Mulai false: tidak ada lagi auto-login yang perlu ditunggu sebelum UI
+     *  tampil. Sesi dibuka lewat gerbang biometrik atau password di layar login. */
+    private val _loading = MutableStateFlow(false)
     val loading: StateFlow<Boolean> = _loading
 
     /** true selama retryLoadMitraProfile() sedang berjalan — dipakai UI untuk menonaktifkan
@@ -41,23 +43,50 @@ object AppSession {
     private val _mitraRetrying = MutableStateFlow(false)
     val mitraRetrying: StateFlow<Boolean> = _mitraRetrying
 
+    /** Hook untuk kerja yang harus berhenti saat sesi habis (mis. foreground service
+     *  pelacakan lokasi). Dipasang dari layer app: core:roles tidak boleh mengenal modul
+     *  yang bergantung padanya. */
+    var onSignOut: (() -> Unit)? = null
+
     /** Username tanpa '@' -> pseudo-email <username>@outlet.local — cermin ADR-008 web. */
     private fun normalizeIdentifier(identifier: String): String {
         val id = identifier.trim()
         return if (id.contains("@")) id else "$id@outlet.local"
     }
 
-    suspend fun tryAutoLogin() {
-        _loading.value = true
-        val refreshToken = AuthPrefs.getRefreshToken()
-        if (refreshToken == null) {
-            _loading.value = false
-            return
-        }
+    /**
+     * Membuka sesi memakai refresh token tersimpan, setelah sidik jari cocok.
+     *
+     * Token diberikan pemanggil — layar login membacanya dari AuthPrefs hanya
+     * setelah BiometricPrompt berhasil — jadi tidak ada jalur yang bisa memakai
+    * token tersimpan tanpa melewati prompt biometrik lebih dulu.
+     */
+    suspend fun loginWithBiometric(refreshToken: String): LoginResult {
+        // Jangan gunakan access token yang mungkin tertinggal dari akun lain
+        // ketika proses aplikasi masih hidup. Jalur ini harus membangun sesi
+        // ulang hanya dari refresh token milik binding biometrik akun ini.
+        SessionTokenHolder.clear()
         SessionTokenHolder.refreshToken = refreshToken
         val ok = AuthSessionManager.ensureAuthenticated()
-        if (ok) loadStaffOrSignOut() else signOut()
-        _loading.value = false
+        if (!ok) {
+            return LoginResult.Failure(
+                "Sesi biometrik perlu diperbarui. Silakan login dengan password; " +
+                    "pengaturan sidik jari tetap tersimpan."
+            )
+        }
+        // Sesi yang terbuka harus milik akun yang sidik jarinya didaftarkan.
+        // Tanpa pemeriksaan ini, token sisa milik akun lain bisa membuka sesi
+        // yang salah di perangkat yang dipakai bergantian.
+        if (AuthPrefs.getBiometricUserId() != currentUserId()) {
+            signOut()
+            return LoginResult.Failure("Credential biometrik tidak cocok dengan akun ini.")
+        }
+        return loadStaffOrSignOut()
+    }
+
+    /** Refresh token hanya menetap di disk untuk akun yang mengaktifkan biometrik. */
+    private fun persistBiometricTokenAfterPasswordLogin(userId: String?, refreshToken: String) {
+        AuthPrefs.setRefreshTokenForUser(userId, refreshToken)
     }
 
     suspend fun login(identifier: String, password: String): LoginResult {
@@ -70,9 +99,11 @@ object AppSession {
             }
             SessionTokenHolder.accessToken = body.access_token
             SessionTokenHolder.refreshToken = body.refresh_token
-            AuthPrefs.setRefreshToken(body.refresh_token)
-
-            return loadStaffOrSignOut()
+            val result = loadStaffOrSignOut()
+            if (result is LoginResult.Success) {
+                persistBiometricTokenAfterPasswordLogin(currentUserId(), body.refresh_token)
+            }
+            return result
         } catch (e: Exception) {
             android.util.Log.e("AppSession", "login() gagal", e)
             return LoginResult.Failure(networkErrorMessage(e))
@@ -95,6 +126,9 @@ object AppSession {
             return signOutWith("Akun Anda berstatus $reason. Hubungi admin/SPV.")
         }
         _staff.value = staff
+        // Dipakai layar login untuk tahu apakah tombol sidik jari boleh
+        // ditawarkan sebelum ada sesi aktif.
+        AuthPrefs.setLastActiveUserId(staff.id)
         loadMitraProfileIfNeeded(staff)
         return LoginResult.Success
     }
@@ -128,7 +162,7 @@ object AppSession {
     }
 
     /** Retry khusus layar galat mitra: HANYA memuat ulang profil, tak menyentuh sesi staff.
-     *  Memakai tryAutoLogin() di sini akan men-sign-out mitra begitu jaringan masih mati —
+     *  Memakai jalur login penuh di sini akan men-sign-out mitra begitu jaringan masih mati —
      *  kebalikan dari maksud desainnya (sinyal jelek tidak boleh menghukum pengguna).
      *
      *  Guard in-flight: tanpa ini, tap ganda pada link goyah bisa membuat request B (sukses)
@@ -190,5 +224,4 @@ object AppSession {
         }
     }
 }
-
 

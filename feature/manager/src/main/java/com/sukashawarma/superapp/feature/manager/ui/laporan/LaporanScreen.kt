@@ -134,7 +134,7 @@ fun LaporanScreen(
         containerColor = SukaCream,
         topBar = {
             TopAppBar(
-                title = { Text("Laporan", fontWeight = FontWeight.Black, fontSize = 17.sp, color = SukaBrown) },
+                title = { Text("Laporan", fontWeight = FontWeight.Black, fontSize = 17.sp, color = SukaBrown, maxLines = 1) },
                 navigationIcon = {
                     IconButton(onClick = onExit) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Kembali", tint = SukaBrown)

@@ -71,6 +71,8 @@ import com.sukashawarma.superapp.feature.absensi.R
 import com.sukashawarma.superapp.presentation.absensi.enroll.captureJpeg
 import androidx.compose.ui.res.painterResource
 import androidx.compose.material.icons.filled.NotificationsNone
+import com.sukashawarma.superapp.core.ui.RealtimeRefresh
+import com.sukashawarma.superapp.core.ui.RealtimeTables
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -160,6 +162,7 @@ fun ClockScreen(isActive: Boolean = true, onExit: () -> Unit) {
         )
     )
     val state by viewModel.state.collectAsState()
+    RealtimeRefresh(RealtimeTables.ATTENDANCE) { viewModel.refreshAttendance() }
     var hasCameraPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED

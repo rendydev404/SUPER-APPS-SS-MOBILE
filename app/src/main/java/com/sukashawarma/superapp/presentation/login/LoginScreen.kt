@@ -28,12 +28,12 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.PersonOutline
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.Icons
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -61,6 +61,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sukashawarma.superapp.R
 import com.sukashawarma.superapp.presentation.theme.StatusRed
@@ -100,6 +103,27 @@ fun LoginScreen(onLoggedIn: () -> Unit, viewModel: LoginViewModel = viewModel())
         keyboard?.hide()
         focusManager.clearFocus()
         viewModel.submit(onLoggedIn)
+    }
+
+    // Tombol sidik jari hanya muncul bila staff terakhir di perangkat ini
+    // mengaktifkannya DAN perangkatnya memang punya sensor yang siap.
+    val konteks = LocalContext.current
+    val activity = remember(konteks) { konteks.cariActivity() }
+    val bisaBiometrik = state.biometricEnabled &&
+        activity != null &&
+        BiometricAuth.isAvailable(activity)
+
+    // Prompt sidik jari muncul sendiri begitu layar login terbuka, tanpa tombol.
+    // Ditandai sekali pakai supaya batal-menyentuh-sensor mengembalikan pengguna
+    // ke form password alih-alih memunculkan prompt berulang tanpa henti.
+    var promptSudahDitawarkan by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(bisaBiometrik) {
+        if (bisaBiometrik && !promptSudahDitawarkan) {
+            promptSudahDitawarkan = true
+            keyboard?.hide()
+            focusManager.clearFocus()
+            activity?.let { viewModel.loginWithBiometric(it, onLoggedIn) }
+        }
     }
 
     Box(
@@ -532,4 +556,14 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.findActivity()
     else -> null
+}
+
+/** Compose memberi Context, sedangkan BiometricPrompt menuntut Activity. */
+private fun Context.cariActivity(): Activity? {
+    var konteks: Context? = this
+    while (konteks is ContextWrapper) {
+        if (konteks is Activity) return konteks
+        konteks = konteks.baseContext
+    }
+    return null
 }

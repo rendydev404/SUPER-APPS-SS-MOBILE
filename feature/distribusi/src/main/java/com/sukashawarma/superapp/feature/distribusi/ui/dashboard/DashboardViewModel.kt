@@ -72,6 +72,10 @@ data class DashboardUiState(
     val bolehTutupDokumen: Boolean = false,
     val sedangMenutup: String? = null,
     val namaPengguna: String = "",
+    val namaOutlet: String = "",
+    /** Menentukan apakah tombol "Scan QR Kedatangan" di banner ditampilkan.
+     *  Pengawas membuka dashboard untuk memantau, bukan menerima barang. */
+    val bolehVerifikasi: Boolean = false,
 )
 
 class DashboardViewModel : ViewModel() {
@@ -84,6 +88,8 @@ class DashboardViewModel : ViewModel() {
         _state.value = _state.value.copy(
             bolehTutupDokumen = DistribusiAkses.bolehTutupDokumen(staff?.role),
             namaPengguna = staff?.name.orEmpty(),
+            namaOutlet = staff?.outletName.orEmpty(),
+            bolehVerifikasi = DistribusiAkses.bolehVerifikasi(staff?.role),
         )
         muat()
     }

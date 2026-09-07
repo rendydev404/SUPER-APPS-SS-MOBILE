@@ -1,5 +1,6 @@
 package com.sukashawarma.superapp.feature.manager.domain
 
+import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.time.format.DateTimeParseException
 
@@ -35,4 +36,20 @@ fun waktuJakartaRingkas(iso: String): String = try {
     "${t.dayOfMonth} ${BULAN_SINGKAT[t.monthValue - 1]} $jam.$menit"
 } catch (e: DateTimeParseException) {
     iso
+}
+
+private val HARI_PANJANG = arrayOf(
+    "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu",
+)
+
+private val BULAN_PANJANG = arrayOf(
+    "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+    "Juli", "Agustus", "September", "Oktober", "November", "Desember",
+)
+
+/** "Kamis, 3 September 2026" — dipakai kepala kartu pada rentang banyak hari. */
+fun tanggalPanjangIndonesia(tanggal: LocalDate): String {
+    val hari = HARI_PANJANG[tanggal.dayOfWeek.value - 1]
+    val bulan = BULAN_PANJANG[tanggal.monthValue - 1]
+    return "$hari, ${tanggal.dayOfMonth} $bulan ${tanggal.year}"
 }

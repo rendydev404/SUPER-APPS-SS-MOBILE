@@ -63,6 +63,8 @@ import com.sukashawarma.superapp.presentation.theme.SukaSurface
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import com.sukashawarma.superapp.core.ui.RealtimeRefresh
+import com.sukashawarma.superapp.core.ui.RealtimeTables
 
 data class LedgerUiState(
     val memuat: Boolean = true,
@@ -179,6 +181,7 @@ class LedgerViewModel : ViewModel() {
 @Composable
 fun LedgerScreen(viewModel: LedgerViewModel = viewModel()) {
     val state by viewModel.state.collectAsState()
+    RealtimeRefresh(RealtimeTables.LEDGER, RealtimeTables.STOK_BALANCE) { viewModel.muatAwal() }
     val sheetState = rememberModalBottomSheetState()
 
     Column(Modifier.fillMaxSize().background(SukaSurface)) {
@@ -196,7 +199,7 @@ fun LedgerScreen(viewModel: LedgerViewModel = viewModel()) {
             state.tidakBerhak -> KeadaanTidakBerhak(
                 "Akun Anda belum terhubung dengan outlet mana pun."
             )
-            state.memuat -> MemuatPenuh()
+            state.memuat && state.outlets.isEmpty() -> MemuatPenuh()
             state.error != null -> KeadaanGagal(state.error!!, viewModel::muatAwal)
             state.transaksi.isEmpty() -> KeadaanKosong("Belum ada mutasi stok di outlet ini.")
             else -> LazyColumn(

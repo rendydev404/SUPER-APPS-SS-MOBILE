@@ -35,17 +35,24 @@ import com.sukashawarma.superapp.feature.distribusi.ui.KartuSuratJalan
 import com.sukashawarma.superapp.feature.distribusi.ui.LayarGalat
 import com.sukashawarma.superapp.feature.distribusi.ui.LayarKosong
 import com.sukashawarma.superapp.feature.distribusi.ui.LayarMemuat
+import com.sukashawarma.superapp.feature.distribusi.ui.NavBawah
+import com.sukashawarma.superapp.feature.distribusi.ui.TabBawah
 import com.sukashawarma.superapp.feature.distribusi.ui.SegarkanSaatAktif
 import com.sukashawarma.superapp.presentation.theme.SukaOnSurface
 import com.sukashawarma.superapp.presentation.theme.SukaSurface
+import com.sukashawarma.superapp.core.ui.RealtimeRefresh
+import com.sukashawarma.superapp.core.ui.RealtimeTables
 
 @Composable
 fun RiwayatScreen(
     onKeluar: () -> Unit,
     onBukaDetail: (String) -> Unit,
+    onBukaDashboard: () -> Unit,
+    onBukaScan: () -> Unit,
     viewModel: RiwayatViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+    RealtimeRefresh(RealtimeTables.SURAT_JALAN) { viewModel.muat(paksa = true) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     SegarkanSaatAktif { viewModel.muat(paksa = true) }
@@ -63,6 +70,15 @@ fun RiwayatScreen(
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
+        bottomBar = {
+            NavBawah(
+                aktif = TabBawah.RIWAYAT,
+                bolehVerifikasi = state.bolehVerifikasi,
+                onDashboard = onBukaDashboard,
+                onScan = onBukaScan,
+                onRiwayat = {},
+            )
+        },
     ) { padding ->
         Column(Modifier.fillMaxSize().background(SukaSurface).padding(padding)) {
             Row(

@@ -25,11 +25,14 @@ import java.time.format.DateTimeFormatter
 /**
  * Pembacaan data modul Manager.
  *
- * Tidak ada penyaringan `outlet_id` di sini, dan itu disengaja. Versi web memakai
- * service-role key yang menembus RLS, jadi ia WAJIB menyusun sendiri daftar outlet
- * yang boleh dilihat lalu menempelkannya ke tujuh query. Native memakai JWT
- * pengguna, sehingga `accessible_outlet_ids()` di database sudah membatasi hal yang
- * sama — menyaring ulang di klien hanya menambah cara baru untuk salah.
+ * Tabel TRANSAKSI tidak disaring `outlet_id` di sini, dan itu disengaja: `orders`,
+ * `attendance`, dan `stok_waste_reports` sudah discope `accessible_outlet_ids()`,
+ * jadi JWT pengguna cukup. Web wajib menyaringnya manual hanya karena memakai
+ * service-role key yang menembus RLS.
+ *
+ * Tabel `outlets` adalah pengecualiannya — policy bacanya `USING (true)`, jadi
+ * daftarnya HARUS dibatasi di sini lewat [CakupanOutletRepository]. Tanpa itu area
+ * manager melihat seluruh cabang.
  */
 object ManagerRepository {
 
@@ -62,12 +65,22 @@ object ManagerRepository {
         return hasil
     }
 
-    suspend fun outlets(): List<OutletRingkas> =
-        selectSemua("outlets", listOf("select" to "id,name,is_active", "order" to "name"))
-            .mapNotNull { baris ->
-                val id = baris.optString("id") ?: return@mapNotNull null
-                OutletRingkas(id, baris.optString("name").orEmpty(), baris.optBoolean("is_active"))
-            }
+    /**
+     * Outlet dibatasi cakupan pengguna, BUKAN diserahkan ke RLS.
+     * `outlets_select_authenticated` berisi `USING (true)` — tanpa penyaring ini
+     * area manager melihat seluruh cabang, termasuk yang bukan binaannya.
+     */
+    suspend fun outlets(): List<OutletRingkas> {
+        val filter = CakupanOutletRepository.filterOutlet(CakupanOutletRepository.cakupan())
+            ?: return emptyList()
+        return selectSemua(
+            "outlets",
+            listOf("select" to "id,name,is_active", "order" to "name") + filter,
+        ).mapNotNull { baris ->
+            val id = baris.optString("id") ?: return@mapNotNull null
+            OutletRingkas(id, baris.optString("name").orEmpty(), baris.optBoolean("is_active"))
+        }
+    }
 
     /**
      * Pesanan selesai pada [rentang]. `order_items` ikut dibawa embedded dalam satu

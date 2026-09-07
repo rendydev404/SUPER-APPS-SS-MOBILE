@@ -39,6 +39,9 @@ dependencies {
     implementation(project(":core:ui"))
     implementation(project(":core:roles"))
     implementation(project(":core:network"))
+    // Form inventaris memotret bukti tiap aset lalu mengunggahnya ke Supabase Storage.
+    implementation(project(":core:camera"))
+    implementation(project(":core:storage"))
     implementation("androidx.navigation:navigation-compose:2.7.7")
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")

@@ -51,6 +51,8 @@ import com.sukashawarma.superapp.presentation.absensi.rekap.selfiePublicUrl
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import com.sukashawarma.superapp.core.ui.RealtimeRefresh
+import com.sukashawarma.superapp.core.ui.RealtimeTables
 
 // Stitch Suka Culinary Design Tokens (samakan dengan layar Absensi lainnya)
 private val StitchPrimary = Color(0xFF450700)
@@ -114,6 +116,7 @@ fun PapanKehadiranScreen(
     viewModel: PapanKehadiranViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+    RealtimeRefresh(RealtimeTables.ATTENDANCE) { viewModel.refresh() }
     var previewUrl by remember { mutableStateOf<String?>(null) }
 
     Scaffold(

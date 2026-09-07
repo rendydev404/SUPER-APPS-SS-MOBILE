@@ -28,11 +28,13 @@ data class HalamanRiwayat(
 /**
  * Pembacaan dan pemrosesan laporan waste.
  *
- * Seperti [ManagerRepository], tidak ada penyaringan cakupan outlet di sini:
- * `waste_reports_read` dan `waste_reports_update` sama-sama memakai
- * `accessible_outlet_ids()`, jadi RLS sudah membatasi baris yang terlihat maupun
- * yang boleh diubah. Penyaring outlet di layar adalah pilihan pengguna, bukan
- * kendali akses.
+ * Laporan waste tidak disaring cakupan di sini: `waste_reports_read` dan
+ * `waste_reports_update` sama-sama memakai `accessible_outlet_ids()`, jadi RLS
+ * sudah membatasi baris yang terlihat maupun yang boleh diubah. Penyaring outlet
+ * di layar adalah pilihan pengguna, bukan kendali akses.
+ *
+ * Yang TIDAK dilindungi RLS adalah daftar outletnya sendiri — lihat
+ * [outletTerakses].
  */
 object WasteRepository {
 
@@ -47,15 +49,23 @@ object WasteRepository {
     private fun filterOutlet(outletId: String?): List<Pair<String, String>> =
         if (outletId.isNullOrBlank()) emptyList() else listOf("outlet_id" to "eq.$outletId")
 
-    suspend fun outletTerakses(): List<OutletPilihan> =
-        Postgrest.select(
+    /**
+     * Outlet dibatasi cakupan pengguna, BUKAN diserahkan ke RLS.
+     * `outlets_select_authenticated` berisi `USING (true)` — tanpa penyaring ini
+     * area manager melihat seluruh cabang, termasuk yang bukan binaannya.
+     */
+    suspend fun outletTerakses(): List<OutletPilihan> {
+        val filter = CakupanOutletRepository.filterOutlet(CakupanOutletRepository.cakupan())
+            ?: return emptyList()
+        return Postgrest.select(
             "outlets",
-            listOf("select" to "id,name", "is_active" to "eq.true", "order" to "name"),
+            listOf("select" to "id,name", "is_active" to "eq.true", "order" to "name") + filter,
         ).mapNotNull { baris ->
             val obj = baris.asJsonObject
             val id = obj.optString("id") ?: return@mapNotNull null
             OutletPilihan(id, obj.optString("name").orEmpty())
         }
+    }
 
     /** Antrean laporan yang masih menunggu keputusan, terbaru di atas. */
     suspend fun menunggu(outletId: String?): List<LaporanWaste> {

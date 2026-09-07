@@ -31,4 +31,13 @@ object ManagerAkses {
      * `app/page.tsx`.
      */
     fun melihatPerformaZona(role: Role?): Boolean = role == Role.REGIONAL_MANAGER
+
+    /**
+     * Layar Resep & HPP hanya untuk regional manager.
+     *
+     * Cermin dua hal di web yang sepakat: `app/resep/page.tsx` me-redirect
+     * `area_manager` ke beranda, dan menu navigasinya menandai rute itu
+     * `excludedRoles: ['area_manager']`.
+     */
+    fun melihatResepHpp(role: Role?): Boolean = role == Role.REGIONAL_MANAGER
 }

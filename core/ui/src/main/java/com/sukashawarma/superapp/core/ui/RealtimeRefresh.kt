@@ -47,6 +47,16 @@ object RealtimeTables {
     // jumlah transaksi, dan porsi terjual bergerak begitu kasir menutup pesanan.
     const val ORDERS = "orders"
     const val ORDER_ITEMS = "order_items"
+
+    // Ditambahkan ke publication lewat migrasi web `20300107000001_fix_manager_realtime_rls`,
+    // bersama pelonggaran policy SELECT-nya supaya area manager benar-benar menerima event.
+    const val PETTY_CASH_TOPUPS = "petty_cash_topups"
+
+    // Antrean persetujuan. `cancellation_requests` masuk publication lewat migrasi
+    // `20300107000001_fix_manager_realtime_rls`, `bypass_requests` lewat
+    // `20260709020000_create_bypass_requests`.
+    const val CANCELLATION_REQUESTS = "cancellation_requests"
+    const val BYPASS_REQUESTS = "bypass_requests"
 }
 
 /**

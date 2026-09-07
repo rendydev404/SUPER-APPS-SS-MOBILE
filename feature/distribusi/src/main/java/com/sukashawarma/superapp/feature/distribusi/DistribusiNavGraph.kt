@@ -68,6 +68,10 @@ fun DistribusiNavGraph(onExit: () -> Unit) {
                 onKeluar = { navController.popBackStack() },
                 onBukaScan = { navController.navigate(DistribusiRoutes.SCAN) },
                 onBukaDetail = { id -> navController.navigate(DistribusiRoutes.detail(id)) },
+                // Nav bawah berpindah antar-tab, bukan menumpuk layar: kembali
+                // ke dashboard memakai popBackStack karena dashboard adalah akar.
+                onBukaDashboard = { navController.popBackStack(DistribusiRoutes.DASHBOARD, false) },
+                onBukaRiwayat = { navController.navigate(DistribusiRoutes.RIWAYAT) },
             )
         }
 
@@ -104,6 +108,8 @@ fun DistribusiNavGraph(onExit: () -> Unit) {
             RiwayatScreen(
                 onKeluar = { navController.popBackStack() },
                 onBukaDetail = { id -> navController.navigate(DistribusiRoutes.detail(id)) },
+                onBukaDashboard = { navController.popBackStack(DistribusiRoutes.DASHBOARD, false) },
+                onBukaScan = { navController.navigate(DistribusiRoutes.INBOX) },
             )
         }
 
