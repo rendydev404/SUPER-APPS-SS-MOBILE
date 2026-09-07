@@ -40,6 +40,8 @@ import com.sukashawarma.superapp.feature.distribusi.ui.TabBawah
 import com.sukashawarma.superapp.feature.distribusi.ui.SegarkanSaatAktif
 import com.sukashawarma.superapp.presentation.theme.SukaOnSurface
 import com.sukashawarma.superapp.presentation.theme.SukaSurface
+import com.sukashawarma.superapp.core.ui.RealtimeRefresh
+import com.sukashawarma.superapp.core.ui.RealtimeTables
 
 @Composable
 fun RiwayatScreen(
@@ -50,6 +52,7 @@ fun RiwayatScreen(
     viewModel: RiwayatViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+    RealtimeRefresh(RealtimeTables.SURAT_JALAN) { viewModel.muat(paksa = true) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     SegarkanSaatAktif { viewModel.muat(paksa = true) }
