@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.Sell
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -58,6 +59,7 @@ import com.sukashawarma.superapp.feature.stok.ui.area.WasteApprovalScreen
 import com.sukashawarma.superapp.feature.stok.ui.entri.EntriManualScreen
 import com.sukashawarma.superapp.feature.stok.ui.laporan.ArusBarangScreen
 import com.sukashawarma.superapp.feature.stok.ui.laporan.HppMenuScreen
+import com.sukashawarma.superapp.feature.stok.ui.laporan.LaporanPenjualanScreen
 import com.sukashawarma.superapp.feature.stok.ui.laporan.NilaiPersediaanScreen
 import com.sukashawarma.superapp.feature.stok.ui.laporan.PlafonBelanjaScreen
 import com.sukashawarma.superapp.feature.stok.ui.ledger.LedgerScreen
@@ -93,6 +95,7 @@ private enum class TabStok(
     // apa adanya supaya orang yang berpindah dari browser ke HP mencari nama yang sama.
     NILAI_PERSEDIAAN("Nilai Stok", "Nilai Persediaan", Icons.Default.Savings),
     HPP_MENU("HPP Menu", "HPP Setiap Menu", Icons.Default.Calculate),
+    LAPORAN_PENJUALAN("Penjualan", "Laporan Penjualan", Icons.Default.TrendingUp),
     PLAFON("Plafon", "Plafon & Belanja Outlet", Icons.Default.AccountBalanceWallet),
     ARUS_BARANG("In/Out", "Inbound / Outbound", Icons.Default.ImportExport),
 }
@@ -141,6 +144,7 @@ private fun tujuanUntukPeran(): List<TabStok> {
         // Tiap menu punya daftar peran sendiri — lihat StokAkses.
         if (StokAkses.melihatNilaiPersediaan(role)) add(TabStok.NILAI_PERSEDIAAN)
         if (StokAkses.melihatHppMenu(role)) add(TabStok.HPP_MENU)
+        if (StokAkses.melihatLaporanPenjualan(role)) add(TabStok.LAPORAN_PENJUALAN)
         if (StokAkses.melihatPlafonBelanja(role)) add(TabStok.PLAFON)
         if (StokAkses.melihatInboundOutbound(role)) add(TabStok.ARUS_BARANG)
     }
@@ -197,6 +201,9 @@ fun StokShell(
                 TabStok.HPP_MENU ->
                     if (StokAkses.melihatHppMenu(peran)) HppMenuScreen(onBack = { tab = tabs.first() })
                     else KeadaanTidakBerhak("Kalkulator HPP hanya untuk pengelola menu.")
+                TabStok.LAPORAN_PENJUALAN ->
+                    if (StokAkses.melihatLaporanPenjualan(peran)) LaporanPenjualanScreen(onBack = { tab = tabs.first() })
+                    else KeadaanTidakBerhak("Laporan penjualan hanya untuk kantor dan gudang pusat.")
                 TabStok.PLAFON ->
                     if (StokAkses.melihatPlafonBelanja(peran)) PlafonBelanjaScreen(onBack = { tab = tabs.first() })
                     else KeadaanTidakBerhak("Plafon belanja hanya untuk kantor dan gudang pusat.")
