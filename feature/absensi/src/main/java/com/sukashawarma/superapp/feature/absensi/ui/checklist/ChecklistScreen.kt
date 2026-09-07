@@ -35,11 +35,14 @@ import com.sukashawarma.superapp.presentation.theme.*
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.sukashawarma.superapp.core.ui.RealtimeRefresh
+import com.sukashawarma.superapp.core.ui.RealtimeTables
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChecklistScreen(onExit: () -> Unit, viewModel: ChecklistViewModel = viewModel()) {
     val state by viewModel.state.collectAsState()
+    RealtimeRefresh(RealtimeTables.CHECKLIST_RECORDS, RealtimeTables.CHECKLIST_TICKS) { viewModel.refresh() }
     val staff by AppSession.staff.collectAsState()
 
     Scaffold(
