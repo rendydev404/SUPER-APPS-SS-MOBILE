@@ -9,9 +9,12 @@ import com.sukashawarma.superapp.data.remote.optJsonArray
 import com.sukashawarma.superapp.data.remote.optJsonObject
 import com.sukashawarma.superapp.data.remote.optString
 import com.sukashawarma.superapp.feature.stok.data.model.OpnameHeader
+import com.sukashawarma.superapp.feature.stok.data.model.OpnameItemDetail
 import com.sukashawarma.superapp.feature.stok.data.model.StatusOpname
+import com.sukashawarma.superapp.feature.stok.domain.UnitMeta
 import java.time.LocalDate
 import java.time.ZoneId
+import kotlin.math.abs
 
 /**
  * Stock opname — cermin `hooks/useOpname.ts` dan `app/actions/opname.ts` di web.
@@ -231,4 +234,120 @@ object OpnameRepository {
         val qty = o.optDouble("qty_fisik") ?: return@mapNotNull null
         id to qty
     }.toMap()
+
+    // ------------------------------------------------------------------ detail
+    //
+    // Tiga pembacaan di bawah menyusun layar Detail Opname — cermin
+    // `components/stok/OpnameDetail.tsx`. Web membacanya dengan browser client
+    // biasa, jadi tidak ada satu pun yang butuh service-role: `opname_item_read`
+    // membuka baris lewat outlet induknya, `ledger_read` dan `bahan_baku_read`
+    // sudah terbuka untuk `authenticated`.
+
+    /**
+     * Satu opname beserta pembuat dan catatan persetujuannya.
+     *
+     * Tidak ada filter `outlet_id` di sini, sama seperti web — RLS `opname_read`
+     * adalah satu-satunya gerbangnya, dan id di luar cakupan hanya mengembalikan
+     * baris kosong.
+     */
+    suspend fun kepala(opnameId: String): JsonObject? = Postgrest.selectOne(
+        "opname",
+        listOf(
+            "select" to "id,outlet_id,tanggal,tipe,status,created_by,created_at,notes," +
+                "approval_notes,outlet_staff!opname_created_by_fkey(name)",
+            "id" to "eq.$opnameId",
+        ),
+    )
+
+    /**
+     * Baris-baris hitung satu opname.
+     *
+     * `selisih` ikut dibaca, bukan dihitung ulang: kolom itu generated stored di
+     * database, jadi nilainya adalah kebenaran yang sama dengan yang dilihat web.
+     */
+    suspend fun detailItem(opnameId: String): List<OpnameItemDetail> = Postgrest.select(
+        "opname_item",
+        listOf(
+            "select" to "id,bahan_baku_id,qty_fisik,qty_system,selisih,flagged,catatan," +
+                "bahan_baku(nama,satuan,satuan_tengah,faktor_tengah,satuan_kecil,faktor_tampilan)",
+            "opname_id" to "eq.$opnameId",
+        ),
+    ).mapNotNull { el ->
+        val o = el.asJsonObject
+        val id = o.optString("id") ?: return@mapNotNull null
+        val bahanId = o.optString("bahan_baku_id") ?: return@mapNotNull null
+        val bahan = o.optJsonObject("bahan_baku")
+        OpnameItemDetail(
+            id = id,
+            bahanBakuId = bahanId,
+            namaBahan = bahan?.optString("nama"),
+            meta = UnitMeta(
+                satuan = bahan?.optString("satuan"),
+                satuanTengah = bahan?.optString("satuan_tengah"),
+                satuanKecil = bahan?.optString("satuan_kecil"),
+                faktorTengah = bahan?.optDouble("faktor_tengah"),
+                faktorTampilan = bahan?.optDouble("faktor_tampilan"),
+            ),
+            qtySystem = o.optDouble("qty_system") ?: 0.0,
+            // Dibiarkan null bila kolomnya null — "belum terhitung" bukan nol.
+            qtyFisik = o.optDouble("qty_fisik"),
+            selisih = o.optDouble("selisih") ?: 0.0,
+            flagged = o.optBoolean("flagged") ?: false,
+            catatan = o.optString("catatan")?.takeIf { it.isNotBlank() },
+        )
+    }
+
+    /**
+     * Pemakaian resep (BOM) pada tanggal opname, dijumlah per bahan.
+     *
+     * Rentang waktunya memakai offset `+07:00` apa adanya seperti web, bukan UTC:
+     * `opname.tanggal` adalah tanggal WIB, jadi menggesernya ke UTC akan menarik
+     * pemakaian dari hari yang salah selama tujuh jam pertama.
+     *
+     * `qty` pemakaian tersimpan negatif; diambil nilai mutlaknya supaya terbaca
+     * sebagai "terpakai sekian", sama seperti `usageMap` di web.
+     */
+    suspend fun pemakaianHarian(outletId: String, tanggal: String): Map<String, Double> =
+        Postgrest.select(
+            "ledger_stok",
+            listOf(
+                "select" to "bahan_baku_id,qty",
+                "outlet_id" to "eq.$outletId",
+                "tipe" to "eq.pemakaian",
+                "created_at" to "gte.${tanggal}T00:00:00+07:00",
+                "created_at" to "lte.${tanggal}T23:59:59+07:00",
+            ),
+        ).mapNotNull { el ->
+            val o = el.asJsonObject
+            val id = o.optString("bahan_baku_id") ?: return@mapNotNull null
+            id to abs(o.optDouble("qty") ?: 0.0)
+        }.groupBy({ it.first }, { it.second })
+            .mapValues { (_, nilai) -> nilai.sum() }
+
+    /**
+     * Master bahan aktif, untuk menentukan bahan mana yang terlewat dihitung.
+     *
+     * Daftar penuh memang diperlukan: bahan yang "belum dihitung" justru dikenali
+     * dari ketiadaan barisnya di `opname_item`, jadi tidak bisa disimpulkan dari
+     * hasil [detailItem] saja.
+     */
+    suspend fun bahanAktifRingkas(): List<BahanAktifRingkas> = Postgrest.select(
+        "bahan_baku",
+        listOf(
+            "select" to "id,nama,kategori",
+            "is_active" to "eq.true",
+            "order" to "nama.asc",
+        ),
+    ).mapNotNull { el ->
+        val o = el.asJsonObject
+        val id = o.optString("id") ?: return@mapNotNull null
+        BahanAktifRingkas(
+            id = id,
+            nama = o.optString("nama")?.takeIf { it.isNotBlank() } ?: "(tanpa nama)",
+            kategori = o.optString("kategori")?.takeIf { it.isNotBlank() } ?: "Lainnya",
+        )
+    }
 }
+
+/** Baris master bahan seperlunya untuk tab "Belum Dihitung" di Detail Opname. */
+data class BahanAktifRingkas(val id: String, val nama: String, val kategori: String)
