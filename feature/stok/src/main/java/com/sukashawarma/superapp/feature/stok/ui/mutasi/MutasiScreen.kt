@@ -68,10 +68,13 @@ import com.sukashawarma.superapp.feature.stok.ui.waktuSingkat
 import com.sukashawarma.superapp.presentation.theme.SukaOnSurface
 import com.sukashawarma.superapp.presentation.theme.SukaOnSurfaceVariant
 import com.sukashawarma.superapp.presentation.theme.SukaSurface
+import com.sukashawarma.superapp.core.ui.RealtimeRefresh
+import com.sukashawarma.superapp.core.ui.RealtimeTables
 
 @Composable
 fun MutasiScreen(viewModel: MutasiViewModel = viewModel()) {
     val state by viewModel.state.collectAsState()
+    RealtimeRefresh(RealtimeTables.LEDGER, RealtimeTables.STOK_BALANCE) { viewModel.muatAwal() }
 
     if (state.formTerbuka) {
         FormAjukan(state, viewModel)
@@ -101,7 +104,7 @@ fun MutasiScreen(viewModel: MutasiViewModel = viewModel()) {
 
         when {
             state.tidakBerhak -> KeadaanTidakBerhak("Akun Anda belum terhubung dengan outlet mana pun.")
-            state.memuat -> MemuatPenuh()
+            state.memuat && state.outlets.isEmpty() -> MemuatPenuh()
             state.error != null && state.daftar.isEmpty() -> KeadaanGagal(state.error!!, viewModel::muatAwal)
             state.daftar.isEmpty() -> KeadaanKosong("Belum ada mutasi yang melibatkan outlet ini.")
             else -> LazyColumn(
