@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.FactCheck
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.ImportExport
 import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.MenuBook
@@ -32,6 +33,7 @@ import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.Sell
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -57,11 +59,13 @@ import com.sukashawarma.superapp.feature.stok.domain.StokAkses
 import com.sukashawarma.superapp.feature.stok.ui.area.HargaBahanScreen
 import com.sukashawarma.superapp.feature.stok.ui.area.WasteApprovalScreen
 import com.sukashawarma.superapp.feature.stok.ui.entri.EntriManualScreen
+import com.sukashawarma.superapp.feature.stok.ui.entri.RiwayatWasteScreen
 import com.sukashawarma.superapp.feature.stok.ui.laporan.ArusBarangScreen
 import com.sukashawarma.superapp.feature.stok.ui.laporan.HppMenuScreen
 import com.sukashawarma.superapp.feature.stok.ui.laporan.LaporanPenjualanScreen
 import com.sukashawarma.superapp.feature.stok.ui.laporan.NilaiPersediaanScreen
 import com.sukashawarma.superapp.feature.stok.ui.laporan.PlafonBelanjaScreen
+import com.sukashawarma.superapp.feature.stok.ui.laporan.ThresholdScreen
 import com.sukashawarma.superapp.feature.stok.ui.ledger.LedgerScreen
 import com.sukashawarma.superapp.feature.stok.ui.monitoring.MonitoringScreen
 import com.sukashawarma.superapp.feature.stok.ui.mutasi.MutasiScreen
@@ -88,6 +92,7 @@ private enum class TabStok(
     LEDGER("Ledger", "Buku Ledger Stok", Icons.Default.MenuBook),
     MUTASI("Mutasi", "Mutasi Antar Outlet", Icons.Default.SwapHoriz),
     ENTRI("Entri Manual", "Entri Manual & Lapor Waste", Icons.Default.EditNote),
+    RIWAYAT_WASTE("Riwayat Waste", "Riwayat Waste Saya", Icons.Default.History),
     PERSETUJUAN_OPNAME("Approval Opname", "Persetujuan Opname", Icons.Default.FactCheck),
     HARGA("Harga Bahan", "Master Harga Bahan Baku", Icons.Default.Sell),
 
@@ -98,6 +103,7 @@ private enum class TabStok(
     LAPORAN_PENJUALAN("Penjualan", "Laporan Penjualan", Icons.Default.TrendingUp),
     PLAFON("Plafon", "Plafon & Belanja Outlet", Icons.Default.AccountBalanceWallet),
     ARUS_BARANG("In/Out", "Inbound / Outbound", Icons.Default.ImportExport),
+    THRESHOLD("Threshold", "Pengaturan Threshold", Icons.Default.Tune),
 }
 
 /**
@@ -135,6 +141,10 @@ private fun tujuanUntukPeran(): List<TabStok> {
         // Sisanya masuk laci, tanpa mengulang yang sudah di bilah.
         if (TabStok.MUTASI !in this) add(TabStok.MUTASI)
         add(TabStok.ENTRI)
+        // Pasangan Entri Manual: di sana orang melapor waste, di sini ia melihat
+        // hasilnya. Tanpa gerbang peran, sama seperti Entri Manual — kueri-nya sudah
+        // dibatasi ke laporan milik akun yang sedang masuk.
+        add(TabStok.RIWAYAT_WASTE)
         if (bolehWaste && TabStok.WASTE !in this) add(TabStok.WASTE)
         if (bolehPo && TabStok.TERIMA_PO !in this) add(TabStok.TERIMA_PO)
         add(TabStok.PERSETUJUAN_OPNAME)
@@ -147,6 +157,7 @@ private fun tujuanUntukPeran(): List<TabStok> {
         if (StokAkses.melihatLaporanPenjualan(role)) add(TabStok.LAPORAN_PENJUALAN)
         if (StokAkses.melihatPlafonBelanja(role)) add(TabStok.PLAFON)
         if (StokAkses.melihatInboundOutbound(role)) add(TabStok.ARUS_BARANG)
+        if (StokAkses.melihatThreshold(role)) add(TabStok.THRESHOLD)
     }
 }
 
@@ -185,6 +196,7 @@ fun StokShell(
                 TabStok.LEDGER -> LedgerScreen()
                 TabStok.MUTASI -> MutasiScreen()
                 TabStok.ENTRI -> EntriManualScreen(onBack = { tab = tabs.first() })
+                TabStok.RIWAYAT_WASTE -> RiwayatWasteScreen(onBack = { tab = tabs.first() })
                 TabStok.PERSETUJUAN_OPNAME -> PersetujuanOpnameScreen(onBack = { tab = tabs.first() })
                 TabStok.TERIMA_PO -> PenerimaanPoScreen(onBack = { tab = tabs.first() })
                 TabStok.HARGA -> if (hargaAccess) HargaBahanScreen(onBack = { tab = tabs.first() })
@@ -210,6 +222,13 @@ fun StokShell(
                 TabStok.ARUS_BARANG ->
                     if (StokAkses.melihatInboundOutbound(peran)) ArusBarangScreen(onBack = { tab = tabs.first() })
                     else KeadaanTidakBerhak("Arus barang hanya untuk staff gudang pusat.")
+
+                // Gerbang kedua ini menanggung lebih banyak daripada yang lain:
+                // `outlet_reorder_point` tidak punya policy RLS, jadi tidak ada
+                // lapisan di belakangnya yang akan menolak peran yang salah.
+                TabStok.THRESHOLD ->
+                    if (StokAkses.melihatThreshold(peran)) ThresholdScreen(onBack = { tab = tabs.first() })
+                    else KeadaanTidakBerhak("Pengaturan threshold hanya untuk admin.")
             }
         }
         BottomNavStok(tab, tabs) { tab = it }
