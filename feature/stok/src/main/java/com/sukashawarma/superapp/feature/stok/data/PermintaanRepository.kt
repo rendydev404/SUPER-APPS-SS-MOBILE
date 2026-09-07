@@ -41,6 +41,12 @@ object PermintaanRepository {
     private const val SELECT_FULL =
         "*,permintaan_bahan_item(*,bahan_baku(nama,satuan)),outlets(name)"
 
+    // Sejak penyaringan status pindah ke klien, [saran] menarik seluruh baris outlet
+    // dan bukan lagi segelintir yang tidak aman. Dihalamani supaya batas baris bawaan
+    // PostgREST tidak diam-diam memotong daftarnya.
+    private const val SARAN_PAGE_SIZE = 200
+    private const val SARAN_MAX_PAGE = 20
+
     // -------------------------------------------------------------- pembacaan
 
     suspend fun daftarOutlet(outletId: String): List<Permintaan> = Postgrest.select(
@@ -131,31 +137,49 @@ object PermintaanRepository {
     }
 
     /**
-     * Bahan yang disarankan untuk diminta: yang statusnya `below` atau `warning`.
+     * SELURUH baris saldo satu outlet, sebagai kandidat permintaan.
      *
      * Dibaca dari `monitoring_view_crew` — view SECURITY DEFINER, sama seperti web,
      * supaya saldo tetap terbaca walau RLS `stok_balance` membatasi.
+     *
+     * Penyaringan "yang mana yang perlu diminta" sengaja TIDAK dilakukan di sini
+     * lewat `status=in.(below,warning)`. Kolom `status` view membandingkan `saldo`
+     * mentah dengan `threshold` tanpa menormalkan satuan, jadi menyaring dengannya
+     * membuang bahan yang justru paling kritis sebelum aplikasi sempat melihatnya —
+     * dan bahan itu lalu hilang dari katalog permintaan, tidak bisa diminta sama
+     * sekali. Keputusannya dipindah ke [SaranPermintaan.perluDiminta], yang punya
+     * metadata satuan dari katalog.
      */
-    suspend fun saran(outletId: String): List<SaranPermintaan> = Postgrest.select(
-        "monitoring_view_crew",
-        listOf(
-            "select" to "bahan_baku_id,item_name,satuan,current_qty,saldo_is_gram,threshold,status",
-            "outlet_id" to "eq.$outletId",
-        ),
-    ).mapNotNull { el ->
-        val o = el.asJsonObject
-        val status = o.optString("status")
-        if (status != "below" && status != "warning") return@mapNotNull null
-        val bahanId = o.optString("bahan_baku_id") ?: return@mapNotNull null
-        SaranPermintaan(
-            bahanBakuId = bahanId,
-            itemName = o.optString("item_name") ?: "(tanpa nama)",
-            satuan = o.optString("satuan"),
-            currentQty = o.optDouble("current_qty") ?: 0.0,
-            saldoIsGram = o.optBoolean("saldo_is_gram"),
-            threshold = o.optDouble("threshold") ?: 0.0,
-            status = status,
-        )
+    suspend fun saran(outletId: String): List<SaranPermintaan> = buildList {
+        var halaman = 0
+        while (halaman < SARAN_MAX_PAGE) {
+            val batch = Postgrest.select(
+                "monitoring_view_crew",
+                listOf(
+                    "select" to "bahan_baku_id,item_name,satuan,current_qty,saldo_is_gram,threshold,status",
+                    "outlet_id" to "eq.$outletId",
+                    // Offset tanpa urutan eksplisit tidak dijamin stabil antar halaman.
+                    "order" to "item_name.asc",
+                    "limit" to SARAN_PAGE_SIZE.toString(),
+                    "offset" to (halaman * SARAN_PAGE_SIZE).toString(),
+                ),
+            ).mapNotNull { el ->
+                val o = el.asJsonObject
+                val bahanId = o.optString("bahan_baku_id") ?: return@mapNotNull null
+                SaranPermintaan(
+                    bahanBakuId = bahanId,
+                    itemName = o.optString("item_name") ?: "(tanpa nama)",
+                    satuan = o.optString("satuan"),
+                    currentQty = o.optDouble("current_qty") ?: 0.0,
+                    saldoIsGram = o.optBoolean("saldo_is_gram"),
+                    threshold = o.optDouble("threshold") ?: 0.0,
+                    statusView = o.optString("status"),
+                )
+            }
+            addAll(batch)
+            if (batch.size < SARAN_PAGE_SIZE) break
+            halaman++
+        }
     }
 
     // ---------------------------------------------------------------- katalog
