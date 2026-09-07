@@ -2,7 +2,9 @@ package com.sukashawarma.superapp.feature.stok.data.model
 
 import com.sukashawarma.superapp.feature.stok.domain.DistribusiUnit
 import com.sukashawarma.superapp.feature.stok.domain.StatusTopUp
+import com.sukashawarma.superapp.feature.stok.domain.StokStatus
 import com.sukashawarma.superapp.feature.stok.domain.UnitMeta
+import com.sukashawarma.superapp.feature.stok.domain.UnitScale
 
 // ------------------------------------------------------------------- ledger
 
@@ -265,7 +267,12 @@ data class EstimasiKeranjang(
     val kategoriNilai: Map<String, Double> = emptyMap(),
 )
 
-/** Bahan berstatus tidak aman yang disarankan untuk diminta. */
+/**
+ * Satu baris saldo `monitoring_view_crew` sebagai kandidat permintaan.
+ *
+ * `statusView` disimpan apa adanya untuk penelusuran, tetapi keputusan "perlu
+ * diminta" TIDAK boleh bersandar padanya sendirian — lihat [perluDiminta].
+ */
 data class SaranPermintaan(
     val bahanBakuId: String,
     val itemName: String,
@@ -273,8 +280,42 @@ data class SaranPermintaan(
     val currentQty: Double,
     val saldoIsGram: Boolean,
     val threshold: Double,
-    val status: String,
-)
+    val statusView: String?,
+) {
+    /**
+     * Status di atas skala ternormalisasi, sama seperti `MonitoringRow.status`.
+     *
+     * View membandingkan `saldo` mentah dengan `threshold`, padahal saldo bisa
+     * berada di satuan terkecil (`saldo_is_gram`) sementara threshold selalu di
+     * satuan besar. Untuk bahan berfaktor bukan 1 perbandingan itu meleset
+     * sebesar faktor_tampilan, dan selalu ke arah yang sama: bahan yang benar-benar
+     * kritis terbaca `ok`.
+     */
+    fun status(meta: UnitMeta): StokStatus = UnitScale.status(
+        UnitScale.normalizeSaldo(currentQty, saldoIsGram, meta),
+        UnitScale.normalizeThreshold(threshold, meta),
+    )
+
+    /**
+     * Perlu ditawarkan di katalog permintaan?
+     *
+     * Gabungan dua sumber, bukan salah satu saja:
+     * - status ternormalisasi, yang memperbaiki perbandingan satuan campuran;
+     * - `statusView`, yang membawa aturan porsi resep (`marquee_warning_threshold`)
+     *   yang hanya dihitung di server dan tidak tersedia di layar ini.
+     *
+     * Menggabungkan keduanya hanya bisa MENAMBAH bahan, tidak pernah menyembunyikan
+     * yang sebelumnya tampil — itu yang membuatnya aman. Juga menjadi jaring bila
+     * [status] mengembalikan UNKNOWN karena faktor satuan tidak dapat dipercaya.
+     */
+    fun perluDiminta(meta: UnitMeta): Boolean {
+        val s = status(meta)
+        return s == StokStatus.BELOW ||
+            s == StokStatus.WARNING ||
+            statusView == "below" ||
+            statusView == "warning"
+    }
+}
 
 // -------------------------------------------------------------------- mutasi
 
