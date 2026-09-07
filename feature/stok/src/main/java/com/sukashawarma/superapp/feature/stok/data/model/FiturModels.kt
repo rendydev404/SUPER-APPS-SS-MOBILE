@@ -111,6 +111,51 @@ data class OpnameItemRow(
         get() = besar.isNotBlank() || tengah.isNotBlank() || kecil.isNotBlank()
 }
 
+/**
+ * Satu baris `opname_item` untuk layar detail — model BACA, bukan masukan form.
+ *
+ * Sengaja terpisah dari [OpnameItemRow]: yang itu membawa tiga field String hasil
+ * ketikan pengguna, sedangkan yang ini membawa angka apa adanya dari database.
+ *
+ * Ketiga angkanya ([qtySystem], [qtyFisik], [selisih]) ada pada **satuan terkecil**
+ * — `OpnameForm` web menghitungnya begitu tanpa kecuali, berbeda dari
+ * `stok_balance.saldo` yang skalanya campuran. Menempelkan satuan besar langsung ke
+ * angka mentahnya adalah bug 1000× yang sama seperti pada SPVTable web dulu.
+ */
+data class OpnameItemDetail(
+    val id: String,
+    val bahanBakuId: String,
+    val namaBahan: String?,
+    val meta: UnitMeta,
+    val qtySystem: Double,
+    /** Null berarti "belum terhitung" — berbeda dari nol, dan tidak boleh disamakan. */
+    val qtyFisik: Double?,
+    /** Kolom generated di database (`qty_fisik - qty_system`). Baca saja, jangan ditulis. */
+    val selisih: Double,
+    val flagged: Boolean,
+    val catatan: String?,
+) {
+    /** Bahan yang sudah tidak aktif di master tetap punya baris; tampilkan ala web. */
+    val namaTampil: String
+        get() = namaBahan?.takeIf { it.isNotBlank() } ?: "Bahan ${bahanBakuId.take(8)}"
+
+    val terhitung: Boolean get() = qtyFisik != null
+}
+
+// --------------------------------------------------------------------- waste
+
+/** Status laporan waste — cermin `stok_waste_reports.status` (huruf besar semua). */
+enum class StatusWaste(val nilai: String, val label: String) {
+    PENDING("PENDING", "Menunggu"),
+    APPROVED("APPROVED", "Disetujui"),
+    REJECTED("REJECTED", "Ditolak");
+
+    companion object {
+        fun dari(nilai: String?): StatusWaste =
+            entries.firstOrNull { it.nilai == nilai } ?: PENDING
+    }
+}
+
 // --------------------------------------------------------------- permintaan
 
 enum class StatusPermintaan(val nilai: String, val label: String) {
