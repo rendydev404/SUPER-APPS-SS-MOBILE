@@ -39,6 +39,8 @@ data class EnrollUiState(
     val loadingCrew: Boolean = true,
     val error: String? = null,
     val outlets: List<EnrollOutletOption> = emptyList(),
+    /** Apakah pengguna memilih outletnya sendiri, alih-alih dikunci ke outlet asalnya. */
+    val canChooseOutlet: Boolean = false,
     val selectedOutletId: String? = null,
     val crew: List<EnrollCrewOption> = emptyList(),
     /** Baris `outlet_staff` milik user yang sedang login. Dipisah dari [crew] karena
@@ -84,7 +86,11 @@ class EnrollViewModel(
         // tidak mau smart-cast propertinya jadi non-null di dalam `when`.
         val outletId = staff?.outletId
         when {
-            staff?.role == Role.REGIONAL_MANAGER -> loadOutlets()
+            staff?.role == Role.REGIONAL_MANAGER -> loadOutlets(binaanSaja = false)
+            // Area Manager membina beberapa outlet, dan `outletId` hanya menyebut satu
+            // di antaranya — outlet asalnya. Mengunci daftar crew ke sana membuat crew
+            // outlet binaannya yang lain tidak pernah bisa di-enroll.
+            staff?.role == Role.AREA_MANAGER -> loadOutlets(binaanSaja = true)
             outletId != null -> selectOutlet(outletId)
             // Admin/HR/owner/kitchen tidak selalu terikat outlet. Dulu ini error keras yang
             // mengosongkan seluruh layar; sekarang hanya daftar crew yang kosong, enrollment
@@ -122,19 +128,46 @@ class EnrollViewModel(
         }
     }
 
-    /** Daftar outlet tidak dibatasi di client. RLS backend menentukan outlet mana yang
-     * benar-benar boleh dilihat Regional Manager. */
-    private fun loadOutlets() {
-        _state.value = _state.value.copy(loadingOutlets = true, loadingCrew = false, error = null)
+    /**
+     * Memuat outlet yang boleh dipilih.
+     *
+     * [binaanSaja] menyaring lewat `staff_outlets`, dan penyaringan itu HARUS terjadi
+     * di sini: policy `outlets_select_authenticated` berisi `USING (true)`, jadi
+     * server memberikan seluruh cabang kepada siapa pun yang login. Regional Manager
+     * memang berhak atas semuanya; Area Manager tidak.
+     */
+    private fun loadOutlets(binaanSaja: Boolean) {
+        _state.value = _state.value.copy(
+            loadingOutlets = true,
+            loadingCrew = false,
+            canChooseOutlet = true,
+            error = null,
+        )
         viewModelScope.launch {
             try {
+                val filter = if (binaanSaja) {
+                    val binaan = outletBinaanSendiri()
+                    if (binaan.isEmpty()) {
+                        _state.value = _state.value.copy(
+                            loadingOutlets = false,
+                            outlets = emptyList(),
+                            error = "Akun Anda belum terhubung ke outlet mana pun, jadi daftar crew tidak dapat dimuat. Enrollment diri sendiri tetap bisa dilakukan.",
+                        )
+                        return@launch
+                    }
+                    // `in.()` tanpa isi adalah sintaks tak sah — karena itu daftar kosong
+                    // dihentikan di atas, bukan diteruskan ke server.
+                    listOf("id" to "in.(${binaan.joinToString(",")})")
+                } else {
+                    emptyList()
+                }
                 val rows = Postgrest.select(
                     "outlets",
                     listOf(
                         "is_active" to "eq.true",
                         "select" to "id,name",
                         "order" to "name.asc",
-                    )
+                    ) + filter
                 )
                 val outlets = rows.map { el ->
                     val o = el.asJsonObject
@@ -148,6 +181,20 @@ class EnrollViewModel(
                 _state.value = _state.value.copy(loadingOutlets = false, error = "Gagal memuat daftar outlet: ${e.message}")
             }
         }
+    }
+
+    /**
+     * Outlet binaan pengguna yang sedang login, dari `staff_outlets`.
+     *
+     * Yang dibaca adalah pemetaan MILIK SENDIRI — itu yang diizinkan RLS lewat
+     * `staff_outlets_select_self` (`staff_id = auth.uid()`).
+     */
+    private suspend fun outletBinaanSendiri(): Set<String> {
+        val me = AppSession.staff.value ?: return emptySet()
+        return Postgrest.select(
+            "staff_outlets",
+            listOf("select" to "outlet_id", "staff_id" to "eq.${me.id}"),
+        ).mapNotNull { it.asJsonObject.optString("outlet_id") }.toSet()
     }
 
     fun selectOutlet(outletId: String) {
