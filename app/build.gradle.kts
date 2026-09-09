@@ -3,8 +3,15 @@ import java.util.Properties
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    id("kotlin-kapt")
-    id("com.google.dagger.hilt.android")
+}
+
+// Plugin google-services MENGGAGALKAN build bila `app/google-services.json` tidak
+// ada, dan file itu baru bisa dibuat setelah paket com.sukashawarma.superapp
+// didaftarkan di Firebase Console. Dipasang bersyarat supaya repo tetap bisa
+// di-build tanpa file itu; begitu file-nya ditaruh di app/, push langsung hidup
+// tanpa perlu menyunting apa pun di sini.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
 }
 
 val localProps = Properties().apply {
@@ -85,11 +92,11 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.7.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
 
-    // Offline-first
+    // Offline-first. Tanpa room-compiler: seluruh @Entity/@Dao/@Database ada di
+    // :core:database, modul ini hanya memakai API-nya.
     val roomVersion = "2.6.1"
     implementation("androidx.room:room-runtime:$roomVersion")
     implementation("androidx.room:room-ktx:$roomVersion")
-    kapt("androidx.room:room-compiler:$roomVersion")
 
     // Network
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
@@ -111,6 +118,12 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
 
     implementation("io.coil-kt:coil-compose:2.5.0")
+
+    // Push. Aman ikut ter-compile walau google-services.json belum ada: seluruh
+    // pemakaiannya dijaga FcmTokenRegistrar.siap(), yang memeriksa Firebase
+    // benar-benar terkonfigurasi sebelum menyentuh FirebaseMessaging.
+    implementation(platform("com.google.firebase:firebase-bom:32.8.1"))
+    implementation("com.google.firebase:firebase-messaging-ktx")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
@@ -136,28 +149,8 @@ dependencies {
     implementation(project(":feature:distribusi"))
     implementation(project(":feature:mitra"))
     implementation(project(":feature:manager"))
-    implementation("com.google.dagger:hilt-android:2.51")
-    kapt("com.google.dagger:hilt-compiler:2.51")
-}
-    dependencies {
-    implementation(project(":core:network"))
-    implementation(project(":core:auth"))
-    implementation(project(":core:realtime"))
-    implementation(project(":core:database"))
-    implementation(project(":core:update"))
-    implementation(project(":core:printer"))
-    implementation(project(":core:camera"))
-    implementation(project(":core:location"))
-    implementation(project(":core:storage"))
-    implementation(project(":core:ui"))
-    implementation(project(":core:roles"))
-    implementation(project(":feature:home"))
-    implementation(project(":feature:absensi"))
-    implementation(project(":feature:stok"))
-    implementation(project(":feature:distribusi"))
-    implementation(project(":feature:mitra"))
-    implementation("com.google.dagger:hilt-android:2.51")
-    kapt("com.google.dagger:hilt-compiler:2.51")
+    implementation(project(":feature:leader"))
+    implementation(project(":feature:profil"))
 }
 
 
