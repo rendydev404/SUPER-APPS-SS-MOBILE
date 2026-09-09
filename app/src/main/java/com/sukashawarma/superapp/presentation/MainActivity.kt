@@ -1,14 +1,32 @@
 package com.sukashawarma.superapp.presentation
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.compose.setContent
+import androidx.compose.runtime.LaunchedEffect
 import androidx.fragment.app.FragmentActivity
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
+import com.sukashawarma.superapp.R
+import com.sukashawarma.superapp.presentation.theme.SukaOrange
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -20,14 +38,18 @@ import com.sukashawarma.superapp.domain.session.StartDestination
 import com.sukashawarma.superapp.domain.session.isMitraArea
 import com.sukashawarma.superapp.domain.session.resolveStartDestination
 import com.sukashawarma.superapp.feature.distribusi.DistribusiNavGraph
+import com.sukashawarma.superapp.feature.leader.LeaderNavGraph
 import com.sukashawarma.superapp.feature.manager.ManagerNavGraph
+import com.sukashawarma.superapp.feature.manager.ui.TujuanManager
 import com.sukashawarma.superapp.feature.stok.StokNavGraph
+import com.sukashawarma.superapp.notif.NotifikasiTujuan
 import com.sukashawarma.superapp.presentation.absensi.AbsensiNavGraph
 import com.sukashawarma.superapp.presentation.home.HomeScreen
 import com.sukashawarma.superapp.presentation.login.LoginScreen
 import com.sukashawarma.superapp.presentation.settings.SettingsScreen
 import com.sukashawarma.superapp.presentation.mitra.MitraDashboardScaffold
 import com.sukashawarma.superapp.presentation.mitra.MitraLoadErrorScreen
+import com.sukashawarma.superapp.feature.profil.ui.ProfilScreen
 import com.sukashawarma.superapp.presentation.mitra.MitraNoProfileScreen
 import com.sukashawarma.superapp.presentation.theme.SukaSuperappTheme
 import kotlinx.coroutines.launch
@@ -39,21 +61,38 @@ object Routes {
     const val STOK = "stok"
     const val DISTRIBUSI = "distribusi"
     const val MANAGER = "manager"
+    const val LEADER = "leader"
     const val MITRA = "mitra"
     const val MITRA_NO_PROFILE = "mitra_no_profile"
     const val MITRA_LOAD_ERROR = "mitra_load_error"
     const val SETTINGS = "settings"
+    const val PROFIL = "profil"
 }
 
-@dagger.hilt.android.AndroidEntryPoint
 class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        bacaTujuanNotifikasi(intent)
         setContent {
             SukaSuperappTheme {
                 RootNav()
             }
         }
+    }
+
+    /**
+     * Notifikasi yang diketuk saat aplikasi MASIH hidup tidak melewati onCreate.
+     * Tanpa jalur ini, mengetuk notifikasi hanya memunculkan layar terakhir dan
+     * tujuannya hilang diam-diam.
+     */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        bacaTujuanNotifikasi(intent)
+    }
+
+    private fun bacaTujuanNotifikasi(intent: Intent?) {
+        NotifikasiTujuan.set(intent?.getStringExtra(NotifikasiTujuan.EXTRA_RUTE))
     }
 
     /** Mengunci ulang aplikasi ketika Activity benar-benar ditutup, termasuk saat task
@@ -76,17 +115,72 @@ private fun RootNav() {
     val mitraLoadFailed by AppSession.mitraLoadFailed.collectAsState()
     val scope = rememberCoroutineScope()
 
-    LocationPermissionGate(staff != null)
+    var splashFinished by remember { mutableStateOf(false) }
 
-    if (loading) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+    if (!splashFinished) {
+        com.sukashawarma.superapp.presentation.splash.CustomSplashVideoScreen(
+            onSplashFinished = { splashFinished = true }
+        )
         return
     }
+
+    if (loading) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.White),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.ic_app_logo),
+                    contentDescription = "Logo Suka Shawarma",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.size(160.dp),
+                )
+                Spacer(modifier = Modifier.height(28.dp))
+                CircularProgressIndicator(
+                    color = SukaOrange,
+                    modifier = Modifier.size(32.dp),
+                    strokeWidth = 3.dp
+                )
+            }
+        }
+        return
+    }
+
+    LocationPermissionGate(staff != null)
 
     val destination = resolveStartDestination(staff, mitraProfile, mitraLoadFailed)
     val isMitra = destination.isMitraArea
 
+    // Tujuan dari notifikasi yang diketuk. Ditahan sampai sesi benar-benar terbuka:
+    // melompat ke halaman manajer sebelum login akan melewati layar login sama sekali.
+    var tujuanManager by remember { mutableStateOf<TujuanManager?>(null) }
+    val ruteNotifikasi by NotifikasiTujuan.rute.collectAsState()
+    LaunchedEffect(ruteNotifikasi, staff, isMitra) {
+        if (ruteNotifikasi == null || staff == null || isMitra) return@LaunchedEffect
+        val tujuan = when (NotifikasiTujuan.ambil()) {
+            NotifikasiTujuan.MANAGER_PERSETUJUAN -> TujuanManager.PERSETUJUAN
+            NotifikasiTujuan.MANAGER_WASTE -> TujuanManager.WASTE
+            else -> null
+        } ?: return@LaunchedEffect
+        tujuanManager = tujuan
+        navController.navigate(Routes.MANAGER)
+    }
+
     NavHost(navController = navController, startDestination = routeFor(destination)) {
+        // Didaftarkan di luar percabangan mitra: profil adalah satu-satunya halaman
+        // yang berlaku untuk SETIAP pemegang akun, termasuk mitra. Menaruhnya di
+        // cabang non-mitra saja akan membuat navigate("profil") dari dashboard mitra
+        // melempar IllegalArgumentException karena rutenya tidak ada di graph itu.
+        composable(Routes.PROFIL) {
+            ProfilScreen(onExit = { navController.popBackStack() })
+        }
+
         composable(Routes.LOGIN) {
             // Sengaja TIDAK navigate() di sini. Saat callback ini jalan, recomposition
             // belum sempat berjalan, jadi graph di NavController MASIH graph sesi-kosong
@@ -100,9 +194,12 @@ private fun RootNav() {
             // HOME, ABSENSI & STOK sengaja TIDAK didaftarkan untuk mitra — tak ada jalan ke
             // sana lewat Back maupun deep link. Cermin route-guard web (RoleContext.tsx).
             composable(Routes.MITRA) {
-                MitraDashboardScaffold(onLoggedOut = {
-                    navController.navigate(Routes.LOGIN) { popUpTo(0) }
-                })
+                MitraDashboardScaffold(
+                    onOpenProfil = { navController.navigate(Routes.PROFIL) },
+                    onLoggedOut = {
+                        navController.navigate(Routes.LOGIN) { popUpTo(0) }
+                    },
+                )
             }
             composable(Routes.MITRA_NO_PROFILE) {
                 MitraNoProfileScreen(onLoggedOut = {
@@ -124,7 +221,9 @@ private fun RootNav() {
                     onOpenStok = { navController.navigate(Routes.STOK) },
                     onOpenDistribusi = { navController.navigate(Routes.DISTRIBUSI) },
                     onOpenManager = { navController.navigate(Routes.MANAGER) },
+                    onOpenLeader = { navController.navigate(Routes.LEADER) },
                     onOpenSettings = { navController.navigate(Routes.SETTINGS) },
+                    onOpenProfil = { navController.navigate(Routes.PROFIL) },
                     onLoggedOut = { navController.navigate(Routes.LOGIN) { popUpTo(0) } }
                 )
             }
@@ -140,8 +239,17 @@ private fun RootNav() {
             composable(Routes.DISTRIBUSI) {
                 DistribusiNavGraph(onExit = { navController.popBackStack() })
             }
+            composable(Routes.LEADER) {
+                LeaderNavGraph(onExit = { navController.popBackStack() })
+            }
             composable(Routes.MANAGER) {
-                ManagerNavGraph(onExit = { navController.popBackStack() })
+                ManagerNavGraph(
+                    onExit = { navController.popBackStack() },
+                    tujuanAwal = tujuanManager,
+                )
+                // Dikosongkan setelah dipakai supaya membuka modul Manager lewat
+                // Beranda tetap mendarat di Overview seperti biasa.
+                LaunchedEffect(Unit) { tujuanManager = null }
             }
         }
     }
