@@ -97,34 +97,59 @@ data class WasteReview(val id: String, val outletId: String, val bahanId: String
 }
 
 object WasteApprovalRepository {
+    private const val KOLOM = "*,bahan_baku(nama,satuan,satuan_tengah,faktor_tengah,satuan_kecil,faktor_tampilan)," +
+        "outlets(name),reported_by_staff:outlet_staff!reported_by(name)"
+
     suspend fun load(): List<WasteReview> {
         WasteApprovalAccess.requireAccess()
-        StokRepository.invalidate()
         val ids = StokRepository.accessibleOutlets().map { it.id }
         if (ids.isEmpty()) return emptyList()
-        val reports = allRows("stok_waste_reports", listOf("select" to "*,bahan_baku(nama,satuan,satuan_tengah,faktor_tengah,satuan_kecil,faktor_tampilan),outlets(name),reported_by_staff:outlet_staff!reported_by(name)",
-            "status" to "eq.PENDING", "outlet_id" to "in.(${ids.joinToString(",")})", "order" to "created_at.desc,id.asc"))
-        val balances = reports.mapNotNull { it.optString("outlet_id") }.distinct().associateWith { outlet ->
-            allRows("stok_balance", listOf("select" to "bahan_baku_id,saldo,saldo_is_gram", "outlet_id" to "eq.$outlet", "order" to "bahan_baku_id.asc"))
-                .associateBy { it.optString("bahan_baku_id") }
-        }
+        return withBalances(allRows("stok_waste_reports", listOf("select" to KOLOM,
+            "status" to "eq.PENDING", "outlet_id" to "in.(${ids.joinToString(",")})", "order" to "created_at.desc,id.asc")))
+    }
+
+    /**
+     * Satu laporan saja. Approve wajib memeriksa saldo terkini, tetapi memuat ulang
+     * seluruh daftar untuk itu membuat satu ketukan tombol menunggu tiga kali kerja
+     * penuh — cukup baris yang sedang diputuskan yang perlu segar.
+     */
+    suspend fun reload(report: WasteReview): WasteReview? {
+        WasteApprovalAccess.requireAccess()
+        val rows = Postgrest.select("stok_waste_reports", listOf("select" to KOLOM,
+            "id" to "eq.${report.id}", "status" to "eq.PENDING", "limit" to "1")).map { it.asJsonObject }
+        return withBalances(rows).firstOrNull()
+    }
+
+    /**
+     * Saldo diambil hanya untuk pasangan outlet×bahan yang benar-benar muncul di
+     * daftar, dalam satu permintaan. Versi sebelumnya menarik seluruh `stok_balance`
+     * per outlet secara halaman-per-halaman — ribuan baris untuk memakai belasan,
+     * dan itulah yang memicu statement timeout 57014 di server.
+     */
+    private suspend fun withBalances(reports: List<JsonObject>): List<WasteReview> {
+        if (reports.isEmpty()) return emptyList()
+        val outlets = reports.mapNotNull { it.optString("outlet_id") }.distinct()
+        val bahan = reports.mapNotNull { it.optString("bahan_baku_id") }.distinct()
+        val balances = allRows("stok_balance", listOf("select" to "outlet_id,bahan_baku_id,saldo,saldo_is_gram",
+            "outlet_id" to "in.(${outlets.joinToString(",")})", "bahan_baku_id" to "in.(${bahan.joinToString(",")})",
+            "order" to "bahan_baku_id.asc")).associateBy { it.optString("outlet_id").orEmpty() to it.optString("bahan_baku_id").orEmpty() }
         return reports.map { row ->
-            val bahan = row.optJsonObject("bahan_baku") ?: JsonObject()
-            val meta = UnitMeta(bahan.optString("satuan"), bahan.optString("satuan_tengah"), bahan.optString("satuan_kecil"), bahan.optDouble("faktor_tengah"), bahan.optDouble("faktor_tampilan"))
+            val bahanRow = row.optJsonObject("bahan_baku") ?: JsonObject()
+            val meta = UnitMeta(bahanRow.optString("satuan"), bahanRow.optString("satuan_tengah"), bahanRow.optString("satuan_kecil"), bahanRow.optDouble("faktor_tengah"), bahanRow.optDouble("faktor_tampilan"))
             val outlet = row.optString("outlet_id").orEmpty()
             val bahanId = row.optString("bahan_baku_id").orEmpty()
-            val bal = balances[outlet]?.get(bahanId)
+            val bal = balances[outlet to bahanId]
             val raw = bal?.optDouble("saldo") ?: 0.0
             val balance = if (bal?.optBoolean("saldo_is_gram") == true) UnitScale.besarFromSmallest(raw, meta) else raw
-            WasteReview(row.optString("id").orEmpty(), outlet, bahanId, bahan.optString("nama").orEmpty(),
+            WasteReview(row.optString("id").orEmpty(), outlet, bahanId, bahanRow.optString("nama").orEmpty(),
                 row.optJsonObject("outlets")?.optString("name").orEmpty(), row.optJsonObject("reported_by_staff")?.optString("name").orEmpty(),
                 row.optString("created_at"), row.optDouble("qty") ?: 0.0, row.optString("reason").orEmpty(), row.optString("photo_url"), meta, balance)
         }
     }
+
     suspend fun decide(report: WasteReview, rejection: String? = null) {
         WasteApprovalAccess.requireAccess()
         require(rejection == null || rejection.isNotBlank()) { "Alasan penolakan wajib diisi." }
-        StokRepository.invalidate()
         check(StokRepository.accessibleOutlets().any { it.id == report.outletId }) { "Outlet di luar akses Anda." }
         val result = Postgrest.update("stok_waste_reports", listOf("id" to "eq.${report.id}", "outlet_id" to "eq.${report.outletId}", "status" to "eq.PENDING"), JsonObject().apply {
             addProperty("status", if (rejection == null) "APPROVED" else "REJECTED")

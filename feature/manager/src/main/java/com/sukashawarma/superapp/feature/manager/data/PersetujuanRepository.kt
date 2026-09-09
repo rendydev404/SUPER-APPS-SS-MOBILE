@@ -21,9 +21,10 @@ data class DataPersetujuan(
 /**
  * Antrean persetujuan: pembatalan transaksi dan bypass kuncian POS.
  *
- * Hanya bypass yang bisa diproses dari sini. `bypass_requests` punya policy UPDATE
- * yang discope `accessible_outlet_ids()`, sedangkan jalur void tidak punya policy
- * tulis sama sekali — lihat `VOID_BISA_DIPROSES_NATIVE` untuk rinciannya.
+ * Keduanya bisa diproses dari sini, lewat dua jalur yang berbeda. Bypass ditulis
+ * langsung: `bypass_requests` punya policy UPDATE yang discope
+ * `accessible_outlet_ids()`. Void tidak bisa begitu — tabelnya tanpa policy UPDATE
+ * sama sekali — jadi lewat RPC `process_void_request`; lihat [prosesVoid].
  */
 object PersetujuanRepository {
 
@@ -149,5 +150,53 @@ object PersetujuanRepository {
         } else {
             null
         }
+    }
+
+    /**
+     * Menyetujui atau menolak pembatalan pesanan.
+     *
+     * Lewat RPC `process_void_request`, bukan UPDATE langsung: `cancellation_requests`
+     * tidak punya policy UPDATE sama sekali dan policy `orders` tidak memuat area
+     * maupun regional manager, jadi tulisan biasa pasti ditolak RLS. RPC-nya
+     * SECURITY DEFINER dan memeriksa peran serta binaan outlet sendiri.
+     *
+     * Mengembalikan pesan siap tampil bila ditolak, atau null bila berhasil.
+     */
+    suspend fun prosesVoid(id: String, setujui: Boolean): String? {
+        try {
+            Postgrest.rpc(
+                "process_void_request",
+                JsonObject().apply {
+                    addProperty("p_request_id", id)
+                    addProperty("p_approve", setujui)
+                },
+            )
+            return null
+        } catch (e: Postgrest.PostgrestException) {
+            val body = e.message.orEmpty()
+            android.util.Log.e("PersetujuanRepository", "process_void_request ditolak ${e.code}: $body")
+            // RPC belum terpasang di database. Dibedakan supaya pesannya menunjuk ke
+            // penyebab sebenarnya, bukan "coba lagi" yang tidak akan pernah berhasil.
+            if (e.code == 404 || body.contains("PGRST202")) {
+                return "Fitur ini belum aktif: fungsi process_void_request belum ada di database."
+            }
+            return pesanDariGalatServer(body)
+        }
+    }
+
+    /**
+     * Mengambil pesan `RAISE EXCEPTION` dari balasan PostgREST.
+     *
+     * Seluruh penolakan di `process_void_request` sudah ditulis dalam kalimat yang
+     * layak dibaca pengguna ("Pengajuan sudah diproses sebelumnya."), jadi yang
+     * terbaik adalah meneruskannya apa adanya ketimbang menggantinya dengan pesan
+     * generik yang menyembunyikan alasannya.
+     */
+    private fun pesanDariGalatServer(body: String): String {
+        val pesan = runCatching {
+            com.google.gson.JsonParser.parseString(body).asJsonObject.optString("message")
+        }.getOrNull()
+        return pesan?.takeIf { it.isNotBlank() }
+            ?: "Gagal memproses pembatalan. Coba lagi."
     }
 }

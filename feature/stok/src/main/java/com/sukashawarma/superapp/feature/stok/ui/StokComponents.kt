@@ -15,16 +15,27 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Inbox
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.filled.ArrowBack
@@ -44,8 +55,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.sukashawarma.superapp.feature.stok.data.model.OutletRingkas
 import com.sukashawarma.superapp.feature.stok.domain.StokStatus
 import com.sukashawarma.superapp.presentation.theme.SukaOnSurface
 import com.sukashawarma.superapp.presentation.theme.SukaOnSurfaceVariant
@@ -218,9 +231,9 @@ fun HeaderStok(
  */
 @Composable
 fun PemilihOutlet(
-    outlets: List<com.sukashawarma.superapp.feature.stok.data.model.OutletRingkas>,
-    terpilih: com.sukashawarma.superapp.feature.stok.data.model.OutletRingkas?,
-    onPilih: (com.sukashawarma.superapp.feature.stok.data.model.OutletRingkas) -> Unit,
+    outlets: List<OutletRingkas>,
+    terpilih: OutletRingkas?,
+    onPilih: (OutletRingkas) -> Unit,
 ) {
     var terbuka by remember { mutableStateOf(false) }
     Box(Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp)) {
@@ -243,14 +256,180 @@ fun PemilihOutlet(
                 )
             }
         }
-        androidx.compose.material3.DropdownMenu(expanded = terbuka, onDismissRequest = { terbuka = false }) {
-            outlets.forEach { o ->
-                androidx.compose.material3.DropdownMenuItem(
-                    text = { Text(o.name, fontSize = 14.sp) },
-                    onClick = { terbuka = false; onPilih(o) },
+    }
+    if (terbuka) {
+        LembarPilihOutlet(
+            outlets = outlets,
+            terpilih = terpilih,
+            onPilih = { terbuka = false; onPilih(it) },
+            onTutup = { terbuka = false },
+        )
+    }
+}
+
+/**
+ * Pemilih outlet berbentuk lembar bawah dengan pencarian.
+ *
+ * Menggantikan `DropdownMenu` polos yang, dengan dua puluhan outlet, menutupi
+ * hampir seluruh layar dan hanya bisa digulir — tidak ada cara mempersempit
+ * selain membaca satu per satu sampai ketemu.
+ *
+ * Dipakai bersama oleh Ledger, Opname, Permintaan, dan Mutasi lewat
+ * [PemilihOutlet], dan langsung oleh form pengajuan mutasi untuk memilih tujuan.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LembarPilihOutlet(
+    outlets: List<OutletRingkas>,
+    terpilih: OutletRingkas?,
+    onPilih: (OutletRingkas) -> Unit,
+    onTutup: () -> Unit,
+    judul: String = "Pilih Outlet",
+) {
+    var cari by remember { mutableStateOf("") }
+    val lembar = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    val hasil = remember(outlets, cari) {
+        val kata = cari.trim().lowercase()
+        outlets
+            .filter { kata.isEmpty() || it.name.lowercase().contains(kata) }
+            .sortedBy { it.name.uppercase() }
+    }
+    val kelompok = remember(hasil) { hasil.groupBy { kelompokOutlet(it.name) } }
+
+    ModalBottomSheet(
+        onDismissRequest = onTutup,
+        sheetState = lembar,
+        containerColor = Color.White,
+    ) {
+        Column(Modifier.fillMaxWidth().heightIn(max = 620.dp)) {
+            Row(
+                Modifier.padding(start = 20.dp, end = 20.dp, bottom = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(judul, color = SukaOnSurface, fontSize = 16.sp, fontWeight = FontWeight.Black)
+                Spacer(Modifier.width(9.dp))
+                Text(
+                    "${hasil.size}",
+                    Modifier
+                        .background(Color(0xFFFFF7ED), RoundedCornerShape(7.dp))
+                        .padding(horizontal = 7.dp, vertical = 2.dp),
+                    color = SukaOrange, fontSize = 11.sp, fontWeight = FontWeight.Black,
                 )
             }
+
+            OutlinedTextField(
+                value = cari,
+                onValueChange = { cari = it },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                placeholder = { Text("Cari nama outlet…", fontSize = 13.sp, color = Color(0xFF94A3B8)) },
+                leadingIcon = {
+                    Icon(Icons.Default.Search, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(18.dp))
+                },
+                trailingIcon = {
+                    if (cari.isNotEmpty()) {
+                        IconButton(onClick = { cari = "" }) {
+                            Icon(
+                                Icons.Default.Close, "Hapus pencarian",
+                                tint = Color(0xFF94A3B8), modifier = Modifier.size(17.dp),
+                            )
+                        }
+                    }
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(13.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = Color.White,
+                    unfocusedContainerColor = Color.White,
+                    focusedBorderColor = SukaOrange,
+                    unfocusedBorderColor = Color(0xFFE2E8F0),
+                ),
+            )
+            Spacer(Modifier.height(10.dp))
+
+            if (hasil.isEmpty()) {
+                Box(
+                    Modifier.fillMaxWidth().padding(vertical = 44.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        "Tidak ada outlet bernama \"$cari\".",
+                        color = Color(0xFF94A3B8), fontSize = 13.sp,
+                    )
+                }
+            } else {
+                LazyColumn(
+                    Modifier.weight(1f, fill = false),
+                    contentPadding = PaddingValues(bottom = 24.dp),
+                ) {
+                    URUTAN_KELOMPOK.forEach { nama ->
+                        val isi = kelompok[nama].orEmpty()
+                        if (isi.isEmpty()) return@forEach
+                        // Judul kelompok disembunyikan saat mencari: hasil sudah sedikit,
+                        // dan pemisah malah memecah daftar pendek jadi kepingan.
+                        if (cari.isBlank()) {
+                            item(key = "judul-$nama") {
+                                Text(
+                                    nama.uppercase(),
+                                    Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 6.dp),
+                                    color = Color(0xFF94A3B8), fontSize = 10.sp,
+                                    fontWeight = FontWeight.Black, letterSpacing = 0.9.sp,
+                                )
+                            }
+                        }
+                        items(isi, key = { it.id }) { o ->
+                            BarisOutlet(o, o.id == terpilih?.id) { onPilih(o) }
+                        }
+                    }
+                }
+            }
         }
+    }
+}
+
+@Composable
+private fun BarisOutlet(outlet: OutletRingkas, aktif: Boolean, onKlik: () -> Unit) {
+    Surface(
+        onClick = onKlik,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 3.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = if (aktif) Color(0xFFFFF7ED) else Color.White,
+        border = BorderStroke(1.dp, if (aktif) Color(0xFFFED7AA) else Color(0xFFF1F5F9)),
+    ) {
+        Row(Modifier.padding(horizontal = 13.dp, vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                outlet.name,
+                Modifier.weight(1f),
+                color = if (aktif) SukaOrange else SukaOnSurface,
+                fontSize = 13.5.sp,
+                fontWeight = if (aktif) FontWeight.Black else FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (aktif) {
+                Spacer(Modifier.width(8.dp))
+                Icon(Icons.Default.CheckCircle, "Terpilih", tint = SukaOrange, modifier = Modifier.size(19.dp))
+            }
+        }
+    }
+}
+
+private val URUTAN_KELOMPOK = listOf("Pusat & Gudang", "Outlet Suka Shawarma", "Mitra", "Lainnya")
+
+/**
+ * Kelompok tampilan berdasarkan awalan nama outlet.
+ *
+ * Murni untuk memudahkan memindai daftar panjang, bukan data — penamaan di
+ * database memang berpola ("GUDANG …", "MITRA …", "SUKA SHAWARMA …"). Nama yang
+ * tidak cocok jatuh ke "Lainnya", jadi outlet baru tetap muncul apa pun namanya.
+ */
+private fun kelompokOutlet(nama: String): String {
+    val n = nama.uppercase()
+    return when {
+        n.startsWith("GUDANG") || n.startsWith("KANTOR") -> "Pusat & Gudang"
+        n.startsWith("MITRA") -> "Mitra"
+        n.startsWith("SUKA SHAWARMA") || n.startsWith("SS ") -> "Outlet Suka Shawarma"
+        else -> "Lainnya"
     }
 }
 

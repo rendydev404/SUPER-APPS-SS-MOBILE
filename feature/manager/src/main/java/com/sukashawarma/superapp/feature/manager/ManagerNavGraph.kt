@@ -54,7 +54,7 @@ import kotlinx.coroutines.launch
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ManagerNavGraph(onExit: () -> Unit) {
+fun ManagerNavGraph(onExit: () -> Unit, tujuanAwal: TujuanManager? = null) {
     val staff by AppSession.staff.collectAsState()
 
     // Gerbang kedua, setelah kartu modul di Beranda yang sudah disembunyikan. Web
@@ -98,6 +98,20 @@ fun ManagerNavGraph(onExit: () -> Unit) {
             popUpTo(TujuanManager.OVERVIEW.rute) { inclusive = false }
             launchSingleTop = true
         }
+    }
+
+    /**
+     * Tujuan dari notifikasi yang diketuk.
+     *
+     * Dibuka lewat [pindah], bukan dengan menukar `startDestination`: Overview tetap
+     * jadi akar, sehingga menekan Kembali dari sini mendarat di Overview seperti
+     * dari tab mana pun — bukan langsung terlempar keluar modul.
+     *
+     * Tujuan yang tidak boleh dilihat peran ini diabaikan; notifikasi datang dari
+     * jaringan dan tidak berwenang membuka layar yang digerbangi.
+     */
+    LaunchedEffect(tujuanAwal) {
+        if (tujuanAwal != null && tujuanAwal in tujuanTerlihat) pindah(tujuanAwal)
     }
 
     Scaffold(

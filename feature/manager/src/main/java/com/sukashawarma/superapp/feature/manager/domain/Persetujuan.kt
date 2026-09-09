@@ -38,21 +38,6 @@ enum class TabPersetujuan(val label: String) {
     BYPASS("Bypass POS"),
 }
 
-/**
- * Apakah pemrosesan void bisa dilakukan dari aplikasi ini.
- *
- * Selalu false, dan itu bukan kelalaian. Menyetujui void menulis ke dua tabel:
- * `cancellation_requests` yang TIDAK punya policy UPDATE sama sekali, dan `orders`
- * yang policy UPDATE-nya hanya untuk crew, leader, dan admin — area manager maupun
- * regional manager tidak termasuk. Web lolos karena `processVoidOrder` memakai
- * service-role key yang menembus RLS lalu memercayai header staff.
- *
- * Menampilkan tombol yang pasti ditolak database lebih buruk daripada menjelaskan
- * keadaannya. Penutupnya adalah satu RPC `SECURITY DEFINER` di sisi database yang
- * memeriksa role sendiri — sekaligus menutup celah "percaya header" milik web.
- */
-const val VOID_BISA_DIPROSES_NATIVE = false
-
 /** Menyaring pengajuan pada rentang tanggal terpilih. */
 fun <T> saringPeriode(
     daftar: List<T>,

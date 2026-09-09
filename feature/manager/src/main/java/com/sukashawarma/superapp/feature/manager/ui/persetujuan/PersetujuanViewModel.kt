@@ -126,6 +126,45 @@ class PersetujuanViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Bentuknya sengaja sama persis dengan [prosesBypass]: baris dibuang lebih dulu
+     * supaya tombolnya tidak bisa ditekan dua kali selagi pemuatan ulang berjalan,
+     * lalu antrean dimuat ulang agar cocok dengan keadaan server.
+     */
+    fun prosesVoid(pengajuan: PengajuanVoid, setujui: Boolean) {
+        if (pengajuan.id in _state.value.sedangDiproses) return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(
+                sedangDiproses = _state.value.sedangDiproses + pengajuan.id,
+            )
+            try {
+                val kalah = PersetujuanRepository.prosesVoid(pengajuan.id, setujui)
+                if (kalah != null) {
+                    _state.value = _state.value.copy(galat = kalah)
+                } else {
+                    _state.value = _state.value.copy(
+                        semuaVoid = _state.value.semuaVoid.filterNot { it.id == pengajuan.id },
+                        kabar = if (setujui) {
+                            "Pembatalan ${pengajuan.nomorOrder} disetujui."
+                        } else {
+                            "Pembatalan ${pengajuan.nomorOrder} ditolak."
+                        },
+                    )
+                }
+                muatUlang()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.e("PersetujuanViewModel", "prosesVoid() gagal", e)
+                _state.value = _state.value.copy(galat = pesanGalat(e))
+            } finally {
+                _state.value = _state.value.copy(
+                    sedangDiproses = _state.value.sedangDiproses - pengajuan.id,
+                )
+            }
+        }
+    }
+
     private fun pesanGalat(e: Exception): String = when (e) {
         is java.net.UnknownHostException ->
             "Tidak ada koneksi internet. Periksa jaringan Wi-Fi/data seluler Anda."

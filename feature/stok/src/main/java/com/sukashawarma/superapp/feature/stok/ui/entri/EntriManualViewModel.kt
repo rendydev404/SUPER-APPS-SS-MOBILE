@@ -27,12 +27,26 @@ enum class JenisEntri(val nilai: String, val label: String) {
 /** Satuan yang sedang dipakai saat mengetik jumlah. */
 enum class SatuanInput { BESAR, TENGAH, KECIL }
 
+/**
+ * Arah penyesuaian — cermin `adjDirection` di `ManualEntryForm.tsx`.
+ *
+ * Tanpa pilihan ini penyesuaian hanya bisa MENAMBAH stok: `ledger_stok.qty` untuk
+ * tipe `adjustment` dipakai apa adanya, dan kolom jumlah tidak menerima angka
+ * negatif. Padahal koreksi ke bawah justru yang paling sering dibutuhkan.
+ */
+enum class ArahPenyesuaian(val label: String, val tanda: String) {
+    MASUK("Penambahan stok", "+"),
+    KELUAR("Pengurangan stok", "−"),
+}
+
 data class EntriManualUiState(
     val outlets: List<OutletRingkas> = emptyList(),
     val outletTerpilih: OutletRingkas? = null,
     val bahan: List<MonitoringRow> = emptyList(),
     val cari: String = "",
     val jenis: JenisEntri = JenisEntri.PENYESUAIAN,
+    /** Hanya berlaku untuk [JenisEntri.PENYESUAIAN]. Bawaan sama dengan web: menambah. */
+    val arah: ArahPenyesuaian = ArahPenyesuaian.MASUK,
     val bahanTerpilih: MonitoringRow? = null,
     val satuanInput: SatuanInput = SatuanInput.BESAR,
     val jumlah: String = "",
@@ -74,6 +88,44 @@ data class EntriManualUiState(
             }
         }
 
+    /**
+     * Jumlah pada SKALA BARIS SALDO, untuk ditulis ke `ledger_stok`.
+     *
+     * Jalur ini menyisipkan baris ledger langsung dari klien, tidak lewat fungsi
+     * database. Jadi konversi yang dilakukan `to_ledger_scale` untuk penulis
+     * server-side (lihat migrasi `20300105000017_scale_aware_ledger_writers`)
+     * harus dikerjakan di sini — kalau tidak, penyesuaian 1 kg pada baris yang
+     * sudah gram-scale tercatat sebagai 1 gram.
+     *
+     * Waste TIDAK memakai ini: `stok_waste_reports.qty` justru wajib satuan besar
+     * karena trigger persetujuannya yang mengonversi.
+     */
+    val jumlahSkalaLedger: Double?
+        get() {
+            val besar = jumlahBesar ?: return null
+            val row = bahanTerpilih ?: return besar
+            return if (row.saldoIsGram) UnitScale.smallestFromBesar(besar, row.meta) else besar
+        }
+
+    /** Perubahan saldo bertanda, pada satuan terkecil — dasar pratinjau. */
+    val deltaNorm: Double?
+        get() {
+            val besar = jumlahBesar ?: return null
+            val row = bahanTerpilih ?: return null
+            val kecil = UnitScale.smallestFromBesar(besar, row.meta) ?: return null
+            return if (jenis == JenisEntri.PENYESUAIAN && arah == ArahPenyesuaian.MASUK) kecil else -kecil
+        }
+
+    /** Saldo setelah entri ini, pada satuan terkecil. Null bila belum bisa dihitung. */
+    val saldoSesudahNorm: Double?
+        get() {
+            val sebelum = bahanTerpilih?.saldoNorm ?: return null
+            return sebelum + (deltaNorm ?: return null)
+        }
+
+    /** Entri ini akan membuat saldo jadi minus — diperingatkan, tidak dilarang. */
+    val saldoJadiMinus: Boolean get() = (saldoSesudahNorm ?: 0.0) < 0.0
+
     val labelSatuan: String
         get() {
             val meta = bahanTerpilih?.meta
@@ -91,6 +143,8 @@ data class EntriManualUiState(
             bahanTerpilih == null -> "Pilih bahan baku."
             jumlahAngka == null || jumlahAngka!! <= 0.0 -> "Jumlah belum diisi."
             jumlahBesar == null -> "Faktor konversi bahan ini belum lengkap, pilih satuan besar."
+            jenis != JenisEntri.WASTE && jumlahSkalaLedger == null ->
+                "Faktor satuan bahan ini belum lengkap, jadi jumlahnya tidak bisa dicatat dengan aman."
             butuhAlasan && alasan.isBlank() -> "Alasan wajib diisi."
             butuhFoto && fotoUrl == null -> "Foto bukti wajib diunggah."
             else -> null
@@ -173,6 +227,8 @@ class EntriManualViewModel : ViewModel() {
         )
     }
 
+    fun pilihArah(arah: ArahPenyesuaian) { _state.value = _state.value.copy(arah = arah) }
+
     fun ubahCari(teks: String) { _state.value = _state.value.copy(cari = teks) }
     fun ubahJumlah(teks: String) { _state.value = _state.value.copy(jumlah = teks) }
     fun ubahAlasan(teks: String) { _state.value = _state.value.copy(alasan = teks) }
@@ -232,6 +288,8 @@ class EntriManualViewModel : ViewModel() {
                         dilaporkanOleh = pengguna,
                     )
                 } else {
+                    // Skala baris saldo, bukan satuan besar — lihat [jumlahSkalaLedger].
+                    val qtyLedger = s.jumlahSkalaLedger!!
                     LedgerRepository.tambahManual(
                         outletId = outletId,
                         createdBy = pengguna,
@@ -240,7 +298,14 @@ class EntriManualViewModel : ViewModel() {
                             LedgerRepository.ManualItem(
                                 bahanBakuId = bahan.bahanBakuId,
                                 tipe = s.jenis.nilai,
-                                qtyAbs = qtyBesar,
+                                qtyAbs = qtyLedger,
+                                // Arah penyesuaian ditentukan pemanggil; transfer keluar
+                                // selalu negatif dan itu diurus tambahManual sendiri.
+                                signedOverride = if (s.jenis == JenisEntri.PENYESUAIAN) {
+                                    if (s.arah == ArahPenyesuaian.MASUK) qtyLedger else -qtyLedger
+                                } else {
+                                    null
+                                },
                                 catatan = s.alasan.trim().ifBlank { null },
                             )
                         ),

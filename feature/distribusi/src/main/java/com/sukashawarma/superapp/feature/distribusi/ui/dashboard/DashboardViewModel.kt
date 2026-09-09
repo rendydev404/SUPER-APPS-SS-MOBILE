@@ -16,6 +16,13 @@ import com.sukashawarma.superapp.feature.distribusi.domain.distribusiErrorMessag
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
+
+/** Jumlah maksimal dokumen yang tampil dalam satu halaman dashboard. */
+internal const val SURAT_JALAN_PER_HALAMAN = 5
 
 /** Tab status dashboard — cermin `StatusTab` di `app/dashboard/page.tsx`. */
 enum class TabStatus(val label: String) {
@@ -38,23 +45,89 @@ fun saringDaftar(
     cari: String,
 ): List<SuratJalanRingkas> {
     val kunci = cari.trim().lowercase()
-    return sumber.filter { baris ->
-        val cocokTab = when (tab) {
-            TabStatus.SEMUA -> true
-            TabStatus.DRAFT -> baris.status == StatusSuratJalan.DRAFT
-            TabStatus.DIKIRIM -> baris.status == StatusSuratJalan.DIKIRIM ||
-                baris.status == StatusSuratJalan.DIKIRIM_LENGKAP
-            TabStatus.BELUM_VERIF -> baris.status?.bolehDitutup == true
-            TabStatus.SELISIH -> baris.adaSelisih
-            TabStatus.SELESAI -> baris.status == StatusSuratJalan.SELESAI
+    return sumber.withIndex()
+        .filter { (_, baris) ->
+            val cocokTab = when (tab) {
+                TabStatus.SEMUA -> true
+                TabStatus.DRAFT -> baris.status == StatusSuratJalan.DRAFT
+                TabStatus.DIKIRIM -> baris.status == StatusSuratJalan.DIKIRIM ||
+                    baris.status == StatusSuratJalan.DIKIRIM_LENGKAP
+                TabStatus.BELUM_VERIF -> baris.status?.bolehDitutup == true
+                TabStatus.SELISIH -> baris.adaSelisih
+                TabStatus.SELESAI -> baris.status == StatusSuratJalan.SELESAI
+            }
+            val cocokOutlet = outlet == null || baris.namaOutlet == outlet
+            val cocokCari = kunci.isEmpty() ||
+                (baris.nomorDokumen ?: baris.id).lowercase().contains(kunci) ||
+                (baris.namaOutlet ?: "").lowercase().contains(kunci)
+            cocokTab && cocokOutlet && cocokCari
         }
-        val cocokOutlet = outlet == null || baris.namaOutlet == outlet
-        val cocokCari = kunci.isEmpty() ||
-            (baris.nomorDokumen ?: baris.id).lowercase().contains(kunci) ||
-            (baris.namaOutlet ?: "").lowercase().contains(kunci)
-        cocokTab && cocokOutlet && cocokCari
+        // Repository sudah meminta created_at.desc. Pengurutan ini tetap
+        // dipertahankan di UI agar hasil filter/realtime selalu newest-first.
+        // Index asal menjadi tie-breaker supaya baris dengan waktu sama stabil.
+        .sortedWith(
+            compareByDescending<IndexedValue<SuratJalanRingkas>> {
+                waktuUrutSuratJalan(it.value.dibuatPada)
+            }.thenBy { it.index }
+        )
+        .map { it.value }
+}
+
+private fun waktuUrutSuratJalan(waktuIso: String?): Long {
+    if (waktuIso.isNullOrBlank()) return Long.MIN_VALUE
+    return try {
+        Instant.parse(waktuIso).toEpochMilli()
+    } catch (_: Exception) {
+        try {
+            OffsetDateTime.parse(waktuIso).toInstant().toEpochMilli()
+        } catch (_: Exception) {
+            try {
+                LocalDateTime.parse(waktuIso).toInstant(ZoneOffset.UTC).toEpochMilli()
+            } catch (_: Exception) {
+                Long.MIN_VALUE
+            }
+        }
     }
 }
+
+/** Potongan daftar siap-render beserta metadata untuk kontrol pagination. */
+internal data class HalamanSuratJalan(
+    val baris: List<SuratJalanRingkas>,
+    val nomor: Int,
+    val totalHalaman: Int,
+    val totalBaris: Int,
+    val urutanMulai: Int,
+    val urutanAkhir: Int,
+)
+
+internal fun halamanSuratJalan(
+    sumber: List<SuratJalanRingkas>,
+    nomorDiminta: Int,
+): HalamanSuratJalan {
+    val totalHalaman = maxOf(1, (sumber.size + SURAT_JALAN_PER_HALAMAN - 1) / SURAT_JALAN_PER_HALAMAN)
+    val nomor = nomorDiminta.coerceIn(1, totalHalaman)
+    val offset = (nomor - 1) * SURAT_JALAN_PER_HALAMAN
+    val baris = sumber.drop(offset).take(SURAT_JALAN_PER_HALAMAN)
+    val urutanMulai = if (baris.isEmpty()) 0 else offset + 1
+
+    return HalamanSuratJalan(
+        baris = baris,
+        nomor = nomor,
+        totalHalaman = totalHalaman,
+        totalBaris = sumber.size,
+        urutanMulai = urutanMulai,
+        urutanAkhir = offset + baris.size,
+    )
+}
+
+/**
+ * Menjaga posisi pagination setelah refresh, sambil mencegah halaman kosong
+ * jika jumlah data terbaru sudah lebih sedikit.
+ */
+internal fun halamanAktifSetelahMuat(
+    terlihat: List<SuratJalanRingkas>,
+    halamanSaatIni: Int,
+): Int = halamanSuratJalan(terlihat, halamanSaatIni).nomor
 
 data class DashboardUiState(
     val memuat: Boolean = true,
@@ -69,6 +142,7 @@ data class DashboardUiState(
     val tab: TabStatus = TabStatus.SEMUA,
     val cari: String = "",
     val outletTerpilih: String? = null,
+    val halamanAktif: Int = 1,
     val bolehTutupDokumen: Boolean = false,
     val sedangMenutup: String? = null,
     val namaPengguna: String = "",
@@ -115,30 +189,42 @@ class DashboardViewModel : ViewModel() {
     }
 
     fun ubahRentang(rentang: RentangTanggal) {
-        _state.value = _state.value.copy(rentang = rentang)
+        _state.value = _state.value.copy(rentang = rentang, halamanAktif = 1)
         muat(paksa = true)
     }
 
     fun ubahTab(tab: TabStatus) {
         _state.value = _state.value.copy(tab = tab)
-        terapkanFilter()
+        terapkanFilter(resetHalaman = true)
     }
 
     fun ubahCari(teks: String) {
         _state.value = _state.value.copy(cari = teks)
-        terapkanFilter()
+        terapkanFilter(resetHalaman = true)
     }
 
     /** Menekan outlet yang sama dua kali melepas filternya. */
     fun pilihOutlet(nama: String?) {
         val sekarang = _state.value.outletTerpilih
         _state.value = _state.value.copy(outletTerpilih = if (sekarang == nama) null else nama)
-        terapkanFilter()
+        terapkanFilter(resetHalaman = true)
     }
 
-    private fun terapkanFilter() {
+    fun pindahHalaman(nomor: Int) {
         val s = _state.value
-        _state.value = s.copy(terlihat = saringDaftar(s.semua, s.tab, s.outletTerpilih, s.cari))
+        _state.value = s.copy(halamanAktif = halamanSuratJalan(s.terlihat, nomor).nomor)
+    }
+
+    private fun terapkanFilter(resetHalaman: Boolean = false) {
+        val s = _state.value
+        val terlihat = saringDaftar(s.semua, s.tab, s.outletTerpilih, s.cari)
+        _state.value = s.copy(
+            terlihat = terlihat,
+            // Refresh saat kembali dari detail mempertahankan posisi pengguna.
+            // Jika jumlah data menyusut, `halamanSuratJalan` melakukan clamp ke
+            // halaman terakhir yang masih tersedia agar tidak menampilkan halaman kosong.
+            halamanAktif = if (resetHalaman) 1 else halamanAktifSetelahMuat(terlihat, s.halamanAktif),
+        )
     }
 
     /**

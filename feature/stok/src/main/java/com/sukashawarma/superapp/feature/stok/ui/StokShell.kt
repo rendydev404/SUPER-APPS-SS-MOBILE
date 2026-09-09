@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -60,9 +61,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import kotlinx.coroutines.launch
+import com.sukashawarma.superapp.core.ui.RealtimeRefresh
+import com.sukashawarma.superapp.core.ui.RealtimeTables
 import com.sukashawarma.superapp.domain.session.AppSession
+import com.sukashawarma.superapp.feature.stok.data.MutasiRepository
 import com.sukashawarma.superapp.feature.stok.data.WasteApprovalAccess
+import com.sukashawarma.superapp.feature.stok.domain.MutasiBadge
 import com.sukashawarma.superapp.feature.stok.domain.StokAkses
 import com.sukashawarma.superapp.feature.stok.ui.area.HargaBahanScreen
 import com.sukashawarma.superapp.feature.stok.ui.area.WasteApprovalScreen
@@ -169,6 +176,52 @@ private fun tujuanUntukPeran(): List<TabStok> {
     }
 }
 
+/**
+ * Jumlah mutasi yang menunggu tindakan pengguna — cermin `useMutasiBadge` web.
+ *
+ * Dihitung di shell, bukan di dalam layar Mutasi, karena justru gunanya ketika
+ * layar itu SEDANG TIDAK dibuka: crew tidak punya cara lain mengetahui ada kiriman
+ * masuk selain membuka lacinya satu per satu.
+ *
+ * Lingkupnya `staff.outletId`, dan untuk peran pusat nilai itu null sehingga seluruh
+ * outlet ikut terhitung. Itu disengaja dan harus tetap sejalan dengan layar Mutasi,
+ * yang membuka peran pusat pada cakupan "Semua Outlet" — lihat [SEMUA_OUTLET].
+ * Pernah tidak sejalan, dan akibatnya lencana menunjukkan 9+ sementara halamannya
+ * kosong karena hanya menampilkan satu outlet.
+ *
+ * Kegagalan diabaikan diam-diam dan angkanya bertahan di nilai sebelumnya. Badge
+ * adalah petunjuk, bukan data: memunculkan pesan galat di bilah bawah yang selalu
+ * terlihat akan lebih mengganggu daripada angka yang telat menyusul.
+ */
+@Composable
+private fun lencanaMutasi(): Int {
+    val staff by AppSession.staff.collectAsState()
+    val role = staff?.role
+    val outletId = staff?.outletId
+    var jumlah by remember { mutableStateOf(0) }
+    val scope = rememberCoroutineScope()
+
+    suspend fun muat() {
+        runCatching { MutasiRepository.ringkasUntukBadge(outletId) }
+            .onSuccess { jumlah = MutasiBadge.hitung(it, role, outletId).total }
+            .onFailure { android.util.Log.w("StokShell", "lencana mutasi gagal", it) }
+    }
+
+    // Seluruh `staff` jadi kunci, bukan role+outletId saja: sesi yang berganti dari
+    // null ke terisi bisa membawa role dan outlet yang sama-sama null, dan kunci
+    // yang lebih sempit tidak akan menyadarinya lalu diam di angka nol.
+    LaunchedEffect(staff) {
+        if (staff != null) muat()
+    }
+    RealtimeRefresh(RealtimeTables.MUTASI) {
+        // Scope milik composable, bukan MainScope(): scope lepas tidak pernah ikut
+        // dibatalkan saat layar hilang, jadi tiap event akan menumpuk pekerjaan yang
+        // menulis ke state yang sudah tidak dipakai.
+        if (staff != null) scope.launch { muat() }
+    }
+    return if (staff == null) 0 else jumlah
+}
+
 @Composable
 fun StokShell(
     onKeluar: () -> Unit,
@@ -189,6 +242,11 @@ fun StokShell(
 
     val utama = if (tabs.size > 5) tabs.take(4) else tabs
     BackHandler(enabled = tab !in utama) { tab = tabs.first() }
+
+    // Peta, bukan satu angka: web memberi lencana pada beberapa tujuan sekaligus
+    // (permintaan, waste, terima PO), dan bentuk ini menampung tambahan itu tanpa
+    // mengubah tanda tangan BottomNavStok lagi.
+    val lencana = mapOf(TabStok.MUTASI to lencanaMutasi())
 
     Column(Modifier.fillMaxSize().background(com.sukashawarma.superapp.presentation.theme.SukaSurface)) {
         Box(Modifier.weight(1f)) {
@@ -239,7 +297,7 @@ fun StokShell(
                     else KeadaanTidakBerhak("Pengaturan threshold hanya untuk admin.")
             }
         }
-        BottomNavStok(tab, tabs) { tab = it }
+        BottomNavStok(tab, tabs, lencana) { tab = it }
     }
 }
 
@@ -273,7 +331,12 @@ private val KELOMPOK_MENU_STOK = listOf(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun BottomNavStok(aktif: TabStok, tabs: List<TabStok>, onPilih: (TabStok) -> Unit) {
+private fun BottomNavStok(
+    aktif: TabStok,
+    tabs: List<TabStok>,
+    lencana: Map<TabStok, Int>,
+    onPilih: (TabStok) -> Unit,
+) {
     var moreOpen by rememberSaveable { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState()
     val scope = rememberCoroutineScope()
@@ -301,7 +364,7 @@ private fun BottomNavStok(aktif: TabStok, tabs: List<TabStok>, onPilih: (TabStok
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
-                    Icon(t.icon, t.label, tint = warna, modifier = Modifier.size(21.dp))
+                    IkonBerlencana(t.icon, t.label, warna, lencana[t] ?: 0)
                     Spacer(Modifier.height(3.dp))
                     Text(
                         t.label,
@@ -320,7 +383,14 @@ private fun BottomNavStok(aktif: TabStok, tabs: List<TabStok>, onPilih: (TabStok
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
-                    Icon(Icons.Default.MoreHoriz, "Lainnya", tint = color, modifier = Modifier.size(21.dp))
+                    // Angka pada "Lainnya" adalah jumlah seluruh tujuan di dalamnya:
+                    // yang tersembunyi di laci justru paling butuh ditunjuk.
+                    IkonBerlencana(
+                        Icons.Default.MoreHoriz,
+                        "Lainnya",
+                        color,
+                        overflow.sumOf { lencana[it] ?: 0 },
+                    )
                     Spacer(Modifier.height(3.dp))
                     Text("Lainnya", color = color, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
                 }
@@ -334,7 +404,7 @@ private fun BottomNavStok(aktif: TabStok, tabs: List<TabStok>, onPilih: (TabStok
     // lembar menu modul Manager supaya berpindah modul tidak berarti belajar ulang.
     if (moreOpen && overflow.isNotEmpty()) {
         ModalBottomSheet(onDismissRequest = { moreOpen = false }, sheetState = sheetState) {
-            IsiMenuStok(aktif, overflow) { tujuan ->
+            IsiMenuStok(aktif, overflow, lencana) { tujuan ->
                 // Lembar ditutup dengan animasinya sendiri lebih dulu; menutup paksa
                 // bersamaan dengan perpindahan tab membuat isinya berkedip.
                 scope.launch { sheetState.hide() }.invokeOnCompletion {
@@ -359,6 +429,7 @@ private fun BottomNavStok(aktif: TabStok, tabs: List<TabStok>, onPilih: (TabStok
 private fun IsiMenuStok(
     aktif: TabStok,
     overflow: List<TabStok>,
+    lencana: Map<TabStok, Int>,
     onPilih: (TabStok) -> Unit,
 ) {
     val terkelompok = KELOMPOK_MENU_STOK.flatMap { it.second }.toSet()
@@ -377,49 +448,111 @@ private fun IsiMenuStok(
             Text(
                 judul.uppercase(),
                 color = Color(0xFF94A3B8),
-                fontSize = 10.sp,
+                fontSize = 11.sp,
                 fontWeight = FontWeight.Black,
                 letterSpacing = 0.9.sp,
             )
-            Spacer(Modifier.height(10.dp))
-            terlihat.forEach { tujuan ->
-                BarisMenuStok(tujuan, aktif == tujuan) { onPilih(tujuan) }
-                Spacer(Modifier.height(8.dp))
-            }
             Spacer(Modifier.height(12.dp))
+            terlihat.forEach { tujuan ->
+                BarisMenuStok(tujuan, aktif == tujuan, lencana[tujuan] ?: 0) { onPilih(tujuan) }
+                Spacer(Modifier.height(10.dp))
+            }
+            Spacer(Modifier.height(14.dp))
         }
     }
 }
 
 @Composable
-private fun BarisMenuStok(tujuan: TabStok, aktif: Boolean, onKlik: () -> Unit) {
+private fun BarisMenuStok(tujuan: TabStok, aktif: Boolean, jumlah: Int, onKlik: () -> Unit) {
     val oranye = Color(0xFFEA580C)
     Surface(
         Modifier.fillMaxWidth().clickable(onClick = onKlik),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(18.dp),
         color = if (aktif) oranye else Color.White,
         border = BorderStroke(1.dp, if (aktif) oranye else Color(0xFFF1F5F9)),
     ) {
         Row(
-            Modifier.padding(horizontal = 14.dp, vertical = 13.dp),
+            Modifier.padding(horizontal = 16.dp, vertical = 17.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
                 tujuan.icon,
                 null,
                 tint = if (aktif) Color.White else oranye,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(22.dp),
             )
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(14.dp))
             Text(
                 tujuan.labelPanjang,
                 Modifier.weight(1f),
                 color = if (aktif) Color.White else Color(0xFF701604),
-                fontSize = 13.sp,
+                fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            if (jumlah > 0) {
+                Spacer(Modifier.width(10.dp))
+                Surface(
+                    shape = RoundedCornerShape(9.dp),
+                    // Di baris terpilih latarnya sudah oranye, jadi lencana merah di
+                    // atasnya nyaris tak terbaca; dibalik jadi putih dengan angka oranye.
+                    color = if (aktif) Color.White else MERAH_LENCANA,
+                ) {
+                    Text(
+                        teksLencana(jumlah),
+                        Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
+                        color = if (aktif) Color(0xFFEA580C) else Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Black,
+                    )
+                }
+            }
+        }
+    }
+}
+
+private val MERAH_LENCANA = Color(0xFFEF4444)
+
+/** Angka lencana dipendekkan seperti web: di atas sembilan cukup "9+". */
+private fun teksLencana(jumlah: Int): String = if (jumlah > 9) "9+" else jumlah.toString()
+
+/**
+ * Ikon tab dengan angka merah di pojok kanan atas.
+ *
+ * [jumlah] nol berarti TIDAK ada lencana sama sekali, bukan lencana bertuliskan "0":
+ * nol adalah kabar baik dan tidak perlu menuntut perhatian.
+ */
+@Composable
+private fun IkonBerlencana(
+    ikon: ImageVector,
+    label: String,
+    warna: Color,
+    jumlah: Int,
+) {
+    Box {
+        Icon(ikon, label, tint = warna, modifier = Modifier.size(21.dp))
+        if (jumlah > 0) {
+            Surface(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    // Digeser keluar kotak ikon supaya tidak menutupi gambarnya;
+                    // ikonnya 21dp, jadi lencana yang duduk di dalam akan menelan
+                    // sebagian besar bentuk yang justru jadi penanda tab.
+                    .offset(x = 7.dp, y = (-5).dp),
+                shape = RoundedCornerShape(9.dp),
+                color = MERAH_LENCANA,
+                border = BorderStroke(1.5.dp, Color.White),
+            ) {
+                Text(
+                    teksLencana(jumlah),
+                    Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+                    color = Color.White,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Black,
+                    textAlign = TextAlign.Center,
+                )
+            }
         }
     }
 }

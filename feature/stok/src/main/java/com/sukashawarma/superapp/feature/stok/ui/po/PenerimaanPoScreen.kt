@@ -14,13 +14,19 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -48,14 +54,27 @@ import com.sukashawarma.superapp.core.ui.RealtimeTables
 import com.sukashawarma.superapp.feature.stok.data.ItemPo
 import com.sukashawarma.superapp.feature.stok.data.PoInbound
 import com.sukashawarma.superapp.feature.stok.ui.HeaderStok
+import com.sukashawarma.superapp.feature.stok.ui.KeadaanGagal
+import com.sukashawarma.superapp.feature.stok.ui.MemuatPenuh
+import com.sukashawarma.superapp.feature.stok.ui.PitaPesan
+import com.sukashawarma.superapp.feature.stok.ui.tanggalSingkat
+import com.sukashawarma.superapp.presentation.theme.SukaGray400
+import com.sukashawarma.superapp.presentation.theme.SukaGray500
+import com.sukashawarma.superapp.presentation.theme.SukaGreen
+import com.sukashawarma.superapp.presentation.theme.SukaBrown
+import com.sukashawarma.superapp.presentation.theme.SukaOnSurface
+import com.sukashawarma.superapp.presentation.theme.SukaOrange
+import com.sukashawarma.superapp.presentation.theme.SukaPrimaryContainer
+import com.sukashawarma.superapp.presentation.theme.SukaSurface
+import com.sukashawarma.superapp.presentation.theme.SukaSurfaceContainerHigh
 
-private val ORANGE = Color(0xFFEA580C)
-private val SLATE400 = Color(0xFF94A3B8)
-private val SLATE500 = Color(0xFF64748B)
-private val SLATE900 = Color(0xFF0F172A)
-private val GARIS = Color(0xFFE2E8F0)
+private val ORANGE = SukaOrange
+private val SLATE400 = SukaGray400
+private val SLATE500 = SukaGray500
+private val SLATE900 = SukaOnSurface
+private val GARIS = SukaSurfaceContainerHigh
 private val MERAH = Color(0xFFB91C1C)
-private val HIJAU = Color(0xFF15803D)
+private val HIJAU = SukaGreen
 private val AMBER_LATAR = Color(0xFFFEF3C7)
 private val AMBER_TEKS = Color(0xFF92400E)
 
@@ -76,11 +95,11 @@ fun PenerimaanPoScreen(
     RealtimeRefresh(RealtimeTables.PURCHASE_ORDER) { viewModel.muatUlang() }
     BackHandler(enabled = state.poDibuka != null) { viewModel.tutupPo() }
 
-    Column(Modifier.fillMaxSize().background(Color(0xFFF8FAFC))) {
+    Column(Modifier.fillMaxSize().background(SukaSurface)) {
         HeaderStok(
             judul = if (state.poDibuka != null) "Verifikasi Penerimaan" else "Penerimaan PO Supplier",
             subjudul = state.poDibuka?.nomorPo
-                ?: if (state.memuat) "Memuat…" else "${state.daftar.size} PO menunggu barang",
+                ?: if (state.memuat) "Memuat…" else "${state.daftar.size} PO menunggu",
             onKembali = { if (state.poDibuka != null) viewModel.tutupPo() else onBack() },
             aksi = {
                 if (state.poDibuka == null) {
@@ -92,28 +111,22 @@ fun PenerimaanPoScreen(
         )
 
         val pesan = state.pesan ?: state.error
-        if (pesan != null) {
-            Surface(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)
-                    .clickable { viewModel.bersihkanPesan() },
-                shape = RoundedCornerShape(12.dp),
-                color = if (state.pesan != null) Color(0xFFDCFCE7) else Color(0xFFFEE2E2),
-            ) {
-                Text(
-                    pesan,
-                    Modifier.padding(12.dp),
-                    color = if (state.pesan != null) HIJAU else MERAH,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
+        if (pesan != null && !(state.error != null && state.daftar.isEmpty())) {
+            PitaPesan(
+                pesan = pesan,
+                gagal = state.error != null && state.pesan == null,
+                onTutup = viewModel::bersihkanPesan,
+            )
         }
 
         when {
-            state.memuat -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = ORANGE)
-            }
             state.poDibuka != null -> FormVerifikasi(state, viewModel)
+            state.memuat -> MemuatPenuh(Modifier.fillMaxSize())
+            state.error != null && state.daftar.isEmpty() -> KeadaanGagal(
+                pesan = state.error.orEmpty(),
+                onCobaLagi = viewModel::muatUlang,
+                modifier = Modifier.fillMaxSize(),
+            )
             else -> DaftarPo(state, viewModel)
         }
     }
@@ -121,45 +134,81 @@ fun PenerimaanPoScreen(
 
 @Composable
 private fun DaftarPo(state: PenerimaanPoUiState, viewModel: PenerimaanPoViewModel) {
-    Column(Modifier.fillMaxSize()) {
-        OutlinedTextField(
-            value = state.cari,
-            onValueChange = viewModel::ubahCari,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-            placeholder = { Text("Cari nomor PO atau supplier…", fontSize = 12.5.sp, color = SLATE400) },
-            singleLine = true,
-            shape = RoundedCornerShape(12.dp),
-            colors = kolomWarna(),
-        )
+    val daftar = state.daftarTampil
+    val jumlahSebagian = daftar.count { it.sebagian }
+    val sedangMencari = state.cari.isNotBlank()
 
-        if (state.daftarTampil.isEmpty()) {
-            Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        "Tidak ada PO yang menunggu",
-                        color = SLATE900,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Black,
-                    )
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        "Yang tampil di sini hanya PO 30 hari terakhir berstatus dikirim ke supplier atau baru diterima sebagian.",
-                        color = SLATE500,
-                        fontSize = 12.5.sp,
-                        lineHeight = 18.sp,
-                        textAlign = TextAlign.Center,
-                    )
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 28.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item(key = "pencarian") {
+            OutlinedTextField(
+                value = state.cari,
+                onValueChange = viewModel::ubahCari,
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("Cari nomor PO atau supplier", fontSize = 13.sp, color = SLATE400) },
+                leadingIcon = {
+                    Icon(Icons.Default.Search, contentDescription = null, tint = ORANGE, modifier = Modifier.size(20.dp))
+                },
+                trailingIcon = if (state.cari.isNotBlank()) {
+                    {
+                        IconButton(onClick = { viewModel.ubahCari("") }) {
+                            Icon(Icons.Default.Close, contentDescription = "Hapus pencarian", tint = SLATE500)
+                        }
+                    }
+                } else null,
+                singleLine = true,
+                shape = RoundedCornerShape(16.dp),
+                colors = kolomWarna(),
+            )
+        }
+
+        item(key = "ringkasan") {
+            RingkasanPenerimaan(
+                total = daftar.size,
+                jumlahSebagian = jumlahSebagian,
+                sedangMencari = sedangMencari,
+            )
+        }
+
+        if (daftar.isEmpty()) {
+            item(key = "kosong") { KosongPo(sedangMencari) }
+        } else {
+            item(key = "judul-daftar") {
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            if (sedangMencari) "Hasil pencarian" else "Perlu diterima",
+                            color = SLATE900,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Black,
+                        )
+                        Text(
+                            if (sedangMencari) "Cocokkan nomor PO atau nama supplier"
+                            else "Tap satu PO untuk mulai verifikasi barang",
+                            color = SLATE500,
+                            fontSize = 11.5.sp,
+                        )
+                    }
+                    Surface(shape = RoundedCornerShape(50), color = SukaPrimaryContainer.copy(alpha = 0.16f)) {
+                        Text(
+                            "${daftar.size} PO",
+                            Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            color = ORANGE,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Black,
+                        )
+                    }
                 }
             }
-        } else {
-            LazyColumn(
-                Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(11.dp),
-            ) {
-                items(state.daftarTampil, key = { it.id }) { po ->
-                    KartuPo(po) { viewModel.bukaPo(po) }
-                }
+
+            items(daftar, key = { it.id }) { po ->
+                KartuPo(po) { viewModel.bukaPo(po) }
             }
         }
     }
@@ -169,38 +218,156 @@ private fun DaftarPo(state: PenerimaanPoUiState, viewModel: PenerimaanPoViewMode
 private fun KartuPo(po: PoInbound, onKlik: () -> Unit) {
     Surface(
         Modifier.fillMaxWidth().clickable(onClick = onKlik),
-        shape = RoundedCornerShape(15.dp),
+        shape = RoundedCornerShape(18.dp),
         color = Color.White,
         border = BorderStroke(1.dp, GARIS),
+        shadowElevation = 1.dp,
     ) {
-        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.Top) {
+            Box(
+                Modifier.size(44.dp).background(SukaPrimaryContainer.copy(alpha = 0.15f), RoundedCornerShape(14.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Default.Inventory2, contentDescription = null, tint = ORANGE, modifier = Modifier.size(22.dp))
+            }
+            Spacer(Modifier.size(12.dp))
             Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        po.nomorPo,
+                        Modifier.weight(1f),
+                        color = SLATE900,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Black,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = SLATE400, modifier = Modifier.size(20.dp))
+                }
+                Spacer(Modifier.height(5.dp))
                 Text(
-                    po.nomorPo,
-                    color = SLATE900,
-                    fontSize = 13.5.sp,
-                    fontWeight = FontWeight.Black,
+                    po.supplierNama,
+                    color = SLATE500,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Text(
-                    listOfNotNull(po.supplierNama, po.tanggal?.take(10)).joinToString(" · "),
-                    color = SLATE500,
-                    fontSize = 11.5.sp,
-                    fontWeight = FontWeight.Medium,
-                )
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Schedule, contentDescription = null, tint = SLATE400, modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.size(4.dp))
+                    Text(tanggalSingkat(po.tanggal), color = SLATE500, fontSize = 11.sp)
+                    Spacer(Modifier.weight(1f))
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = if (po.sebagian) AMBER_LATAR else SukaGreen.copy(alpha = 0.10f),
+                    ) {
+                        Text(
+                            if (po.sebagian) "Sebagian" else "Menunggu",
+                            Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            color = if (po.sebagian) AMBER_TEKS else HIJAU,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Black,
+                        )
+                    }
+                }
             }
-            if (po.sebagian) {
-                Surface(shape = RoundedCornerShape(50), color = AMBER_LATAR) {
+        }
+    }
+}
+
+@Composable
+private fun RingkasanPenerimaan(total: Int, jumlahSebagian: Int, sedangMencari: Boolean) {
+    Surface(
+        Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(22.dp),
+        color = SukaBrown,
+    ) {
+        Column(Modifier.padding(18.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier.size(36.dp).background(Color.White.copy(alpha = 0.14f), RoundedCornerShape(12.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Default.Inventory2, contentDescription = null, tint = Color.White, modifier = Modifier.size(19.dp))
+                }
+                Spacer(Modifier.size(10.dp))
+                Column {
                     Text(
-                        "SEBAGIAN",
-                        Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
-                        color = AMBER_TEKS,
-                        fontSize = 9.sp,
+                        if (sedangMencari) "Hasil antrean" else "Antrean penerimaan",
+                        color = Color(0xFFFFE8D1),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Black,
+                    )
+                    Text(
+                        if (total == 0) "Tidak ada PO yang cocok" else "$total PO menunggu barang",
+                        color = Color.White,
+                        fontSize = 17.sp,
                         fontWeight = FontWeight.Black,
                     )
                 }
             }
+            Spacer(Modifier.height(16.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    if (sedangMencari) "Perbarui kata kunci untuk hasil lain"
+                    else "Mulai dari PO paling atas",
+                    Modifier.weight(1f),
+                    color = Color(0xFFFFE8D1),
+                    fontSize = 11.5.sp,
+                )
+                if (!sedangMencari && jumlahSebagian > 0) {
+                    Surface(shape = RoundedCornerShape(50), color = Color.White.copy(alpha = 0.14f)) {
+                        Text(
+                            "$jumlahSebagian sebagian",
+                            Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+                            color = Color.White,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun KosongPo(sedangMencari: Boolean) {
+    Surface(
+        Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = Color.White,
+        border = BorderStroke(1.dp, GARIS),
+    ) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 30.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(
+                Modifier.size(52.dp).background(SukaSurfaceContainerHigh, RoundedCornerShape(16.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = HIJAU, modifier = Modifier.size(27.dp))
+            }
+            Spacer(Modifier.height(13.dp))
+            Text(
+                if (sedangMencari) "PO tidak ditemukan" else "Antrean sudah bersih",
+                color = SLATE900,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Black,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                if (sedangMencari) "Coba nomor PO atau nama supplier lain."
+                else "PO 30 hari terakhir yang masih menunggu barang akan muncul di sini.",
+                color = SLATE500,
+                fontSize = 12.sp,
+                lineHeight = 18.sp,
+                textAlign = TextAlign.Center,
+            )
         }
     }
 }
@@ -212,12 +379,16 @@ private fun FormVerifikasi(state: PenerimaanPoUiState, viewModel: PenerimaanPoVi
             CircularProgressIndicator(color = ORANGE)
         }
     } else {
+        val po = state.poDibuka ?: return
         Column(Modifier.fillMaxSize()) {
             LazyColumn(
                 Modifier.weight(1f),
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                item(key = "panduan-verifikasi") {
+                    PanduanVerifikasi(po, state.item.size)
+                }
                 items(state.item, key = { it.id }) { baris ->
                     KartuItemPo(baris, state, viewModel)
                 }
@@ -249,6 +420,48 @@ private fun FormVerifikasi(state: PenerimaanPoUiState, viewModel: PenerimaanPoVi
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun PanduanVerifikasi(po: PoInbound, jumlahBaris: Int) {
+    Surface(
+        Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = SukaPrimaryContainer.copy(alpha = 0.13f),
+        border = BorderStroke(1.dp, SukaPrimaryContainer.copy(alpha = 0.28f)),
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier.size(38.dp).background(Color.White.copy(alpha = 0.72f), RoundedCornerShape(12.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Default.Inventory2, contentDescription = null, tint = ORANGE, modifier = Modifier.size(20.dp))
+                }
+                Spacer(Modifier.size(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Cek barang yang datang", color = SLATE900, fontSize = 13.sp, fontWeight = FontWeight.Black)
+                    Text(po.supplierNama, color = SLATE500, fontSize = 11.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                Surface(shape = RoundedCornerShape(50), color = Color.White.copy(alpha = 0.75f)) {
+                    Text(
+                        "$jumlahBaris baris",
+                        Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                        color = ORANGE,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Black,
+                    )
+                }
+            }
+            Spacer(Modifier.height(11.dp))
+            Text(
+                "Isi jumlah dan harga aktual. Tandai rusak bila perlu, lalu simpan setelah semua baris diperiksa.",
+                color = SLATE500,
+                fontSize = 11.5.sp,
+                lineHeight = 17.sp,
+            )
         }
     }
 }
@@ -320,7 +533,7 @@ private fun KartuItemPo(
                     Surface(
                         Modifier.weight(1f).clickable { viewModel.ubahKondisi(baris.id, nilai) },
                         shape = RoundedCornerShape(10.dp),
-                        color = if (aktif) warna.copy(alpha = 0.10f) else Color(0xFFF8FAFC),
+                        color = if (aktif) warna.copy(alpha = 0.10f) else SukaSurface,
                         border = BorderStroke(1.dp, if (aktif) warna else GARIS),
                     ) {
                         Text(

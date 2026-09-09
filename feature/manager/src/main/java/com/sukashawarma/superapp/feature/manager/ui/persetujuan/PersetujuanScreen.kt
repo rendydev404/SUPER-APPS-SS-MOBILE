@@ -27,7 +27,6 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.VpnKey
@@ -69,7 +68,6 @@ import com.sukashawarma.superapp.feature.manager.domain.PengajuanBypass
 import com.sukashawarma.superapp.feature.manager.domain.PengajuanVoid
 import com.sukashawarma.superapp.feature.manager.domain.PresetPeriode
 import com.sukashawarma.superapp.feature.manager.domain.TabPersetujuan
-import com.sukashawarma.superapp.feature.manager.domain.VOID_BISA_DIPROSES_NATIVE
 import com.sukashawarma.superapp.feature.manager.domain.cacah
 import com.sukashawarma.superapp.feature.manager.domain.rupiah
 import com.sukashawarma.superapp.feature.manager.domain.waktuRelatif
@@ -103,11 +101,13 @@ private val AMBER_TEKS = Color(0xFF78350F)
 /**
  * Persetujuan & Pembatalan — cermin `app/approvals/` web.
  *
- * Dua dari tiga tab web ada di sini. Tab "Bypass POS" berfungsi penuh. Tab "Void
- * Transaksi" hanya bisa dibaca: RLS tidak memberi jalur tulis kepada area maupun
- * regional manager, lihat [VOID_BISA_DIPROSES_NATIVE]. Tab "Pesanan Selesai"
- * (pembatalan paksa) sengaja tidak dibuat karena terhalang hal yang sama, dan
- * layar pencarian tanpa satu pun tindakan yang bisa dijalankan hanya menyesatkan.
+ * Dua dari tiga tab web ada di sini, keduanya berfungsi penuh. Tab "Void Transaksi"
+ * sempat hanya bisa dibaca karena RLS tidak memberi jalur tulis kepada area maupun
+ * regional manager; jalurnya kini dibuka RPC `process_void_request` yang memeriksa
+ * peran dan binaan outlet sendiri — lihat `PersetujuanRepository.prosesVoid`.
+ *
+ * Tab "Pesanan Selesai" (pembatalan paksa) masih sengaja tidak dibuat: ia terhalang
+ * hal yang sama dan belum punya RPC penggantinya.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -161,7 +161,7 @@ fun PersetujuanScreen(
             item { PanelKepala(state, viewModel) }
             item { BarisTab(state, viewModel) }
             when (state.tab) {
-                TabPersetujuan.VOID -> isiTabVoid(state)
+                TabPersetujuan.VOID -> isiTabVoid(state, viewModel)
                 TabPersetujuan.BYPASS -> isiTabBypass(state, viewModel)
             }
             item { Spacer(Modifier.height(8.dp)) }
@@ -355,43 +355,28 @@ private fun TombolTab(
 /* Tab void                                                                 */
 /* ----------------------------------------------------------------------- */
 
-private fun LazyListScope.isiTabVoid(state: PersetujuanUiState) {
-    if (!VOID_BISA_DIPROSES_NATIVE) {
-        item { CatatanVoidBacaSaja() }
-    }
+private fun LazyListScope.isiTabVoid(state: PersetujuanUiState, viewModel: PersetujuanViewModel) {
     if (state.void.isEmpty()) {
         item { PanelAntreanKosong(state.memuat, "Tidak ada pengajuan void transaksi saat ini.") }
         return
     }
-    items(state.void, key = { it.id }) { pengajuan -> KartuVoid(pengajuan) }
-}
-
-@Composable
-private fun CatatanVoidBacaSaja() {
-    Surface(
-        Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = AMBER_LATAR,
-        border = BorderStroke(1.dp, AMBER_GARIS),
-    ) {
-        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.Top) {
-            Icon(Icons.Default.Info, null, tint = AMBER_TEKS, modifier = Modifier.size(16.dp))
-            Spacer(Modifier.width(9.dp))
-            Text(
-                "Antrean ini bisa dipantau di sini, tetapi persetujuannya masih " +
-                    "dikerjakan lewat dashboard web. Database belum membuka jalur tulis " +
-                    "pembatalan pesanan untuk aplikasi manajer.",
-                color = AMBER_TEKS,
-                fontSize = 11.sp,
-                lineHeight = 16.sp,
-                fontWeight = FontWeight.Bold,
-            )
-        }
+    items(state.void, key = { it.id }) { pengajuan ->
+        KartuVoid(
+            pengajuan = pengajuan,
+            sedangDiproses = pengajuan.id in state.sedangDiproses,
+            onSetujui = { viewModel.prosesVoid(pengajuan, setujui = true) },
+            onTolak = { viewModel.prosesVoid(pengajuan, setujui = false) },
+        )
     }
 }
 
 @Composable
-private fun KartuVoid(pengajuan: PengajuanVoid) {
+private fun KartuVoid(
+    pengajuan: PengajuanVoid,
+    sedangDiproses: Boolean,
+    onSetujui: () -> Unit,
+    onTolak: () -> Unit,
+) {
     KartuPanel {
         Row(verticalAlignment = Alignment.CenterVertically) {
             ChipJingga(pengajuan.outletNama)
@@ -498,6 +483,30 @@ private fun KartuVoid(pengajuan: PengajuanVoid) {
                 letterSpacing = 0.6.sp,
             )
             Text(rupiah(pengajuan.total), color = SukaBrown, fontSize = 19.sp, fontWeight = FontWeight.Black)
+        }
+
+        Spacer(Modifier.height(14.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            TombolAksi(
+                label = "Tolak",
+                ikon = Icons.Default.Close,
+                latar = Color.White,
+                teks = MerahTeks,
+                garis = MerahGaris,
+                sedangDiproses = sedangDiproses,
+                modifier = Modifier.weight(1f),
+                onClick = onTolak,
+            )
+            TombolAksi(
+                label = "Setujui",
+                ikon = Icons.Default.Check,
+                latar = Color(0xFFD97706),
+                teks = Color.White,
+                garis = Color(0xFFD97706),
+                sedangDiproses = sedangDiproses,
+                modifier = Modifier.weight(1f),
+                onClick = onSetujui,
+            )
         }
     }
 }

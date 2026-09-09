@@ -76,3 +76,17 @@ internal val MANAGER_ROLES = setOf(
     Role.REGIONAL_MANAGER,
 )
 
+
+/**
+ * Role yang boleh membuka modul Leader. Sama persis dengan `LeaderAkses.ROLE_MODUL`,
+ * disalin ke sini supaya `:feature:home` tidak perlu bergantung pada `:feature:leader`
+ * hanya untuk satu himpunan — pola yang sama dipakai STOK_ROLES, DISTRIBUSI_ROLES,
+ * dan MANAGER_ROLES.
+ *
+ * Cuma satu role, dan memang begitu di web: seluruh isi kelompok "Leader Dashboard"
+ * di `navConfig.ts` ditandai `roles: ['LEADER']`, dan `RoleContext.tsx` mengembalikan
+ * role itu ke sana setiap kali ia menyimpang.
+ */
+internal val LEADER_ROLES = setOf(
+    Role.LEADER,
+)

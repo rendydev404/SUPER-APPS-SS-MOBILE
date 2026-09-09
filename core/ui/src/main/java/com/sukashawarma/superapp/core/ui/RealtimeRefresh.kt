@@ -18,8 +18,7 @@ import com.sukashawarma.superapp.data.remote.Realtime
  * `20260713100001` supaya salah ketik tertangkap kompilator, bukan di lapangan.
  *
  * Yang TIDAK ada di publication dan karena itu tidak bisa realtime tanpa
- * migration: `mutasi_antar_outlet`, `surat_jalan_item`, `staff_outlets`,
- * `permintaan_bahan_item`.
+ * migration: `surat_jalan_item`, `staff_outlets`, `permintaan_bahan_item`.
  */
 object RealtimeTables {
     const val ATTENDANCE = "attendance"
@@ -57,6 +56,11 @@ object RealtimeTables {
     // `20260709020000_create_bypass_requests`.
     const val CANCELLATION_REQUESTS = "cancellation_requests"
     const val BYPASS_REQUESTS = "bypass_requests"
+
+    // Ditambahkan ke publication lewat migrasi web `20300108000022_mutasi_antar_outlet_realtime`,
+    // yang sekalian menyetel REPLICA IDENTITY FULL supaya payload UPDATE membawa
+    // kolom lama — tanpa itu perpindahan status tidak bisa dibaca dari event.
+    const val MUTASI = "mutasi_antar_outlet"
 }
 
 /**

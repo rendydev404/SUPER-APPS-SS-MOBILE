@@ -1,8 +1,6 @@
 plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
-    id("kotlin-kapt")
-    id("com.google.dagger.hilt.android")
 }
 
 android {
@@ -37,9 +35,11 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
     api("com.google.code.gson:gson:2.10.1")
+    // `api`, bukan `implementation`: Realtime.updates() mengembalikan Flow, jadi
+    // coroutines ikut jadi bagian API modul ini. Sebelumnya ikut menumpang lewat
+    // hilt-android — kebetulan yang pecah begitu Hilt dilepas.
+    api("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     implementation("androidx.core:core-ktx:1.12.0")
-    implementation("com.google.dagger:hilt-android:2.51")
-    kapt("com.google.dagger:hilt-compiler:2.51")
 }
 
 

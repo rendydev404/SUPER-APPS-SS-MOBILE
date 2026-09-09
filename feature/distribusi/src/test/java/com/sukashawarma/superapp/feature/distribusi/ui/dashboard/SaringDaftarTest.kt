@@ -13,7 +13,8 @@ class SaringDaftarTest {
         outlet: String? = "Outlet A",
         nomor: String? = "SJ-001",
         selisih: Boolean = false,
-    ) = SuratJalanRingkas(id, "o1", status, outlet, nomor, "2026-09-04T00:00:00Z", selisih)
+        dibuatPada: String? = "2026-09-04T00:00:00Z",
+    ) = SuratJalanRingkas(id, "o1", status, outlet, nomor, dibuatPada, selisih)
 
     private val sumber = listOf(
         baris("1", StatusSuratJalan.DRAFT, nomor = "SJ-001"),
@@ -70,5 +71,54 @@ class SaringDaftarTest {
     fun `tab dan pencarian digabung, bukan saling menggantikan`() {
         val hasil = saringDaftar(sumber, TabStatus.BELUM_VERIF, null, "SJ-005")
         assertEquals(listOf("5"), hasil.map { it.id })
+    }
+
+    @Test
+    fun `hasil selalu diurutkan dari surat jalan terbaru`() {
+        val sumberTidakUrut = listOf(
+            baris("lama", StatusSuratJalan.DRAFT, dibuatPada = "2026-09-01T08:00:00Z"),
+            baris("tanpa-tanggal", StatusSuratJalan.DRAFT, dibuatPada = null),
+            baris("baru", StatusSuratJalan.DRAFT, dibuatPada = "2026-09-07T08:00:00Z"),
+        )
+
+        assertEquals(
+            listOf("baru", "lama", "tanpa-tanggal"),
+            saringDaftar(sumberTidakUrut, TabStatus.SEMUA, null, "").map { it.id },
+        )
+    }
+
+    @Test
+    fun `pagination membatasi daftar pada lima surat jalan per halaman`() {
+        val daftar = (1..12).map { nomor ->
+            baris(
+                id = nomor.toString(),
+                status = StatusSuratJalan.DRAFT,
+                dibuatPada = "2026-09-${nomor.toString().padStart(2, '0')}T08:00:00Z",
+            )
+        }
+
+        val halamanDua = halamanSuratJalan(daftar, 2)
+        assertEquals(3, halamanDua.totalHalaman)
+        assertEquals(listOf("6", "7", "8", "9", "10"), halamanDua.baris.map { it.id })
+        assertEquals(6, halamanDua.urutanMulai)
+        assertEquals(10, halamanDua.urutanAkhir)
+
+        val halamanTerakhir = halamanSuratJalan(daftar, 99)
+        assertEquals(3, halamanTerakhir.nomor)
+        assertEquals(listOf("11", "12"), halamanTerakhir.baris.map { it.id })
+    }
+
+    @Test
+    fun `refresh mempertahankan halaman aktif dan clamp bila halaman hilang`() {
+        val daftar = (1..12).map { nomor ->
+            baris(
+                id = nomor.toString(),
+                status = StatusSuratJalan.DRAFT,
+                dibuatPada = "2026-09-${nomor.toString().padStart(2, '0')}T08:00:00Z",
+            )
+        }
+
+        assertEquals(2, halamanAktifSetelahMuat(daftar, 2))
+        assertEquals(3, halamanAktifSetelahMuat(daftar, 99))
     }
 }

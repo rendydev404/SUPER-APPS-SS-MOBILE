@@ -15,11 +15,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.QrCodeScanner
@@ -95,7 +98,7 @@ private val MerahIkon = Color(0xFFFEE2E2)
 @Composable
 fun DashboardScreen(
     onKeluar: () -> Unit,
-    onBukaInbox: () -> Unit,
+    onBukaScan: () -> Unit,
     onBukaRiwayat: () -> Unit,
     onBukaDetail: (String) -> Unit,
     viewModel: DashboardViewModel = viewModel(),
@@ -104,6 +107,10 @@ fun DashboardScreen(
     RealtimeRefresh(RealtimeTables.SURAT_JALAN) { viewModel.muat(paksa = true) }
     var konfirmasiTutup by remember { mutableStateOf<SuratJalanRingkas?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
+    val daftarState = rememberLazyListState()
+    val halamanSuratJalan = halamanSuratJalan(state.terlihat, state.halamanAktif)
+    // Indeks item daftar konstan untuk dua susunan: dengan atau tanpa filter outlet.
+    val indeksDaftar = if (state.rincianOutlet.size > 1) 5 else 3
 
     SegarkanSaatAktif { viewModel.muat(paksa = true) }
 
@@ -123,6 +130,10 @@ fun DashboardScreen(
         }
     }
 
+    LaunchedEffect(state.halamanAktif) {
+        if (state.terlihat.isNotEmpty()) daftarState.animateScrollToItem(indeksDaftar)
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
@@ -130,7 +141,7 @@ fun DashboardScreen(
                 aktif = TabBawah.DASHBOARD,
                 bolehVerifikasi = state.bolehVerifikasi,
                 onDashboard = {},
-                onScan = onBukaInbox,
+                onScan = onBukaScan,
                 onRiwayat = onBukaRiwayat,
             )
         },
@@ -145,6 +156,7 @@ fun DashboardScreen(
 
             LazyColumn(
                 Modifier.fillMaxSize(),
+                state = daftarState,
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
@@ -154,7 +166,7 @@ fun DashboardScreen(
                         rentang = state.rentang,
                         bolehVerifikasi = state.bolehVerifikasi,
                         onUbahRentang = viewModel::ubahRentang,
-                        onScan = onBukaInbox,
+                        onScan = onBukaScan,
                     )
                 }
 
@@ -206,7 +218,11 @@ fun DashboardScreen(
                         }
                     }
                 } else {
-                    items(state.terlihat, key = { it.id }) { baris ->
+                    item {
+                        KepalaDaftarSuratJalan(halamanSuratJalan)
+                    }
+
+                    items(halamanSuratJalan.baris, key = { it.id }) { baris ->
                         val bolehTutup = state.bolehTutupDokumen && baris.status?.bolehDitutup == true
                         val sedangDiproses = state.sedangMenutup == baris.id
                         KartuSuratJalan(
@@ -222,6 +238,13 @@ fun DashboardScreen(
                             } else {
                                 null
                             },
+                        )
+                    }
+
+                    item {
+                        KontrolPaginationSuratJalan(
+                            halaman = halamanSuratJalan,
+                            onPilihHalaman = viewModel::pindahHalaman,
                         )
                     }
                 }
@@ -249,6 +272,158 @@ fun DashboardScreen(
                 TextButton(onClick = { konfirmasiTutup = null }) { Text("Batal") }
             },
         )
+    }
+}
+
+@Composable
+private fun KepalaDaftarSuratJalan(halaman: HalamanSuratJalan) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        color = Color.White,
+        border = androidx.compose.foundation.BorderStroke(1.dp, SukaOrange.copy(alpha = 0.22f)),
+        shadowElevation = 2.dp,
+    ) {
+        Row(
+            Modifier.padding(horizontal = 14.dp, vertical = 13.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Surface(
+                shape = RoundedCornerShape(13.dp),
+                color = SukaOrange.copy(alpha = 0.16f),
+                modifier = Modifier.size(42.dp),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Default.Description,
+                        contentDescription = null,
+                        tint = Cokelat,
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
+            }
+            Spacer(Modifier.size(11.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "Daftar Surat Jalan",
+                    color = SukaOnSurface,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Black,
+                )
+                Text(
+                    "Terbaru di atas • 5 dokumen per halaman",
+                    color = SukaGray500,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = Cokelat.copy(alpha = 0.08f),
+            ) {
+                Text(
+                    "${halaman.totalBaris} SJ",
+                    Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
+                    color = Cokelat,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Black,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun KontrolPaginationSuratJalan(
+    halaman: HalamanSuratJalan,
+    onPilihHalaman: (Int) -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        color = Cokelat,
+        shadowElevation = 3.dp,
+    ) {
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+            Text(
+                "NAVIGASI DAFTAR",
+                color = Color.White.copy(alpha = 0.66f),
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 1.sp,
+            )
+            Spacer(Modifier.height(8.dp))
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TombolArahHalaman(
+                    ikon = Icons.Default.ChevronLeft,
+                    keterangan = "Halaman sebelumnya",
+                    aktif = halaman.nomor > 1,
+                    onKlik = { onPilihHalaman(halaman.nomor - 1) },
+                )
+                Spacer(Modifier.size(10.dp))
+                Column(
+                    Modifier.weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Surface(shape = RoundedCornerShape(12.dp), color = SukaOrange) {
+                        Text(
+                            "HALAMAN ${halaman.nomor} / ${halaman.totalHalaman}",
+                            Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            color = Color.White,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 0.4.sp,
+                        )
+                    }
+                    Spacer(Modifier.height(5.dp))
+                    Text(
+                        "Menampilkan ${halaman.urutanMulai}–${halaman.urutanAkhir} dari ${halaman.totalBaris} SJ",
+                        color = Color.White.copy(alpha = 0.72f),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                Spacer(Modifier.size(10.dp))
+                TombolArahHalaman(
+                    ikon = Icons.Default.ChevronRight,
+                    keterangan = "Halaman berikutnya",
+                    aktif = halaman.nomor < halaman.totalHalaman,
+                    onKlik = { onPilihHalaman(halaman.nomor + 1) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TombolArahHalaman(
+    ikon: ImageVector,
+    keterangan: String,
+    aktif: Boolean,
+    onKlik: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .size(38.dp)
+            .clickable(enabled = aktif, onClick = onKlik),
+        shape = CircleShape,
+        color = if (aktif) Color.White.copy(alpha = 0.15f) else Color.White.copy(alpha = 0.06f),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            Color.White.copy(alpha = if (aktif) 0.2f else 0.08f),
+        ),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                ikon,
+                contentDescription = keterangan,
+                tint = Color.White.copy(alpha = if (aktif) 1f else 0.35f),
+                modifier = Modifier.size(22.dp),
+            )
+        }
     }
 }
 

@@ -12,6 +12,7 @@ import com.sukashawarma.superapp.feature.stok.data.model.Mutasi
 import com.sukashawarma.superapp.feature.stok.data.model.MutasiItem
 import com.sukashawarma.superapp.feature.stok.data.model.OutletRingkas
 import com.sukashawarma.superapp.feature.stok.data.model.StatusMutasi
+import com.sukashawarma.superapp.feature.stok.domain.MutasiRingkas
 
 /**
  * Mutasi antar outlet — cermin `app/actions/mutasi.ts` dan `hooks/useMutasi.ts`.
@@ -46,6 +47,39 @@ object MutasiRepository {
         return Postgrest.select("mutasi_antar_outlet", params)
             .mapNotNull { it.asJsonObject.toMutasi() }
             .lengkapiNamaStaff()
+    }
+
+    /**
+     * Query ringan khusus badge — cermin `fetchPendingMutasiRaw` web.
+     *
+     * Sengaja TIDAK memakai [daftar]: yang dibutuhkan cuma empat kolom, sedangkan
+     * [daftar] menarik seluruh item beserta bahan bakunya lalu menembak satu query
+     * nama staf lagi. Badge ini ikut menyala di layar mana pun, jadi ongkosnya
+     * dibayar terus-menerus.
+     *
+     * Penyaring outletnya SAMA PERSIS dengan [daftar] dan itu yang paling penting di
+     * sini: lencana harus menghitung himpunan baris yang sama dengan yang ditampilkan
+     * layar Mutasi. Versi sebelumnya meniru `fetchPendingMutasiRaw` web yang menarik
+     * seluruh `menunggu_persetujuan` lintas outlet, dan hasilnya lencana bernilai 27
+     * di atas halaman yang kosong.
+     */
+    suspend fun ringkasUntukBadge(outletId: String?): List<MutasiRingkas> {
+        val params = buildList {
+            add("select" to "id,status,outlet_asal_id,outlet_tujuan_id")
+            add("status" to "in.(menunggu_persetujuan,menunggu_pengiriman,dikirim)")
+            if (outletId != null) {
+                add("or" to "(outlet_asal_id.eq.$outletId,outlet_tujuan_id.eq.$outletId)")
+            }
+        }
+        return Postgrest.select("mutasi_antar_outlet", params).mapNotNull { el ->
+            val o = el.asJsonObject
+            MutasiRingkas(
+                id = o.optString("id") ?: return@mapNotNull null,
+                status = o.optString("status") ?: return@mapNotNull null,
+                outletAsalId = o.optString("outlet_asal_id") ?: return@mapNotNull null,
+                outletTujuanId = o.optString("outlet_tujuan_id") ?: return@mapNotNull null,
+            )
+        }
     }
 
     suspend fun detail(mutasiId: String): Mutasi? {

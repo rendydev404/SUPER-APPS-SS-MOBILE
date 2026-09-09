@@ -1,6 +1,8 @@
 package com.sukashawarma.superapp.feature.distribusi
 
 import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -30,48 +32,69 @@ fun DistribusiNavGraph(onExit: () -> Unit) {
         navController = navController,
         startDestination = DistribusiRoutes.DASHBOARD,
         enterTransition = {
-            slideIntoContainer(
-                AnimatedContentTransitionScope.SlideDirection.Start,
-                tween(280, easing = FastOutSlowInEasing),
-            ) + fadeIn(tween(280))
+            // Kamera tidak ikut cross-fade dengan halaman sebelumnya. CameraX
+            // adalah AndroidView yang berat dan overlap selama animasi menjadi
+            // sumber frame drop pada perangkat dengan resource terbatas.
+            if (targetState.destination.route == DistribusiRoutes.SCAN) {
+                EnterTransition.None
+            } else {
+                slideIntoContainer(
+                    AnimatedContentTransitionScope.SlideDirection.Start,
+                    tween(180, easing = FastOutSlowInEasing),
+                ) + fadeIn(tween(180))
+            }
         },
         exitTransition = {
-            slideOutOfContainer(
-                AnimatedContentTransitionScope.SlideDirection.Start,
-                tween(280, easing = FastOutSlowInEasing),
-            ) + fadeOut(tween(280))
+            if (targetState.destination.route == DistribusiRoutes.SCAN ||
+                initialState.destination.route == DistribusiRoutes.SCAN
+            ) {
+                ExitTransition.None
+            } else {
+                slideOutOfContainer(
+                    AnimatedContentTransitionScope.SlideDirection.Start,
+                    tween(180, easing = FastOutSlowInEasing),
+                ) + fadeOut(tween(180))
+            }
         },
         popEnterTransition = {
-            slideIntoContainer(
-                AnimatedContentTransitionScope.SlideDirection.End,
-                tween(280, easing = FastOutSlowInEasing),
-            ) + fadeIn(tween(280))
+            if (targetState.destination.route == DistribusiRoutes.SCAN) {
+                EnterTransition.None
+            } else {
+                slideIntoContainer(
+                    AnimatedContentTransitionScope.SlideDirection.End,
+                    tween(180, easing = FastOutSlowInEasing),
+                ) + fadeIn(tween(180))
+            }
         },
         popExitTransition = {
-            slideOutOfContainer(
-                AnimatedContentTransitionScope.SlideDirection.End,
-                tween(280, easing = FastOutSlowInEasing),
-            ) + fadeOut(tween(280))
+            if (initialState.destination.route == DistribusiRoutes.SCAN) {
+                ExitTransition.None
+            } else {
+                slideOutOfContainer(
+                    AnimatedContentTransitionScope.SlideDirection.End,
+                    tween(180, easing = FastOutSlowInEasing),
+                ) + fadeOut(tween(180))
+            }
         },
     ) {
         composable(DistribusiRoutes.DASHBOARD) {
             DashboardScreen(
                 onKeluar = onExit,
-                onBukaInbox = { navController.navigate(DistribusiRoutes.INBOX) },
-                onBukaRiwayat = { navController.navigate(DistribusiRoutes.RIWAYAT) },
-                onBukaDetail = { id -> navController.navigate(DistribusiRoutes.detail(id)) },
+                onBukaScan = { navController.navigateSekali(DistribusiRoutes.SCAN) },
+                onBukaRiwayat = { navController.navigateSekali(DistribusiRoutes.RIWAYAT) },
+                onBukaDetail = { id -> navController.navigateSekali(DistribusiRoutes.detail(id)) },
             )
         }
 
         composable(DistribusiRoutes.INBOX) {
             InboxScreen(
                 onKeluar = { navController.popBackStack() },
-                onBukaScan = { navController.navigate(DistribusiRoutes.SCAN) },
-                onBukaDetail = { id -> navController.navigate(DistribusiRoutes.detail(id)) },
+                onBukaScan = { navController.navigateSekali(DistribusiRoutes.SCAN) },
+                onBukaDetail = { id -> navController.navigateSekali(DistribusiRoutes.detail(id)) },
                 // Nav bawah berpindah antar-tab, bukan menumpuk layar: kembali
                 // ke dashboard memakai popBackStack karena dashboard adalah akar.
                 onBukaDashboard = { navController.popBackStack(DistribusiRoutes.DASHBOARD, false) },
-                onBukaRiwayat = { navController.navigate(DistribusiRoutes.RIWAYAT) },
+                onBukaRiwayat = { navController.navigateSekali(DistribusiRoutes.RIWAYAT) },
             )
         }
 
@@ -83,6 +106,7 @@ fun DistribusiNavGraph(onExit: () -> Unit) {
                     // layar verifikasi harus mendarat di inbox, bukan menyalakan
                     // kamera lagi.
                     navController.navigate(DistribusiRoutes.verifikasi(id)) {
+                        launchSingleTop = true
                         popUpTo(DistribusiRoutes.SCAN) { inclusive = true }
                     }
                 },
@@ -98,6 +122,7 @@ fun DistribusiNavGraph(onExit: () -> Unit) {
                 onKeluar = { navController.popBackStack() },
                 onSelesai = {
                     navController.navigate(DistribusiRoutes.RIWAYAT) {
+                        launchSingleTop = true
                         popUpTo(DistribusiRoutes.DASHBOARD)
                     }
                 },
@@ -107,9 +132,9 @@ fun DistribusiNavGraph(onExit: () -> Unit) {
         composable(DistribusiRoutes.RIWAYAT) {
             RiwayatScreen(
                 onKeluar = { navController.popBackStack() },
-                onBukaDetail = { id -> navController.navigate(DistribusiRoutes.detail(id)) },
+                onBukaDetail = { id -> navController.navigateSekali(DistribusiRoutes.detail(id)) },
                 onBukaDashboard = { navController.popBackStack(DistribusiRoutes.DASHBOARD, false) },
-                onBukaScan = { navController.navigate(DistribusiRoutes.INBOX) },
+                onBukaScan = { navController.navigateSekali(DistribusiRoutes.SCAN) },
             )
         }
 
@@ -123,4 +148,10 @@ fun DistribusiNavGraph(onExit: () -> Unit) {
             )
         }
     }
+}
+
+/** Mencegah tap berulang menumpuk destination saat animasi belum selesai. */
+private fun androidx.navigation.NavHostController.navigateSekali(route: String) {
+    if (currentDestination?.route == route) return
+    navigate(route) { launchSingleTop = true }
 }

@@ -1,14 +1,24 @@
 package com.sukashawarma.superapp.feature.stok.ui.opname
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.sukashawarma.superapp.data.local.AppDatabase
+import com.sukashawarma.superapp.data.local.entity.PendingOpnameFinalizeEntity
+import kotlinx.coroutines.CancellationException
 import com.sukashawarma.superapp.domain.session.AppSession
+import com.sukashawarma.superapp.domain.model.Role
 import com.sukashawarma.superapp.feature.stok.data.OpnameRepository
 import com.sukashawarma.superapp.feature.stok.data.StokRepository
 import com.sukashawarma.superapp.feature.stok.data.model.OpnameHeader
 import com.sukashawarma.superapp.feature.stok.data.model.OpnameItemRow
 import com.sukashawarma.superapp.feature.stok.data.model.OutletRingkas
+import com.sukashawarma.superapp.feature.stok.data.model.StatusOpname
+import com.sukashawarma.superapp.feature.stok.domain.AlasanOpnameTerkunci
+import com.sukashawarma.superapp.feature.stok.domain.MasukanBerjenjang
 import com.sukashawarma.superapp.feature.stok.domain.OpnameHitung
+import com.sukashawarma.superapp.feature.stok.domain.bungkusCatatanOpname
+import com.sukashawarma.superapp.feature.stok.domain.formatTriUnitAdaptif
 import com.sukashawarma.superapp.feature.stok.domain.Selisih
 import com.sukashawarma.superapp.feature.stok.domain.bolehTampilDiOutlet
 import com.sukashawarma.superapp.feature.stok.domain.stokErrorMessage
@@ -30,6 +40,8 @@ data class OpnameUiState(
     val menyimpan: Boolean = false,
     val opnameId: String? = null,
     val statusDraft: String? = null,
+    /** Terisi bila opname hari ini ada tapi tidak boleh disunting; lihat [AlasanOpnameTerkunci]. */
+    val terkunci: AlasanOpnameTerkunci? = null,
     val items: List<OpnameItemRow> = emptyList(),
     val cari: String = "",
 ) {
@@ -41,14 +53,78 @@ data class OpnameUiState(
         }
 
     val jumlahTerisi: Int get() = items.count { it.adaMasukan }
+
+    /**
+     * Crew yang sudah menyelesaikan opname hari ini tidak boleh membuat opname baru.
+     * Role selain crew (leader, SPV, admin, dsb.) tetap boleh.
+     */
+    val crewSudahOpname: Boolean
+        get() {
+            val role = AppSession.staff.value?.role
+            if (role != Role.CREW) return false
+            val hariIni = java.time.LocalDate.now().toString()  // "2026-09-09"
+            return riwayat.any { h ->
+                h.tanggal == hariIni && (
+                    h.status == StatusOpname.FINALIZED ||
+                    h.status == StatusOpname.APPROVED ||
+                    h.status == StatusOpname.PENDING_APPROVAL
+                )
+            }
+        }
 }
 
-class OpnameViewModel : ViewModel() {
+class OpnameViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _state = MutableStateFlow(OpnameUiState())
     val state: StateFlow<OpnameUiState> = _state
 
-    init { muatAwal() }
+    private val antreanFinalisasi = AppDatabase.get(app).pendingOpnameFinalizeDao()
+
+    init {
+        muatAwal()
+        // Antrean dicoba tiap layar dibuka. Tidak ada pemantau jaringan tersendiri:
+        // opname dibuka manual oleh kru, dan kesempatan itu sudah cukup sering — satu
+        // pemantau konektivitas hanya menambah bagian yang bisa rusak sendiri.
+        kirimUlangAntrean()
+    }
+
+    /**
+     * Mengirim ulang finalisasi yang tertunda.
+     *
+     * Baris dibuang HANYA ketika servernya menerima, atau ketika opname itu ternyata
+     * sudah finalized — dua-duanya berarti pekerjaannya selesai. Kegagalan lain
+     * dibiarkan mengantre; menghapusnya berarti stok yang tidak pernah terpotong.
+     */
+    private fun kirimUlangAntrean() {
+        viewModelScope.launch {
+            val tertunda = runCatching { antreanFinalisasi.getAll() }.getOrElse { return@launch }
+            if (tertunda.isEmpty()) return@launch
+            var berhasil = 0
+            for (baris in tertunda) {
+                try {
+                    OpnameRepository.finalisasi(baris.opnameId)
+                    antreanFinalisasi.delete(baris.opnameId)
+                    berhasil++
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    if (OpnameRepository.sudahFinalized(baris.opnameId)) {
+                        antreanFinalisasi.delete(baris.opnameId)
+                        berhasil++
+                    } else {
+                        antreanFinalisasi.markFailedAttempt(baris.opnameId, e.message)
+                    }
+                }
+            }
+            if (berhasil > 0) {
+                StokRepository.invalidate()
+                _state.value = _state.value.copy(
+                    pesan = "$berhasil opname yang tertunda berhasil dikirim.",
+                )
+                muatRiwayat()
+            }
+        }
+    }
 
     fun muatAwal() {
         viewModelScope.launch {
@@ -102,6 +178,27 @@ class OpnameViewModel : ViewModel() {
             _state.value = _state.value.copy(formTerbuka = true, memuatForm = true, error = null, pesan = null)
             try {
                 val draft = OpnameRepository.buatAtauPakaiDraft(outlet.id, "harian", staffId)
+
+                // Status diperiksa DI SINI, bukan dibiarkan gagal saat menyimpan.
+                // Menulis item ke opname non-draft ditolak policy RLS `opname_item_write`,
+                // dan galat PostgREST-nya tidak memberi tahu kru apa pun yang berguna.
+                val terkunci = when (draft.status) {
+                    StatusOpname.DRAFT -> null
+                    StatusOpname.PENDING_APPROVAL -> AlasanOpnameTerkunci.SEDANG_DITINJAU
+                    StatusOpname.REJECTED -> AlasanOpnameTerkunci.DITOLAK
+                    StatusOpname.FINALIZED, StatusOpname.APPROVED -> AlasanOpnameTerkunci.SUDAH_FINAL
+                }
+                if (terkunci != null) {
+                    _state.value = _state.value.copy(
+                        memuatForm = false,
+                        opnameId = draft.id,
+                        statusDraft = draft.status.nilai,
+                        terkunci = terkunci,
+                        items = emptyList(),
+                    )
+                    return@launch
+                }
+
                 val tersimpan = OpnameRepository.itemTersimpan(draft.id)
 
                 val baris = StokRepository.monitoringOutlet(outlet.id)
@@ -112,10 +209,11 @@ class OpnameViewModel : ViewModel() {
                             saldoIsGram = row.saldoIsGram,
                             meta = row.meta,
                         )
-                        // Item yang sudah tersimpan dikembalikan ke kolom satuan kecil
-                        // apa adanya; memecahnya lagi ke tiga jenjang berisiko bergeser
-                        // karena pembulatan, dan angka kru tidak boleh berubah sendiri.
-                        val fisik = tersimpan[row.bahanBakuId]
+                        // Masukan mentah dipulihkan persis seperti diketik. Baris lama
+                        // yang belum menyimpannya jatuh ke kolom satuan terkecil —
+                        // angkanya tetap benar, hanya penyajiannya yang tidak terpecah.
+                        val draft = tersimpan[row.bahanBakuId]
+                        val masukan = draft?.masukan
                         OpnameItemRow(
                             bahanBakuId = row.bahanBakuId,
                             namaBahan = row.itemName,
@@ -124,13 +222,23 @@ class OpnameViewModel : ViewModel() {
                             qtySystemSmallest = sistem,
                             saldoIsGram = row.saldoIsGram,
                             terukur = Selisih.ambangPersen(row.meta.satuan, row.meta.satuanKecil) > 0,
-                            kecil = fisik?.let { if (it % 1.0 == 0.0) it.toLong().toString() else it.toString() } ?: "",
+                            besar = masukan?.besar.orEmpty(),
+                            tengah = masukan?.tengah.orEmpty(),
+                            kecil = masukan?.kecil
+                                ?: draft?.qtyFisik?.let {
+                                    if (it % 1.0 == 0.0) it.toLong().toString() else it.toString()
+                                }
+                                ?: "",
+                            // Item yang sudah pernah tersimpan di server ditandai;
+                            // item baru yang belum pernah disimpan tetap polos.
+                            tersimpanDraft = draft != null,
                         )
                     }
                 _state.value = _state.value.copy(
                     memuatForm = false,
                     opnameId = draft.id,
                     statusDraft = draft.status.nilai,
+                    terkunci = null,
                     items = baris,
                 )
             } catch (e: Exception) {
@@ -140,7 +248,9 @@ class OpnameViewModel : ViewModel() {
     }
 
     fun tutupForm() {
-        _state.value = _state.value.copy(formTerbuka = false, items = emptyList(), opnameId = null, cari = "")
+        _state.value = _state.value.copy(
+            formTerbuka = false, items = emptyList(), opnameId = null, cari = "", terkunci = null,
+        )
         viewModelScope.launch { muatRiwayat() }
     }
 
@@ -178,13 +288,23 @@ class OpnameViewModel : ViewModel() {
 
     private fun itemUntukDisimpan(opnameId: String): List<OpnameRepository.ItemSimpan> =
         _state.value.items.filter { it.adaMasukan }.map { item ->
+            val fisikNilai = fisik(item)
+            val selisihNilai = selisih(item)
             OpnameRepository.ItemSimpan(
                 opnameId = opnameId,
                 bahanBakuId = item.bahanBakuId,
-                qtyFisik = fisik(item),
+                qtyFisik = fisikNilai,
                 qtySystem = item.qtySystemSmallest,
                 flagged = ditandai(item),
-                catatan = item.catatan.ifBlank { null },
+                // Angka yang DIKETIK kru ikut disimpan, bukan hanya totalnya. Tanpa ini,
+                // draft yang dilanjutkan memunculkan satu angka besar di kolom satuan
+                // terkecil alih-alih "2 Dus 3 Kg 500 Gram" yang tadi diisi.
+                catatan = bungkusCatatanOpname(
+                    fisikTeks = formatTriUnitAdaptif(fisikNilai, saldoIsGram = true, meta = item.meta),
+                    sistemTeks = formatTriUnitAdaptif(item.qtySystemSmallest, saldoIsGram = true, meta = item.meta),
+                    selisihTeks = formatTriUnitAdaptif(selisihNilai, saldoIsGram = true, meta = item.meta),
+                    masukan = MasukanBerjenjang(item.besar, item.tengah, item.kecil),
+                ),
             )
         }
 
@@ -199,7 +319,17 @@ class OpnameViewModel : ViewModel() {
             _state.value = _state.value.copy(menyimpan = true, error = null, pesan = null)
             try {
                 OpnameRepository.simpanItem(items)
-                _state.value = _state.value.copy(menyimpan = false, pesan = "Draft tersimpan (${items.size} item).")
+                // Tandai baris yang sudah tersimpan supaya UI menampilkan
+                // indikator visual — baris yang polos belum pernah ke server.
+                val idTersimpan = items.map { it.bahanBakuId }.toSet()
+                _state.value = _state.value.copy(
+                    menyimpan = false,
+                    pesan = "Draft tersimpan (${items.size} item).",
+                    items = _state.value.items.map { row ->
+                        if (row.bahanBakuId in idTersimpan) row.copy(tersimpanDraft = true)
+                        else row
+                    },
+                )
             } catch (e: Exception) {
                 _state.value = _state.value.copy(menyimpan = false, error = stokErrorMessage(e))
             }
@@ -242,9 +372,47 @@ class OpnameViewModel : ViewModel() {
                     },
                 )
                 muatRiwayat()
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-                _state.value = _state.value.copy(menyimpan = false, error = stokErrorMessage(e))
+                antrekanFinalisasiGagal(opnameId, e)
             }
+        }
+    }
+
+    /**
+     * Finalisasi gagal — diantre kalau item-nya sudah tersimpan.
+     *
+     * Yang menentukan bisa-tidaknya diantre adalah [OpnameRepository.simpanItem] yang
+     * SUDAH lewat sebelum baris ini tercapai: hitungan kru ada di server, tinggal
+     * pemotongan stoknya yang tertunda. Kalau justru penyimpanan item yang gagal,
+     * tidak ada yang layak diantre — kru harus mengulang, dan itu jalur galat biasa.
+     */
+    private suspend fun antrekanFinalisasiGagal(opnameId: String, penyebab: Exception) {
+        val outletId = _state.value.outletTerpilih?.id
+        val terantre = outletId != null && runCatching {
+            antreanFinalisasi.insert(
+                PendingOpnameFinalizeEntity(
+                    opnameId = opnameId,
+                    outletId = outletId,
+                    createdAtMs = System.currentTimeMillis(),
+                    lastError = penyebab.message,
+                )
+            )
+        }.isSuccess
+
+        android.util.Log.w("OpnameViewModel", "finalisasi gagal, terantre=$terantre", penyebab)
+        _state.value = if (terantre) {
+            _state.value.copy(
+                menyimpan = false,
+                formTerbuka = false,
+                items = emptyList(),
+                opnameId = null,
+                pesan = "Hitungan tersimpan, tetapi finalisasi belum terkirim. " +
+                    "Akan dicoba lagi otomatis saat modul Opname dibuka kembali dengan koneksi aktif.",
+            )
+        } else {
+            _state.value.copy(menyimpan = false, error = stokErrorMessage(penyebab))
         }
     }
 

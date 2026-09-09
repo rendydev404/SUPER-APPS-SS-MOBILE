@@ -17,13 +17,15 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.SubcomposeAsyncImage
 import com.sukashawarma.superapp.feature.stok.data.WasteReview
 import com.sukashawarma.superapp.feature.stok.domain.formatAngkaStok
 import com.sukashawarma.superapp.feature.stok.ui.*
@@ -45,16 +47,14 @@ private fun tone(report: WasteReview): WasteTone = when {
 @Composable
 fun WasteApprovalScreen(onBack: () -> Unit, vm: WasteApprovalViewModel = viewModel()) {
     val state by vm.state.collectAsState()
-    val uri = LocalUriHandler.current
     RealtimeRefresh(RealtimeTables.WASTE_REPORTS, RealtimeTables.STOK_BALANCE) { vm.refresh() }
-    var photoError by remember { mutableStateOf<String?>(null) }
+    var photoPreview by remember { mutableStateOf<WasteReview?>(null) }
     Column(Modifier.fillMaxSize().background(Slate50)) {
         HeaderStok("Persetujuan Waste", "Kelola dan tinjau laporan waste dari outlet", onBack) {
             IconButton(onClick = vm::refresh, enabled = !state.loading && !state.busy) { Icon(Icons.Default.Refresh, "Perbarui data", tint = Color.White) }
         }
         state.message?.let { PitaPesan(it, false, vm::clearMessage) }
         state.error?.let { PitaPesan(it, true, vm::clearMessage) }
-        photoError?.let { PitaPesan(it, true) { photoError = null } }
         if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Orange500, trackColor = Orange50)
         when {
             state.loading -> MemuatPenuh()
@@ -77,15 +77,16 @@ fun WasteApprovalScreen(onBack: () -> Unit, vm: WasteApprovalViewModel = viewMod
                     WasteCard(
                         report = report,
                         busy = state.busy,
-                        onPhoto = {
-                            try { uri.openUri(report.photo!!) } catch (_: Exception) { photoError = "Foto bukti tidak dapat dibuka." }
-                        },
+                        onPhoto = { photoPreview = report },
                         onApprove = { vm.approve(report) },
                         onReject = { vm.reject(report) },
                     )
                 }
             }
         }
+    }
+    photoPreview?.let { report ->
+        DialogFotoBukti(report) { photoPreview = null }
     }
     state.confirmation?.let { report ->
         AlertDialog(
@@ -241,6 +242,52 @@ private fun WasteCard(report: WasteReview, busy: Boolean, onPhoto: () -> Unit, o
                         Spacer(Modifier.width(6.dp))
                         Text("Tolak", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Bukti waste ditinjau di dalam aplikasi: melempar approver ke browser memutus
+ * alur persetujuan dan menyembunyikan konteks kartu yang sedang dinilai.
+ */
+@Composable
+private fun DialogFotoBukti(report: WasteReview, onTutup: () -> Unit) {
+    Dialog(onDismissRequest = onTutup) {
+        Surface(shape = RoundedCornerShape(20.dp), color = Color.White) {
+            Column {
+                Row(Modifier.padding(start = 16.dp, end = 6.dp, top = 10.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(report.name, color = Slate900, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            report.outlet.ifBlank { "Outlet tidak tercatat" },
+                            color = Slate500, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    IconButton(onClick = onTutup) { Icon(Icons.Default.Close, "Tutup foto bukti", tint = Slate500) }
+                }
+                SubcomposeAsyncImage(
+                    model = report.photo,
+                    contentDescription = "Foto bukti waste ${report.name}",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxWidth().height(340.dp).background(Slate900),
+                    loading = {
+                        Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator(color = Orange500) }
+                    },
+                    error = {
+                        Box(Modifier.fillMaxSize().padding(24.dp), Alignment.Center) {
+                            Text(
+                                "Foto bukti tidak dapat dimuat.",
+                                color = Slate400, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center,
+                            )
+                        }
+                    },
+                )
+                Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Jumlah waste", Modifier.weight(1f), color = Slate500, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    Text(report.quantityLabel, color = Rose600, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
                 }
             }
         }

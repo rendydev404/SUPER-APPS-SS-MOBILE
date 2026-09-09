@@ -23,6 +23,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -96,15 +98,65 @@ fun OpnameScreen(viewModel: OpnameViewModel = viewModel()) {
         state.pesan?.let { PitaPesan(it, false, viewModel::bersihkanPesan) }
 
         if (!state.tidakBerhak) {
-            Button(
-                onClick = viewModel::bukaForm,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEA580C)),
-                shape = RoundedCornerShape(14.dp),
-            ) {
-                Icon(Icons.Default.Add, null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(7.dp))
-                Text("Mulai Opname Hari Ini", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            if (state.crewSudahOpname) {
+                // Crew yang sudah opname hari ini: tampilkan pesan, bukan tombol.
+                Surface(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    color = Color(0xFF94A3B8).copy(alpha = 0.10f),
+                    border = BorderStroke(1.dp, Color(0xFF94A3B8).copy(alpha = 0.25f)),
+                ) {
+                    Row(
+                        Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                    ) {
+                        Icon(
+                            Icons.Default.CheckCircle, null,
+                            tint = Color(0xFF168451),
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "Opname hari ini sudah selesai",
+                            color = Color(0xFF64748B),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                }
+            } else {
+                val adaDraft = state.riwayat.any { it.status == StatusOpname.DRAFT }
+                val draftHeader = state.riwayat.firstOrNull { it.status == StatusOpname.DRAFT }
+                Button(
+                    onClick = viewModel::bukaForm,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (adaDraft) Color(0xFFD97706) else Color(0xFFEA580C),
+                    ),
+                    shape = RoundedCornerShape(14.dp),
+                ) {
+                    Icon(
+                        if (adaDraft) Icons.Default.EditNote else Icons.Default.Add,
+                        null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.width(7.dp))
+                    Column {
+                        Text(
+                            if (adaDraft) "Lanjutkan Draft" else "Mulai Opname Hari Ini",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
+                        )
+                        if (adaDraft && draftHeader != null && draftHeader.jumlahItem > 0) {
+                            Text(
+                                "${draftHeader.jumlahItem} item tersimpan",
+                                fontSize = 10.sp,
+                                color = Color.White.copy(alpha = 0.80f),
+                            )
+                        }
+                    }
+                }
             }
         }
 
@@ -194,8 +246,13 @@ private fun FormOpname(state: OpnameUiState, viewModel: OpnameViewModel) {
         state.error?.let { PitaPesan(it, true, viewModel::bersihkanPesan) }
         state.pesan?.let { PitaPesan(it, false, viewModel::bersihkanPesan) }
 
+        val terkunci = state.terkunci
         if (state.memuatForm) {
             MemuatPenuh()
+        } else if (terkunci != null) {
+            // Form sengaja tidak dirender sama sekali: menampilkan kolom isian yang
+            // penyimpanannya pasti ditolak lebih buruk daripada tidak menampilkannya.
+            KeadaanKosong(terkunci.pesan)
         } else {
         OutlinedTextField(
             value = state.cari,
@@ -263,14 +320,19 @@ private fun BarisHitung(item: OpnameItemRow, viewModel: OpnameViewModel) {
     val ditandai = viewModel.ditandai(item)
     val persen = Selisih.persen(selisih, item.qtySystemSmallest)
 
+    // Warna border: merah bila selisih di luar toleransi, hijau bila sudah tersimpan
+    // sebagai draft, abu-abu polos bila belum ada aksi apa-apa.
+    val borderColor = when {
+        item.adaMasukan && ditandai -> Color(0xFFDC2626).copy(alpha = 0.35f)
+        item.tersimpanDraft -> Color(0xFF168451).copy(alpha = 0.30f)
+        else -> Color(0xFFF1F5F9)
+    }
+
     Surface(
         Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        color = Color.White,
-        border = BorderStroke(
-            1.dp,
-            if (item.adaMasukan && ditandai) Color(0xFFDC2626).copy(alpha = 0.35f) else Color(0xFFF1F5F9),
-        ),
+        color = if (item.tersimpanDraft) Color(0xFFF0FDF4) else Color.White,
+        border = BorderStroke(1.dp, borderColor),
     ) {
         Column(Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -289,6 +351,15 @@ private fun BarisHitung(item: OpnameItemRow, viewModel: OpnameViewModel) {
                         color = SukaOnSurfaceVariant,
                         fontSize = 10.sp,
                     )
+                    // Tanda visual: baris yang sudah tersimpan sebagai draft tidak polos.
+                    if (item.tersimpanDraft) {
+                        Text(
+                            "✓ Tersimpan",
+                            color = Color(0xFF168451),
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
                 }
                 if (item.adaMasukan) {
                     Column(horizontalAlignment = Alignment.End) {

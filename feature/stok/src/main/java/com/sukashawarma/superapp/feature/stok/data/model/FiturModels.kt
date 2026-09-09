@@ -79,6 +79,8 @@ data class OpnameHeader(
     val status: StatusOpname,
     val createdBy: String?,
     val createdAt: String?,
+    /** Kapan draft terakhir disentuh — dipakai penanda "draft tersimpan" di form. */
+    val updatedAt: String? = null,
     val outletName: String? = null,
     val creatorName: String? = null,
     val jumlahItem: Int = 0,
@@ -106,6 +108,8 @@ data class OpnameItemRow(
     val tengah: String = "",
     val kecil: String = "",
     val catatan: String = "",
+    /** Sudah pernah tersimpan ke server sebagai draft — baris ini tidak polos lagi. */
+    val tersimpanDraft: Boolean = false,
 ) {
     val adaMasukan: Boolean
         get() = besar.isNotBlank() || tengah.isNotBlank() || kecil.isNotBlank()
@@ -353,6 +357,17 @@ data class SaranPermintaan(
      * yang sebelumnya tampil — itu yang membuatnya aman. Juga menjadi jaring bila
      * [status] mengembalikan UNKNOWN karena faktor satuan tidak dapat dipercaya.
      */
+    /**
+     * Benar-benar kritis, memakai definisi yang sama persis dengan KPI "Kritis" di
+     * layar Dashboard: `StokStatus.BELOW`, atau `below` menurut view (yang membawa
+     * aturan porsi resep `marquee_warning_threshold` dari server).
+     *
+     * Sengaja lebih sempit daripada [perluDiminta]. Katalog permintaan harus tetap
+     * menawarkan bahan yang baru menipis, tetapi menyebut semuanya "kritis" membuat
+     * angka di layar ini berselisih dengan Dashboard tanpa ada yang salah pada data.
+     */
+    fun kritis(meta: UnitMeta): Boolean = status(meta) == StokStatus.BELOW || statusView == "below"
+
     fun perluDiminta(meta: UnitMeta): Boolean {
         val s = status(meta)
         return s == StokStatus.BELOW ||

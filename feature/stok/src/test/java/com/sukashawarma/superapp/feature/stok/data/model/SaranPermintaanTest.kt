@@ -93,4 +93,38 @@ class SaranPermintaanTest {
         assertEquals(StokStatus.OK, aman.status(kg))
         assertEquals(StokStatus.BELOW, kritis.status(kg))
     }
+
+    /**
+     * Selisih yang dilaporkan dari lapangan: Dashboard menghitung 0 kritis sementara
+     * layar Permintaan menampilkan 1. Datanya benar — bahan itu memang menipis, bukan
+     * kritis. Yang salah dulu adalah labelnya, jadi pemisahan ini yang dikunci.
+     */
+    @Test
+    fun `bahan menipis perlu diminta tetapi tidak dihitung kritis`() {
+        val row = baris(saldo = 3000.0, statusView = "ok")
+        assertEquals(StokStatus.WARNING, row.status(kg))
+        assertTrue(row.perluDiminta(kg))
+        assertFalse(row.kritis(kg))
+    }
+
+    @Test
+    fun `bahan di bawah separuh threshold dihitung kritis`() {
+        val row = baris(saldo = 1000.0, statusView = "ok")
+        assertTrue(row.kritis(kg))
+    }
+
+    /** Aturan porsi resep hanya ada di server; `below` dari view tetap dihormati. */
+    @Test
+    fun `status view below dihitung kritis walau hitungan saldo bilang aman`() {
+        val row = baris(saldo = 9000.0, statusView = "below")
+        assertEquals(StokStatus.OK, row.status(kg))
+        assertTrue(row.kritis(kg))
+    }
+
+    @Test
+    fun `status view warning saja belum berarti kritis`() {
+        val row = baris(saldo = 9000.0, statusView = "warning")
+        assertTrue(row.perluDiminta(kg))
+        assertFalse(row.kritis(kg))
+    }
 }

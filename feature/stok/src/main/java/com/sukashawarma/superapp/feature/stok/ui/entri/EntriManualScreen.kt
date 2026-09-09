@@ -16,17 +16,25 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -52,20 +60,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.sukashawarma.superapp.core.camera.KameraFotoSheet
 import com.sukashawarma.superapp.feature.stok.data.EntriManualRepository
 import com.sukashawarma.superapp.feature.stok.data.model.MonitoringRow
+import com.sukashawarma.superapp.feature.stok.domain.UnitScale
 import com.sukashawarma.superapp.feature.stok.ui.HeaderStok
 
 private val ORANGE = Color(0xFFEA580C)
@@ -74,15 +84,46 @@ private val SLATE500 = Color(0xFF64748B)
 private val SLATE900 = Color(0xFF0F172A)
 private val GARIS = Color(0xFFE2E8F0)
 private val HIJAU = Color(0xFF15803D)
+private val HIJAU_LATAR = Color(0xFFECFDF5)
 private val MERAH = Color(0xFFB91C1C)
+private val MERAH_LATAR = Color(0xFFFEF2F2)
+private val AMBER = Color(0xFFB45309)
+private val AMBER_LATAR = Color(0xFFFFFBEB)
+private val LATAR = Color(0xFFF8FAFC)
+
+/** Ikon dan warna tiap jenis entri, dipisah dari enum supaya domain bebas Compose. */
+private val JenisEntri.ikon: ImageVector
+    get() = when (this) {
+        JenisEntri.PENYESUAIAN -> Icons.Default.Tune
+        JenisEntri.WASTE -> Icons.Default.DeleteSweep
+        JenisEntri.TRANSFER_KELUAR -> Icons.Default.LocalShipping
+    }
+
+private val JenisEntri.penjelasan: String
+    get() = when (this) {
+        JenisEntri.PENYESUAIAN -> "Mengoreksi saldo yang salah, tanpa menunggu opname."
+        JenisEntri.WASTE -> "Melaporkan bahan terbuang, rusak, atau kedaluwarsa."
+        JenisEntri.TRANSFER_KELUAR -> "Mencatat bahan yang dikirim keluar dari outlet ini."
+    }
+
+/** Kalimat konsekuensi — ini yang paling menentukan pilihan, jadi ditonjolkan. */
+private val JenisEntri.akibat: String
+    get() = when (this) {
+        JenisEntri.WASTE -> "Perlu disetujui dulu"
+        else -> "Stok langsung berubah"
+    }
+
+private val JenisEntri.warnaAkibat: Color
+    get() = if (this == JenisEntri.WASTE) AMBER else MERAH
 
 /**
  * Entri manual stok — cermin `ManualEntryForm.tsx` web.
  *
- * Tiga jenis dalam satu layar, dan perbedaannya bukan kosmetik: waste berhenti di
- * antrean persetujuan, sedangkan penyesuaian dan transfer keluar langsung memotong
- * saldo. Teks di bawah tombol kirim menyebutkan itu supaya pengguna tahu apa yang
- * akan terjadi sebelum menekannya.
+ * Layar ini menulis langsung ke saldo, jadi susunannya dibuat berurutan dan tiap
+ * langkah bernomor: orang harus tahu persis apa yang akan terjadi sebelum menekan
+ * kirim. Dua hal yang paling menentukan sengaja tidak disembunyikan sebagai teks
+ * kecil — akibat tiap jenis entri (langsung memotong vs menunggu persetujuan) dan
+ * pratinjau saldo sesudah entri.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -114,12 +155,28 @@ fun EntriManualScreen(
         }
     }
 
-    Column(Modifier.fillMaxSize().background(Color(0xFFF8FAFC))) {
+    // Outlet hanya jadi langkah tersendiri kalau memang ada yang bisa dipilih.
+    val adaPilihanOutlet = state.outlets.size > 1
+    var no = 0
+    val noOutlet = if (adaPilihanOutlet) ++no else 0
+    val noJenis = ++no
+    val noBahan = ++no
+    val noJumlah = ++no
+    val noRincian = ++no
+
+    Column(Modifier.fillMaxSize().background(LATAR)) {
         HeaderStok(
             judul = "Entri Manual Stok",
             subjudul = "Penyesuaian, waste & transfer keluar",
             onKembali = onBack,
         )
+
+        // Banner ditaruh di atas, bukan di ujung daftar: pesan sukses yang muncul
+        // di bawah layar sering tidak pernah terlihat sama sekali.
+        val pesan = state.pesan ?: state.error
+        if (pesan != null) {
+            Banner(teks = pesan, sukses = state.pesan != null)
+        }
 
         if (state.memuat) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -128,38 +185,28 @@ fun EntriManualScreen(
         } else {
             LazyColumn(
                 Modifier.weight(1f),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                item { PemilihOutlet(state, viewModel) }
-                item { PemilihJenis(state, viewModel) }
-                item { PemilihBahan(state, viewModel) }
+                if (adaPilihanOutlet) {
+                    item { PemilihOutlet(noOutlet, state, viewModel) }
+                }
+                item { PemilihJenis(noJenis, state, viewModel) }
+                item { PemilihBahan(noBahan, state, viewModel) }
 
                 if (state.bahanTerpilih != null) {
-                    item { KolomJumlah(state, viewModel) }
-                    if (state.butuhAlasan) item { KolomAlasan(state, viewModel) }
-                    if (state.jenis != JenisEntri.WASTE) {
-                        item { KolomCatatan(state, viewModel) }
-                    }
-                    if (state.butuhFoto) {
-                        item { BagianFoto(state, ::mintaFoto) }
-                    }
-                }
+                    item { KolomJumlah(noJumlah, state, viewModel) }
+                    item { PratinjauDampak(state) }
 
-                item { Kirim(state, viewModel) }
-
-                val pesan = state.pesan ?: state.error
-                if (pesan != null) {
-                    item {
-                        Text(
-                            pesan,
-                            color = if (state.pesan != null) HIJAU else MERAH,
-                            fontSize = 12.5.sp,
-                            fontWeight = FontWeight.SemiBold,
-                        )
+                    if (state.butuhAlasan || state.butuhFoto || state.jenis != JenisEntri.WASTE) {
+                        item { KartuRincian(noRincian, state, viewModel, ::mintaFoto) }
                     }
                 }
             }
+
+            // Tombol kirim tidak ikut ter-scroll. Di form sepanjang ini, tombol yang
+            // harus dicari dulu membuat orang mengira formnya belum selesai.
+            BilahKirim(state, viewModel)
         }
     }
 
@@ -170,12 +217,7 @@ fun EntriManualScreen(
             containerColor = Color.White,
         ) {
             Column(Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp)) {
-                Text(
-                    "Foto bukti waste",
-                    color = SLATE900,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Black,
-                )
+                Text("Foto bukti waste", color = SLATE900, fontSize = 14.sp, fontWeight = FontWeight.Black)
                 Spacer(Modifier.height(10.dp))
                 KameraFotoSheet(
                     onDiambil = viewModel::simpanFoto,
@@ -195,41 +237,94 @@ fun EntriManualScreen(
     }
 }
 
+// ------------------------------------------------------------------ potongan umum
+
 @Composable
-private fun Kartu(judul: String, isi: @Composable () -> Unit) {
+private fun Banner(teks: String, sukses: Boolean) {
+    Surface(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = if (sukses) HIJAU_LATAR else MERAH_LATAR,
+        border = BorderStroke(1.dp, if (sukses) HIJAU.copy(alpha = 0.35f) else MERAH.copy(alpha = 0.35f)),
+    ) {
+        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                if (sukses) Icons.Default.CheckCircle else Icons.Default.ErrorOutline,
+                null,
+                tint = if (sukses) HIJAU else MERAH,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(Modifier.width(9.dp))
+            Text(
+                teks,
+                color = if (sukses) HIJAU else MERAH,
+                fontSize = 12.5.sp,
+                lineHeight = 17.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+    }
+}
+
+/**
+ * Kartu satu langkah. Nomor dan centang di judul membuat alurnya terbaca sekali
+ * lihat: mana yang sudah beres, mana yang masih menunggu diisi.
+ */
+@Composable
+private fun KartuLangkah(
+    nomor: Int,
+    judul: String,
+    selesai: Boolean,
+    isi: @Composable () -> Unit,
+) {
     Surface(
         Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         color = Color.White,
-        border = BorderStroke(1.dp, GARIS),
+        border = BorderStroke(1.dp, if (selesai) HIJAU.copy(alpha = 0.30f) else GARIS),
     ) {
         Column(Modifier.padding(14.dp)) {
-            Text(
-                judul.uppercase(),
-                color = SLATE400,
-                fontSize = 9.5.sp,
-                fontWeight = FontWeight.Black,
-                letterSpacing = 0.7.sp,
-            )
-            Spacer(Modifier.height(9.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier.size(20.dp).background(if (selesai) HIJAU else SLATE400, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (selesai) {
+                        Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(13.dp))
+                    } else {
+                        Text("$nomor", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Black)
+                    }
+                }
+                Spacer(Modifier.width(9.dp))
+                Text(
+                    judul.uppercase(),
+                    color = if (selesai) HIJAU else SLATE500,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 0.7.sp,
+                )
+            }
+            Spacer(Modifier.height(11.dp))
             isi()
         }
     }
 }
 
+// ------------------------------------------------------------------ langkah-langkah
+
 @Composable
-private fun PemilihOutlet(state: EntriManualUiState, viewModel: EntriManualViewModel) {
+private fun PemilihOutlet(nomor: Int, state: EntriManualUiState, viewModel: EntriManualViewModel) {
     var terbuka by remember { mutableStateOf(false) }
-    Kartu("Outlet") {
+    KartuLangkah(nomor, "Outlet", state.outletTerpilih != null) {
         Box {
             Surface(
-                Modifier.fillMaxWidth().clickable(enabled = state.outlets.size > 1) { terbuka = true },
+                Modifier.fillMaxWidth().clickable { terbuka = true },
                 shape = RoundedCornerShape(12.dp),
-                color = Color(0xFFF8FAFC),
+                color = LATAR,
                 border = BorderStroke(1.dp, GARIS),
             ) {
                 Row(
-                    Modifier.padding(horizontal = 13.dp, vertical = 11.dp),
+                    Modifier.padding(horizontal = 13.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -241,9 +336,7 @@ private fun PemilihOutlet(state: EntriManualUiState, viewModel: EntriManualViewM
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    if (state.outlets.size > 1) {
-                        Icon(Icons.Default.ArrowDropDown, null, tint = SLATE500)
-                    }
+                    Icon(Icons.Default.ArrowDropDown, null, tint = SLATE500)
                 }
             }
             DropdownMenu(terbuka, { terbuka = false }) {
@@ -259,48 +352,65 @@ private fun PemilihOutlet(state: EntriManualUiState, viewModel: EntriManualViewM
 }
 
 @Composable
-private fun PemilihJenis(state: EntriManualUiState, viewModel: EntriManualViewModel) {
-    Kartu("Jenis entri") {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+private fun PemilihJenis(nomor: Int, state: EntriManualUiState, viewModel: EntriManualViewModel) {
+    KartuLangkah(nomor, "Mau mencatat apa?", true) {
+        // Satu kartu penuh per jenis, bukan tiga chip sempit: label "Transfer keluar"
+        // terpotong di layar kecil, dan akibat tiap pilihan tidak muat ditulis.
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             JenisEntri.entries.forEach { jenis ->
                 val aktif = jenis == state.jenis
                 Surface(
-                    Modifier.weight(1f).clickable { viewModel.pilihJenis(jenis) },
-                    shape = RoundedCornerShape(11.dp),
-                    color = if (aktif) ORANGE else Color(0xFFF8FAFC),
-                    border = BorderStroke(1.dp, if (aktif) ORANGE else GARIS),
+                    Modifier.fillMaxWidth().clickable { viewModel.pilihJenis(jenis) },
+                    shape = RoundedCornerShape(13.dp),
+                    color = if (aktif) Color(0xFFFFF7ED) else LATAR,
+                    border = BorderStroke(if (aktif) 1.5.dp else 1.dp, if (aktif) ORANGE else GARIS),
                 ) {
-                    Text(
-                        jenis.label,
-                        Modifier.padding(vertical = 10.dp, horizontal = 4.dp).fillMaxWidth(),
-                        color = if (aktif) Color.White else SLATE500,
-                        fontSize = 11.5.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            jenis.ikon,
+                            null,
+                            tint = if (aktif) ORANGE else SLATE400,
+                            modifier = Modifier.size(21.dp),
+                        )
+                        Spacer(Modifier.width(11.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                jenis.label,
+                                color = if (aktif) SLATE900 else SLATE500,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Black,
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(jenis.penjelasan, color = SLATE500, fontSize = 11.sp, lineHeight = 15.sp)
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Pil(jenis.akibat, jenis.warnaAkibat)
+                    }
                 }
             }
         }
-        Spacer(Modifier.height(9.dp))
+    }
+}
+
+@Composable
+private fun Pil(teks: String, warna: Color) {
+    Surface(shape = RoundedCornerShape(50), color = warna.copy(alpha = 0.11f)) {
         Text(
-            when (state.jenis) {
-                JenisEntri.PENYESUAIAN -> "Mengoreksi saldo tanpa opname. Langsung mengubah stok."
-                JenisEntri.WASTE -> "Masuk antrean persetujuan. Stok baru dipotong setelah disetujui."
-                JenisEntri.TRANSFER_KELUAR -> "Mengurangi stok outlet ini. Langsung mengubah saldo."
-            },
-            color = SLATE500,
-            fontSize = 11.5.sp,
-            lineHeight = 16.sp,
+            teks,
+            Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            color = warna,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Black,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            lineHeight = 12.sp,
         )
     }
 }
 
 @Composable
-private fun PemilihBahan(state: EntriManualUiState, viewModel: EntriManualViewModel) {
-    Kartu("Bahan baku") {
-        val terpilih = state.bahanTerpilih
+private fun PemilihBahan(nomor: Int, state: EntriManualUiState, viewModel: EntriManualViewModel) {
+    val terpilih = state.bahanTerpilih
+    KartuLangkah(nomor, "Bahan baku", terpilih != null) {
         if (terpilih != null) {
             Surface(
                 Modifier.fillMaxWidth().clickable { viewModel.pilihBahan(null) },
@@ -318,8 +428,9 @@ private fun PemilihBahan(state: EntriManualUiState, viewModel: EntriManualViewMo
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
+                        Spacer(Modifier.height(2.dp))
                         Text(
-                            "Saldo saat ini: ${terpilih.saldoRingkas()}",
+                            "Saldo sekarang ${terpilih.saldoRingkas()}",
                             color = SLATE500,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium,
@@ -333,7 +444,8 @@ private fun PemilihBahan(state: EntriManualUiState, viewModel: EntriManualViewMo
                 value = state.cari,
                 onValueChange = viewModel::ubahCari,
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Cari bahan…", fontSize = 12.5.sp, color = SLATE400) },
+                placeholder = { Text("Ketik nama bahan…", fontSize = 12.5.sp, color = SLATE400) },
+                leadingIcon = { Icon(Icons.Default.Search, null, tint = SLATE400, modifier = Modifier.size(18.dp)) },
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
@@ -343,21 +455,15 @@ private fun PemilihBahan(state: EntriManualUiState, viewModel: EntriManualViewMo
                     unfocusedBorderColor = GARIS,
                 ),
             )
-            Spacer(Modifier.height(8.dp))
-            val hasil = state.bahanTampil.take(12)
+            Spacer(Modifier.height(9.dp))
+            // Semua bahan ditampilkan, bukan dipotong 12 lalu diminta mengetik:
+            // pengguna mengira daftarnya memang sedikit dan bahan yang dicari tidak ada.
+            val hasil = state.bahanTampil
             if (hasil.isEmpty()) {
                 Text("Tidak ada bahan yang cocok.", color = SLATE400, fontSize = 12.sp)
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     hasil.forEach { row -> BarisPilihBahan(row) { viewModel.pilihBahan(row) } }
-                }
-                if (state.bahanTampil.size > hasil.size) {
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        "${state.bahanTampil.size - hasil.size} bahan lain — persempit dengan pencarian.",
-                        color = SLATE400,
-                        fontSize = 11.sp,
-                    )
                 }
             }
         }
@@ -369,9 +475,9 @@ private fun BarisPilihBahan(row: MonitoringRow, onKlik: () -> Unit) {
     Surface(
         Modifier.fillMaxWidth().clickable(onClick = onKlik),
         shape = RoundedCornerShape(10.dp),
-        color = Color(0xFFF8FAFC),
+        color = LATAR,
     ) {
-        Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+        Row(Modifier.padding(horizontal = 12.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(
                 row.itemName,
                 Modifier.weight(1f),
@@ -381,15 +487,46 @@ private fun BarisPilihBahan(row: MonitoringRow, onKlik: () -> Unit) {
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            Spacer(Modifier.width(8.dp))
             Text(row.saldoRingkas(), color = SLATE500, fontSize = 11.sp, fontWeight = FontWeight.Medium)
         }
     }
 }
 
 @Composable
-private fun KolomJumlah(state: EntriManualUiState, viewModel: EntriManualViewModel) {
+private fun KolomJumlah(nomor: Int, state: EntriManualUiState, viewModel: EntriManualViewModel) {
     val meta = state.bahanTerpilih?.meta
-    Kartu("Jumlah") {
+    val terisi = (state.jumlahAngka ?: 0.0) > 0.0
+    KartuLangkah(nomor, "Berapa banyak?", terisi) {
+        if (state.jenis == JenisEntri.PENYESUAIAN) {
+            // Tanpa pilihan arah, penyesuaian hanya bisa menambah stok — dan
+            // pengguna tidak punya cara tahu itu. Lihat `adjDirection` di web.
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ArahPenyesuaian.entries.forEach { arah ->
+                    val aktif = arah == state.arah
+                    val warna = if (arah == ArahPenyesuaian.MASUK) HIJAU else MERAH
+                    Surface(
+                        Modifier.weight(1f).clickable { viewModel.pilihArah(arah) },
+                        shape = RoundedCornerShape(11.dp),
+                        color = if (aktif) warna else LATAR,
+                        border = BorderStroke(1.dp, if (aktif) warna else GARIS),
+                    ) {
+                        Text(
+                            "${arah.tanda} ${arah.label}",
+                            Modifier.padding(vertical = 10.dp, horizontal = 6.dp).fillMaxWidth(),
+                            color = if (aktif) Color.White else SLATE500,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Black,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            maxLines = 2,
+                            lineHeight = 14.sp,
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(11.dp))
+        }
+
         // Satuan yang faktornya tidak ada tidak ditawarkan: menawarkannya berarti
         // membiarkan pengguna memilih konversi yang tidak bisa dihitung.
         val pilihan = buildList {
@@ -402,13 +539,15 @@ private fun KolomJumlah(state: EntriManualUiState, viewModel: EntriManualViewMod
             }
         }
         if (pilihan.size > 1) {
+            Text("Satuan yang dipakai mengetik", color = SLATE400, fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(7.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 pilihan.forEach { (satuan, label) ->
                     val aktif = satuan == state.satuanInput
                     Surface(
                         Modifier.clickable { viewModel.pilihSatuanInput(satuan) },
                         shape = RoundedCornerShape(50),
-                        color = if (aktif) Color(0xFFFFF7ED) else Color(0xFFF8FAFC),
+                        color = if (aktif) Color(0xFFFFF7ED) else LATAR,
                         border = BorderStroke(1.dp, if (aktif) ORANGE else GARIS),
                     ) {
                         Text(
@@ -423,12 +562,13 @@ private fun KolomJumlah(state: EntriManualUiState, viewModel: EntriManualViewMod
             }
             Spacer(Modifier.height(10.dp))
         }
+
         OutlinedTextField(
             value = state.jumlah,
             onValueChange = viewModel::ubahJumlah,
             modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("0", fontSize = 13.sp, color = SLATE400) },
-            suffix = { Text(state.labelSatuan, color = SLATE500, fontSize = 12.sp) },
+            placeholder = { Text("0", fontSize = 15.sp, color = SLATE400) },
+            suffix = { Text(state.labelSatuan, color = SLATE500, fontSize = 12.sp, fontWeight = FontWeight.Bold) },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
@@ -441,9 +581,9 @@ private fun KolomJumlah(state: EntriManualUiState, viewModel: EntriManualViewMod
         )
         val besar = state.jumlahBesar
         if (besar != null && state.satuanInput != SatuanInput.BESAR) {
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(7.dp))
             Text(
-                "Tercatat sebagai ${String.format(java.util.Locale.US, "%.4f", besar).trimEnd('0').trimEnd('.')} ${meta?.satuan.orEmpty()}",
+                "Sama dengan ${angkaRapi(besar)} ${meta?.satuan.orEmpty()}",
                 color = SLATE500,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Medium,
@@ -452,35 +592,159 @@ private fun KolomJumlah(state: EntriManualUiState, viewModel: EntriManualViewMod
     }
 }
 
+/**
+ * Pratinjau saldo sesudah entri — cermin teks "-> Target:" di web.
+ *
+ * Ini pengaman terpenting di layar ini: salah satuan atau salah arah baru
+ * kelihatan jelas ketika angka sesudahnya ditampilkan, bukan dari angka yang
+ * baru saja diketik.
+ */
 @Composable
-private fun KolomAlasan(state: EntriManualUiState, viewModel: EntriManualViewModel) {
-    Kartu(if (state.jenis == JenisEntri.WASTE) "Alasan waste" else "Alasan penyesuaian") {
-        if (state.jenis == JenisEntri.WASTE) {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                EntriManualRepository.ALASAN_WASTE.forEach { alasan ->
-                    val aktif = alasan == state.alasan
-                    Surface(
-                        Modifier.fillMaxWidth().clickable { viewModel.ubahAlasan(alasan) },
-                        shape = RoundedCornerShape(10.dp),
-                        color = if (aktif) Color(0xFFFFF7ED) else Color(0xFFF8FAFC),
-                        border = BorderStroke(1.dp, if (aktif) ORANGE else GARIS),
-                    ) {
-                        Text(
-                            alasan,
-                            Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                            color = if (aktif) ORANGE else SLATE500,
-                            fontSize = 12.5.sp,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
+private fun PratinjauDampak(state: EntriManualUiState) {
+    val row = state.bahanTerpilih ?: return
+    val sesudah = state.saldoSesudahNorm
+    val sebelum = row.saldoNorm
+
+    val warna = when {
+        sesudah == null -> SLATE400
+        state.saldoJadiMinus -> MERAH
+        (state.deltaNorm ?: 0.0) > 0 -> HIJAU
+        else -> ORANGE
+    }
+
+    Surface(
+        Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = if (state.saldoJadiMinus) MERAH_LATAR else Color.White,
+        border = BorderStroke(1.dp, if (state.saldoJadiMinus) MERAH.copy(alpha = 0.35f) else GARIS),
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            Text(
+                "SETELAH DISIMPAN",
+                color = SLATE400,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 0.7.sp,
+            )
+            Spacer(Modifier.height(10.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Sekarang", color = SLATE400, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        row.saldoRingkas(),
+                        color = SLATE500,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Icon(Icons.Default.ArrowForward, null, tint = SLATE400, modifier = Modifier.size(17.dp))
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Menjadi", color = SLATE400, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        // Angka belum lengkap tampil "—", bukan angka lama: menampilkan
+                        // saldo sekarang di kolom "menjadi" akan terbaca seperti hasil.
+                        if (sesudah == null || sebelum == null) "—"
+                        else UnitScale.formatBerjenjang(sesudah, row.meta) ?: angkaRapi(sesudah),
+                        color = warna,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Black,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
-        } else {
+
+            if (state.saldoJadiMinus) {
+                Spacer(Modifier.height(11.dp))
+                Row(verticalAlignment = Alignment.Top) {
+                    Icon(Icons.Default.WarningAmber, null, tint = MERAH, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "Saldo akan jadi minus. Periksa lagi satuan dan arahnya sebelum menyimpan.",
+                        color = MERAH,
+                        fontSize = 11.5.sp,
+                        lineHeight = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            } else if (state.jenis == JenisEntri.WASTE) {
+                Spacer(Modifier.height(9.dp))
+                Text(
+                    "Saldo baru berkurang setelah laporan ini disetujui.",
+                    color = AMBER,
+                    fontSize = 11.5.sp,
+                    lineHeight = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun KartuRincian(
+    nomor: Int,
+    state: EntriManualUiState,
+    viewModel: EntriManualViewModel,
+    onMintaFoto: () -> Unit,
+) {
+    val alasanBeres = !state.butuhAlasan || state.alasan.isNotBlank()
+    val fotoBeres = !state.butuhFoto || state.fotoUrl != null
+    KartuLangkah(nomor, if (state.jenis == JenisEntri.WASTE) "Alasan & bukti" else "Alasan", alasanBeres && fotoBeres) {
+        if (state.butuhAlasan) {
+            if (state.jenis == JenisEntri.WASTE) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    EntriManualRepository.ALASAN_WASTE.forEach { alasan ->
+                        val aktif = alasan == state.alasan
+                        Surface(
+                            Modifier.fillMaxWidth().clickable { viewModel.ubahAlasan(alasan) },
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (aktif) Color(0xFFFFF7ED) else LATAR,
+                            border = BorderStroke(1.dp, if (aktif) ORANGE else GARIS),
+                        ) {
+                            Text(
+                                alasan,
+                                Modifier.padding(horizontal = 12.dp, vertical = 11.dp),
+                                color = if (aktif) ORANGE else SLATE500,
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                    }
+                }
+            } else {
+                OutlinedTextField(
+                    value = state.alasan,
+                    onValueChange = viewModel::ubahAlasan,
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = {
+                        Text("Contoh: koreksi salah input opname", fontSize = 12.sp, color = SLATE400)
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = Color.White,
+                        unfocusedContainerColor = Color.White,
+                        focusedBorderColor = ORANGE,
+                        unfocusedBorderColor = GARIS,
+                    ),
+                )
+            }
+        }
+
+        if (state.jenis != JenisEntri.WASTE) {
+            Spacer(Modifier.height(10.dp))
+            Text("Keterangan tambahan (opsional)", color = SLATE400, fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(6.dp))
             OutlinedTextField(
-                value = state.alasan,
-                onValueChange = viewModel::ubahAlasan,
+                value = state.catatan,
+                onValueChange = viewModel::ubahCatatan,
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Contoh: koreksi salah input opname", fontSize = 12.sp, color = SLATE400) },
+                placeholder = { Text("Boleh dikosongkan", fontSize = 12.sp, color = SLATE400) },
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedContainerColor = Color.White,
@@ -490,102 +754,109 @@ private fun KolomAlasan(state: EntriManualUiState, viewModel: EntriManualViewMod
                 ),
             )
         }
-    }
-}
 
-@Composable
-private fun KolomCatatan(state: EntriManualUiState, viewModel: EntriManualViewModel) {
-    Kartu("Keterangan tambahan") {
-        OutlinedTextField(
-            value = state.catatan,
-            onValueChange = viewModel::ubahCatatan,
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("Opsional", fontSize = 12.sp, color = SLATE400) },
-            shape = RoundedCornerShape(12.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = Color.White,
-                unfocusedContainerColor = Color.White,
-                focusedBorderColor = ORANGE,
-                unfocusedBorderColor = GARIS,
-            ),
-        )
+        if (state.butuhFoto) {
+            Spacer(Modifier.height(12.dp))
+            BagianFoto(state, onMintaFoto)
+        }
     }
 }
 
 @Composable
 private fun BagianFoto(state: EntriManualUiState, onMintaFoto: () -> Unit) {
-    Kartu("Foto bukti") {
-        val url = state.fotoUrl
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(180.dp)
-                .background(Color(0xFFF1F5F9), RoundedCornerShape(12.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
-            when {
-                state.mengunggahFoto -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 3.dp, color = ORANGE)
-                    Spacer(Modifier.height(8.dp))
-                    Text("Mengunggah…", color = SLATE500, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                }
-                url != null -> AsyncImage(
-                    model = url,
-                    contentDescription = "Foto bukti waste",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)),
-                )
-                else -> Text("Belum ada foto", color = SLATE400, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+    val url = state.fotoUrl
+    Text("Foto bukti (wajib)", color = SLATE400, fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+    Spacer(Modifier.height(7.dp))
+    Box(
+        Modifier.fillMaxWidth().height(170.dp).background(Color(0xFFF1F5F9), RoundedCornerShape(12.dp)),
+        contentAlignment = Alignment.Center,
+    ) {
+        when {
+            state.mengunggahFoto -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 3.dp, color = ORANGE)
+                Spacer(Modifier.height(8.dp))
+                Text("Mengunggah…", color = SLATE500, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            }
+            url != null -> AsyncImage(
+                model = url,
+                contentDescription = "Foto bukti waste",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)),
+            )
+            else -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(Icons.Default.PhotoCamera, null, tint = SLATE400, modifier = Modifier.size(26.dp))
+                Spacer(Modifier.height(7.dp))
+                Text("Belum ada foto", color = SLATE400, fontSize = 12.sp, fontWeight = FontWeight.Medium)
             }
         }
-        Spacer(Modifier.height(10.dp))
-        OutlinedButton(
-            onClick = onMintaFoto,
-            enabled = !state.mengunggahFoto,
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-        ) {
-            Icon(
-                if (url != null) Icons.Default.CheckCircle else Icons.Default.PhotoCamera,
-                null,
-                tint = if (url != null) HIJAU else ORANGE,
-                modifier = Modifier.size(17.dp),
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                if (url != null) "Foto tersimpan — ambil ulang" else "Ambil foto bukti (wajib)",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (url != null) HIJAU else SLATE900,
-            )
+    }
+    Spacer(Modifier.height(10.dp))
+    OutlinedButton(
+        onClick = onMintaFoto,
+        enabled = !state.mengunggahFoto,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+    ) {
+        Icon(
+            if (url != null) Icons.Default.CheckCircle else Icons.Default.PhotoCamera,
+            null,
+            tint = if (url != null) HIJAU else ORANGE,
+            modifier = Modifier.size(17.dp),
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            if (url != null) "Foto tersimpan — ambil ulang" else "Ambil foto sekarang",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            color = if (url != null) HIJAU else SLATE900,
+        )
+    }
+}
+
+/**
+ * Bilah kirim yang menempel di bawah.
+ *
+ * Alasan tombol belum bisa ditekan ditulis DI ATAS tombol, bukan di bawahnya:
+ * pengguna menekan tombol mati lalu mencari penjelasannya, dan penjelasan yang
+ * berada di bawah lipatan layar tidak pernah terbaca.
+ */
+@Composable
+private fun BilahKirim(state: EntriManualUiState, viewModel: EntriManualViewModel) {
+    Surface(color = Color.White, shadowElevation = 12.dp) {
+        Column(Modifier.navigationBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp)) {
+            val halangan = state.halangan
+            if (halangan != null) {
+                Row(Modifier.padding(bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.ErrorOutline, null, tint = AMBER, modifier = Modifier.size(15.dp))
+                    Spacer(Modifier.width(7.dp))
+                    Text(halangan, color = AMBER, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, lineHeight = 15.sp)
+                }
+            }
+            Button(
+                onClick = viewModel::kirim,
+                enabled = halangan == null && !state.menyimpan && !state.mengunggahFoto,
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = ORANGE,
+                    disabledContainerColor = Color(0xFFE2E8F0),
+                    disabledContentColor = SLATE400,
+                ),
+            ) {
+                Text(
+                    when {
+                        state.menyimpan -> "Menyimpan…"
+                        state.jenis == JenisEntri.WASTE -> "Kirim laporan waste"
+                        else -> "Simpan ${state.jenis.label.lowercase()}"
+                    },
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Black,
+                )
+            }
         }
     }
 }
 
-@Composable
-private fun Kirim(state: EntriManualUiState, viewModel: EntriManualViewModel) {
-    Column {
-        Button(
-            onClick = viewModel::kirim,
-            enabled = state.halangan == null && !state.menyimpan && !state.mengunggahFoto,
-            modifier = Modifier.fillMaxWidth().height(50.dp),
-            shape = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = ORANGE),
-        ) {
-            Text(
-                when {
-                    state.menyimpan -> "Menyimpan…"
-                    state.jenis == JenisEntri.WASTE -> "Kirim laporan waste"
-                    else -> "Simpan ${state.jenis.label.lowercase()}"
-                },
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Black,
-            )
-        }
-        val halangan = state.halangan
-        if (halangan != null) {
-            Spacer(Modifier.height(8.dp))
-            Text(halangan, color = SLATE500, fontSize = 11.5.sp, fontWeight = FontWeight.Medium)
-        }
-    }
-}
+/** Angka tanpa ekor desimal palsu, maksimal empat digit di belakang koma. */
+private fun angkaRapi(nilai: Double): String =
+    String.format(java.util.Locale.US, "%.4f", nilai).trimEnd('0').trimEnd('.')

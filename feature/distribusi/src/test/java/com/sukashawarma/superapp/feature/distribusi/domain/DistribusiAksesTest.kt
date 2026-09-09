@@ -33,28 +33,28 @@ class DistribusiAksesTest {
     }
 
     @Test
-    fun `hanya crew dan leader yang memverifikasi penerimaan`() {
+    fun `crew, leader, dan area manager yang memverifikasi penerimaan`() {
         assertTrue(DistribusiAkses.bolehVerifikasi(Role.CREW))
         assertTrue(DistribusiAkses.bolehVerifikasi(Role.LEADER))
-        assertFalse(DistribusiAkses.bolehVerifikasi(Role.AREA_MANAGER))
+        assertTrue(DistribusiAkses.bolehVerifikasi(Role.AREA_MANAGER))
         assertFalse(DistribusiAkses.bolehVerifikasi(Role.REGIONAL_MANAGER))
     }
 
     @Test
-    fun `hanya area dan regional manager yang menutup dokumen`() {
-        assertTrue(DistribusiAkses.bolehTutupDokumen(Role.AREA_MANAGER))
+    fun `hanya regional manager yang menutup dokumen`() {
         assertTrue(DistribusiAkses.bolehTutupDokumen(Role.REGIONAL_MANAGER))
+        assertFalse(DistribusiAkses.bolehTutupDokumen(Role.AREA_MANAGER))
         assertFalse(DistribusiAkses.bolehTutupDokumen(Role.CREW))
         assertFalse(DistribusiAkses.bolehTutupDokumen(Role.LEADER))
     }
 
-    /** Kalau crew bisa membaca kode verifikasi di layar, gerbang scan QR kehilangan
-     *  maknanya: dia bisa membuka verifikasi tanpa memegang dokumen fisik. */
+    /** Kalau crew/leader/AM bisa membaca kode verifikasi di layar, gerbang scan QR kehilangan
+     *  maknanya: AM tidak melihat kode pengirim; penerimaan tetap melewati scan fisik. */
     @Test
-    fun `kode verifikasi disembunyikan dari crew dan leader`() {
+    fun `kode verifikasi disembunyikan dari crew, leader, dan area manager`() {
         assertFalse(DistribusiAkses.bolehLihatKodeVerifikasi(Role.CREW))
         assertFalse(DistribusiAkses.bolehLihatKodeVerifikasi(Role.LEADER))
-        assertTrue(DistribusiAkses.bolehLihatKodeVerifikasi(Role.AREA_MANAGER))
+        assertFalse(DistribusiAkses.bolehLihatKodeVerifikasi(Role.AREA_MANAGER))
         assertTrue(DistribusiAkses.bolehLihatKodeVerifikasi(Role.REGIONAL_MANAGER))
     }
 }

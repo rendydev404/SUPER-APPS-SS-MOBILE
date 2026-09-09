@@ -115,14 +115,7 @@ private fun RootNav() {
     val mitraLoadFailed by AppSession.mitraLoadFailed.collectAsState()
     val scope = rememberCoroutineScope()
 
-    var splashFinished by remember { mutableStateOf(false) }
 
-    if (!splashFinished) {
-        com.sukashawarma.superapp.presentation.splash.CustomSplashVideoScreen(
-            onSplashFinished = { splashFinished = true }
-        )
-        return
-    }
 
     if (loading) {
         Box(

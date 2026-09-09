@@ -2,16 +2,36 @@ package com.sukashawarma.superapp.feature.stok.ui.mutasi
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.sukashawarma.superapp.domain.session.AppSession
 import com.sukashawarma.superapp.feature.stok.data.MutasiRepository
 import com.sukashawarma.superapp.feature.stok.data.StokRepository
 import com.sukashawarma.superapp.feature.stok.data.model.Mutasi
 import com.sukashawarma.superapp.feature.stok.data.model.OutletRingkas
 import com.sukashawarma.superapp.feature.stok.data.model.StatusMutasi
 import com.sukashawarma.superapp.feature.stok.domain.bolehTampilDiOutlet
+import com.sukashawarma.superapp.feature.stok.domain.formatAngkaStok
 import com.sukashawarma.superapp.feature.stok.domain.stokErrorMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+
+/**
+ * Pilihan semu "Semua Outlet" — cermin `queryOutletId = undefined` di
+ * `app/stok/mutasi/page.tsx` web, yang membuat `fetchMutasiList` mengembalikan
+ * seluruh mutasi yang terlihat RLS.
+ *
+ * Tanpa ini, peran pusat yang tidak memegang outlet (admin, owner, kitchen — 
+ * `outlet_id`-nya null) tidak punya cara melihat antrean persetujuan lintas outlet:
+ * layar memaksa satu outlet, sementara lencana di bilah bawah menghitung semuanya.
+ * Angka lencana lalu menjanjikan pekerjaan yang halamannya sendiri tidak bisa
+ * tunjukkan — persis keluhan yang memunculkan perbaikan ini.
+ *
+ * `id` kosong dipakai sebagai penanda karena tidak ada outlet asli yang ber-id kosong.
+ */
+val SEMUA_OUTLET = OutletRingkas(id = "", name = "Semua Outlet")
+
+/** Cakupan ini menampilkan lintas outlet, jadi tidak punya outlet asal yang konkret. */
+val OutletRingkas?.adalahSemuaOutlet: Boolean get() = this != null && id.isEmpty()
 
 /** Bahan yang bisa dipilih saat mengajukan mutasi, beserta sisa stoknya. */
 data class BahanPilihan(
@@ -55,6 +75,33 @@ data class MutasiUiState(
             val q = jumlah[b.bahanBakuId]?.toDoubleOrNull() ?: return@mapNotNull null
             if (q > 0) b to q else null
         }
+
+    /**
+     * Bahan yang jumlahnya melampaui sisa stok outlet asal.
+     *
+     * Dihitung di sini supaya barisnya bisa ditandai saat diketik. Sebelumnya
+     * kelebihan baru ketahuan setelah `ajukan_mutasi` ditolak database, jadi
+     * pengguna sudah menekan kirim dan menunggu sia-sia dulu.
+     */
+    val melebihiSisa: Set<String>
+        get() = bahan.mapNotNull { b ->
+            val q = jumlah[b.bahanBakuId]?.toDoubleOrNull() ?: return@mapNotNull null
+            if (q > b.sisa) b.bahanBakuId else null
+        }.toSet()
+
+    /** Alasan pengajuan belum boleh dikirim, atau null bila sudah siap. */
+    val halanganAjukan: String?
+        get() = when {
+            // Mutasi selalu berangkat dari satu outlet tertentu; cakupan "Semua Outlet"
+            // hanya untuk melihat, bukan untuk mengajukan.
+            outletTerpilih.adalahSemuaOutlet ->
+                "Pilih outlet asal dulu — pengajuan tidak bisa dari cakupan Semua Outlet."
+            tujuanTerpilih == null -> "Pilih outlet tujuan lebih dulu."
+            tujuanTerpilih.id == outletTerpilih?.id -> "Outlet tujuan harus berbeda dari outlet asal."
+            itemDiajukan.isEmpty() -> "Isi jumlah minimal satu bahan."
+            melebihiSisa.isNotEmpty() -> "Ada jumlah yang melebihi sisa stok."
+            else -> null
+        }
 }
 
 class MutasiViewModel : ViewModel() {
@@ -73,16 +120,31 @@ class MutasiViewModel : ViewModel() {
                     _state.value = _state.value.copy(memuat = false, tidakBerhak = true)
                     return@launch
                 }
+                // Peran pusat tidak memegang outlet, jadi outlet mana pun yang "pertama"
+                // sama sewenang-wenangnya. Mereka dibuka pada cakupan Semua Outlet supaya
+                // apa yang dihitung lencana benar-benar terlihat di daftar.
+                val outletSendiri = AppSession.staff.value?.outletId
+                val pilihanTersedia = daftarPilihan(outlets)
                 val terpilih = _state.value.outletTerpilih?.let { lama ->
-                    outlets.firstOrNull { it.id == lama.id }
-                } ?: outlets.first()
-                _state.value = _state.value.copy(outlets = outlets, outletTerpilih = terpilih)
+                    pilihanTersedia.firstOrNull { it.id == lama.id }
+                }
+                    ?: outletSendiri?.let { id -> outlets.firstOrNull { it.id == id } }
+                    ?: if (pilihanTersedia.size > outlets.size) SEMUA_OUTLET else outlets.first()
+                _state.value = _state.value.copy(outlets = pilihanTersedia, outletTerpilih = terpilih)
                 muatDaftar()
             } catch (e: Exception) {
                 _state.value = _state.value.copy(memuat = false, error = stokErrorMessage(e))
             }
         }
     }
+
+    /**
+     * Isi pemilih outlet. "Semua Outlet" hanya ditawarkan bila memang ada lebih dari
+     * satu outlet untuk digabung — menawarkannya kepada kru satu outlet cuma menambah
+     * pilihan yang tidak mengubah apa pun.
+     */
+    private fun daftarPilihan(outlets: List<OutletRingkas>): List<OutletRingkas> =
+        if (outlets.size > 1) listOf(SEMUA_OUTLET) + outlets else outlets
 
     fun pilihOutlet(outlet: OutletRingkas) {
         if (outlet.id == _state.value.outletTerpilih?.id) return
@@ -92,10 +154,14 @@ class MutasiViewModel : ViewModel() {
 
     private suspend fun muatDaftar() {
         val outlet = _state.value.outletTerpilih ?: return
+        // id kosong -> tanpa penyaring outlet, yang oleh repository diartikan
+        // "seluruh mutasi yang terlihat RLS".
+        val lingkup = outlet.id.ifEmpty { null }
         _state.value = _state.value.copy(memuat = true, error = null)
         try {
-            _state.value = _state.value.copy(memuat = false, daftar = MutasiRepository.daftar(outlet.id))
+            _state.value = _state.value.copy(memuat = false, daftar = MutasiRepository.daftar(lingkup))
         } catch (e: Exception) {
+            android.util.Log.e("MutasiViewModel", "muatDaftar() gagal, lingkup=$lingkup", e)
             _state.value = _state.value.copy(memuat = false, error = stokErrorMessage(e))
         }
     }
@@ -104,6 +170,14 @@ class MutasiViewModel : ViewModel() {
 
     fun bukaForm() {
         val outlet = _state.value.outletTerpilih ?: return
+        // Ditolak dengan alasan, bukan `return` diam-diam: tombolnya terlihat, dan
+        // tombol yang ditekan tanpa terjadi apa-apa terbaca sebagai aplikasi rusak.
+        if (outlet.adalahSemuaOutlet) {
+            _state.value = _state.value.copy(
+                pesan = "Pilih satu outlet asal dulu sebelum mengajukan mutasi.",
+            )
+            return
+        }
         viewModelScope.launch {
             _state.value = _state.value.copy(formTerbuka = true, memuatForm = true, error = null, pesan = null)
             try {
@@ -146,23 +220,35 @@ class MutasiViewModel : ViewModel() {
         _state.value = _state.value.copy(jumlah = _state.value.jumlah + (bahanBakuId to nilai))
     }
 
+    /**
+     * Isi jumlah sebanyak seluruh sisa. Mengosongkan satu bahan dari outlet adalah
+     * alasan mutasi yang paling sering, dan mengetik ulang angka sisa yang panjang
+     * (mis. 7055) rawan salah ketik.
+     */
+    fun isiSeluruhSisa(bahanBakuId: String) {
+        val b = _state.value.bahan.firstOrNull { it.bahanBakuId == bahanBakuId } ?: return
+        if (b.sisa <= 0) return
+        _state.value = _state.value.copy(
+            jumlah = _state.value.jumlah + (bahanBakuId to formatAngkaStok(b.sisa)),
+        )
+    }
+
+    fun hapusJumlah(bahanBakuId: String) {
+        _state.value = _state.value.copy(jumlah = _state.value.jumlah - bahanBakuId)
+    }
+
     fun ajukan() {
-        val asal = _state.value.outletTerpilih ?: return
-        val tujuan = _state.value.tujuanTerpilih
-        if (tujuan == null) {
-            _state.value = _state.value.copy(pesan = "Pilih outlet tujuan terlebih dahulu.")
+        val asal = _state.value.outletTerpilih?.takeUnless { it.adalahSemuaOutlet } ?: return
+        // Semua syaratnya — termasuk outlet tujuan wajib berbeda dari asal, yang juga
+        // dijaga database — terkumpul di halanganAjukan supaya layar bisa menampilkan
+        // alasan yang sama persis di bawah tombol sebelum ditekan.
+        val halangan = _state.value.halanganAjukan
+        if (halangan != null) {
+            _state.value = _state.value.copy(pesan = halangan)
             return
         }
-        // Outlet asal dan tujuan wajib berbeda — dijaga di sini dan di database.
-        if (tujuan.id == asal.id) {
-            _state.value = _state.value.copy(pesan = "Outlet tujuan harus berbeda dari outlet asal.")
-            return
-        }
+        val tujuan = _state.value.tujuanTerpilih!!
         val items = _state.value.itemDiajukan
-        if (items.isEmpty()) {
-            _state.value = _state.value.copy(pesan = "Isi jumlah minimal satu bahan.")
-            return
-        }
         viewModelScope.launch {
             _state.value = _state.value.copy(memproses = true, error = null, pesan = null)
             try {

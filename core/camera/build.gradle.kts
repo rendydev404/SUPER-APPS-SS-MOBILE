@@ -1,9 +1,23 @@
 plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
-    id("kotlin-kapt")
-    id("com.google.dagger.hilt.android")
 }
+
+/**
+ * ABI yang dibangun untuk varian debug, dari properti `superapp.debugAbi`.
+ *
+ * ncnn/ArcFace di modul ini dibangun lewat CMake, dan AGP membuat satu pasang
+ * task configure+build untuk SETIAP ABI. Empat ABI berarti delapan task native
+ * yang ikut jalan di tiap build padahal saat ngoprek hanya satu yang benar-benar
+ * dipasang ke perangkat.
+ *
+ * Kosongkan nilainya di `gradle.properties` untuk kembali membangun semua ABI —
+ * perlu kalau memakai emulator x86_64. Varian release TIDAK tersentuh, jadi APK
+ * rilis tetap membawa keempat ABI.
+ */
+val debugAbi: List<String> = providers.gradleProperty("superapp.debugAbi").orNull
+    ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
+    ?: emptyList()
 
 android {
     namespace = "com.sukashawarma.superapp.core.camera"
@@ -28,6 +42,13 @@ android {
             path = file("src/main/cpp/CMakeLists.txt")
         }
     }
+    buildTypes {
+        debug {
+            if (debugAbi.isNotEmpty()) {
+                ndk { abiFilters += debugAbi }
+            }
+        }
+    }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.8"
     }
@@ -48,7 +69,5 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.activity:activity-compose:1.8.2")
     implementation("androidx.core:core-ktx:1.12.0")
-    implementation("com.google.dagger:hilt-android:2.51")
-    kapt("com.google.dagger:hilt-compiler:2.51")
     testImplementation("junit:junit:4.13.2")
 }

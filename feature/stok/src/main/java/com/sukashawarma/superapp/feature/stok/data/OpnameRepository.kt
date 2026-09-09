@@ -11,6 +11,11 @@ import com.sukashawarma.superapp.data.remote.optString
 import com.sukashawarma.superapp.feature.stok.data.model.OpnameHeader
 import com.sukashawarma.superapp.feature.stok.data.model.OpnameItemDetail
 import com.sukashawarma.superapp.feature.stok.data.model.StatusOpname
+import com.sukashawarma.superapp.feature.stok.domain.KeputusanDraftOpname
+import com.sukashawarma.superapp.feature.stok.domain.MasukanBerjenjang
+import com.sukashawarma.superapp.feature.stok.domain.parseCatatanOpname
+import com.sukashawarma.superapp.feature.stok.domain.OpnameTanggal
+import com.sukashawarma.superapp.feature.stok.domain.putuskanDraftOpname
 import com.sukashawarma.superapp.feature.stok.domain.UnitMeta
 import java.time.LocalDate
 import java.time.ZoneId
@@ -37,14 +42,47 @@ object OpnameRepository {
     fun hariIniWIB(): String = LocalDate.now(WIB).toString()
 
     /**
-     * Web punya `getEffectiveTodayWIB` dengan sederet pengecualian outlet/tanggal
-     * (Cileungsi 21 Agu, Empang 24 Agu, Paledang 26 Agu, Jatiwaringin 30 Agu 2026,
-     * dan jatah opname ganda 13 Agu 2026). Seluruh tanggal itu sudah lewat, sehingga
-     * cabangnya tidak akan pernah aktif lagi. Sengaja tidak diport: menyalin cabang
-     * mati hanya menambah jalur yang tak teruji, dan perilakunya untuk semua tanggal
-     * ke depan identik dengan jalur normal ini.
+     * Tanggal yang dipakai untuk opname hari ini — cermin `getEffectiveTodayWIB` web.
+     *
+     * Umumnya sama dengan [hariIniWIB]. Berbeda hanya bila outlet ini punya aturan
+     * pengalihan yang sedang berlaku DAN kuota opname pada tanggal tujuannya belum
+     * terpenuhi; lihat [OpnameTanggal] untuk alasan aturan itu ada.
+     *
+     * Kegagalan membaca jumlah finalized sengaja jatuh kembali ke tanggal hari ini,
+     * bukan melempar: opname pekerjaan harian yang tidak boleh terhenti gara-gara satu
+     * query tambahan gagal, dan tanggal hari ini jawaban yang benar untuk hampir semua
+     * outlet pada hampir semua hari.
      */
-    private fun tanggalEfektif(): String = hariIniWIB()
+    private suspend fun tanggalEfektif(outletId: String): String {
+        val hariIni = hariIniWIB()
+        val aturan = OpnameTanggal.pengalihanUntuk(outletId, hariIni) ?: return hariIni
+        val sudahFinal = runCatching {
+            jumlahOpname(outletId, aturan.tanggalTujuan, hanyaFinalized = true)
+        }.getOrElse { return hariIni }
+        return if (sudahFinal < aturan.minimalFinalized) aturan.tanggalTujuan else hariIni
+    }
+
+    /**
+     * Menghitung opname satu outlet pada satu tanggal.
+     *
+     * Barisnya ditarik lalu dihitung, bukan lewat `count` PostgREST: satu outlet pada
+     * satu tanggal hanya punya segelintir opname, dan `select id` sudah sekecil itu —
+     * menambah pembacaan header `Content-Range` ke lapisan jaringan tidak menghemat apa
+     * pun yang terasa.
+     */
+    private suspend fun jumlahOpname(
+        outletId: String,
+        tanggal: String,
+        hanyaFinalized: Boolean,
+    ): Int = Postgrest.select(
+        "opname",
+        listOf(
+            "select" to "id",
+            "outlet_id" to "eq.$outletId",
+            "tanggal" to "eq.$tanggal",
+            if (hanyaFinalized) "status" to "eq.finalized" else "status" to "neq.rejected",
+        ),
+    ).size()
 
     // -------------------------------------------------------------- pembacaan
 
@@ -88,6 +126,7 @@ object OpnameRepository {
             status = StatusOpname.dari(optString("status")),
             createdBy = optString("created_by"),
             createdAt = optString("created_at"),
+            updatedAt = optString("updated_at"),
             outletName = optJsonObject("outlets")?.optString("name"),
             creatorName = optJsonObject("outlet_staff")?.optString("name"),
             jumlahItem = items.size(),
@@ -95,17 +134,24 @@ object OpnameRepository {
         )
     }
 
-    /** Draft yang masih berjalan hari ini, kalau ada. */
-    suspend fun draftHariIni(outletId: String): JsonObject? = Postgrest.selectOne(
-        "opname",
-        listOf(
-            "select" to "*,opname_item(*)",
-            "outlet_id" to "eq.$outletId",
-            "tanggal" to "eq.${tanggalEfektif()}",
-            "status" to "eq.draft",
-            "order" to "created_at.desc",
-        ),
-    )
+    /**
+     * Draft yang masih berjalan hari ini, APA PUN tipenya.
+     *
+     * Tanpa filter tipe, dan itu inti perbaikannya: draft `ad_hoc` yang lahir dari
+     * opname kedua tidak akan pernah terlihat oleh pencarian bertipe `harian`. Cermin
+     * `fetchTodayOpnameDraftAction` web, yang juga hanya menyaring `status='draft'`.
+     */
+    private suspend fun draftBerjalan(outletId: String, tanggal: String): OpnameHeader? =
+        Postgrest.selectOne(
+            "opname",
+            listOf(
+                "select" to "id,outlet_id,tanggal,tipe,status,created_by,created_at,updated_at",
+                "outlet_id" to "eq.$outletId",
+                "tanggal" to "eq.$tanggal",
+                "status" to "eq.draft",
+                "order" to "created_at.desc",
+            ),
+        )?.toHeader()
 
     /**
      * Ambil draft hari ini bila ada, atau buat baru.
@@ -119,22 +165,53 @@ object OpnameRepository {
         createdBy: String,
         catatan: String? = null,
     ): OpnameHeader {
-        val tanggal = tanggalEfektif()
+        val tanggal = tanggalEfektif(outletId)
 
-        val adaSebelumnya = Postgrest.selectOne(
+        // Draft berjalan dicari LEBIH DULU dan tanpa memandang tipe. Urutan ini yang
+        // membuat "Simpan Draft lalu lanjutkan" bekerja; lihat [putuskanDraftOpname].
+        val berjalan = draftBerjalan(outletId, tanggal)
+
+        val sudahAda = if (berjalan != null) null else Postgrest.selectOne(
             "opname",
             listOf(
-                "select" to "id,outlet_id,tanggal,tipe,status,created_by,created_at",
+                "select" to "id,outlet_id,tanggal,tipe,status,created_by,created_at,updated_at",
                 "outlet_id" to "eq.$outletId",
                 "tipe" to "eq.$tipe",
                 "tanggal" to "eq.$tanggal",
                 "status" to "neq.rejected",
             ),
-        )
-        if (adaSebelumnya != null) {
-            return adaSebelumnya.toHeader() ?: error("Opname tidak terbaca")
-        }
+        )?.toHeader()
 
+        val keputusan = putuskanDraftOpname(
+            tipe = tipe,
+            draftBerjalanId = berjalan?.id,
+            sudahAdaId = sudahAda?.id,
+            sudahAdaFinal = sudahAda?.status == StatusOpname.FINALIZED,
+            // Dihitung hanya bila memang menentukan, supaya tidak menambah satu
+            // permintaan jaringan pada jalur yang paling sering ditempuh.
+            jumlahHariIni = if (sudahAda?.status == StatusOpname.FINALIZED) {
+                jumlahOpname(outletId, tanggal, hanyaFinalized = false)
+            } else {
+                0
+            },
+            maksimalHariIni = OpnameTanggal.maksimalOpname(outletId, tanggal),
+        )
+
+        return when (keputusan) {
+            is KeputusanDraftOpname.Lanjutkan -> berjalan!!
+            is KeputusanDraftOpname.Tampilkan -> sudahAda!!
+            is KeputusanDraftOpname.BuatBaru ->
+                buatBaru(outletId, keputusan.tipe, createdBy, catatan, tanggal)
+        }
+    }
+
+    private suspend fun buatBaru(
+        outletId: String,
+        tipe: String,
+        createdBy: String,
+        catatan: String?,
+        tanggal: String,
+    ): OpnameHeader {
         val body = JsonObject().apply {
             addProperty("outlet_id", outletId)
             addProperty("tipe", tipe)
@@ -199,6 +276,24 @@ object OpnameRepository {
         })
     }
 
+    /**
+     * Apakah opname ini sudah difinalisasi.
+     *
+     * Dipakai antrean offline untuk membedakan dua kegagalan yang tampak sama: kiriman
+     * yang benar-benar belum sampai, dan kiriman yang sebenarnya SUDAH diterima server
+     * tetapi balasannya hilang di jalan. Tanpa pembedaan ini baris kedua akan terus
+     * dicoba selamanya.
+     *
+     * Gagal membaca dijawab `false` — menganggapnya belum selesai berarti antreannya
+     * dipertahankan, dan itu arah salah yang lebih aman.
+     */
+    suspend fun sudahFinalized(opnameId: String): Boolean = runCatching {
+        Postgrest.selectOne(
+            "opname",
+            listOf("select" to "status", "id" to "eq.$opnameId"),
+        )?.optString("status") == StatusOpname.FINALIZED.nilai
+    }.getOrDefault(false)
+
     /** Finalisasi langsung — menulis `opname_selisih` ke ledger lewat trigger. */
     suspend fun finalisasi(opnameId: String) {
         Postgrest.rpc("finalize_opname", JsonObject().apply {
@@ -221,18 +316,28 @@ object OpnameRepository {
         })
     }
 
+    /**
+     * Satu baris draft yang sudah tersimpan.
+     *
+     * [masukan] null berarti barisnya ditulis SEBELUM native menyimpan masukan mentah
+     * (atau oleh klien lain yang tidak menulisnya). Draft seperti itu tetap bisa
+     * dilanjutkan, hanya saja pemulihannya jatuh ke [qtyFisik] pada satuan terkecil —
+     * lihat penanganannya di OpnameViewModel.
+     */
+    data class ItemDraft(val qtyFisik: Double, val masukan: MasukanBerjenjang?)
+
     /** Item yang sudah tersimpan pada satu opname, untuk melanjutkan draft. */
-    suspend fun itemTersimpan(opnameId: String): Map<String, Double> = Postgrest.select(
+    suspend fun itemTersimpan(opnameId: String): Map<String, ItemDraft> = Postgrest.select(
         "opname_item",
         listOf(
-            "select" to "bahan_baku_id,qty_fisik",
+            "select" to "bahan_baku_id,qty_fisik,catatan",
             "opname_id" to "eq.$opnameId",
         ),
     ).mapNotNull { el ->
         val o = el.asJsonObject
         val id = o.optString("bahan_baku_id") ?: return@mapNotNull null
         val qty = o.optDouble("qty_fisik") ?: return@mapNotNull null
-        id to qty
+        id to ItemDraft(qty, parseCatatanOpname(o.optString("catatan")).masukan)
     }.toMap()
 
     // ------------------------------------------------------------------ detail

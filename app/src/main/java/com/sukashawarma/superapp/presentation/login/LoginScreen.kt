@@ -272,7 +272,7 @@ private fun BrandMark() {
         }
 
         Image(
-            painter = painterResource(R.mipmap.ic_launcher),
+            painter = painterResource(R.drawable.ic_app_logo),
             contentDescription = "Logo Suka Shawarma",
             contentScale = ContentScale.Fit,
             modifier = Modifier.size(158.dp),

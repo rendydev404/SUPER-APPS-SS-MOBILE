@@ -71,10 +71,10 @@ class WasteApprovalViewModel : ViewModel() {
         viewModelScope.launch {
             mutable.update { it.copy(busy = true, error = null) }
             try {
-                val fresh = WasteApprovalRepository.load().firstOrNull { it.id == report.id }
+                val fresh = WasteApprovalRepository.reload(report)
                     ?: error("Laporan sudah diproses. Silakan muat ulang.")
                 if (fresh.deficit) mutable.update { it.copy(confirmation = fresh) }
-                else { WasteApprovalRepository.decide(fresh); mutable.update { it.copy(message = "Laporan disetujui") }; load() }
+                else { WasteApprovalRepository.decide(fresh); selesai(fresh, "Laporan disetujui") }
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { mutable.update { it.copy(error = e.message ?: stokErrorMessage(e)) } }
             finally { mutable.update { it.copy(busy = false) } }
@@ -87,11 +87,22 @@ class WasteApprovalViewModel : ViewModel() {
             mutable.update { it.copy(busy = true, error = null) }
             try {
                 WasteApprovalRepository.decide(report, reason)
-                mutable.update { it.copy(confirmation = null, rejecting = null, message = if (reason == null) "Laporan disetujui" else "Laporan ditolak") }
-                load()
+                selesai(report, if (reason == null) "Laporan disetujui" else "Laporan ditolak")
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { mutable.update { it.copy(error = e.message ?: stokErrorMessage(e)) } }
             finally { mutable.update { it.copy(busy = false) } }
         }
+    }
+
+    /**
+     * Baris yang sudah diputuskan hilang dari daftar seketika; pemuatan ulang hanya
+     * menyegarkan saldo kartu lain dan berjalan di latar, supaya tombol tidak
+     * menahan pengguna menunggu satu putaran jaringan penuh.
+     */
+    private fun selesai(report: WasteReview, pesan: String) {
+        mutable.update { s ->
+            s.copy(reports = s.reports.filterNot { it.id == report.id }, confirmation = null, rejecting = null, message = pesan)
+        }
+        job = viewModelScope.launch { load() }
     }
 }

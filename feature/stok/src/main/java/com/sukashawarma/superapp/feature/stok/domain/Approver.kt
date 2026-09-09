@@ -5,11 +5,20 @@ import com.sukashawarma.superapp.domain.model.Role
 /**
  * Matriks role approval — cermin `apps/stok/src/lib/stok/approver.ts` di web.
  *
- * Ini murni untuk menyembunyikan tombol; keputusan sebenarnya tetap di database.
- * Web memakai daftar ini sebagai gerbang server-side karena RPC-nya SECURITY
- * DEFINER dan tidak memeriksa role sama sekali. Native tidak punya lapisan server
- * sendiri, jadi yang melindungi adalah RLS pada tabel yang disentuh RPC serta
- * `accessible_outlet_ids()` — bukan daftar di bawah ini.
+ * Ini murni untuk menyembunyikan tombol, dan HANYA itu.
+ *
+ * Jangan percaya kalimat lama di tempat ini yang menyebut "yang melindungi adalah
+ * RLS pada tabel yang disentuh RPC". Itu keliru: `approve_opname`, `reject_opname`,
+ * `set_opname_pending`, dan `finalize_opname` semuanya SECURITY DEFINER, yang justru
+ * MEM-BYPASS RLS. Diperiksa langsung ke database pada 9 September 2026 — keempatnya
+ * dijawab sampai ke pemeriksaan status opname bahkan oleh pemanggil anonim tanpa
+ * sesi, jadi tidak ada pemeriksaan auth.uid(), peran, maupun outlet di dalamnya.
+ *
+ * Akses anonim ditutup migrasi web `20300206000000_opname_rpc_cabut_akses_anon`.
+ * Pengguna yang sudah login dengan peran apa pun MASIH bisa memanggilnya langsung;
+ * penutupnya menuntut pemeriksaan peran di dalam badan fungsi, dan badan itu belum
+ * ada di repo migration mana pun. Sampai itu dikerjakan, anggap daftar di bawah ini
+ * sebagai kerapian tampilan, bukan pengaman.
  */
 object Approver {
 

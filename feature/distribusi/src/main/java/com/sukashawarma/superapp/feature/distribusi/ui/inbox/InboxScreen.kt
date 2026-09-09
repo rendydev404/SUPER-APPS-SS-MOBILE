@@ -12,10 +12,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
@@ -83,24 +81,15 @@ fun InboxScreen(
                 onRiwayat = onBukaRiwayat,
             )
         },
-        floatingActionButton = {
-            // Tombol pindai hanya untuk yang berhak memverifikasi. Pengawas
-            // membuka layar ini untuk memantau, bukan untuk menerima barang.
-            if (state.bolehVerifikasi) {
-                ExtendedFloatingActionButton(
-                    onClick = onBukaScan,
-                    icon = { Icon(Icons.Default.QrCodeScanner, null) },
-                    text = { Text("Pindai QR") },
-                )
-            }
-        },
     ) { padding ->
         Column(Modifier.fillMaxSize().background(SukaSurface).padding(padding)) {
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(onClick = onKeluar) { Icon(Icons.Default.ArrowBack, "Kembali") }
+                IconButton(onClick = onKeluar) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "Kembali")
+                }
                 Column {
                     Text(
                         "Penerimaan Barang",

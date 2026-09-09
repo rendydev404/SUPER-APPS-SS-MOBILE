@@ -1,8 +1,6 @@
 plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
-    id("kotlin-kapt")
-    id("com.google.dagger.hilt.android")
 }
 
 android {
@@ -44,9 +42,8 @@ dependencies {
     // Lapor waste memotret bukti lalu mengunggahnya ke bucket `waste_evidence`.
     implementation(project(":core:camera"))
     implementation(project(":core:storage"))
+    implementation(project(":core:database"))
     implementation("io.coil-kt:coil-compose:2.5.0")
-    implementation("com.google.dagger:hilt-android:2.51")
-    kapt("com.google.dagger:hilt-compiler:2.51")
     testImplementation("junit:junit:4.13.2")
 }
 

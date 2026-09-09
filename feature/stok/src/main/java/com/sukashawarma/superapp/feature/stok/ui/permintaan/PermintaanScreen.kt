@@ -107,6 +107,12 @@ private fun warnaStatus(status: StatusPermintaan): Color = when (status) {
 }
 
 /**
+ * Judul grup katalog saat filter "kritis" aktif. Isinya bahan kritis DAN yang baru
+ * menipis, jadi judulnya tidak boleh menjanjikan kritis semua.
+ */
+private const val JUDUL_PERLU_DIMINTA = "Bahan Baku Perlu Diminta"
+
+/**
  * Badge sisa budget — cermin `BudgetBadge.tsx`. Disembunyikan bila outlet tak
  * punya plafon. Tidak pernah memblokir pengiriman: web pun menandainya
  * "Tahap Developer (Bisa Diabaikan)", keputusan tetap di approver.
@@ -363,7 +369,7 @@ private fun KontenKatalog(state: PermintaanUiState, viewModel: PermintaanViewMod
                     ) { viewModel.pilihKategori("all") }
                     if (saranBoleh.isNotEmpty()) {
                         ChipKategori(
-                            label = "🔥 Kritis (${saranBoleh.size})",
+                            label = "🔥 Perlu Diminta (${saranBoleh.size})",
                             aktif = state.kategoriTerpilih == "kritis",
                             warnaAktif = Merah,
                         ) { viewModel.pilihKategori("kritis") }
@@ -387,7 +393,7 @@ private fun KontenKatalog(state: PermintaanUiState, viewModel: PermintaanViewMod
                         shape = RoundedCornerShape(13.dp),
                     ) {
                         Text(
-                            "＋ Tambah Semua Kritis ($belumDitambah)",
+                            "＋ Tambah Semua yang Perlu ($belumDitambah)",
                             fontSize = 12.sp, fontWeight = FontWeight.Black,
                         )
                     }
@@ -421,7 +427,7 @@ private fun KontenKatalog(state: PermintaanUiState, viewModel: PermintaanViewMod
             } else {
                 // Kelompokkan per kategori seperti web; filter kritis/kategori jadi satu grup.
                 val grup: List<Pair<String, List<BahanBaku>>> = when (state.kategoriTerpilih) {
-                    "kritis" -> listOf("Bahan Baku Stok Kritis" to terfilter)
+                    "kritis" -> listOf(JUDUL_PERLU_DIMINTA to terfilter)
                     "all" -> terfilter.groupBy { kategoriTampil(it.kategori) }.toList()
                     else -> listOf(state.kategoriTerpilih to terfilter)
                 }
@@ -434,7 +440,7 @@ private fun KontenKatalog(state: PermintaanUiState, viewModel: PermintaanViewMod
                             Box(
                                 Modifier.size(width = 8.dp, height = 14.dp)
                                     .background(
-                                        if (kategori == "Bahan Baku Stok Kritis") Merah else Oranye,
+                                        if (kategori == JUDUL_PERLU_DIMINTA) Merah else Oranye,
                                         RoundedCornerShape(50),
                                     )
                             )
@@ -491,7 +497,10 @@ private fun KartuBahanKatalog(
     qty: Long,
     viewModel: PermintaanViewModel,
 ) {
-    val kritis = saran != null
+    // Perlu diminta belum tentu kritis: yang baru menipis ikut ditawarkan di sini,
+    // dan menyebutnya kritis membuat angka layar ini berselisih dengan Dashboard.
+    val perluDiminta = saran != null
+    val kritis = saran?.kritis(bahan.meta) == true
     val ditambah = qty > 0L
     Surface(
         Modifier.fillMaxWidth(),
@@ -501,7 +510,7 @@ private fun KartuBahanKatalog(
             1.dp,
             when {
                 ditambah -> Oranye.copy(alpha = 0.55f)
-                kritis -> Merah.copy(alpha = 0.30f)
+                perluDiminta -> Merah.copy(alpha = 0.30f)
                 else -> Color(0xFFF1F5F9)
             },
         ),
@@ -513,16 +522,17 @@ private fun KartuBahanKatalog(
                     color = Color(0xFF94A3B8), fontSize = 9.sp, fontWeight = FontWeight.Black,
                     letterSpacing = 0.5.sp, modifier = Modifier.weight(1f),
                 )
-                if (kritis) {
+                if (perluDiminta) {
+                    val warna = if (kritis) Merah else Oranye
                     Surface(
                         shape = RoundedCornerShape(50),
-                        color = Merah.copy(alpha = 0.10f),
-                        border = BorderStroke(1.dp, Merah.copy(alpha = 0.28f)),
+                        color = warna.copy(alpha = 0.10f),
+                        border = BorderStroke(1.dp, warna.copy(alpha = 0.28f)),
                     ) {
                         Text(
-                            "🔥 KRITIS",
+                            if (kritis) "🔥 KRITIS" else "⚠️ MENIPIS",
                             Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                            color = Merah, fontSize = 9.sp, fontWeight = FontWeight.Black,
+                            color = warna, fontSize = 9.sp, fontWeight = FontWeight.Black,
                         )
                     }
                 }
@@ -537,7 +547,7 @@ private fun KartuBahanKatalog(
             if (saran != null) {
                 Text(
                     "Sisa: ${formatTriUnitAdaptif(saran.currentQty, saran.saldoIsGram, bahan.meta)}",
-                    color = Merah, fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                    color = if (kritis) Merah else Oranye, fontSize = 11.sp, fontWeight = FontWeight.Bold,
                 )
             } else {
                 Text(
@@ -554,14 +564,14 @@ private fun KartuBahanKatalog(
                     },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, if (kritis) Merah.copy(alpha = 0.4f) else Color(0xFFE2E8F0)),
+                    border = BorderStroke(1.dp, if (perluDiminta) Merah.copy(alpha = 0.4f) else Color(0xFFE2E8F0)),
                 ) {
-                    Icon(Icons.Default.Add, null, tint = if (kritis) Merah else Oranye, modifier = Modifier.size(15.dp))
+                    Icon(Icons.Default.Add, null, tint = if (perluDiminta) Merah else Oranye, modifier = Modifier.size(15.dp))
                     Spacer(Modifier.width(5.dp))
                     Text(
-                        if (kritis) "Rekomendasi (${formatSatuan(bahan.satuanPesan)})"
+                        if (perluDiminta) "Rekomendasi (${formatSatuan(bahan.satuanPesan)})"
                         else "Tambah (${formatSatuan(bahan.satuanPesan)})",
-                        color = if (kritis) Merah else Oranye,
+                        color = if (perluDiminta) Merah else Oranye,
                         fontSize = 12.sp, fontWeight = FontWeight.Bold,
                     )
                 }

@@ -31,6 +31,7 @@
         android:name=".SuperappApplication"
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:label="SUKA Superapp"
         android:theme="@style/Theme.SukaSuperapp"
         android:usesCleartextTraffic="false">
@@ -90,5 +91,15 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- Penerima push. Tidak berbahaya walau google-services.json belum ada:
+             tanpa konfigurasi Firebase, service ini tidak pernah dipanggil. -->
+        <service
+            android:name=".notif.SuperappMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>
