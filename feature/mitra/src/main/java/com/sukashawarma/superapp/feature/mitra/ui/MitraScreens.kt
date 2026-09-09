@@ -49,7 +49,7 @@ import com.sukashawarma.superapp.presentation.theme.SukaSurfaceContainerLowest
  * login-lalu-redirect bisa dites di HP nyata sebelum satu pun angka dibangun.
  */
 @Composable
-fun MitraDashboardScaffold(onLoggedOut: () -> Unit) {
+fun MitraDashboardScaffold(onOpenProfil: () -> Unit, onLoggedOut: () -> Unit) {
     val staff by AppSession.staff.collectAsState()
     val profil by AppSession.mitraProfile.collectAsState()
 
@@ -93,6 +93,11 @@ fun MitraDashboardScaffold(onLoggedOut: () -> Unit) {
         )
 
         Spacer(Modifier.weight(1f))
+        // Mitra tidak punya modul Absensi maupun Beranda, jadi ini satu-satunya
+        // jalan mereka ke halaman profil dan ganti password.
+        TextButton(onClick = onOpenProfil) {
+            Text("Profil Saya", color = SukaOrange, fontWeight = FontWeight.Bold)
+        }
         TextButton(onClick = { AppSession.signOut(); onLoggedOut() }) {
             Text("Keluar", color = SukaOrange, fontWeight = FontWeight.Bold)
         }
