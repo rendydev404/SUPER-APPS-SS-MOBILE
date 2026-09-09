@@ -37,6 +37,7 @@ data class HomeUiState(
     val stokMenipis: Int? = null,
     val kirimanMenunggu: Int? = null,
     val wasteMenunggu: Int? = null,
+    val pettyCashButuhAksi: Int? = null,
     val memuatSorotan: Boolean = true,
 ) {
     /** Jam absen terakhir hari ini dalam WIB, mis. "07:12". */
@@ -57,7 +58,6 @@ class HomeViewModel : ViewModel() {
     val pesanPos: SharedFlow<String> = _pesanPos
 
     init {
-        val staff = AppSession.staff.value
         val now = JakartaTime.now()
         val greeting = when {
             now.hour < 11 -> "Selamat pagi"
@@ -66,9 +66,28 @@ class HomeViewModel : ViewModel() {
             else -> "Selamat malam"
         }
         val dateLabel = now.format(DateTimeFormatter.ofPattern("EEEE, d MMMM yyyy", Locale.forLanguageTag("id-ID")))
-        _state.value = HomeUiState(staff = staff, greeting = greeting, dateLabel = dateLabel)
-        loadTodayAttendance(staff?.id)
-        muatSorotan(staff)
+        _state.value = _state.value.copy(greeting = greeting, dateLabel = dateLabel)
+
+        // MENGIKUTI sesi, bukan memotretnya sekali di sini. Versi sebelumnya membaca
+        // AppSession.staff.value satu kali, jadi nama dan foto profil yang baru
+        // disimpan tidak pernah sampai ke beranda sampai ViewModel dibuat ulang —
+        // yang praktis berarti "tutup dan buka lagi aplikasinya".
+        viewModelScope.launch {
+            var kunciSebelumnya: String? = null
+            AppSession.staff.collect { staff ->
+                _state.value = _state.value.copy(staff = staff)
+
+                // Angka absensi dan sorotan modul hanya bergantung pada SIAPA dan DI
+                // MANA, bukan pada nama tampilan atau foto. Tanpa gerbang ini, setiap
+                // penyuntingan profil menembakkan ulang empat query beranda —
+                // pemborosan yang langsung terasa di ratusan perangkat.
+                val kunci = "${staff?.id}|${staff?.outletId}|${staff?.roleRaw}"
+                if (kunci == kunciSebelumnya) return@collect
+                kunciSebelumnya = kunci
+                loadTodayAttendance(staff?.id)
+                muatSorotan(staff)
+            }
+        }
     }
 
     /**
@@ -127,12 +146,25 @@ class HomeViewModel : ViewModel() {
                     ).size()
                 }.getOrNull()
             }
+            val pettyCash = async {
+                if (role !in LEADER_ROLES) null
+                else runCatching {
+                    // Cermin LencanaViewModel modul Leader: hanya status
+                    // `forwarded_by_area_manager` yang benar-benar menunggu tangan
+                    // leader — `leader_forward_funds` menolak status lain apa pun.
+                    Postgrest.select(
+                        "petty_cash_topups",
+                        listOf("select" to "id", "status" to "eq.forwarded_by_area_manager"),
+                    ).size()
+                }.getOrNull()
+            }
             val hasilStok = stok.await()
             _state.value = _state.value.copy(
                 stokKritis = hasilStok?.first,
                 stokMenipis = hasilStok?.second,
                 kirimanMenunggu = kiriman.await(),
                 wasteMenunggu = waste.await(),
+                pettyCashButuhAksi = pettyCash.await(),
                 memuatSorotan = false,
             )
         }
