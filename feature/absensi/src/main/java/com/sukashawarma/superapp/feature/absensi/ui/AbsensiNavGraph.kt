@@ -77,7 +77,7 @@ import com.sukashawarma.superapp.presentation.absensi.enroll.EnrollScreen
 import com.sukashawarma.superapp.presentation.absensi.kasbon.KasbonScreen
 import com.sukashawarma.superapp.presentation.absensi.papan.PapanKehadiranScreen
 import com.sukashawarma.superapp.presentation.absensi.pengaturan.PengaturanScreen
-import com.sukashawarma.superapp.presentation.absensi.profil.ProfilScreen
+import com.sukashawarma.superapp.feature.profil.ui.ProfilScreen
 import com.sukashawarma.superapp.presentation.absensi.rekap.RekapScreen
 import com.sukashawarma.superapp.domain.model.Role
 import com.sukashawarma.superapp.domain.session.AppSession
@@ -522,9 +522,14 @@ fun AbsensiMainPagerScreen(
                             coroutineScope.launch { pagerState.animateScrollToPage(0) }
                         })
                     } else {
-                        ProfilScreen(onExit = {
-                            coroutineScope.launch { pagerState.animateScrollToPage(0) }
-                        })
+                        // Sebagai tab, layar ini tidak punya halaman induk untuk
+                        // dituju — tombol kembali di sana hanya akan membingungkan.
+                        ProfilScreen(
+                            onExit = {
+                                coroutineScope.launch { pagerState.animateScrollToPage(0) }
+                            },
+                            tampilkanTombolKembali = false,
+                        )
                     }
                     3 -> AbsensiHubScreen(
                         onNavigate = onNavigateToSubRoute,
