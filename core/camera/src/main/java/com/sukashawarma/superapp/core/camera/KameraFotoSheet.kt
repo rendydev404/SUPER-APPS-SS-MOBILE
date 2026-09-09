@@ -55,6 +55,9 @@ fun KameraFotoSheet(
     onDiambil: (Bitmap) -> Unit,
     onBatal: () -> Unit,
     labelAmbil: String = "Ambil Foto",
+    /** Kamera depan untuk foto orang (foto profil), belakang untuk foto barang.
+     *  Default belakang supaya pemanggil lama tidak berubah perilakunya. */
+    kameraDepan: Boolean = false,
 ) {
     val konteks = LocalContext.current
     val pemilikDaurHidup = LocalLifecycleOwner.current
@@ -94,7 +97,8 @@ fun KameraFotoSheet(
                         kamera.unbindAll()
                         kamera.bindToLifecycle(
                             pemilikDaurHidup,
-                            CameraSelector.DEFAULT_BACK_CAMERA,
+                            if (kameraDepan) CameraSelector.DEFAULT_FRONT_CAMERA
+                            else CameraSelector.DEFAULT_BACK_CAMERA,
                             pratinjau,
                             penangkap,
                         )
