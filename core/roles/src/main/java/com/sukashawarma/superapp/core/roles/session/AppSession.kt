@@ -181,6 +181,30 @@ object AppSession {
         }
     }
 
+    /**
+     * Memuat ulang baris staff milik sesi yang sedang berjalan.
+     *
+     * Dipakai setelah profil disunting sendiri (nama tampilan/username tampilan/
+     * foto), supaya seluruh layar yang membaca [staff] ikut berubah tanpa perlu
+     * login ulang. Sengaja TIDAK memakai jalur login: kegagalan jaringan di sini
+     * hanya berarti "layar belum ikut berubah", bukan alasan menutup sesi.
+     *
+     * Hasil dibuang bila sesi sudah berpindah ke akun lain selagi request berjalan
+     * — alasan yang sama dengan loadMitraProfileIfNeeded().
+     */
+    suspend fun refreshStaff() {
+        val current = _staff.value ?: return
+        try {
+            val segar = StaffRepository.getOutletStaff(current.id) ?: return
+            if (_staff.value?.id != current.id) return
+            _staff.value = segar
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            android.util.Log.e("AppSession", "refreshStaff() gagal", e)
+        }
+    }
+
     private fun signOutWith(message: String): LoginResult {
         signOut()
         return LoginResult.Failure(message)
