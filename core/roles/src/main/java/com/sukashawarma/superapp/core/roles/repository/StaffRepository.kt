@@ -20,7 +20,7 @@ object StaffRepository {
             "outlet_staff",
             listOf(
                 "id" to "eq.$userId",
-                "select" to "id,outlet_id,name,role,status,ref_photo_url,username,allow_manual_button,outlets!outlet_staff_outlet_id_fkey(name)"
+                "select" to "id,outlet_id,name,role,status,ref_photo_url,username,allow_manual_button,display_name,display_username,avatar_url,outlets!outlet_staff_outlet_id_fkey(name)"
             )
         ) ?: return null
 
@@ -56,6 +56,9 @@ object StaffRepository {
             refPhotoUrl = row.optString("ref_photo_url"),
             allowManualButton = row.optBoolean("allow_manual_button"),
             faceDescriptor = null,
+            displayName = row.optString("display_name"),
+            displayUsername = row.optString("display_username"),
+            avatarUrl = row.optString("avatar_url"),
         )
     }
 }
