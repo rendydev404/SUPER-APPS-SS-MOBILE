@@ -1,8 +1,6 @@
 plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
-    id("kotlin-kapt")
-    id("com.google.dagger.hilt.android")
 }
 
 android {
@@ -38,8 +36,8 @@ dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     // RealtimeRefresh menyalurkan Realtime (core:network) ke lifecycle layar.
     api(project(":core:network"))
+    // AvatarStaf memuat foto dari bucket privat lewat OkHttp client Supabase.
+    implementation("io.coil-kt:coil-compose:2.5.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
-    implementation("com.google.dagger:hilt-android:2.51")
-    kapt("com.google.dagger:hilt-compiler:2.51")
 }
 
