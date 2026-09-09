@@ -5,6 +5,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
@@ -22,6 +23,7 @@ import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.PointOfSale
 import androidx.compose.material.icons.filled.Settings
@@ -42,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import android.widget.Toast
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.sukashawarma.superapp.core.ui.AvatarStaf
 import com.sukashawarma.superapp.presentation.theme.*
 
 /** Satu angka pada kaki kartu modul. [menonjol] mewarnainya dengan aksen modul,
@@ -69,6 +72,7 @@ private val AKSEN_ABSENSI = Color(0xFFEA580C)
 private val AKSEN_STOK = Color(0xFF0EA5E9)
 private val AKSEN_DISTRIBUSI = Color(0xFF6366F1)
 private val AKSEN_MANAGER = Color(0xFFE11D48)
+private val AKSEN_LEADER = Color(0xFF7C3AED)
 private val AKSEN_POS = Color(0xFF059669)
 
 @Composable
@@ -77,8 +81,10 @@ fun HomeScreen(
     onOpenStok: () -> Unit,
     onOpenDistribusi: () -> Unit,
     onOpenManager: () -> Unit,
+    onOpenLeader: () -> Unit,
     onLoggedOut: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenProfil: () -> Unit,
     viewModel: HomeViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
@@ -88,7 +94,7 @@ fun HomeScreen(
         viewModel.pesanPos.collect { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }
     }
     Column(Modifier.fillMaxSize().background(SukaSurface).verticalScroll(rememberScrollState())) {
-        HomeHero(state, staff, { viewModel.logout(); onLoggedOut() }, onOpenSettings)
+        HomeHero(state, staff, { viewModel.logout(); onLoggedOut() }, onOpenSettings, onOpenProfil)
         AttendanceSummaryCard(state)
         Column(Modifier.padding(horizontal = 20.dp)) {
             Spacer(Modifier.height(24.dp))
@@ -117,6 +123,22 @@ fun HomeScreen(
                         ),
                         Sorotan("JAM", state.jamAbsen ?: "—"),
                         Sorotan("CUTI & KASBON", "Tersedia"),
+                    ),
+                )
+            )
+            Spacer(Modifier.height(14.dp))
+            ModuleCard(
+                ModuleTile(
+                    label = "POS",
+                    desc = "Kasir, pesanan & cetak struk di aplikasi POS",
+                    icon = Icons.Default.PointOfSale,
+                    aksen = AKSEN_POS,
+                    onClick = { viewModel.bukaPos(context) },
+                    memuat = state.membukaPos,
+                    sorotan = listOf(
+                        Sorotan("KASIR", "Aplikasi POS"),
+                        Sorotan("MASUK", "Tanpa login"),
+                        Sorotan("STRUK", "Cetak"),
                     ),
                 )
             )
@@ -201,29 +223,36 @@ fun HomeScreen(
                     )
                 )
             }
-            Spacer(Modifier.height(14.dp))
-            ModuleCard(
-                ModuleTile(
-                    label = "POS",
-                    desc = "Kasir, pesanan & cetak struk di aplikasi POS",
-                    icon = Icons.Default.PointOfSale,
-                    aksen = AKSEN_POS,
-                    onClick = { viewModel.bukaPos(context) },
-                    memuat = state.membukaPos,
-                    sorotan = listOf(
-                        Sorotan("KASIR", "Aplikasi POS"),
-                        Sorotan("MASUK", "Tanpa login"),
-                        Sorotan("STRUK", "Cetak"),
-                    ),
+            if (staff?.role in LEADER_ROLES) {
+                Spacer(Modifier.height(14.dp))
+                ModuleCard(
+                    ModuleTile(
+                        label = "Leader",
+                        desc = "Ringkasan cabang, target harian & top up petty cash",
+                        icon = Icons.Default.Storefront,
+                        aksen = AKSEN_LEADER,
+                        onClick = onOpenLeader,
+                        memuat = state.memuatSorotan,
+                        lencana = state.pettyCashButuhAksi?.takeIf { it > 0 }?.let { "$it dana siap" },
+                        sorotan = listOf(
+                            Sorotan(
+                                "PETTY CASH",
+                                state.pettyCashButuhAksi.atau(),
+                                menonjol = (state.pettyCashButuhAksi ?: 0) > 0,
+                            ),
+                            Sorotan("OMZET", "Hari ini"),
+                            Sorotan("TARGET", "Progres"),
+                        ),
+                    )
                 )
-            )
+            }
             Spacer(Modifier.height(28.dp))
         }
     }
 }
 
 @Composable
-private fun HomeHero(state: HomeUiState, staff: com.sukashawarma.superapp.domain.model.StaffProfile?, onLoggedOut: () -> Unit, onOpenSettings: () -> Unit) {
+private fun HomeHero(state: HomeUiState, staff: com.sukashawarma.superapp.domain.model.StaffProfile?, onLoggedOut: () -> Unit, onOpenSettings: () -> Unit, onOpenProfil: () -> Unit) {
     Box(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(Color(0xFFEA580C), Color(0xFFF97316), SukaSurface)))) {
         Box(Modifier.size(220.dp).align(Alignment.TopEnd).offset(x = 72.dp, y = (-78).dp).background(Color.White.copy(alpha = 0.10f), CircleShape))
         Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 24.dp)) {
@@ -248,20 +277,29 @@ private fun HomeHero(state: HomeUiState, staff: com.sukashawarma.superapp.domain
             }
             Spacer(Modifier.height(18.dp))
             Surface(shape = RoundedCornerShape(18.dp), color = Color.White.copy(alpha = 0.12f), border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f))) {
-                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(54.dp).background(Color.White, RoundedCornerShape(15.dp)), contentAlignment = Alignment.Center) {
-                        Text(staff?.name?.firstOrNull()?.uppercase() ?: "?", color = Color(0xFFEA580C), fontSize = 23.sp, fontWeight = FontWeight.ExtraBold)
-                    }
+                Row(Modifier.clickable(onClick = onOpenProfil).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    AvatarStaf(
+                        path = staff?.avatarUrl,
+                        nama = staff?.namaTampil,
+                        modifier = Modifier.size(54.dp),
+                        bentuk = RoundedCornerShape(15.dp),
+                        warnaLatar = Color.White,
+                        warnaHuruf = Color(0xFFEA580C),
+                        ukuranHuruf = 23.sp,
+                    )
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text("${state.greeting},", color = Color(0xFFFFEDD5), fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                        Text(staff?.name ?: "Pengguna", color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(staff?.namaTampil ?: "Pengguna", color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.LocationOn, null, tint = Color(0xFFFFD5B5), modifier = Modifier.size(12.dp))
                             Spacer(Modifier.width(3.dp))
                             Text(staff?.outletName ?: "Semua Outlet", color = Color(0xFFFFEDD5), fontSize = 11.sp)
                         }
                     }
+                    // Tanpa penanda ini kartu sapaan terlihat seperti hiasan, dan
+                    // tidak ada yang tahu profil bisa dibuka dari sini.
+                    Icon(Icons.Default.ArrowForward, "Buka profil", tint = Color.White.copy(alpha = 0.75f), modifier = Modifier.size(16.dp))
                 }
             }
         }
