@@ -107,8 +107,9 @@ class ChatLogicTest {
 
     @Test
     fun `pemisah tanggal disisipkan saat hari berganti`() {
-        // 2026-09-10 01:00 WIB dan sehari sebelumnya 23:00 WIB.
-        val now = 1_789_000_000_000L
+        // 2026-09-10 00:30 WIB; dua jam sebelumnya jatuh di 9 September.
+        val now = java.time.ZonedDateTime.of(2026, 9, 10, 0, 30, 0, 0, zona)
+            .toInstant().toEpochMilli()
         val kemarinMalam = now - 2 * 60 * 60_000
         val items = susunItemChat(
             listOf(pesan("1", "a", kemarinMalam), pesan("2", "a", now - 60_000)),
