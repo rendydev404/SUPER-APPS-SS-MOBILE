@@ -52,19 +52,27 @@ class SuperappMessagingService : FirebaseMessagingService() {
         // meneruskannya, tanpa perlu mengubah apa pun di sisi ini.
         val mentah = message.data["route"] ?: message.data["url"]
 
-        // Chat dikenali dari url '/chat?from=<uuid>'. Bentuk itu dipilih karena
-        // `send-push` hanya meneruskan title/body/type/url ke FCM, jadi id
-        // pengirim harus menumpang salah satunya (lihat migrasi 20300210000000).
-        if (mentah != null && mentah.startsWith("/chat")) {
-            val pengirim = mentah.substringAfter("from=", "").takeIf { it.isNotBlank() }
+        // Chat datang lewat edge function `send-chat-push` dengan type 'chat'
+        // dan membawa payload lengkap: nama grup, foto grup, dan nama pengirim.
+        // (Jalur lama '/chat?from=' ikut dikenali supaya perangkat yang belum
+        // memperbarui basis datanya tidak kehilangan notifikasi.)
+        if (message.data["type"] == "chat" || mentah?.startsWith("/chat") == true) {
+            val pengirimId = message.data["sender_id"]
+                ?: mentah?.substringAfter("from=", "")?.takeIf { it.isNotBlank() }
             // Jangan memberi tahu seseorang tentang pesannya sendiri, dan jangan
             // berbunyi untuk percakapan yang sedang dibuka di layar.
-            if (pengirim == AppSession.staff.value?.id) return
+            if (pengirimId != null && pengirimId == AppSession.staff.value?.id) return
             if (ChatKehadiran.terbuka) return
-            // Saluran dan gaya sendiri: percakapan yang bisa dibalas langsung,
-            // terpisah dari saluran kabar operasional. `judul` adalah nama
-            // pengirim (diisi trigger database).
-            ChatNotifikasi.tampilkan(this, judul, isi, ChatKehadiran.namaGrup)
+
+            val namaGrup = message.data["title"]?.takeIf { it.isNotBlank() } ?: ChatKehadiran.namaGrup
+            val pengirim = message.data["sender"]?.takeIf { it.isNotBlank() } ?: judul
+            ChatNotifikasi.tampilkan(
+                context = this,
+                pengirim = pengirim,
+                isi = isi,
+                namaGrup = namaGrup,
+                fotoGrupPath = message.data["group_photo"]?.takeIf { it.isNotBlank() },
+            )
             return
         }
 
