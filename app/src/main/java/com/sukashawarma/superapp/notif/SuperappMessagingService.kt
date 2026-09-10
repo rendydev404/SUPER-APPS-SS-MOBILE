@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -43,6 +44,7 @@ class SuperappMessagingService : FirebaseMessagingService() {
 
     override fun onMessageReceived(message: RemoteMessage) {
         super.onMessageReceived(message)
+        Log.d(TAG, "FCM masuk: type=${message.data["type"]} url=${message.data["url"]}")
         val judul = message.data["title"] ?: message.notification?.title ?: "SUKA Superapp"
         val isi = message.data["body"] ?: message.notification?.body ?: return
         // `url` dibaca sebagai cadangan karena edge function `send-push` hanya
@@ -61,8 +63,19 @@ class SuperappMessagingService : FirebaseMessagingService() {
                 ?: mentah?.substringAfter("from=", "")?.takeIf { it.isNotBlank() }
             // Jangan memberi tahu seseorang tentang pesannya sendiri, dan jangan
             // berbunyi untuk percakapan yang sedang dibuka di layar.
-            if (pengirimId != null && pengirimId == AppSession.staff.value?.id) return
-            if (ChatKehadiran.terbuka) return
+            //
+            // Kedua penolakan ini DICATAT. Tanpa jejaknya, notifikasi yang tidak
+            // muncul tidak bisa dibedakan dari notifikasi yang tidak pernah
+            // sampai — dan penelusurannya terpaksa menebak ke arah server.
+            if (pengirimId != null && pengirimId == AppSession.staff.value?.id) {
+                Log.d(TAG, "Push chat dilewati: pesan dari diri sendiri.")
+                return
+            }
+            if (ChatKehadiran.terbuka) {
+                Log.d(TAG, "Push chat dilewati: layar chat sedang terlihat.")
+                return
+            }
+            Log.d(TAG, "Push chat diterima, notifikasi disusun.")
 
             val namaGrup = message.data["title"]?.takeIf { it.isNotBlank() } ?: ChatKehadiran.namaGrup
             val pengirim = message.data["sender"]?.takeIf { it.isNotBlank() } ?: judul
@@ -121,6 +134,8 @@ class SuperappMessagingService : FirebaseMessagingService() {
     }
 
     companion object {
+        private const val TAG = "SuperappMessaging"
+
         const val SALURAN = "suka_superapp_umum"
 
         private val RUTE_DIKENAL = setOf(
