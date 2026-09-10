@@ -44,8 +44,17 @@ object ChatNotifikasi {
 
     const val SALURAN = "suka_chat_pesan"
 
-    /** Satu id tetap: semua pesan chat menempati notifikasi percakapan yang sama. */
-    const val ID_NOTIF = 4711
+    /**
+     * Satu id tetap: semua pesan chat menempati notifikasi percakapan yang sama.
+     *
+     * ID INI HARUS UNIK SE-APLIKASI. Nilai sebelumnya, 4711, ternyata sama
+     * dengan `LocationTrackingService.NOTIF_ID`; keduanya lalu saling menimpa,
+     * dan notifikasi chat bahkan ikut mewarisi flag ONGOING/FOREGROUND_SERVICE
+     * milik layanan lokasi sehingga tidak bisa ditutup dan tidak berbunyi.
+     *
+     * Yang sudah dipakai: 4210 AbsenReminder, 4711 layanan lokasi.
+     */
+    const val ID_NOTIF = 5171
 
     /** Id pintasan percakapan; menautkan notifikasi ke identitas grup. */
     private const val ID_PINTASAN = "chat_tim"
