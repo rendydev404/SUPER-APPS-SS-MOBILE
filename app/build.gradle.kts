@@ -151,6 +151,7 @@ dependencies {
     implementation(project(":feature:manager"))
     implementation(project(":feature:leader"))
     implementation(project(":feature:profil"))
+    implementation(project(":feature:chat"))
 }
 
 
