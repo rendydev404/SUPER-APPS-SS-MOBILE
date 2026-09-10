@@ -23,7 +23,7 @@ class ChatLogicTest {
     ) = PesanChat(
         id = id, senderId = sender, senderName = "Nama $sender", senderAvatar = null,
         body = body, imagePath = image,
-        replyToId = null, replyToName = null, replyToSnippet = null,
+        replyToId = null, replyToName = null, replyToSnippet = null, replyToImage = null,
         createdAtMs = atMs,
     )
 
@@ -189,6 +189,21 @@ class ChatLogicTest {
         assertEquals("Sari", p.replyToName)
         assertNull(p.imagePath)
         assertTrue(p.createdAtMs > 0)
+    }
+
+    @Test
+    fun `balasan atas foto membawa path fotonya untuk kartu kutipan`() {
+        val o = JsonParser.parseString(
+            """
+            {"id":"m2","sender_id":"u2","sender_name":"Sari","body":"bagus!",
+             "reply_to_id":"m1","reply_to_name":"Budi","reply_to_snippet":"stok baru",
+             "reply_to_image":"chat-media/u1/abc.webp",
+             "created_at":"2026-09-10T03:04:05+00:00"}
+            """.trimIndent()
+        ).asJsonObject
+        val p = parsePesanChat(o)!!
+        assertEquals("chat-media/u1/abc.webp", p.replyToImage)
+        assertEquals("stok baru", p.replyToSnippet)
     }
 
     @Test
