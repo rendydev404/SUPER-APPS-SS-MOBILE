@@ -12,6 +12,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.StartOffset
@@ -29,6 +30,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -240,6 +242,18 @@ fun ChatScreen(
     // dari pesan, bukan objek anggotanya: orang yang sudah non-aktif tidak ada di
     // daftar anggota, tapi pesannya masih ada dan fotonya tetap harus bisa dibuka.
     var profilDibuka by remember { mutableStateOf<Triple<String, String, String?>?>(null) }
+    // Pesan yang sedang disorot setelah melompat dari kartu kutipan.
+    var sorotPesanId by remember { mutableStateOf<String?>(null) }
+    // Foto yang sedang dibuka layar penuh: URL siap muat + judulnya.
+    var fotoDibuka by remember { mutableStateOf<Pair<String, String>?>(null) }
+
+    // Sorotan padam sendiri. Membiarkannya menyala terus membuat pesan itu
+    // tampak "terpilih" selamanya, padahal ia hanya sedang ditunjukkan.
+    LaunchedEffect(sorotPesanId) {
+        if (sorotPesanId == null) return@LaunchedEffect
+        kotlinx.coroutines.delay(1_600)
+        sorotPesanId = null
+    }
     var menyimpanPengaturan by remember { mutableStateOf(false) }
     var galatPengaturan by remember { mutableStateOf<String?>(null) }
     val clipboard = LocalClipboardManager.current
@@ -430,13 +444,31 @@ fun ChatScreen(
                                 onBalas = { viewModel.setBalas(it) },
                                 onTekanLama = { menuPesan = it },
                                 onKetukReaksi = { sheetReaksi = it },
+                                disorot = item.pesan.id == sorotPesanId,
+                                onKlikFoto = { pesan ->
+                                    ChatRepository.urlFoto(pesan.imagePath)?.let { url ->
+                                        fotoDibuka = url to pesan.senderName
+                                    }
+                                },
                                 onKlikPengirim = { pesan ->
                                     profilDibuka = Triple(pesan.senderId, pesan.senderName, pesan.senderAvatar)
                                     viewModel.muatAnggota()
                                 },
                                 onLompatKe = { idAsal ->
                                     val idx = itemTampil.indexOfFirst { it is ItemChat.Bubble && it.pesan.id == idAsal }
-                                    if (idx >= 0) scope.launch { listState.animateScrollToItem(idx) }
+                                    if (idx >= 0) {
+                                        scope.launch { listState.animateScrollToItem(idx) }
+                                        sorotPesanId = idAsal
+                                    } else {
+                                        // Pesan asli bisa sudah dihapus atau lewat
+                                        // 24 jam. Diam saja membuat ketukan terasa
+                                        // rusak, padahal jawabannya sederhana.
+                                        Toast.makeText(
+                                            context,
+                                            "Pesan aslinya sudah tidak ada.",
+                                            Toast.LENGTH_SHORT,
+                                        ).show()
+                                    }
                                 },
                             )
                         }
@@ -660,6 +692,15 @@ fun ChatScreen(
                 }
             },
             onTutup = { sheetInfo = false },
+        )
+    }
+
+    fotoDibuka?.let { (url, judul) ->
+        PenampilFoto(
+            url = url,
+            judul = judul,
+            keterangan = "Foto di Chat Tim",
+            onTutup = { fotoDibuka = null },
         )
     }
 
@@ -956,6 +997,8 @@ private fun BarisBubble(
     onLompatKe: (String) -> Unit,
     onKetukReaksi: (PesanChat) -> Unit,
     onKlikPengirim: (PesanChat) -> Unit,
+    onKlikFoto: (PesanChat) -> Unit,
+    disorot: Boolean,
 ) {
     val p = item.pesan
     val haptic = LocalHapticFeedback.current
@@ -1033,6 +1076,8 @@ private fun BarisBubble(
                 Bubble(
                     item = item,
                     onLompatKe = onLompatKe,
+                    onKlikFoto = { onKlikFoto(p) },
+                    disorot = disorot,
                     modifier = Modifier.combinedClickable(
                         onClick = {},
                         onLongClick = { onTekanLama(p) },
@@ -1093,17 +1138,31 @@ private fun KepingReaksi(
 private fun Bubble(
     item: ItemChat.Bubble,
     onLompatKe: (String) -> Unit,
+    onKlikFoto: () -> Unit = {},
+    disorot: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val p = item.pesan
     val warnaBubble = if (item.milikSendiri) BubbleSendiri else BubbleLawan
     val warnaTeks = if (item.milikSendiri) Color.White else TeksUtama
 
+    // Cincin oranye merek, bukan perubahan warna latar: gelembung sendiri sudah
+    // biru pekat dan gelembung lawan abu muda, jadi satu warna latar yang sama
+    // mustahil terlihat jelas di keduanya. Cincin di tepinya terbaca di atas
+    // warna apa pun, dan memudar sendiri saat sorotannya padam.
+    val bentuk = BentukGelembung(item.milikSendiri, item.posisi)
+    val warnaSorot by animateColorAsState(
+        targetValue = if (disorot) Color(0xFFEA580C) else Color.Transparent,
+        animationSpec = tween(if (disorot) 160 else 480),
+        label = "sorotPesan",
+    )
+
     Column(
         modifier
             .widthIn(max = 290.dp + EKOR)
-            .clip(BentukGelembung(item.milikSendiri, item.posisi))
+            .clip(bentuk)
             .background(warnaBubble)
+            .border(2.5.dp, warnaSorot, bentuk)
             // Ruang ekor ditambahkan ke sisi pengirim supaya isi pesan berhenti
             // tepat di tepi badan, bukan menindih lengkungan ekornya.
             .padding(
@@ -1146,7 +1205,8 @@ private fun Bubble(
                     .width(240.dp)
                     .heightIn(min = 140.dp, max = 320.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(if (item.milikSendiri) Color(0x33FFFFFF) else Color(0x11000000)),
+                    .background(if (item.milikSendiri) Color(0x33FFFFFF) else Color(0x11000000))
+                    .clickable(onClick = onKlikFoto),
             )
         }
 
