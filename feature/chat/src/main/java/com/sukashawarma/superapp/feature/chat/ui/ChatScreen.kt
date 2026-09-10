@@ -34,6 +34,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -120,6 +121,12 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -136,10 +143,16 @@ import com.sukashawarma.superapp.core.ui.AvatarStorage
 import com.sukashawarma.superapp.domain.session.AppSession
 import com.sukashawarma.superapp.feature.chat.ChatBacaan
 import com.sukashawarma.superapp.feature.chat.ChatKehadiran
+import com.sukashawarma.superapp.feature.chat.data.AnggotaGrup
 import com.sukashawarma.superapp.feature.chat.data.ChatRepository
 import com.sukashawarma.superapp.feature.chat.data.PesanChat
 import com.sukashawarma.superapp.feature.chat.data.ReaksiPesan
+import com.sukashawarma.superapp.feature.chat.data.Sebutan
 import com.sukashawarma.superapp.feature.chat.domain.ItemChat
+import com.sukashawarma.superapp.feature.chat.domain.cariKueriSebutan
+import com.sukashawarma.superapp.feature.chat.domain.rentangSebutan
+import com.sukashawarma.superapp.feature.chat.domain.sebutanTerpakai
+import com.sukashawarma.superapp.feature.chat.domain.sisipkanSebutan
 import com.sukashawarma.superapp.feature.chat.domain.PosisiGrup
 import com.sukashawarma.superapp.feature.chat.domain.indeksWarnaNama
 import com.sukashawarma.superapp.feature.chat.domain.MAKS_WAJAH_PENGETIK
@@ -473,6 +486,15 @@ fun ChatScreen(
                                     profilDibuka = Triple(pesan.senderId, pesan.senderName, pesan.senderAvatar)
                                     viewModel.muatAnggota()
                                 },
+                                onKlikSebutan = { orang ->
+                                    // Wajahnya sengaja null: yang tersimpan di
+                                    // pesan hanya id dan nama saat disebut.
+                                    // Kartu profil menariknya sendiri dari
+                                    // daftar anggota, sehingga foto yang tampil
+                                    // selalu yang terbaru, bukan yang lama.
+                                    profilDibuka = Triple(orang.id, orang.nama, null)
+                                    viewModel.muatAnggota()
+                                },
                                 onLompatKe = { idAsal ->
                                     val idx = itemTampil.indexOfFirst { it is ItemChat.Bubble && it.pesan.id == idAsal }
                                     if (idx >= 0) {
@@ -539,9 +561,15 @@ fun ChatScreen(
         if (state.bolehKirim) {
             KomposerChat(
                 ketikan = ketikan,
+                anggota = state.anggota,
+                userId = userId,
+                onMulaiMenyebut = { viewModel.muatAnggota() },
                 papanEmojiTerbuka = papanEmoji,
                 sedangKompres = sedangKompres,
-                onTeksBerubah = { ketikan.teks = it; viewModel.ketikan(it) },
+                // Isi kotak ketik ditulis komposer sendiri (kursornya harus
+                // ikut terjaga); yang sampai ke sini hanya kabar 'ada yang
+                // mengetik' untuk disiarkan ke anggota lain.
+                onTeksBerubah = { viewModel.ketikan(it) },
                 onToggleEmoji = {
                     if (papanEmoji) {
                         papanEmoji = false
@@ -556,8 +584,13 @@ fun ChatScreen(
                 },
                 onFokusIsian = { papanEmoji = false },
                 onKirim = {
+                    // Menyunting TIDAK mengubah daftar sebutan: siapa yang
+                    // tersebut sudah ditetapkan saat pesan terkirim, dan
+                    // menyebut orang lewat suntingan tidak boleh dipakai untuk
+                    // membangunkan orang berulang kali (aturan yang sama
+                    // dipegang trigger push di server).
                     if (state.suntingTarget != null) viewModel.simpanSuntingan(ketikan.teks)
-                    else viewModel.kirimTeks(ketikan.teks)
+                    else viewModel.kirimTeks(ketikan.teks, sebutanTerpakai(ketikan.teks, ketikan.kandidat))
                     ketikan.teks = ""
                 },
                 modeSunting = state.suntingTarget != null,
@@ -565,7 +598,7 @@ fun ChatScreen(
             )
             if (papanEmoji) {
                 PapanEmoji(
-                    onPilih = { ketikan.teks += it },
+                    onPilih = { ketikan.sisip(it) },
                     onHapus = { ketikan.teks = hapusSatuKarakter(ketikan.teks) },
                 )
             }
@@ -1080,6 +1113,7 @@ private fun BarisBubble(
     onLompatKe: (String) -> Unit,
     onKetukReaksi: (PesanChat) -> Unit,
     onKlikPengirim: (PesanChat) -> Unit,
+    onKlikSebutan: (Sebutan) -> Unit,
     onKlikFoto: (PesanChat) -> Unit,
     disorot: Boolean,
 ) {
@@ -1160,6 +1194,12 @@ private fun BarisBubble(
                     item = item,
                     onLompatKe = onLompatKe,
                     onKlikFoto = { onKlikFoto(p) },
+                    onKlikSebutan = onKlikSebutan,
+                    // Teks yang memuat sebutan menangani ketukannya sendiri,
+                    // sehingga tekan-lama di atasnya tidak lagi sampai ke
+                    // `combinedClickable` di bawah ini. Jalur itu karena itu
+                    // diteruskan langsung ke bubble.
+                    onTekanLama = { onTekanLama(p) },
                     disorot = disorot,
                     modifier = Modifier.combinedClickable(
                         onClick = {},
@@ -1222,6 +1262,8 @@ private fun Bubble(
     item: ItemChat.Bubble,
     onLompatKe: (String) -> Unit,
     onKlikFoto: () -> Unit = {},
+    onKlikSebutan: (Sebutan) -> Unit = {},
+    onTekanLama: () -> Unit = {},
     disorot: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
@@ -1295,10 +1337,13 @@ private fun Bubble(
 
         Row(verticalAlignment = Alignment.Bottom) {
             if (p.body.isNotBlank()) {
-                Text(
-                    p.body,
-                    fontSize = 16.sp,
-                    color = warnaTeks,
+                TeksBubble(
+                    body = p.body,
+                    sebutan = p.mentions,
+                    warnaTeks = warnaTeks,
+                    diBubbleSendiri = item.milikSendiri,
+                    onKlikSebutan = onKlikSebutan,
+                    onTekanLama = onTekanLama,
                     modifier = Modifier.weight(1f, fill = false),
                 )
                 Spacer(Modifier.width(6.dp))
@@ -1320,6 +1365,69 @@ private fun Bubble(
             )
         }
     }
+}
+
+/**
+ * Isi pesan, dengan @sebutan disorot dan bisa diketuk.
+ *
+ * Ketukan dan tekan-lama ditangani SATU pendeteksi gestur di sini. Kalau
+ * ketukannya dipasang sendiri, ia akan menelan tekan-lama milik baris di
+ * atasnya — dan menu pesan berhenti muncul justru di bagian bubble yang paling
+ * sering ditekan orang, yaitu teksnya.
+ */
+@Composable
+private fun TeksBubble(
+    body: String,
+    sebutan: List<Sebutan>,
+    warnaTeks: Color,
+    diBubbleSendiri: Boolean,
+    onKlikSebutan: (Sebutan) -> Unit,
+    onTekanLama: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val rentang = remember(body, sebutan) { rentangSebutan(body, sebutan) }
+    if (rentang.isEmpty()) {
+        Text(body, fontSize = 16.sp, color = warnaTeks, modifier = modifier)
+        return
+    }
+
+    // Di gelembung sendiri yang biru pekat, biru merek justru menghilang; yang
+    // terbaca di sana adalah putih tebal bergaris bawah.
+    val warnaSebutan = if (diBubbleSendiri) Color.White else BiruIos
+    val teks = remember(body, rentang, diBubbleSendiri) {
+        buildAnnotatedString {
+            append(body)
+            rentang.forEach { (r, _) ->
+                addStyle(
+                    SpanStyle(
+                        color = warnaSebutan,
+                        fontWeight = FontWeight.SemiBold,
+                        textDecoration = if (diBubbleSendiri) TextDecoration.Underline else null,
+                    ),
+                    r.first,
+                    r.last + 1,
+                )
+            }
+        }
+    }
+
+    var tataLetak by remember { mutableStateOf<TextLayoutResult?>(null) }
+    Text(
+        teks,
+        fontSize = 16.sp,
+        color = warnaTeks,
+        onTextLayout = { tataLetak = it },
+        modifier = modifier.pointerInput(rentang) {
+            detectTapGestures(
+                onLongPress = { onTekanLama() },
+                onTap = { posisi ->
+                    val letak = tataLetak ?: return@detectTapGestures
+                    val offset = letak.getOffsetForPosition(posisi)
+                    rentang.firstOrNull { offset in it.first }?.let { onKlikSebutan(it.second) }
+                },
+            )
+        },
+    )
 }
 
 @Composable
@@ -1590,7 +1698,40 @@ private fun TombolKeBawah(badge: Int, onClick: () -> Unit) {
  */
 @Stable
 class IsiKetikan {
-    var teks by mutableStateOf("")
+    /**
+     * Isi BESERTA posisi kursor.
+     *
+     * Kursornya ikut disimpan karena @sebutan hanya bisa dikenali dari kata
+     * tempat kursor berada — dan sebagai keuntungan lanjutan, emoji kini
+     * tersisip di tempat kursor, bukan selalu di ujung teks.
+     */
+    var nilai by mutableStateOf(TextFieldValue(""))
+
+    /**
+     * Orang yang sempat dipilih dari pemilih sebutan.
+     *
+     * Sengaja BUKAN state: tidak ada yang menggambarnya, isinya hanya dibaca
+     * sekali saat kirim, dan menjadikannya state berarti setiap pilihan memicu
+     * penyusunan ulang tanpa alasan. Yang tidak lagi ada di teks disaring
+     * [sebutanTerpakai] saat itu juga.
+     */
+    var kandidat: List<Sebutan> = emptyList()
+
+    var teks: String
+        get() = nilai.text
+        set(baru) {
+            nilai = TextFieldValue(baru, TextRange(baru.length))
+            if (baru.isEmpty()) kandidat = emptyList()
+        }
+
+    /** Menyisipkan [potongan] di posisi kursor dan menaruh kursor sesudahnya. */
+    fun sisip(potongan: String) {
+        val n = nilai
+        val mulai = n.selection.min
+        val akhir = n.selection.max
+        val baru = n.text.substring(0, mulai) + potongan + n.text.substring(akhir)
+        nilai = TextFieldValue(baru, TextRange(mulai + potongan.length))
+    }
 }
 
 /**
@@ -1658,6 +1799,9 @@ private fun KartuBalasComposer(target: PesanChat, onTutup: () -> Unit) {
 @Composable
 private fun KomposerChat(
     ketikan: IsiKetikan,
+    anggota: List<AnggotaGrup>,
+    userId: String,
+    onMulaiMenyebut: () -> Unit,
     papanEmojiTerbuka: Boolean,
     sedangKompres: Boolean,
     onTeksBerubah: (String) -> Unit,
@@ -1667,8 +1811,39 @@ private fun KomposerChat(
     onLampiran: () -> Unit,
     modeSunting: Boolean = false,
 ) {
-    val teks = ketikan.teks
+    val nilai = ketikan.nilai
+    val teks = nilai.text
+
+    // Pemilih sebutan dihitung DI SINI, bukan di badan layar: yang membacanya
+    // adalah isi kotak ketik, dan membacanya di atas sana berarti setiap ketukan
+    // tombol menyusun ulang header dan seluruh daftar pesan.
+    val kueri = remember(nilai) {
+        if (modeSunting) null else cariKueriSebutan(nilai.text, nilai.selection.start)
+    }
+    // Daftar anggota baru ditarik saat seseorang benar-benar mengetik '@';
+    // membacanya lebih awal berarti satu permintaan jaringan untuk setiap orang
+    // yang cuma ingin membaca chat.
+    LaunchedEffect(kueri != null) { if (kueri != null) onMulaiMenyebut() }
+
+    val saran = remember(kueri, anggota) {
+        val k = kueri ?: return@remember emptyList()
+        val cari = k.kueri.trim().lowercase()
+        anggota.asSequence()
+            .filter { it.id != userId }
+            .filter { cari.isEmpty() || it.nama.lowercase().contains(cari) ||
+                it.username?.lowercase()?.contains(cari) == true }
+            .take(30)
+            .toList()
+    }
+
     Column(Modifier.fillMaxWidth().background(LatarBar)) {
+        if (kueri != null && saran.isNotEmpty()) {
+            PemilihSebutan(saran) { orang ->
+                val (baru, kursor) = sisipkanSebutan(nilai.text, kueri, orang.nama)
+                ketikan.nilai = TextFieldValue(baru, TextRange(kursor))
+                ketikan.kandidat = ketikan.kandidat + Sebutan(orang.id, orang.nama)
+            }
+        }
         Box(Modifier.fillMaxWidth().height(0.5.dp).background(GarisTipis))
         Row(
             Modifier.fillMaxWidth().padding(start = 2.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
@@ -1694,8 +1869,8 @@ private fun KomposerChat(
                             Text("Ketik pesan…", fontSize = 16.sp, color = TeksSekunder)
                         }
                         BasicTextField(
-                            value = teks,
-                            onValueChange = onTeksBerubah,
+                            value = nilai,
+                            onValueChange = { ketikan.nilai = it; onTeksBerubah(it.text) },
                             textStyle = TextStyle(fontSize = 16.sp, color = TeksUtama),
                             cursorBrush = SolidColor(BiruIos),
                             maxLines = 5,
@@ -1747,6 +1922,63 @@ private fun KomposerChat(
                     tint = Color.White,
                     modifier = Modifier.size(20.dp),
                 )
+            }
+        }
+    }
+}
+
+/**
+ * Daftar nama yang muncul saat mengetik '@'.
+ *
+ * Dibatasi tingginya dan digulir sendiri: di grup se-perusahaan, '@' yang
+ * ditekan tanpa huruf apa pun akan menyodorkan ratusan nama, dan panel yang
+ * tumbuh sebebasnya akan menelan seluruh layar percakapan.
+ */
+@Composable
+private fun PemilihSebutan(saran: List<AnggotaGrup>, onPilih: (AnggotaGrup) -> Unit) {
+    Column(Modifier.fillMaxWidth()) {
+        Box(Modifier.fillMaxWidth().height(0.5.dp).background(GarisTipis))
+        LazyColumn(
+            Modifier.fillMaxWidth().heightIn(max = 208.dp).background(LatarBar),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 4.dp),
+        ) {
+            items(count = saran.size, key = { saran[it].id }, contentType = { "sebutan" }) { i ->
+                val orang = saran[i]
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { onPilih(orang) }
+                        .padding(horizontal = 12.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    AvatarStaf(
+                        path = orang.avatar,
+                        nama = orang.nama,
+                        modifier = Modifier.size(32.dp).clip(CircleShape),
+                        ukuranHuruf = 13.sp,
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            orang.nama,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = TeksUtama,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        val bawah = orang.username?.let { "@" + it } ?: orang.outlet
+                        if (!bawah.isNullOrBlank()) {
+                            Text(
+                                bawah,
+                                fontSize = 12.sp,
+                                color = TeksSekunder,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
             }
         }
     }
