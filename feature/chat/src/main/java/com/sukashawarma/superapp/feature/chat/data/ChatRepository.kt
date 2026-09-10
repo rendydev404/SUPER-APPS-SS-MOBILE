@@ -106,14 +106,33 @@ object ChatRepository {
         return row?.let(::parsePengaturan) ?: PengaturanGrup()
     }
 
+    /**
+     * Unggah foto grup ke bucket `avatars`, BUKAN `chat-media`.
+     *
+     * `chat-media` disapu job pembersih setiap jam, jadi foto grup yang ditaruh
+     * di sana akan lenyap sehari kemudian. Folder pertama tetap harus id
+     * pengunggah — itu syarat policy `avatars_insert_self`.
+     */
+    suspend fun unggahFotoGrup(userId: String, jpeg: ByteArray): String =
+        StorageUtil.uploadJpeg("avatars", "$userId/grup-${UUID.randomUUID()}.jpg", jpeg)
+
     /** RLS `chat_settings_update_pengelola` menolak pemanggil di luar allowlist. */
-    suspend fun simpanPengaturan(nama: String, deskripsi: String, hanyaAdmin: Boolean, olehNama: String) {
+    suspend fun simpanPengaturan(
+        nama: String,
+        deskripsi: String,
+        hanyaAdmin: Boolean,
+        olehNama: String,
+        fotoGrup: String? = null,
+    ) {
         val patch = JsonObject().apply {
             addProperty("nama_grup", nama.trim().ifBlank { "Chat Tim" })
             addProperty("deskripsi", deskripsi.trim())
             addProperty("hanya_admin", hanyaAdmin)
             addProperty("diubah_oleh", olehNama)
             addProperty("diubah_pada", java.time.Instant.now().toString())
+            // null = jangan sentuh foto yang sudah ada; string kosong = hapus.
+            // Tanpa pembedaan ini, menyimpan nama grup akan ikut menghapus fotonya.
+            fotoGrup?.let { addProperty("foto_grup", it.ifBlank { null }) }
         }
         val hasil = Postgrest.update(TABLE_PENGATURAN, listOf("id" to "eq.1"), patch)
         // PostgREST membalas 200 dengan array kosong ketika RLS menyaring habis
