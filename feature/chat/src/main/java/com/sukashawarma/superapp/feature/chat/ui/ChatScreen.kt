@@ -90,6 +90,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -143,8 +144,6 @@ import com.sukashawarma.superapp.feature.chat.ui.emoji.hapusSatuKarakter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 
 /* ---------- Palet estetika iOS (iMessage) ---------- */
@@ -169,7 +168,9 @@ private val WarnaNama = listOf(
 
 private fun warnaNama(senderId: String): Color = WarnaNama[indeksWarnaNama(senderId, WarnaNama.size)]
 
-private val formatJam = SimpleDateFormat("HH:mm", Locale("id", "ID"))
+// Jam bubble kini diformat sekali per pesan di `susunItemChat`, bukan di dalam
+// composable. SimpleDateFormat juga tidak aman dipakai bersama antar-thread,
+// jadi menyimpannya sebagai objek bersama seperti dulu memang salah tempat.
 
 /* ---------- Layar ---------- */
 
@@ -288,8 +289,11 @@ fun ChatScreen(
 
     // Daftar item (bubble + pemisah), terbaru DULU karena LazyColumn reverseLayout.
     val itemTampil = remember(state.pesan, userId) {
-        susunItemChat(state.pesan, userId, System.currentTimeMillis()).reversed()
+        susunItemChat(state.pesan, userId, System.currentTimeMillis()).asReversed()
     }
+    // `asReversed()` di sini SEKALI, bukan di dalam lambda item: dipanggil di
+    // sana, satu pandangan baru dialokasikan untuk tiap petak yang digambar.
+    val tertundaTerbalik = remember(state.tertunda) { state.tertunda.asReversed() }
 
     // Auto-ikut ke bawah saat pesan baru datang dan pengguna memang sedang di bawah;
     // kalau sedang membaca ke atas, jangan menyeret paksa — cukup badge pesan baru.
@@ -316,7 +320,14 @@ fun ChatScreen(
 
     // Isi kotak ketik hidup di sini, bukan di dalam komposer: papan emoji harus
     // bisa menyisipkan dan menghapus karakter pada teks yang sama.
-    var teksPesan by remember { mutableStateOf("") }
+    //
+    // Disimpan di dalam pemegang, bukan sebagai `var teks by remember` langsung:
+    // membaca state di badan ChatScreen membuat SETIAP ketukan tombol menyusun
+    // ulang seluruh layar — header, daftar, komposer. Dengan pemegang ini,
+    // pembacaannya terjadi di dalam komposer saja, dan pemanggil lain cukup
+    // menyentuhnya dari dalam lambda (yang berjalan saat diklik, bukan saat
+    // disusun).
+    val ketikan = remember { IsiKetikan() }
     var papanEmoji by remember { mutableStateOf(false) }
     val papanKetik = LocalSoftwareKeyboardController.current
 
@@ -370,19 +381,33 @@ fun ChatScreen(
                     }
 
                     // Kiriman tertunda selalu paling baru, jadi ditaruh paling awal.
-                    items(state.tertunda.asReversed().size, key = { i -> state.tertunda.asReversed()[i].kunci }) { i ->
+                    items(
+                        count = tertundaTerbalik.size,
+                        key = { i -> tertundaTerbalik[i].kunci },
+                        contentType = { "tertunda" },
+                    ) { i ->
                         BubbleTertunda(
-                            kiriman = state.tertunda.asReversed()[i],
+                            kiriman = tertundaTerbalik[i],
                             onUlangi = viewModel::ulangi,
                             onBatal = viewModel::batalkanKiriman,
                         )
                     }
                     items(
-                        itemTampil.size,
+                        count = itemTampil.size,
                         key = { i ->
                             when (val item = itemTampil[i]) {
                                 is ItemChat.Bubble -> item.pesan.id
                                 is ItemChat.Pemisah -> "pemisah-${item.label}"
+                            }
+                        },
+                        // Bubble dan pemisah tanggal berbeda bentuk. Dengan
+                        // penanda jenis ini, Compose memakai ulang petak yang
+                        // sejenis alih-alih menyusun ulang dari nol tiap kali
+                        // daftar digulir.
+                        contentType = { i ->
+                            when (itemTampil[i]) {
+                                is ItemChat.Bubble -> "bubble"
+                                is ItemChat.Pemisah -> "pemisah"
                             }
                         },
                     ) { i ->
@@ -441,10 +466,10 @@ fun ChatScreen(
 
         if (state.bolehKirim) {
             KomposerChat(
-                teks = teksPesan,
+                ketikan = ketikan,
                 papanEmojiTerbuka = papanEmoji,
                 sedangKompres = sedangKompres,
-                onTeksBerubah = { teksPesan = it; viewModel.ketikan(it) },
+                onTeksBerubah = { ketikan.teks = it; viewModel.ketikan(it) },
                 onToggleEmoji = {
                     if (papanEmoji) {
                         papanEmoji = false
@@ -459,15 +484,15 @@ fun ChatScreen(
                 },
                 onFokusIsian = { papanEmoji = false },
                 onKirim = {
-                    viewModel.kirimTeks(teksPesan)
-                    teksPesan = ""
+                    viewModel.kirimTeks(ketikan.teks)
+                    ketikan.teks = ""
                 },
                 onLampiran = { papanEmoji = false; lembarSumber = true },
             )
             if (papanEmoji) {
                 PapanEmoji(
-                    onPilih = { teksPesan += it },
-                    onHapus = { teksPesan = hapusSatuKarakter(teksPesan) },
+                    onPilih = { ketikan.teks += it },
+                    onHapus = { ketikan.teks = hapusSatuKarakter(ketikan.teks) },
                 )
             }
         } else {
@@ -1042,7 +1067,7 @@ private fun Bubble(
                 Spacer(Modifier.width(6.dp))
             }
             Text(
-                formatJam.format(Date(p.createdAtMs)),
+                item.jam,
                 fontSize = 10.5.sp,
                 color = if (item.milikSendiri) Color(0xB3FFFFFF) else TeksSekunder,
                 modifier = Modifier.padding(top = 2.dp),
@@ -1160,7 +1185,12 @@ private fun BubbleTertunda(
                 }
                 kiriman.fotoWebp?.let { bytes ->
                     val bmp = remember(kiriman.kunci) {
-                        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+                        // Dikecilkan saat di-decode, bukan dimuat penuh. Berkasnya
+                        // 1600 px sementara petak ini hanya 240 dp; membaca penuh
+                        // berarti membongkar bitmap belasan megabyte DI MAIN
+                        // THREAD tepat saat bubble kiriman muncul.
+                        val opsi = BitmapFactory.Options().apply { inSampleSize = 4 }
+                        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opsi)?.asImageBitmap()
                     }
                     if (bmp != null) {
                         Image(
@@ -1305,6 +1335,18 @@ private fun TombolKeBawah(badge: Int, onClick: () -> Unit) {
 
 /* ---------- Composer ---------- */
 
+/**
+ * Pemegang isi kotak ketik.
+ *
+ * Ditandai [Stable] supaya Compose tahu perubahannya diberitahukan lewat state
+ * di dalamnya, sehingga hanya composable yang benar-benar membaca [teks] yang
+ * ikut disusun ulang saat mengetik.
+ */
+@Stable
+class IsiKetikan {
+    var teks by mutableStateOf("")
+}
+
 @Composable
 private fun KartuBalasComposer(target: PesanChat, onTutup: () -> Unit) {
     Row(
@@ -1328,7 +1370,7 @@ private fun KartuBalasComposer(target: PesanChat, onTutup: () -> Unit) {
 
 @Composable
 private fun KomposerChat(
-    teks: String,
+    ketikan: IsiKetikan,
     papanEmojiTerbuka: Boolean,
     sedangKompres: Boolean,
     onTeksBerubah: (String) -> Unit,
@@ -1337,6 +1379,7 @@ private fun KomposerChat(
     onKirim: () -> Unit,
     onLampiran: () -> Unit,
 ) {
+    val teks = ketikan.teks
     Column(Modifier.fillMaxWidth().background(LatarBar)) {
         Box(Modifier.fillMaxWidth().height(0.5.dp).background(GarisTipis))
         Row(
