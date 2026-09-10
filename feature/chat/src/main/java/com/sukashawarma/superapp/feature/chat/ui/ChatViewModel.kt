@@ -297,6 +297,9 @@ class ChatViewModel : ViewModel() {
                     imagePath = null,
                     mentions = emptyList(),
                     deletedAtMs = System.currentTimeMillis(),
+                    // Ditandatangani hanya bila yang dihapus milik orang lain,
+                    // sama seperti aturan di server.
+                    deletedByName = if (it.senderId == userId) null else namaSendiri,
                 )
             },
             // Reaksi ikut lenyap bersama isinya; emoji di bawah nisan hanya
