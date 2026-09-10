@@ -28,6 +28,14 @@ data class PesanChat(
     val editedAtMs: Long? = null,
     /** Orang yang disebut di pesan ini. Kosong = tidak menyebut siapa pun. */
     val mentions: List<Sebutan> = emptyList(),
+    /**
+     * Kapan pesan ini dihapus pengirimnya. null = masih utuh.
+     *
+     * Barisnya sengaja tetap ada. Menghapusnya sungguhan membuat percakapan
+     * berlubang: balasan di bawahnya menunjuk pesan yang tidak ada lagi, dan
+     * orang yang sudah membacanya melihat jawaban tanpa pertanyaan.
+     */
+    val deletedAtMs: Long? = null,
 )
 
 /**
@@ -109,6 +117,9 @@ fun parsePesanChat(o: JsonObject): PesanChat? {
             val nama = obj.get("nama")?.takeIf { !it.isJsonNull }?.asString ?: return@mapNotNull null
             Sebutan(id, nama)
         }.orEmpty(),
+        deletedAtMs = teks("deleted_at")?.let {
+            runCatching { OffsetDateTime.parse(it).toInstant().toEpochMilli() }.getOrNull()
+        },
         editedAtMs = teks("edited_at")?.let {
             runCatching { OffsetDateTime.parse(it).toInstant().toEpochMilli() }.getOrNull()
         },
