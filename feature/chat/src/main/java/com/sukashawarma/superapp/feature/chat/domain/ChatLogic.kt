@@ -30,10 +30,19 @@ sealed interface ItemChat {
         val posisi: PosisiGrup,
         /** Nama + avatar hanya tampil di bubble PERTAMA grup lawan bicara. */
         val tampilkanIdentitas: Boolean,
+        /** "HH:mm" yang sudah jadi. Diformat di sini, sekali per pesan, bukan di
+         *  dalam composable: pemformatan tanggal termasuk yang paling mahal di
+         *  jalur gambar, dan bubble digambar ulang jauh lebih sering daripada
+         *  isinya berubah. */
+        val jam: String = "",
     ) : ItemChat
 }
 
 private val FORMAT_TANGGAL = DateTimeFormatter.ofPattern("d MMMM yyyy", Locale("id", "ID"))
+
+/** DateTimeFormatter aman dipakai bersama antar-thread, tidak seperti
+ *  SimpleDateFormat yang sebelumnya dipanggil dari dalam composable. */
+private val FORMAT_JAM = DateTimeFormatter.ofPattern("HH:mm", Locale("id", "ID"))
 
 fun labelTanggal(hari: LocalDate, hariIni: LocalDate): String = when (hari) {
     hariIni -> "Hari Ini"
@@ -60,19 +69,28 @@ fun susunItemChat(
     if (hidup.isEmpty()) return emptyList()
 
     val hariIni = Instant.ofEpochMilli(nowMs).atZone(zona).toLocalDate()
-    val hasil = mutableListOf<ItemChat>()
+
+    // Tanggal dan jam dihitung SEKALI per pesan, bukan tiga kali seperti versi
+    // sebelumnya (hari ini, hari sebelum, hari sesudah masing-masing memanggil
+    // atZone lagi). Konversi zona waktu adalah bagian termahal fungsi ini, dan
+    // pada daftar 500 pesan bedanya terasa di HP kelas bawah.
+    val waktu = hidup.map { it.createdAtMs.let(Instant::ofEpochMilli).atZone(zona) }
+    val hariPer = waktu.map { it.toLocalDate() }
+    val jamPer = waktu.map { it.format(FORMAT_JAM) }
+
+    val hasil = ArrayList<ItemChat>(hidup.size + 4)
 
     hidup.forEachIndexed { i, p ->
-        val hari = Instant.ofEpochMilli(p.createdAtMs).atZone(zona).toLocalDate()
+        val hari = hariPer[i]
         val sebelum = hidup.getOrNull(i - 1)
         val sesudah = hidup.getOrNull(i + 1)
 
-        val hariSebelum = sebelum?.let { Instant.ofEpochMilli(it.createdAtMs).atZone(zona).toLocalDate() }
+        val hariSebelum = if (i > 0) hariPer[i - 1] else null
         if (hari != hariSebelum) hasil += ItemChat.Pemisah(labelTanggal(hari, hariIni))
 
         val nyambungAtas = sebelum != null && sebelum.senderId == p.senderId &&
             hari == hariSebelum && p.createdAtMs - sebelum.createdAtMs <= JARAK_GRUP_MS
-        val hariSesudah = sesudah?.let { Instant.ofEpochMilli(it.createdAtMs).atZone(zona).toLocalDate() }
+        val hariSesudah = if (i + 1 < hariPer.size) hariPer[i + 1] else null
         val nyambungBawah = sesudah != null && sesudah.senderId == p.senderId &&
             hari == hariSesudah && sesudah.createdAtMs - p.createdAtMs <= JARAK_GRUP_MS
 
@@ -87,6 +105,7 @@ fun susunItemChat(
             milikSendiri = p.senderId == userId,
             posisi = posisi,
             tampilkanIdentitas = p.senderId != userId && !nyambungAtas,
+            jam = jamPer[i],
         )
     }
     return hasil
