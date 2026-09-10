@@ -101,6 +101,20 @@ object ChatRepository {
         Postgrest.upsert(TABLE_REAKSI, row, onConflict = "message_id,user_id")
     }
 
+    /**
+     * Anggota grup, lewat RPC `chat_daftar_anggota`.
+     *
+     * BUKAN select ke `outlet_staff`: RLS tabel itu hanya membuka baris sendiri
+     * (dan outlet binaan bagi sebagian peran), jadi kru biasa akan menerima
+     * daftar berisi satu orang. RPC-nya SECURITY DEFINER dan hanya membuka
+     * kolom tampilan — lihat migrasi 20300213000000.
+     */
+    suspend fun ambilAnggota(): List<AnggotaGrup> {
+        val hasil = Postgrest.rpc("chat_daftar_anggota")
+        if (!hasil.isJsonArray) return emptyList()
+        return hasil.asJsonArray.mapNotNull { it?.asJsonObject?.let(::parseAnggota) }
+    }
+
     suspend fun ambilPengaturan(): PengaturanGrup {
         val row = Postgrest.selectOne(TABLE_PENGATURAN, listOf("select" to "*", "id" to "eq.1"))
         return row?.let(::parsePengaturan) ?: PengaturanGrup()
