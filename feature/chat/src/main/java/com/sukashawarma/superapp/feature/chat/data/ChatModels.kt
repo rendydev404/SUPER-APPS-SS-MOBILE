@@ -40,6 +40,8 @@ data class PengaturanGrup(
     val deskripsi: String = "Ruang obrolan seluruh tim. Pesan hilang setelah 24 jam.",
     val hanyaAdmin: Boolean = false,
     val diubahOleh: String? = null,
+    /** Path objek di bucket `avatars` — bukan `chat-media`, yang disapu tiap jam. */
+    val fotoGrup: String? = null,
 )
 
 fun parseReaksi(o: JsonObject): ReaksiPesan? {
@@ -59,6 +61,7 @@ fun parsePengaturan(o: JsonObject): PengaturanGrup {
         deskripsi = teks("deskripsi").orEmpty(),
         hanyaAdmin = o.get("hanya_admin")?.takeIf { !it.isJsonNull }?.asBoolean ?: false,
         diubahOleh = teks("diubah_oleh"),
+        fotoGrup = teks("foto_grup"),
     )
 }
 
