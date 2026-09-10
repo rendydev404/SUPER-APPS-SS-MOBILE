@@ -42,6 +42,7 @@ import com.sukashawarma.superapp.feature.leader.LeaderNavGraph
 import com.sukashawarma.superapp.feature.manager.ManagerNavGraph
 import com.sukashawarma.superapp.feature.manager.ui.TujuanManager
 import com.sukashawarma.superapp.feature.stok.StokNavGraph
+import com.sukashawarma.superapp.notif.ChatNotifikasi
 import com.sukashawarma.superapp.notif.NotifikasiTujuan
 import com.sukashawarma.superapp.presentation.absensi.AbsensiNavGraph
 import com.sukashawarma.superapp.presentation.home.HomeScreen
@@ -187,6 +188,10 @@ private fun RootNav() {
         // Chat Tim juga berlaku untuk setiap pemegang akun — alasan penempatan
         // yang sama dengan PROFIL di atas.
         composable(Routes.CHAT) {
+            // Membuka ruangnya berarti pesannya sudah terbaca; notifikasi
+            // percakapan yang masih menggantung ditutup di sini.
+            val konteks = androidx.compose.ui.platform.LocalContext.current
+            LaunchedEffect(Unit) { ChatNotifikasi.tutup(konteks) }
             ChatScreen(onBack = { navController.popBackStack() })
         }
 
