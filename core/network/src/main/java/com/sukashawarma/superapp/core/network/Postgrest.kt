@@ -39,10 +39,22 @@ object Postgrest {
         }
     }
 
-    suspend fun select(table: String, params: List<Pair<String, String>> = emptyList()): JsonArray {
+    /**
+     * Penguraian JSON dijalankan di luar thread pemanggil.
+     *
+     * [execute] hanya memindahkan bagian JARINGAN ke IO; hasilnya kembali
+     * sebagai String dan diurai di context pemanggil — yang untuk
+     * `viewModelScope.launch` berarti MAIN THREAD. Balasan berisi ratusan baris
+     * (daftar chat, ledger, laporan) karena itu mengurai di thread UI dan
+     * membuat frame jatuh persis saat data datang. Satu pembungkus ini
+     * memindahkan semuanya ke Default.
+     */
+    private suspend fun <T> parse(blok: suspend () -> T): T = withContext(Dispatchers.Default) { blok() }
+
+    suspend fun select(table: String, params: List<Pair<String, String>> = emptyList()): JsonArray = parse {
         val req = Request.Builder().url(urlFor(table, params)).get().build()
         val body = execute(req)
-        return if (body.isBlank()) JsonArray() else JsonParser.parseString(body).asJsonArray
+        if (body.isBlank()) JsonArray() else JsonParser.parseString(body).asJsonArray
     }
 
     suspend fun selectOne(table: String, params: List<Pair<String, String>>): JsonObject? {
@@ -50,14 +62,14 @@ object Postgrest {
         return if (arr.size() > 0) arr[0].asJsonObject else null
     }
 
-    suspend fun insert(table: String, body: JsonElement, returning: Boolean = true): JsonArray {
+    suspend fun insert(table: String, body: JsonElement, returning: Boolean = true): JsonArray = parse {
         val req = Request.Builder()
             .url(urlFor(table))
             .post(body.toString().toRequestBody(jsonMedia))
             .header("Prefer", if (returning) "return=representation" else "return=minimal")
             .build()
         val res = execute(req)
-        return if (res.isBlank()) JsonArray() else JsonParser.parseString(res).asJsonArray
+        if (res.isBlank()) JsonArray() else JsonParser.parseString(res).asJsonArray
     }
 
     suspend fun upsert(table: String, body: JsonElement, onConflict: String? = null, ignoreDuplicates: Boolean = false): JsonArray {
@@ -76,14 +88,14 @@ object Postgrest {
         return if (res.isBlank()) JsonArray() else JsonParser.parseString(res).asJsonArray
     }
 
-    suspend fun update(table: String, params: List<Pair<String, String>>, patch: JsonElement): JsonArray {
+    suspend fun update(table: String, params: List<Pair<String, String>>, patch: JsonElement): JsonArray = parse {
         val req = Request.Builder()
             .url(urlFor(table, params))
             .patch(patch.toString().toRequestBody(jsonMedia))
             .header("Prefer", "return=representation")
             .build()
         val res = execute(req)
-        return if (res.isBlank()) JsonArray() else JsonParser.parseString(res).asJsonArray
+        if (res.isBlank()) JsonArray() else JsonParser.parseString(res).asJsonArray
     }
 
     suspend fun delete(table: String, params: List<Pair<String, String>>) {
@@ -92,12 +104,12 @@ object Postgrest {
     }
 
     /** RPC — kembalikan JsonElement mentah (bisa array, object, atau scalar). */
-    suspend fun rpc(fn: String, body: JsonElement = JsonObject()): JsonElement {
+    suspend fun rpc(fn: String, body: JsonElement = JsonObject()): JsonElement = parse {
         val req = Request.Builder()
             .url(urlFor("rpc/$fn"))
             .post(body.toString().toRequestBody(jsonMedia))
             .build()
         val res = execute(req)
-        return if (res.isBlank()) JsonObject() else JsonParser.parseString(res)
+        if (res.isBlank()) JsonObject() else JsonParser.parseString(res)
     }
 }
