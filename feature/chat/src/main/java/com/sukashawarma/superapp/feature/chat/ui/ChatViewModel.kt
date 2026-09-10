@@ -281,12 +281,31 @@ class ChatViewModel : ViewModel() {
         }
     }
 
-    /** Hapus pesan sendiri — optimis; kalau server menolak, daftar dimuat ulang. */
+    /**
+     * Hapus pesan sendiri — optimis; kalau server menolak, daftar dimuat ulang.
+     *
+     * Barisnya tidak dibuang dari daftar melainkan diubah jadi nisan, sama
+     * seperti yang dilakukan server. Membuangnya di sini akan membuat pesan
+     * berkedip hilang lalu muncul lagi begitu pemuatan berikutnya tiba.
+     */
     fun hapus(pesan: PesanChat) {
-        _state.value = _state.value.copy(pesan = _state.value.pesan.filterNot { it.id == pesan.id })
+        _state.value = _state.value.copy(
+            pesan = _state.value.pesan.map {
+                if (it.id != pesan.id) it
+                else it.copy(
+                    body = "",
+                    imagePath = null,
+                    mentions = emptyList(),
+                    deletedAtMs = System.currentTimeMillis(),
+                )
+            },
+            // Reaksi ikut lenyap bersama isinya; emoji di bawah nisan hanya
+            // menyisakan teka-teki.
+            reaksi = _state.value.reaksi - pesan.id,
+        )
         viewModelScope.launch {
             try {
-                ChatRepository.hapus(pesan.id)
+                ChatRepository.hapusPesan(pesan.id)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
