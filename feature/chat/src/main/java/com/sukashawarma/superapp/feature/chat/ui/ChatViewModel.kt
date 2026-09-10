@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.google.gson.JsonObject
 import com.sukashawarma.superapp.data.remote.Realtime
 import com.sukashawarma.superapp.domain.session.AppSession
+import com.sukashawarma.superapp.feature.chat.data.AnggotaGrup
 import com.sukashawarma.superapp.feature.chat.data.ChatRepository
 import com.sukashawarma.superapp.feature.chat.data.PengaturanGrup
 import com.sukashawarma.superapp.feature.chat.data.PesanChat
@@ -44,6 +45,9 @@ data class ChatState(
     val pengaturan: PengaturanGrup = PengaturanGrup(),
     /** true bila akun ini boleh mengubah pengaturan grup (developer/admin/HR). */
     val pengelola: Boolean = false,
+    /** Anggota grup. Kosong sampai ada yang benar-benar membutuhkannya. */
+    val anggota: List<AnggotaGrup> = emptyList(),
+    val memuatAnggota: Boolean = false,
 ) {
     /** Mode pengumuman menutup kotak ketik untuk yang bukan pengelola. */
     val bolehKirim: Boolean get() = !pengaturan.hanyaAdmin || pengelola
@@ -289,6 +293,31 @@ class ChatViewModel : ViewModel() {
             } catch (e: Exception) {
                 android.util.Log.e("ChatViewModel", "simpan pengaturan gagal", e)
                 onSelesai(e.message ?: "Gagal menyimpan pengaturan.")
+            }
+        }
+    }
+
+    /**
+     * Daftar anggota diambil SESUAI PERMINTAAN, bukan saat layar dibuka.
+     *
+     * Isinya jarang berubah dan hanya dipakai dua tempat (info grup, kartu
+     * profil), sementara jumlahnya se-perusahaan. Menariknya di awal berarti
+     * satu permintaan tambahan untuk setiap orang yang cuma ingin membaca chat.
+     */
+    fun muatAnggota(paksa: Boolean = false) {
+        val sekarang = _state.value
+        if (sekarang.memuatAnggota) return
+        if (!paksa && sekarang.anggota.isNotEmpty()) return
+        _state.value = sekarang.copy(memuatAnggota = true)
+        viewModelScope.launch {
+            try {
+                val anggota = ChatRepository.ambilAnggota()
+                _state.value = _state.value.copy(anggota = anggota, memuatAnggota = false)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.w("ChatViewModel", "daftar anggota tidak tersedia: ${e.message}")
+                _state.value = _state.value.copy(memuatAnggota = false)
             }
         }
     }
