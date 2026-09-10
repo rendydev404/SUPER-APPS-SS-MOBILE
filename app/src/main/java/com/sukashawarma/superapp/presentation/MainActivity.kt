@@ -157,7 +157,15 @@ private fun RootNav() {
     var tujuanManager by remember { mutableStateOf<TujuanManager?>(null) }
     val ruteNotifikasi by NotifikasiTujuan.rute.collectAsState()
     LaunchedEffect(ruteNotifikasi, staff, isMitra) {
-        if (ruteNotifikasi == null || staff == null || isMitra) return@LaunchedEffect
+        if (ruteNotifikasi == null || staff == null) return@LaunchedEffect
+        // Chat berlaku untuk setiap pemegang akun, termasuk mitra — jadi
+        // ditangani sebelum penjaga isMitra di bawah.
+        if (ruteNotifikasi == NotifikasiTujuan.CHAT) {
+            NotifikasiTujuan.ambil()
+            navController.navigate(Routes.CHAT)
+            return@LaunchedEffect
+        }
+        if (isMitra) return@LaunchedEffect
         val tujuan = when (NotifikasiTujuan.ambil()) {
             NotifikasiTujuan.MANAGER_PERSETUJUAN -> TujuanManager.PERSETUJUAN
             NotifikasiTujuan.MANAGER_WASTE -> TujuanManager.WASTE
