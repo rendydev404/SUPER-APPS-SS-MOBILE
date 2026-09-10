@@ -5,8 +5,16 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -45,6 +53,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -98,6 +107,10 @@ fun InfoGrupSheet(
     var fotoBaru by remember { mutableStateOf<ByteArray?>(null) }
     var pratinjauBaru by remember { mutableStateOf<ImageBitmap?>(null) }
     var hapusFoto by remember { mutableStateOf(false) }
+    // Tertutup saat dibuka: daftar anggota se-perusahaan jauh lebih panjang
+    // daripada seluruh isi lembar ini digabung, dan menggulirinya untuk mencapai
+    // tombol Simpan bukan yang dicari orang saat membuka info grup.
+    var anggotaTerbuka by remember { mutableStateOf(false) }
 
     val pilihFoto = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia()
@@ -212,38 +225,51 @@ fun InfoGrupSheet(
             }
 
             Spacer(Modifier.height(18.dp))
-            LabelBagian(
-                if (anggota.isEmpty()) "Anggota" else "${anggota.size} anggota",
-            )
+            LabelBagian("Anggota")
             Kartu {
-                when {
-                    memuatAnggota && anggota.isEmpty() -> Row(
-                        Modifier.fillMaxWidth().padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        CircularProgressIndicator(
-                            color = BiruIosInfo,
-                            strokeWidth = 2.dp,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Spacer(Modifier.width(12.dp))
-                        Text("Memuat anggota…", fontSize = 14.sp, color = AbuInfo)
-                    }
+                KepalaAccordionAnggota(
+                    jumlah = anggota.size,
+                    memuat = memuatAnggota,
+                    terbuka = anggotaTerbuka,
+                    pratinjau = anggota,
+                    onKlik = { anggotaTerbuka = !anggotaTerbuka },
+                )
+                AnimatedVisibility(
+                    visible = anggotaTerbuka,
+                    enter = fadeIn(tween(150)) + expandVertically(tween(220)),
+                    exit = fadeOut(tween(120)) + shrinkVertically(tween(200)),
+                ) {
+                    Column {
+                        when {
+                            memuatAnggota && anggota.isEmpty() -> Row(
+                                Modifier.fillMaxWidth().padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                CircularProgressIndicator(
+                                    color = BiruIosInfo,
+                                    strokeWidth = 2.dp,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                                Spacer(Modifier.width(12.dp))
+                                Text("Memuat anggota…", fontSize = 14.sp, color = AbuInfo)
+                            }
 
-                    anggota.isEmpty() -> Text(
-                        "Daftar anggota belum tersedia.",
-                        fontSize = 14.sp,
-                        color = AbuInfo,
-                        modifier = Modifier.padding(14.dp),
-                    )
+                            anggota.isEmpty() -> Text(
+                                "Daftar anggota belum tersedia.",
+                                fontSize = 14.sp,
+                                color = AbuInfo,
+                                modifier = Modifier.padding(14.dp),
+                            )
 
-                    else -> anggota.forEachIndexed { i, a ->
-                        if (i > 0) PemisahAnggota()
-                        BarisAnggota(
-                            anggota = a,
-                            akuSendiri = a.id == userId,
-                            onKlik = { onKlikAnggota(a) },
-                        )
+                            else -> anggota.forEach { a ->
+                                PemisahAnggota()
+                                BarisAnggota(
+                                    anggota = a,
+                                    akuSendiri = a.id == userId,
+                                    onKlik = { onKlikAnggota(a) },
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -339,6 +365,90 @@ private fun FotoGrupBesar(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(Icons.Filled.PhotoCamera, "Ganti foto grup", tint = Color.White, modifier = Modifier.size(16.dp))
+            }
+        }
+    }
+}
+
+/**
+ * Kepala accordion anggota: ikon, jumlah, pratinjau wajah saat tertutup, dan
+ * chevron yang berputar 90 derajat mengikuti keadaannya.
+ *
+ * Wajah hanya muncul saat TERTUTUP. Terbuka, daftarnya sendiri sudah
+ * menampilkan tiap orang; membiarkan tumpukan itu tetap ada hanya membuat
+ * kepalanya berebut perhatian dengan isinya.
+ */
+@Composable
+private fun KepalaAccordionAnggota(
+    jumlah: Int,
+    memuat: Boolean,
+    terbuka: Boolean,
+    pratinjau: List<AnggotaGrup>,
+    onKlik: () -> Unit,
+) {
+    val putaran by animateFloatAsState(
+        targetValue = if (terbuka) 90f else 0f,
+        animationSpec = tween(220),
+        label = "putaranChevron",
+    )
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onKlik)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier.size(30.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFFD8E7FB)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Filled.Groups, null, tint = BiruIosInfo, modifier = Modifier.size(17.dp))
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text("Anggota grup", fontSize = 15.sp, color = Color.Black)
+            Text(
+                when {
+                    memuat && jumlah == 0 -> "Memuat…"
+                    jumlah == 0 -> "Belum tersedia"
+                    else -> "$jumlah orang"
+                },
+                fontSize = 12.sp,
+                color = AbuInfo,
+            )
+        }
+        AnimatedVisibility(
+            visible = !terbuka && pratinjau.isNotEmpty(),
+            enter = fadeIn(tween(180)),
+            exit = fadeOut(tween(120)),
+        ) {
+            TumpukanWajahAnggota(pratinjau)
+        }
+        Spacer(Modifier.width(8.dp))
+        Icon(
+            Icons.Filled.ChevronRight,
+            if (terbuka) "Tutup daftar anggota" else "Buka daftar anggota",
+            tint = Color(0xFFC7C7CC),
+            modifier = Modifier.size(18.dp).graphicsLayer { rotationZ = putaran },
+        )
+    }
+}
+
+/** Beberapa wajah pertama, saling menindih — ringkasan visual saat tertutup. */
+@Composable
+private fun TumpukanWajahAnggota(anggota: List<AnggotaGrup>) {
+    val tampil = anggota.take(4)
+    Row(horizontalArrangement = Arrangement.spacedBy((-8).dp)) {
+        tampil.forEach { a ->
+            Box(
+                Modifier.size(26.dp).clip(CircleShape).background(Color.White).padding(1.dp),
+            ) {
+                AvatarStaf(
+                    path = a.avatar,
+                    nama = a.nama,
+                    modifier = Modifier.size(24.dp),
+                    ukuranHuruf = 10.sp,
+                )
             }
         }
     }
