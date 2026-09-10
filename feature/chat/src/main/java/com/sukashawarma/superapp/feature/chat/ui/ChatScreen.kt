@@ -136,7 +136,10 @@ import com.sukashawarma.superapp.feature.chat.data.ReaksiPesan
 import com.sukashawarma.superapp.feature.chat.domain.ItemChat
 import com.sukashawarma.superapp.feature.chat.domain.PosisiGrup
 import com.sukashawarma.superapp.feature.chat.domain.indeksWarnaNama
+import com.sukashawarma.superapp.feature.chat.domain.MAKS_WAJAH_PENGETIK
+import com.sukashawarma.superapp.feature.chat.domain.Pengetik
 import com.sukashawarma.superapp.feature.chat.domain.labelPengetik
+import com.sukashawarma.superapp.feature.chat.domain.labelPengetikPendek
 import com.sukashawarma.superapp.feature.chat.domain.snippetPesan
 import com.sukashawarma.superapp.feature.chat.domain.susunItemChat
 import com.sukashawarma.superapp.feature.chat.ui.emoji.PapanEmoji
@@ -347,10 +350,13 @@ fun ChatScreen(
         HeaderChat(
             judul = state.pengaturan.namaGrup,
             fotoGrup = state.pengaturan.fotoGrup,
-            subtitle = labelPengetik(state.namaPengetik)
+            // Header memakai versi PENDEK: ruangnya sempit dan sudah berbagi
+            // dengan nama grup, jadi menyebut dua nama di sana justru terpotong.
+            // Daftar nama lengkapnya ada di baris pengetik di dasar percakapan.
+            subtitle = labelPengetikPendek(state.pengetik)
                 ?: if (state.pengaturan.hanyaAdmin) "Mode pengumuman aktif"
                 else "Pesan hilang otomatis setelah 24 jam",
-            subtitleAktif = state.namaPengetik.isNotEmpty(),
+            subtitleAktif = state.pengetik.isNotEmpty(),
             onBukaInfo = { galatPengaturan = null; sheetInfo = true },
             onBack = onBack,
         )
@@ -376,8 +382,8 @@ fun ChatScreen(
                     // Item-nya SELALU ada (isinya yang beranimasi masuk/keluar);
                     // menyisipkan-menghapus item di indeks 0 akan membuat daftar
                     // tersentak setiap sinyal typing datang.
-                    item(key = "pengetik") {
-                        BarisPengetik(state.namaPengetik)
+                    item(key = "pengetik", contentType = "pengetik") {
+                        BarisPengetik(state.pengetik)
                     }
 
                     // Kiriman tertunda selalu paling baru, jadi ditaruh paling awal.
@@ -745,25 +751,95 @@ private fun PitaModePengumuman() {
  * muncul dan hilang dengan animasi halus.
  */
 @Composable
-private fun BarisPengetik(nama: List<String>) {
+private fun BarisPengetik(orang: List<Pengetik>) {
+    // Daftar terakhir yang tidak kosong ditahan selama animasi keluar. Tanpa itu,
+    // isinya berubah jadi kosong sebelum baris selesai menyusut, dan yang terlihat
+    // adalah wajah-wajah lenyap mendadak lalu kotak kosong ikut mengecil.
+    var terakhirTampak by remember { mutableStateOf(orang) }
+    if (orang.isNotEmpty()) terakhirTampak = orang
+
     androidx.compose.animation.AnimatedVisibility(
-        visible = nama.isNotEmpty(),
+        visible = orang.isNotEmpty(),
         enter = fadeIn(tween(180)) + expandVertically(tween(220)),
         exit = fadeOut(tween(140)) + shrinkVertically(tween(200)),
     ) {
         Row(
-            Modifier.fillMaxWidth().padding(start = 36.dp, top = 3.dp, bottom = 3.dp),
+            Modifier
+                .fillMaxWidth()
+                .padding(start = 12.dp, end = 16.dp, top = 4.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            TumpukanWajahPengetik(terakhirTampak)
+            Spacer(Modifier.width(8.dp))
             BubbleTigaTitik()
             Spacer(Modifier.width(8.dp))
             Text(
-                labelPengetik(nama).orEmpty(),
+                labelPengetik(terakhirTampak).orEmpty(),
                 fontSize = 11.5.sp,
                 color = TeksSekunder,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+        }
+    }
+}
+
+/**
+ * Wajah para pengetik, ditumpuk saling menindih seperti daftar peserta.
+ *
+ * Dibatasi [MAKS_WAJAH_PENGETIK]; sisanya diringkas jadi lingkaran "+N".
+ * Lebarnya karena itu punya batas atas yang pasti, sehingga baris ini tidak
+ * pernah mendorong kalimat di sebelahnya keluar layar berapa pun jumlah orang
+ * yang mengetik bersamaan.
+ */
+@Composable
+private fun TumpukanWajahPengetik(orang: List<Pengetik>) {
+    val tampil = orang.take(MAKS_WAJAH_PENGETIK)
+    val sisa = orang.size - tampil.size
+    val diameter = 22.dp
+    val tindih = 7.dp
+
+    Row(horizontalArrangement = Arrangement.spacedBy(-tindih)) {
+        tampil.forEach { p ->
+            Box(
+                Modifier
+                    .size(diameter)
+                    // Cincin putih tipis memisahkan wajah yang saling menindih;
+                    // tanpa itu dua foto gelap berdempet terlihat seperti satu
+                    // gumpalan.
+                    .clip(CircleShape)
+                    .background(Color.White)
+                    .padding(1.dp),
+            ) {
+                AvatarStaf(
+                    path = p.avatar,
+                    nama = p.nama,
+                    modifier = Modifier.size(diameter - 2.dp),
+                    ukuranHuruf = 9.sp,
+                )
+            }
+        }
+        if (sisa > 0) {
+            Box(
+                Modifier
+                    .size(diameter)
+                    .clip(CircleShape)
+                    .background(Color.White)
+                    .padding(1.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    Modifier.fillMaxSize().clip(CircleShape).background(Color(0xFFD8E7FB)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        "+$sisa",
+                        fontSize = 8.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = BiruIos,
+                    )
+                }
+            }
         }
     }
 }
@@ -910,8 +986,12 @@ private fun BarisBubble(
             if (!item.milikSendiri) {
                 // Avatar hanya di bubble pertama grup; sisanya diberi ruang kosong
                 // selebar avatar supaya bubble-nya tetap sejajar.
-                Box(Modifier.width(36.dp), contentAlignment = Alignment.BottomCenter) {
-                    if (item.tampilkanIdentitas) {
+                // Avatar dipasang di bubble TERAKHIR rentetan, sejajar dengan
+                // ekornya — bukan di bubble pertama seperti sebelumnya. Ekor dan
+                // wajah harus menunjuk satu sama lain; kalau terpisah, lengkungan
+                // itu justru terlihat menuding ruang kosong.
+                Box(Modifier.width(34.dp), contentAlignment = Alignment.BottomCenter) {
+                    if (item.posisi == PosisiGrup.TUNGGAL || item.posisi == PosisiGrup.AKHIR) {
                         AvatarStaf(
                             path = p.senderAvatar,
                             nama = p.senderName,
@@ -920,7 +1000,6 @@ private fun BarisBubble(
                         )
                     }
                 }
-                Spacer(Modifier.width(6.dp))
             }
 
             Column(horizontalAlignment = if (item.milikSendiri) Alignment.End else Alignment.Start) {
@@ -983,25 +1062,6 @@ private fun KepingReaksi(
     }
 }
 
-/** Bentuk sudut asimetris ala iMessage: sisi "ekor" grup lebih siku. */
-private fun bentukBubble(milikSendiri: Boolean, posisi: PosisiGrup): RoundedCornerShape {
-    val besar = 18.dp
-    val kecil = 5.dp
-    val atasNyambung = posisi == PosisiGrup.TENGAH || posisi == PosisiGrup.AKHIR
-    val bawahNyambung = posisi == PosisiGrup.AWAL || posisi == PosisiGrup.TENGAH
-    return if (milikSendiri) RoundedCornerShape(
-        topStart = besar,
-        topEnd = if (atasNyambung) kecil else besar,
-        bottomEnd = if (bawahNyambung) kecil else besar,
-        bottomStart = besar,
-    ) else RoundedCornerShape(
-        topStart = if (atasNyambung) kecil else besar,
-        topEnd = besar,
-        bottomEnd = besar,
-        bottomStart = if (bawahNyambung) kecil else besar,
-    )
-}
-
 @Composable
 private fun Bubble(
     item: ItemChat.Bubble,
@@ -1014,10 +1074,17 @@ private fun Bubble(
 
     Column(
         modifier
-            .widthIn(max = 290.dp)
-            .clip(bentukBubble(item.milikSendiri, item.posisi))
+            .widthIn(max = 290.dp + EKOR)
+            .clip(BentukGelembung(item.milikSendiri, item.posisi))
             .background(warnaBubble)
-            .padding(horizontal = 10.dp, vertical = 6.dp),
+            // Ruang ekor ditambahkan ke sisi pengirim supaya isi pesan berhenti
+            // tepat di tepi badan, bukan menindih lengkungan ekornya.
+            .padding(
+                start = if (item.milikSendiri) 12.dp else 12.dp + EKOR,
+                end = if (item.milikSendiri) 12.dp + EKOR else 12.dp,
+                top = 6.dp,
+                bottom = 6.dp,
+            ),
     ) {
         if (item.tampilkanIdentitas) {
             Text(
@@ -1169,10 +1236,10 @@ private fun BubbleTertunda(
             Column(
                 Modifier
                     .widthIn(max = 290.dp)
-                    .clip(bentukBubble(milikSendiri = true, posisi = PosisiGrup.TUNGGAL))
+                    .clip(BentukGelembung(milikSendiri = true, posisi = PosisiGrup.TUNGGAL))
                     .background(if (kiriman.gagal) BubbleSendiri.copy(alpha = 0.55f) else BubbleSendiri.copy(alpha = 0.8f))
                     .clickable { if (kiriman.gagal) menu = true }
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                    .padding(start = 12.dp, end = 12.dp + EKOR, top = 6.dp, bottom = 6.dp),
             ) {
                 kiriman.replyTo?.let {
                     KutipanReply(
