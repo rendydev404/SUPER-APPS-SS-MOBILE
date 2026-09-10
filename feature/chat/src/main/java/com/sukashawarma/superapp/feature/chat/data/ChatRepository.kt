@@ -10,7 +10,14 @@ import java.util.UUID
 object ChatRepository {
 
     const val TABLE = "chat_messages"
+    const val TABLE_REAKSI = "chat_message_reactions"
+    const val TABLE_PENGATURAN = "chat_settings"
     private const val BUCKET = "chat-media"
+
+    /** Role yang boleh mengubah pengaturan grup. Cermin `chat_is_pengelola()` di
+     *  database — daftar di sini hanya menentukan apa yang TAMPIL; penegakannya
+     *  tetap di RLS, jadi menyamakan keduanya wajib tapi tidak menggantikannya. */
+    val ROLE_PENGELOLA = setOf("developer", "admin", "admin_hr")
 
     /** Batas atas satu pengambilan. Grup seramai apa pun jarang menembus ini
      *  dalam 24 jam; kalau sampai, yang terpotong adalah pesan TERLAMA. */
@@ -60,6 +67,61 @@ object ChatRepository {
      */
     suspend fun unggahFoto(senderId: String, webp: ByteArray): String =
         StorageUtil.uploadWebp(BUCKET, "$senderId/${UUID.randomUUID()}.webp", webp, upsert = false)
+
+    /**
+     * Semua reaksi untuk pesan yang sedang tampil.
+     *
+     * Tabelnya kecil (ikut terhapus bersama pesannya dalam 24 jam), jadi diambil
+     * utuh sekali jalan alih-alih per pesan — satu permintaan, bukan puluhan.
+     */
+    suspend fun ambilReaksi(): List<ReaksiPesan> {
+        val rows = Postgrest.select(TABLE_REAKSI, listOf("select" to "*"))
+        return rows.mapNotNull { it?.asJsonObject?.let(::parseReaksi) }
+    }
+
+    /**
+     * Pasang, ganti, atau cabut reaksi. Emoji yang sama dengan yang sedang
+     * terpasang berarti mencabut — perilaku WhatsApp.
+     */
+    suspend fun setReaksi(messageId: String, emoji: String?, userId: String) {
+        if (emoji == null) {
+            Postgrest.delete(
+                TABLE_REAKSI,
+                listOf("message_id" to "eq.$messageId", "user_id" to "eq.$userId"),
+            )
+            return
+        }
+        val row = JsonObject().apply {
+            addProperty("message_id", messageId)
+            addProperty("user_id", userId)
+            addProperty("emoji", emoji)
+        }
+        // on_conflict pada kunci utama: satu orang satu reaksi per pesan, memilih
+        // emoji lain menggantikan yang lama alih-alih gagal duplikat.
+        Postgrest.upsert(TABLE_REAKSI, row, onConflict = "message_id,user_id")
+    }
+
+    suspend fun ambilPengaturan(): PengaturanGrup {
+        val row = Postgrest.selectOne(TABLE_PENGATURAN, listOf("select" to "*", "id" to "eq.1"))
+        return row?.let(::parsePengaturan) ?: PengaturanGrup()
+    }
+
+    /** RLS `chat_settings_update_pengelola` menolak pemanggil di luar allowlist. */
+    suspend fun simpanPengaturan(nama: String, deskripsi: String, hanyaAdmin: Boolean, olehNama: String) {
+        val patch = JsonObject().apply {
+            addProperty("nama_grup", nama.trim().ifBlank { "Chat Tim" })
+            addProperty("deskripsi", deskripsi.trim())
+            addProperty("hanya_admin", hanyaAdmin)
+            addProperty("diubah_oleh", olehNama)
+            addProperty("diubah_pada", java.time.Instant.now().toString())
+        }
+        val hasil = Postgrest.update(TABLE_PENGATURAN, listOf("id" to "eq.1"), patch)
+        // PostgREST membalas 200 dengan array kosong ketika RLS menyaring habis
+        // barisnya. Tanpa pemeriksaan ini, penolakan izin terlihat seperti sukses.
+        if (hasil.size() == 0) {
+            throw IllegalStateException("Perubahan ditolak: akun Anda tidak berhak mengubah pengaturan grup.")
+        }
+    }
 
     /** Hapus pesan milik sendiri. RLS menolak diam-diam untuk pesan orang lain. */
     suspend fun hapus(id: String) {
