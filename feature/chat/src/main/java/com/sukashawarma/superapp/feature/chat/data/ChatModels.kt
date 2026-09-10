@@ -26,7 +26,18 @@ data class PesanChat(
     val createdAtMs: Long,
     /** Kapan isi pesan terakhir disunting. null = belum pernah. */
     val editedAtMs: Long? = null,
+    /** Orang yang disebut di pesan ini. Kosong = tidak menyebut siapa pun. */
+    val mentions: List<Sebutan> = emptyList(),
 )
+
+/**
+ * Satu orang yang disebut, beserta NAMA SAAT DISEBUT.
+ *
+ * Namanya ikut disimpan, bukan dicari ulang dari daftar anggota: pemiliknya bisa
+ * menggantinya kapan saja, dan potongan teks "@Budi" di pesan lama harus tetap
+ * tersorot walau orangnya kini bernama lain.
+ */
+data class Sebutan(val id: String, val nama: String)
 
 /** Satu reaksi emoji pada sebuah pesan. Satu orang hanya punya satu per pesan. */
 data class ReaksiPesan(
@@ -92,6 +103,12 @@ fun parsePesanChat(o: JsonObject): PesanChat? {
         replyToSnippet = teks("reply_to_snippet"),
         replyToImage = teks("reply_to_image"),
         createdAtMs = createdAtMs,
+        mentions = o.get("mentions")?.takeIf { it.isJsonArray }?.asJsonArray?.mapNotNull { m ->
+            val obj = m?.takeIf { it.isJsonObject }?.asJsonObject ?: return@mapNotNull null
+            val id = obj.get("id")?.takeIf { !it.isJsonNull }?.asString ?: return@mapNotNull null
+            val nama = obj.get("nama")?.takeIf { !it.isJsonNull }?.asString ?: return@mapNotNull null
+            Sebutan(id, nama)
+        }.orEmpty(),
         editedAtMs = teks("edited_at")?.let {
             runCatching { OffsetDateTime.parse(it).toInstant().toEpochMilli() }.getOrNull()
         },
