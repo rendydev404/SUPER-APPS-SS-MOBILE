@@ -49,8 +49,22 @@ object Realtime {
 
     private const val HEARTBEAT_MS = 25_000L
 
+    /**
+     * Kunci internal channel broadcast di peta [wanted]/[joined]. Diberi awalan
+     * supaya tidak mungkin bertabrakan dengan nama tabel postgres ("bc:" bukan
+     * karakter yang sah untuk nama tabel), dan supaya [join] tahu harus memakai
+     * config broadcast, bukan postgres_changes.
+     */
+    private const val BC_PREFIX = "bc:"
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val events = MutableSharedFlow<String>(extraBufferCapacity = 64, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+
+    /** Pesan broadcast mentah: kunci channel ("bc:<nama>") -> payload {event, payload}. */
+    private val broadcastEvents = MutableSharedFlow<Pair<String, JsonObject>>(
+        extraBufferCapacity = 64,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
     private val counter = AtomicInteger()
 
     private val lock = Any()
@@ -78,6 +92,46 @@ object Realtime {
             .filter { it == ANY || it in keys }
             .debounce(250)
             .map { }
+    }
+
+    /**
+     * Pesan broadcast dari channel bernama [channel] (mis. "chat-typing").
+     *
+     * Berbeda dengan [updates], aliran ini MEMBAWA payload: broadcast memang
+     * ditujukan untuk sinyal ringan antar-klien (typing indicator, presence
+     * sederhana) yang tidak pernah menyentuh database, jadi kekhawatiran
+     * "payload realtime tidak melewati RLS" tidak berlaku — tidak ada baris
+     * database yang diwakilinya. Emisinya objek `{event, payload}` mentah;
+     * pemanggil memilah lewat `event`.
+     *
+     * Menumpang socket, mesin join, dan hitungan pemakai yang sama dengan
+     * [updates] — channel di-join saat kolektor pertama datang dan ditinggal
+     * saat kolektor terakhir pergi.
+     */
+    fun broadcasts(channel: String): Flow<JsonObject> {
+        val key = BC_PREFIX + channel
+        return broadcastEvents
+            .onStart { retain(setOf(key)) }
+            .onCompletion { release(setOf(key)) }
+            .filter { it.first == key }
+            .map { it.second }
+    }
+
+    /**
+     * Kirim satu pesan broadcast ke [channel]. Best-effort dan sengaja lossy:
+     * kalau socket sedang putus atau channel belum ter-join, pesan dibuang
+     * diam-diam — sinyal semacam typing tidak berharga untuk diantre.
+     * Kembalian true hanya berarti "sempat dikirim ke socket".
+     */
+    fun sendBroadcast(channel: String, event: String, payload: JsonObject): Boolean {
+        val key = BC_PREFIX + channel
+        val socket = synchronized(lock) { if (key in joined) live else null } ?: return false
+        val bungkus = JsonObject().apply {
+            addProperty("type", "broadcast")
+            addProperty("event", event)
+            add("payload", payload)
+        }
+        return socket.send(frame("broadcast", bungkus, topic(key)))
     }
 
     private fun retain(tables: Set<String>) {
@@ -148,6 +202,14 @@ object Realtime {
                         "postgres_changes" -> events.tryEmit(
                             data.getAsJsonObject("payload")?.getAsJsonObject("data")?.get("table")?.asString ?: ANY
                         )
+                        "broadcast" -> {
+                            // topic "realtime:native-bc-<nama>" -> kunci "bc:<nama>"
+                            val nama = data.get("topic")?.asString?.removePrefix("realtime:native-bc-")
+                            val payload = data.getAsJsonObject("payload")
+                            if (nama != null && payload != null) {
+                                broadcastEvents.tryEmit(BC_PREFIX + nama to payload)
+                            }
+                        }
                         "phx_error", "phx_close" -> close(mine, webSocket)
                     }
                 }
@@ -188,10 +250,15 @@ object Realtime {
             if (table in joined || table !in wanted) return
             joined += table
         }
+        // Channel broadcast tidak mendaftar postgres_changes: tidak ada tabel
+        // yang diwakilinya, dan server menolak join yang menyebut tabel fiktif.
+        val config = if (table.startsWith(BC_PREFIX)) {
+            """{"broadcast":{"self":false},"presence":{"key":""}}"""
+        } else {
+            """{"broadcast":{"self":false},"presence":{"key":""},"postgres_changes":[{"event":"*","schema":"public","table":"$table"}]}"""
+        }
         val payload = JsonObject().apply {
-            add("config", JsonParser.parseString(
-                """{"broadcast":{"self":false},"presence":{"key":""},"postgres_changes":[{"event":"*","schema":"public","table":"$table"}]}"""
-            ))
+            add("config", JsonParser.parseString(config))
             addProperty("access_token", SessionTokenHolder.accessToken)
         }
         socket.send(frame("phx_join", payload, topic(table)))
@@ -205,7 +272,10 @@ object Realtime {
         socket.send(frame("phx_leave", JsonObject(), topic(table)))
     }
 
-    private fun topic(table: String) = "realtime:native-$table"
+    /** "bc:chat-typing" -> "realtime:native-bc-chat-typing"; nama tabel tetap seperti semula. */
+    private fun topic(table: String) =
+        if (table.startsWith(BC_PREFIX)) "realtime:native-bc-${table.removePrefix(BC_PREFIX)}"
+        else "realtime:native-$table"
 
     private fun tokenPayload() = JsonObject().apply { addProperty("access_token", SessionTokenHolder.accessToken) }
 
