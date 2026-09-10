@@ -7,6 +7,8 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.media.AudioAttributes
 import android.media.RingtoneManager
 import android.os.Build
@@ -15,8 +17,13 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.Person
 import androidx.core.app.RemoteInput
+import androidx.core.content.pm.ShortcutInfoCompat
+import androidx.core.content.pm.ShortcutManagerCompat
+import androidx.core.graphics.drawable.IconCompat
 import com.sukashawarma.superapp.R
+import com.sukashawarma.superapp.data.remote.SupabaseClient
 import com.sukashawarma.superapp.presentation.MainActivity
+import okhttp3.Request
 
 /**
  * Notifikasi khusus chat: gaya percakapan, bisa dibalas langsung dari bilah
@@ -39,6 +46,9 @@ object ChatNotifikasi {
 
     /** Satu id tetap: semua pesan chat menempati notifikasi percakapan yang sama. */
     const val ID_NOTIF = 4711
+
+    /** Id pintasan percakapan; menautkan notifikasi ke identitas grup. */
+    private const val ID_PINTASAN = "chat_tim"
 
     const val KUNCI_BALASAN = "balasan_chat"
     const val AKSI_BALAS = "com.sukashawarma.superapp.BALAS_CHAT"
@@ -73,38 +83,39 @@ object ChatNotifikasi {
         manajer.createNotificationChannel(saluran)
     }
 
+    /** Nama grup terakhir yang dipakai, supaya balasan dari notifikasi tetap
+     *  memakai judul percakapan yang sama. */
+    @Volatile
+    private var namaGrupTerakhir: String = "Chat Tim"
+
+    /** Foto grup yang sudah diunduh, agar tidak diambil ulang tiap pesan. */
+    @Volatile
+    private var fotoGrupPathTerakhir: String? = null
+
+    @Volatile
+    private var fotoGrupBitmap: Bitmap? = null
+
     /** Menampilkan pesan baru, menumpuknya ke percakapan yang sedang tampil. */
-    fun tampilkan(context: Context, pengirim: String, isi: String, namaGrup: String) {
+    fun tampilkan(
+        context: Context,
+        pengirim: String,
+        isi: String,
+        namaGrup: String,
+        fotoGrupPath: String? = null,
+    ) {
         siapkanSaluran(context)
+        namaGrupTerakhir = namaGrup
 
         synchronized(riwayat) {
             riwayat.addLast(Triple(pengirim, isi, System.currentTimeMillis()))
             while (riwayat.size > MAKS_RIWAYAT) riwayat.removeFirst()
         }
 
-        val aku = Person.Builder().setName("Anda").setKey("aku").build()
-        val gaya = NotificationCompat.MessagingStyle(aku)
-            .setConversationTitle(namaGrup)
-            .setGroupConversation(true)
-        synchronized(riwayat) {
-            riwayat.forEach { (nama, teks, waktu) ->
-                gaya.addMessage(
-                    teks,
-                    waktu,
-                    Person.Builder().setName(nama).setKey(nama).build(),
-                )
-            }
-        }
+        val foto = fotoGrup(context, fotoGrupPath)
+        pastikanPintasan(context, namaGrup, foto)
 
-        val notif = NotificationCompat.Builder(context, SALURAN)
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setStyle(gaya)
-            .setCategory(NotificationCompat.CATEGORY_MESSAGE)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setAutoCancel(true)
+        val notif = bangun(context, namaGrup, foto)
             .setOnlyAlertOnce(false)
-            .setContentIntent(intentBuka(context))
-            .addAction(aksiBalas(context))
             .addAction(aksiTandaiDibaca(context))
             .build()
 
@@ -117,37 +128,124 @@ object ChatNotifikasi {
         NotificationManagerCompat.from(context).notify(ID_NOTIF, notif)
     }
 
-    /**
-     * Menyusun ulang notifikasi setelah balasan terkirim, dengan balasan itu
-     * ikut tampil. Wajib: notifikasi yang punya RemoteInput akan terus
-     * memperlihatkan pemintal "mengirim…" sampai diperbarui atau ditutup.
-     */
-    fun tampilkanBalasanTerkirim(context: Context, teks: String, namaGrup: String) {
-        synchronized(riwayat) {
-            riwayat.addLast(Triple("Anda", teks, System.currentTimeMillis()))
-            while (riwayat.size > MAKS_RIWAYAT) riwayat.removeFirst()
-        }
+    /** Kerangka notifikasi percakapan, dipakai jalur pesan masuk maupun balasan. */
+    private fun bangun(
+        context: Context,
+        namaGrup: String,
+        foto: Bitmap?,
+    ): NotificationCompat.Builder {
         val aku = Person.Builder().setName("Anda").setKey("aku").build()
         val gaya = NotificationCompat.MessagingStyle(aku)
             .setConversationTitle(namaGrup)
             .setGroupConversation(true)
         synchronized(riwayat) {
-            riwayat.forEach { (nama, isi, waktu) ->
+            riwayat.forEach { (nama, teks, waktu) ->
+                // Pesan sendiri ditandai dengan pengirim null: itu cara
+                // MessagingStyle membedakan "saya" dari lawan bicara.
                 val orang = if (nama == "Anda") null
                 else Person.Builder().setName(nama).setKey(nama).build()
-                gaya.addMessage(isi, waktu, orang)
+                gaya.addMessage(teks, waktu, orang)
             }
         }
-        val notif = NotificationCompat.Builder(context, SALURAN)
+
+        return NotificationCompat.Builder(context, SALURAN)
             .setSmallIcon(R.mipmap.ic_launcher)
+            .setLargeIcon(foto)
             .setStyle(gaya)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
-            // Balasan sendiri tidak perlu berbunyi lagi.
-            .setSilent(true)
+            // Menautkan notifikasi ke pintasan percakapan: Android 11+ akan
+            // menaruhnya di bagian "Percakapan", lengkap dengan foto grup, dan
+            // membuka pintu gelembung mengambang bila pengguna mengizinkannya.
+            .setShortcutId(ID_PINTASAN)
             .setContentIntent(intentBuka(context))
             .addAction(aksiBalas(context))
+    }
+
+    /**
+     * Foto grup untuk ikon besar notifikasi.
+     *
+     * Bucket `avatars` bersifat privat, jadi pengunduhannya memakai klien
+     * OkHttp aplikasi yang sudah menyisipkan token sesi. Tanpa sesi hidup
+     * (proses baru dibangunkan push) pengunduhan gagal dan notifikasinya
+     * tampil tanpa foto — itu diterima, karena notifikasi tidak boleh menunggu
+     * jaringan hanya demi sebuah lingkaran kecil.
+     */
+    private fun fotoGrup(context: Context, path: String?): Bitmap? {
+        if (path.isNullOrBlank()) return null
+        if (path == fotoGrupPathTerakhir && fotoGrupBitmap != null) return fotoGrupBitmap
+
+        return try {
+            val objek = path.removePrefix("avatars/")
+            val url = "${SupabaseClient.BASE_URL}storage/v1/object/authenticated/avatars/$objek"
+            val permintaan = Request.Builder().url(url).get().build()
+            SupabaseClient.okHttpClient.newCall(permintaan).execute().use { resp ->
+                if (!resp.isSuccessful) return null
+                val bytes = resp.body?.bytes() ?: return null
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.also {
+                    fotoGrupBitmap = it
+                    fotoGrupPathTerakhir = path
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("ChatNotifikasi", "foto grup gagal dimuat: ${e.message}")
+            null
+        }
+    }
+
+    /**
+     * Pintasan percakapan yang menjadi identitas grup di mata sistem.
+     *
+     * Wajib `setLongLived`: tanpa itu Android membuang pintasannya dan
+     * notifikasi kehilangan status percakapannya begitu daftar pintasan
+     * disegarkan.
+     */
+    private fun pastikanPintasan(context: Context, namaGrup: String, foto: Bitmap?) {
+        try {
+            val orangGrup = Person.Builder()
+                .setName(namaGrup)
+                .setKey(ID_PINTASAN)
+                .apply { if (foto != null) setIcon(IconCompat.createWithAdaptiveBitmap(foto)) }
+                .build()
+
+            val pintasan = ShortcutInfoCompat.Builder(context, ID_PINTASAN)
+                .setShortLabel(namaGrup)
+                .setLongLived(true)
+                .setIntent(
+                    Intent(context, MainActivity::class.java)
+                        .setAction(Intent.ACTION_VIEW)
+                        .putExtra(NotifikasiTujuan.EXTRA_RUTE, NotifikasiTujuan.CHAT)
+                )
+                .setPerson(orangGrup)
+                .apply {
+                    if (foto != null) setIcon(IconCompat.createWithAdaptiveBitmap(foto))
+                    else setIcon(IconCompat.createWithResource(context, R.mipmap.ic_launcher))
+                }
+                .setCategories(setOf("android.shortcut.conversation"))
+                .build()
+
+            ShortcutManagerCompat.pushDynamicShortcut(context, pintasan)
+        } catch (e: Exception) {
+            // Pintasan hanyalah penyempurna tampilan; kegagalannya tidak boleh
+            // membuat notifikasinya sendiri batal muncul.
+            android.util.Log.w("ChatNotifikasi", "pintasan percakapan gagal: ${e.message}")
+        }
+    }
+
+    /**
+     * Menyusun ulang notifikasi setelah balasan terkirim, dengan balasan itu
+     * ikut tampil. Wajib: notifikasi yang punya RemoteInput akan terus
+     * memperlihatkan pemintal "mengirim…" sampai diperbarui atau ditutup.
+     */
+    fun tampilkanBalasanTerkirim(context: Context, teks: String) {
+        synchronized(riwayat) {
+            riwayat.addLast(Triple("Anda", teks, System.currentTimeMillis()))
+            while (riwayat.size > MAKS_RIWAYAT) riwayat.removeFirst()
+        }
+        val notif = bangun(context, namaGrupTerakhir, fotoGrupBitmap)
+            // Balasan sendiri tidak perlu berbunyi lagi.
+            .setSilent(true)
             .build()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
