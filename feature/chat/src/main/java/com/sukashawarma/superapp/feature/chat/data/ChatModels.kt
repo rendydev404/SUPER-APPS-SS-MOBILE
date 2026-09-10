@@ -92,3 +92,54 @@ fun parsePesanChat(o: JsonObject): PesanChat? {
         createdAtMs = createdAtMs,
     )
 }
+
+/**
+ * Satu anggota grup, sebagaimana dibuka RPC `chat_daftar_anggota`.
+ *
+ * Sengaja BUKAN `StaffProfile`: yang boleh dilihat lintas-outlet hanya enam
+ * kolom tampilan ini. Memakai model kepegawaian yang penuh di sini akan
+ * mengundang layar lain membaca kolom yang tidak pernah dikirim server.
+ */
+data class AnggotaGrup(
+    val id: String,
+    val nama: String,
+    val username: String?,
+    val avatar: String?,
+    val role: String?,
+    val outlet: String?,
+)
+
+fun parseAnggota(o: JsonObject): AnggotaGrup? {
+    fun teks(k: String): String? = o.get(k)?.takeIf { !it.isJsonNull }?.asString
+    return AnggotaGrup(
+        id = teks("id") ?: return null,
+        nama = teks("nama")?.ifBlank { null } ?: "Tanpa Nama",
+        username = teks("display_username"),
+        avatar = teks("avatar_url"),
+        role = teks("role"),
+        outlet = teks("outlet_nama"),
+    )
+}
+
+/** Nama jabatan yang layak dibaca manusia, bukan kode mentah basis data. */
+fun labelRole(role: String?): String = when (role) {
+    null, "" -> "Anggota"
+    "admin" -> "Admin"
+    "admin_hr" -> "Admin HR"
+    "admin_finance" -> "Admin Finance"
+    "owner" -> "Owner"
+    "spv" -> "Supervisor"
+    "regional_manager" -> "Regional Manager"
+    "area_manager" -> "Area Manager"
+    "leader" -> "Leader"
+    "crew" -> "Crew"
+    "kitchen" -> "Kitchen"
+    "kiosk" -> "Kiosk"
+    "mitra" -> "Mitra"
+    "staff_pusat" -> "Staff Pusat"
+    "purchasing" -> "Purchasing"
+    "developer" -> "Developer"
+    "korlap" -> "Korlap"
+    "kepala_outlet" -> "Kepala Outlet"
+    else -> role.replace('_', ' ').replaceFirstChar { it.uppercase() }
+}
