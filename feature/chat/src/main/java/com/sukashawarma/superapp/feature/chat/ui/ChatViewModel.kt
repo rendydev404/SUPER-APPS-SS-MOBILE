@@ -13,6 +13,7 @@ import com.sukashawarma.superapp.feature.chat.domain.PelacakPengetik
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -71,12 +72,18 @@ class ChatViewModel : ViewModel() {
         // Sinyal "tabel berubah" -> muat ulang lewat jalur baca normal. Emisi
         // pertama saat sambungan terbuka sekaligus mengejar yang terlewat
         // selama offline.
+        // TIGA aliran terpisah, bukan satu gabungan. Sebelumnya satu pesan masuk
+        // ikut menarik ulang seluruh daftar reaksi DAN pengaturan grup — tiga
+        // permintaan jaringan untuk satu kejadian. Sekarang tiap tabel hanya
+        // memuat ulang bagiannya sendiri.
         viewModelScope.launch {
-            Realtime.updates(
-                ChatRepository.TABLE,
-                ChatRepository.TABLE_REAKSI,
-                ChatRepository.TABLE_PENGATURAN,
-            ).collect { muatUlang() }
+            Realtime.updates(ChatRepository.TABLE).collect { muatPesan() }
+        }
+        viewModelScope.launch {
+            Realtime.updates(ChatRepository.TABLE_REAKSI).collect { muatReaksi() }
+        }
+        viewModelScope.launch {
+            Realtime.updates(ChatRepository.TABLE_PENGATURAN).collect { muatPengaturan() }
         }
 
         // Sinyal typing dari klien lain (broadcast murni, tanpa database).
@@ -94,10 +101,21 @@ class ChatViewModel : ViewModel() {
 
         // Nama pengetik kedaluwarsa sendiri setelah 5 detik hening; detak ini
         // yang menurunkannya dari layar tanpa perlu sinyal "berhenti".
+        //
+        // Detaknya BERHENTI saat tidak ada yang mengetik. Versi sebelumnya
+        // bangun tiap detik sepanjang layar hidup walau tidak ada apa pun yang
+        // berubah — pekerjaan sia-sia yang paling terasa di HP lemah dan di
+        // baterai.
         viewModelScope.launch {
             while (isActive) {
-                delay(1_000)
-                segarkanPengetik()
+                // Tidur TANPA BATAS sampai ada yang mengetik: `first` menunggu
+                // perubahan state, bukan berdetak. Nol pekerjaan saat grup sepi,
+                // dan grup memang sepi hampir sepanjang waktu.
+                _state.first { it.namaPengetik.isNotEmpty() }
+                while (isActive && _state.value.namaPengetik.isNotEmpty()) {
+                    delay(1_000)
+                    segarkanPengetik()
+                }
             }
         }
     }
@@ -270,48 +288,91 @@ class ChatViewModel : ViewModel() {
         }
     }
 
+    /** Muat semuanya — hanya untuk pembukaan layar dan pemulihan galat. */
     fun muatUlang(awal: Boolean = false) {
         if (awal) _state.value = _state.value.copy(memuat = true)
         viewModelScope.launch {
-            try {
-                val pesan = ChatRepository.ambilPesan()
+            muatPesanSekarang(tandaiSelesai = true)
+            muatReaksiSekarang()
+            muatPengaturanSekarang()
+        }
+    }
 
-                // Reaksi dan pengaturan diambil dengan penjaga sendiri: keduanya
-                // datang dari migrasi yang lebih baru, dan chat harus tetap jalan
-                // di perangkat yang databasenya belum diperbarui.
-                val reaksi = try {
-                    ChatRepository.ambilReaksi().groupBy { it.messageId }
-                } catch (e: Exception) {
-                    android.util.Log.w("ChatViewModel", "reaksi tidak tersedia: ${e.message}")
-                    _state.value.reaksi
-                }
-                val pengaturan = try {
-                    ChatRepository.ambilPengaturan()
-                } catch (e: Exception) {
-                    android.util.Log.w("ChatViewModel", "pengaturan tidak tersedia: ${e.message}")
-                    _state.value.pengaturan
-                }
-                _state.value = _state.value.copy(
-                    reaksi = reaksi,
-                    pengaturan = pengaturan,
-                    pengelola = AppSession.staff.value?.roleRaw in ChatRepository.ROLE_PENGELOLA,
-                )
-                // Orang yang pesannya baru tiba jelas sudah selesai mengetik.
-                pesan.filter { it.createdAtMs > maksCreatedMs }.forEach { pelacak.selesai(it.senderId) }
-                maksCreatedMs = pesan.maxOfOrNull { it.createdAtMs } ?: maksCreatedMs
-                _state.value = _state.value.copy(memuat = false, galat = null, pesan = pesan)
+    private fun muatPesan() {
+        viewModelScope.launch { muatPesanSekarang(tandaiSelesai = true) }
+    }
+
+    private fun muatReaksi() {
+        viewModelScope.launch { muatReaksiSekarang() }
+    }
+
+    private fun muatPengaturan() {
+        viewModelScope.launch { muatPengaturanSekarang() }
+    }
+
+    private suspend fun muatPesanSekarang(tandaiSelesai: Boolean) {
+        try {
+            val pesan = ChatRepository.ambilPesan()
+
+            // Orang yang pesannya baru tiba jelas sudah selesai mengetik.
+            if (tandaiSelesai) {
+                pesan.forEach { if (it.createdAtMs > maksCreatedMs) pelacak.selesai(it.senderId) }
+            }
+            maksCreatedMs = pesan.maxOfOrNull { it.createdAtMs } ?: maksCreatedMs
+
+            val sekarang = _state.value
+            // Isi yang sama tidak ditulis ulang ke state. Tanpa penjaga ini,
+            // setiap sinyal realtime — termasuk yang tidak mengubah apa pun —
+            // membuat seluruh daftar disusun ulang dan digambar ulang.
+            if (sekarang.pesan == pesan && !sekarang.memuat && sekarang.galat == null) {
                 segarkanPengetik()
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                android.util.Log.e("ChatViewModel", "muatUlang gagal", e)
-                // Galat hanya ditampilkan bila layar belum punya apa-apa; kalau
-                // sudah ada isi, kegagalan refresh cukup diam (realtime akan
-                // mencoba lagi sendiri).
-                _state.value = _state.value.copy(
-                    memuat = false,
-                    galat = if (_state.value.pesan.isEmpty()) "Gagal memuat chat. Periksa koneksi." else _state.value.galat,
-                )
+                return
+            }
+            _state.value = sekarang.copy(memuat = false, galat = null, pesan = pesan)
+            segarkanPengetik()
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            android.util.Log.e("ChatViewModel", "muat pesan gagal", e)
+            // Galat hanya ditampilkan bila layar belum punya apa-apa; kalau
+            // sudah ada isi, kegagalan refresh cukup diam (realtime akan
+            // mencoba lagi sendiri).
+            _state.value = _state.value.copy(
+                memuat = false,
+                galat = if (_state.value.pesan.isEmpty()) "Gagal memuat chat. Periksa koneksi." else _state.value.galat,
+            )
+        }
+    }
+
+    // Reaksi dan pengaturan punya penjaga sendiri: keduanya datang dari migrasi
+    // yang lebih baru, dan chat harus tetap jalan di perangkat yang databasenya
+    // belum diperbarui.
+    private suspend fun muatReaksiSekarang() {
+        try {
+            val reaksi = ChatRepository.ambilReaksi().groupBy { it.messageId }
+            if (reaksi != _state.value.reaksi) {
+                _state.value = _state.value.copy(reaksi = reaksi)
+            }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            android.util.Log.w("ChatViewModel", "reaksi tidak tersedia: ${e.message}")
+        }
+    }
+
+    private suspend fun muatPengaturanSekarang() {
+        val pengelola = AppSession.staff.value?.roleRaw in ChatRepository.ROLE_PENGELOLA
+        try {
+            val pengaturan = ChatRepository.ambilPengaturan()
+            if (pengaturan != _state.value.pengaturan || pengelola != _state.value.pengelola) {
+                _state.value = _state.value.copy(pengaturan = pengaturan, pengelola = pengelola)
+            }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            android.util.Log.w("ChatViewModel", "pengaturan tidak tersedia: ${e.message}")
+            if (pengelola != _state.value.pengelola) {
+                _state.value = _state.value.copy(pengelola = pengelola)
             }
         }
     }
