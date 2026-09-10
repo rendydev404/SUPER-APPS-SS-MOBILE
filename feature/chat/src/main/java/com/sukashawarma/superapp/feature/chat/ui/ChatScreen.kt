@@ -16,6 +16,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.StartOffset
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -62,6 +63,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBackIos
 import androidx.compose.material.icons.automirrored.filled.Reply
+import androidx.compose.material.icons.filled.AlternateEmail
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Campaign
@@ -105,9 +107,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -181,6 +186,10 @@ private val TeksSekunder = Color(0xFF8E8E93)
 private val LatarBanner = Color(0xFFFEF7DC)
 private val TeksBanner = Color(0xFF6B5D2E)
 private val Merah = Color(0xFFFF3B30)
+
+/** Aksen merek. Dipakai untuk hal yang menuntut perhatian: sorotan lompatan,
+ *  mode sunting, dan tombol '@'. */
+private val Oranye = Color(0xFFEA580C)
 
 /** Warna nama pengirim di grup — satu warna tetap per orang, seperti WA. */
 /** Cermin batas di `chat_edit_pesan`. Di sini hanya menentukan apakah tombolnya
@@ -272,7 +281,10 @@ fun ChatScreen(
     // tampak "terpilih" selamanya, padahal ia hanya sedang ditunjukkan.
     LaunchedEffect(sorotPesanId) {
         if (sorotPesanId == null) return@LaunchedEffect
-        kotlinx.coroutines.delay(1_600)
+        // Lebih lama dari denyutnya (220 + 1000 + 420 ms) supaya gelembungnya
+        // sempat memudar keluar; dibuang lebih cepat, sorotannya lenyap
+        // mendadak di tengah animasi.
+        kotlinx.coroutines.delay(1_900)
         sorotPesanId = null
     }
     var menyimpanPengaturan by remember { mutableStateOf(false) }
@@ -344,9 +356,40 @@ fun ChatScreen(
     // sana, satu pandangan baru dialokasikan untuk tiap petak yang digambar.
     val tertundaTerbalik = remember(state.tertunda) { state.tertunda.asReversed() }
 
+    // Batas baca DIBACA SEKALI saat layar dibuka, bukan setiap penyusunan ulang.
+    // Meninggalkan layar akan memajukan penandanya (lihat DisposableEffect di
+    // atas); kalau nilainya dibaca ulang terus, garis "belum dibaca" akan
+    // bergeser sendiri selagi percakapan masih dilihat.
+    val batasBacaMs = remember { ChatBacaan.terakhirDibaca(context) }
+
+    // Pesan orang lain yang datang setelah penanda baca. `indexOfLast` karena
+    // daftar ini terbalik: yang PALING TUA justru berada di ujung belakang, dan
+    // itulah tempat percakapan harus dilanjutkan.
+    val indeksBelumDibaca = remember(itemTampil, batasBacaMs, userId) {
+        itemTampil.indexOfLast {
+            it is ItemChat.Bubble && it.pesan.senderId != userId && it.pesan.createdAtMs > batasBacaMs
+        }
+    }
+    val jumlahBelumDibaca = remember(itemTampil, batasBacaMs, userId) {
+        itemTampil.count {
+            it is ItemChat.Bubble && it.pesan.senderId != userId && it.pesan.createdAtMs > batasBacaMs
+        }
+    }
+    // Sebutan belum dibaca yang paling tua — sasaran tombol '@'.
+    val indeksSebutanku = remember(itemTampil, batasBacaMs, userId) {
+        if (userId.isBlank()) -1 else itemTampil.indexOfLast {
+            it is ItemChat.Bubble && it.pesan.senderId != userId &&
+                it.pesan.createdAtMs > batasBacaMs &&
+                it.pesan.mentions.any { m -> m.id == userId }
+        }
+    }
+    var sebutanSudahDilihat by remember { mutableStateOf(false) }
+
     // Auto-ikut ke bawah saat pesan baru datang dan pengguna memang sedang di bawah;
     // kalau sedang membaca ke atas, jangan menyeret paksa — cukup badge pesan baru.
     var jumlahTerlihat by remember { mutableIntStateOf(0) }
+    /** Sudahkah layar diposisikan ke tempat pembacaan terakhir. */
+    var sudahPosisiAwal by remember { mutableStateOf(false) }
     var pesanBaruBelumDilihat by remember { mutableIntStateOf(0) }
     val diBawah by remember {
         androidx.compose.runtime.derivedStateOf {
@@ -355,6 +398,25 @@ fun ChatScreen(
     }
     LaunchedEffect(state.pesan.size, state.tertunda.size) {
         val total = state.pesan.size + state.tertunda.size
+
+        // PEMUATAN PERTAMA: lanjutkan dari tempat terakhir ditinggalkan, bukan
+        // diseret ke dasar percakapan. Orang yang meninggalkan 40 pesan belum
+        // dibaca lalu dilempar ke pesan paling baru harus menggulir mundur
+        // sendiri untuk tahu apa yang ia lewatkan — dan dengan chat yang hilang
+        // tiap 24 jam, yang terlewat itu tidak akan pernah dibacanya lagi.
+        if (!sudahPosisiAwal && total > 0) {
+            sudahPosisiAwal = true
+            jumlahTerlihat = total
+            if (indeksBelumDibaca > 0) {
+                // `scrollToItem`, bukan animasi: ini menempatkan layar sebelum
+                // pengguna sempat melihatnya, bukan perjalanan yang perlu
+                // diikuti mata.
+                listState.scrollToItem(indeksBelumDibaca)
+                pesanBaruBelumDilihat = jumlahBelumDibaca
+            }
+            return@LaunchedEffect
+        }
+
         if (total > jumlahTerlihat) {
             if (diBawah || state.tertunda.isNotEmpty()) {
                 listState.gulirHalusKe(0)
@@ -521,15 +583,35 @@ fun ChatScreen(
                 }
             }
 
-            // Tombol lompat ke bawah + badge pesan baru, gaya iOS.
-            androidx.compose.animation.AnimatedVisibility(
-                visible = !diBawah && !state.memuat,
-                enter = fadeIn() + slideInVertically { it / 2 },
-                exit = fadeOut() + slideOutVertically { it / 2 },
-                modifier = Modifier.align(Alignment.BottomEnd).padding(14.dp),
+            // Tombol melayang, gaya iOS: '@' di atas, lompat-ke-bawah di bawah.
+            Column(
+                Modifier.align(Alignment.BottomEnd).padding(14.dp),
+                horizontalAlignment = Alignment.End,
             ) {
-                TombolKeBawah(pesanBaruBelumDilihat) {
-                    scope.launch { listState.gulirHalusKe(0) }
+                // Tombol '@' hanya lahir bila memang ada sebutan yang belum
+                // dibaca. Di grup se-perusahaan, disebut namanya jarang terjadi —
+                // dan tombol yang selalu ada akan berhenti berarti.
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = indeksSebutanku >= 0 && !sebutanSudahDilihat && !state.memuat,
+                    enter = fadeIn() + slideInVertically { it / 2 },
+                    exit = fadeOut() + slideOutVertically { it / 2 },
+                ) {
+                    TombolKeSebutan {
+                        sebutanSudahDilihat = true
+                        val sasaran = itemTampil.getOrNull(indeksSebutanku)
+                        scope.launch { listState.gulirHalusKe(indeksSebutanku) }
+                        if (sasaran is ItemChat.Bubble) sorotPesanId = sasaran.pesan.id
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = !diBawah && !state.memuat,
+                    enter = fadeIn() + slideInVertically { it / 2 },
+                    exit = fadeOut() + slideOutVertically { it / 2 },
+                ) {
+                    TombolKeBawah(pesanBaruBelumDilihat) {
+                        scope.launch { listState.gulirHalusKe(0) }
+                    }
                 }
             }
         }
@@ -880,22 +962,27 @@ private fun PitaModePengumuman() {
 }
 
 /**
- * Warna cincin sorot, memudar masuk saat gelembungnya mulai disorot.
+ * Denyut sorotan: 0 -> 1 (muncul), ditahan, lalu 1 -> 0 (padam).
  *
  * Berdiri sebagai composable sendiri supaya state animasinya lahir dan mati
  * bersama sorotannya — bukan menumpang di setiap gelembung yang kebetulan
  * tersusun.
+ *
+ * SATU float untuk seluruh efek. Nilainya dipakai bersama oleh cincin, kilau
+ * latar, dan pembesaran halus, sehingga ketiganya bergerak sebagai satu benda —
+ * dan yang dibayar tetap satu animasi, pada satu gelembung, sekali lompatan.
+ * Padamnya ikut dianimasikan; versi sebelumnya hanya memudar masuk lalu hilang
+ * begitu saja, dan justru kepergian mendadak itulah yang terlihat patah.
  */
 @Composable
-private fun warnaCincinSorot(): Color {
-    var mulai by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { mulai = true }
-    val warna by animateColorAsState(
-        targetValue = if (mulai) Color(0xFFEA580C) else Color.Transparent,
-        animationSpec = tween(180),
-        label = "cincinSorot",
-    )
-    return warna
+private fun denyutSorot(): Animatable<Float, *> {
+    val maju = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        maju.animateTo(1f, tween(220, easing = FastOutSlowInEasing))
+        kotlinx.coroutines.delay(1_000)
+        maju.animateTo(0f, tween(420, easing = FastOutSlowInEasing))
+    }
+    return maju
 }
 
 /** Sisa jarak yang masih dianimasikan setelah lompatan instan. */
@@ -1280,14 +1367,43 @@ private fun Bubble(
     // Versi sebelumnya memanggil animateColorAsState di SETIAP gelembung, jadi
     // setiap kali daftar melompat, belasan Animatable dan LaunchedEffect lahir
     // sekaligus hanya untuk menganimasikan warna transparan ke transparan.
-    val warnaSorot = if (disorot) warnaCincinSorot() else Color.Transparent
+    val denyut = if (disorot) denyutSorot() else null
 
     Column(
         modifier
             .widthIn(max = 290.dp + EKOR)
+            // Denyutnya dibaca DI DALAM lambda gambar dan lapisan, bukan saat
+            // penyusunan. Compose karena itu hanya menggambar ulang satu
+            // gelembung tiap frame — tanpa menyusun ulang apa pun dan tanpa
+            // mengukur ulang daftarnya. Itulah yang membuat efek sekaya ini
+            // tetap gratis di HP lemah.
+            .then(
+                if (denyut == null) Modifier else Modifier.graphicsLayer {
+                    val skala = 1f + 0.04f * denyut.value
+                    scaleX = skala
+                    scaleY = skala
+                }
+            )
             .clip(bentuk)
             .background(warnaBubble)
-            .border(2.5.dp, warnaSorot, bentuk)
+            .then(
+                if (denyut == null) Modifier else Modifier.drawWithContent {
+                    drawContent()
+                    val maju = denyut.value
+                    if (maju <= 0f) return@drawWithContent
+                    val garis = bentuk.createOutline(size, layoutDirection, this)
+                    // Kilau tipis di dalam, cincin tegas di tepi: yang pertama
+                    // membuat gelembungnya terasa menyala, yang kedua membuat
+                    // batasnya jelas di atas latar terang maupun gelap.
+                    drawOutline(garis, Oranye, alpha = 0.14f * maju)
+                    drawOutline(
+                        garis,
+                        Oranye,
+                        alpha = maju,
+                        style = Stroke(width = 2.5.dp.toPx()),
+                    )
+                }
+            )
             // Ruang ekor ditambahkan ke sisi pengirim supaya isi pesan berhenti
             // tepat di tepi badan, bukan menindih lengkungan ekornya.
             .padding(
@@ -1654,6 +1770,44 @@ private fun KeadaanGalat(pesan: String, onCoba: () -> Unit) {
         Text(pesan, fontSize = 14.sp, color = TeksSekunder, textAlign = TextAlign.Center)
         Spacer(Modifier.height(12.dp))
         TextButton(onClick = onCoba) { Text("Coba lagi", color = BiruIos) }
+    }
+}
+
+@Composable
+private fun TombolKeSebutan(onClick: () -> Unit) {
+    // Berdenyut pelan supaya mata menemukannya tanpa perlu berkedip keras.
+    // Satu animasi float untuk satu tombol — jauh lebih murah daripada warna
+    // atau bayangan yang beranimasi, dan dibaca di dalam `graphicsLayer`
+    // sehingga hanya lapisan gambarnya yang diperbarui, bukan susunannya.
+    val transisi = rememberInfiniteTransition(label = "denyutSebutan")
+    val denyut by transisi.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1_100, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "denyut",
+    )
+    Box(
+        Modifier
+            .graphicsLayer {
+                val skala = 1f + 0.06f * denyut
+                scaleX = skala
+                scaleY = skala
+            }
+            .size(40.dp)
+            .clip(CircleShape)
+            .background(Oranye)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            Icons.Filled.AlternateEmail,
+            "Lompat ke pesan yang menyebut Anda",
+            tint = Color.White,
+            modifier = Modifier.size(21.dp),
+        )
     }
 }
 
