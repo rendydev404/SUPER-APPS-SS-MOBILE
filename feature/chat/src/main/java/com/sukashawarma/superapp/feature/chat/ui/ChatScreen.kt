@@ -1,9 +1,11 @@
 package com.sukashawarma.superapp.feature.chat.ui
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.os.Build
+import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -69,6 +71,7 @@ import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -106,7 +109,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -241,11 +247,43 @@ fun ChatScreen(
     // scrim gelap milik menu yang menanggung seluruh pemisahannya.
     val buramkan = menuPesan != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
-    // Notifikasi pesan masuk ditahan selama layar ini terbuka — pesan yang
+    // Notifikasi pesan masuk ditahan selama layar ini TERLIHAT — pesan yang
     // sedang dibaca tidak perlu diumumkan lagi di baki notifikasi.
-    DisposableEffect(Unit) {
+    //
+    // Penandanya mengikuti DAUR HIDUP, bukan komposisi. `DisposableEffect`
+    // saja tidak cukup: menekan Home tidak membuang composable ini, jadi
+    // penandanya akan tetap menyala selama layar chat menjadi layar terakhir —
+    // dan notifikasi ikut dibungkam selamanya walau aplikasi sudah lama
+    // ditinggalkan. Itu persis bug yang membuat push terlihat "tidak jalan".
+    // Izin notifikasi diperiksa ulang tiap kali layar kembali terlihat: pengguna
+    // bisa saja baru menyalakannya dari Setelan lalu kembali ke sini.
+    var notifikasiMati by remember { mutableStateOf(false) }
+    fun periksaIzinNotifikasi() {
+        notifikasiMati = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(
+                context, Manifest.permission.POST_NOTIFICATIONS,
+            ) != PackageManager.PERMISSION_GRANTED
+    }
+
+    val pemilikDaurHidup = LocalLifecycleOwner.current
+    DisposableEffect(pemilikDaurHidup) {
+        val pengamat = LifecycleEventObserver { _, peristiwa ->
+            when (peristiwa) {
+                Lifecycle.Event.ON_RESUME -> {
+                    ChatKehadiran.masuk()
+                    periksaIzinNotifikasi()
+                }
+                Lifecycle.Event.ON_PAUSE -> ChatKehadiran.keluar()
+                else -> Unit
+            }
+        }
+        pemilikDaurHidup.lifecycle.addObserver(pengamat)
         ChatKehadiran.masuk()
-        onDispose { ChatKehadiran.keluar() }
+        periksaIzinNotifikasi()
+        onDispose {
+            pemilikDaurHidup.lifecycle.removeObserver(pengamat)
+            ChatKehadiran.keluar()
+        }
     }
 
     // Daftar item (bubble + pemisah), terbaru DULU karena LazyColumn reverseLayout.
@@ -381,6 +419,19 @@ fun ChatScreen(
                 TombolKeBawah(pesanBaruBelumDilihat) {
                     scope.launch { listState.animateScrollToItem(0) }
                 }
+            }
+        }
+
+        if (notifikasiMati) {
+            PitaNotifikasiMati {
+                // Dialog izin Android berhenti muncul setelah dua penolakan,
+                // jadi satu-satunya jalan yang pasti berhasil adalah halaman
+                // setelan notifikasi aplikasi ini.
+                context.startActivity(
+                    Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                        .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
             }
         }
 
@@ -598,6 +649,48 @@ private fun LembarSemuaEmoji(onPilih: (String) -> Unit, onTutup: () -> Unit) {
                 onHapus = {},
             )
         }
+    }
+}
+
+/**
+ * Pita peringatan saat izin notifikasi belum diberikan.
+ *
+ * Tanpa ini, notifikasi yang dibuang sistem tidak meninggalkan jejak apa pun di
+ * layar — pengguna hanya merasa "chat tidak memberi tahu apa-apa" dan tidak
+ * punya cara menemukan sebabnya.
+ */
+@Composable
+private fun PitaNotifikasiMati(onAktifkan: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(LatarBanner)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            Icons.Filled.NotificationsOff,
+            null,
+            tint = TeksBanner,
+            modifier = Modifier.size(18.dp),
+        )
+        Spacer(Modifier.width(10.dp))
+        Text(
+            "Notifikasi mati, Anda tidak akan tahu ada pesan baru.",
+            fontSize = 12.5.sp,
+            color = TeksBanner,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            "Aktifkan",
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = BiruIos,
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .clickable(onClick = onAktifkan)
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+        )
     }
 }
 
