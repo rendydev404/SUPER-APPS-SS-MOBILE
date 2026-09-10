@@ -61,7 +61,10 @@ class SuperappMessagingService : FirebaseMessagingService() {
             // berbunyi untuk percakapan yang sedang dibuka di layar.
             if (pengirim == AppSession.staff.value?.id) return
             if (ChatKehadiran.terbuka) return
-            tampilkan(judul, isi, NotifikasiTujuan.CHAT)
+            // Saluran dan gaya sendiri: percakapan yang bisa dibalas langsung,
+            // terpisah dari saluran kabar operasional. `judul` adalah nama
+            // pengirim (diisi trigger database).
+            ChatNotifikasi.tampilkan(this, judul, isi, ChatKehadiran.namaGrup)
             return
         }
 
