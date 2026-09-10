@@ -64,6 +64,8 @@ import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.EmojiEmotions
+import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -72,7 +74,9 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -92,6 +96,8 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -100,6 +106,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -125,6 +132,8 @@ import com.sukashawarma.superapp.feature.chat.domain.indeksWarnaNama
 import com.sukashawarma.superapp.feature.chat.domain.labelPengetik
 import com.sukashawarma.superapp.feature.chat.domain.snippetPesan
 import com.sukashawarma.superapp.feature.chat.domain.susunItemChat
+import com.sukashawarma.superapp.feature.chat.ui.emoji.PapanEmoji
+import com.sukashawarma.superapp.feature.chat.ui.emoji.hapusSatuKarakter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -215,6 +224,7 @@ fun ChatScreen(
     var menuPesan by remember { mutableStateOf<PesanChat?>(null) }
     var konfirmasiHapus by remember { mutableStateOf<PesanChat?>(null) }
     var sheetReaksi by remember { mutableStateOf<PesanChat?>(null) }
+    var pilihEmojiReaksi by remember { mutableStateOf<PesanChat?>(null) }
     var sheetInfo by remember { mutableStateOf(false) }
     var menyimpanPengaturan by remember { mutableStateOf(false) }
     var galatPengaturan by remember { mutableStateOf<String?>(null) }
@@ -266,7 +276,16 @@ fun ChatScreen(
     }
     LaunchedEffect(diBawah) { if (diBawah) pesanBaruBelumDilihat = 0 }
 
-    BackHandler(onBack = onBack)
+    // Isi kotak ketik hidup di sini, bukan di dalam komposer: papan emoji harus
+    // bisa menyisipkan dan menghapus karakter pada teks yang sama.
+    var teksPesan by remember { mutableStateOf("") }
+    var papanEmoji by remember { mutableStateOf(false) }
+    val papanKetik = LocalSoftwareKeyboardController.current
+
+    // Tombol kembali menutup papan emoji dulu — persis seperti ia menutup papan
+    // ketik, bukan langsung meninggalkan percakapan.
+    BackHandler(enabled = papanEmoji) { papanEmoji = false }
+    BackHandler(enabled = !papanEmoji, onBack = onBack)
 
     Box(Modifier.fillMaxSize().background(LatarChat)) {
     Column(
@@ -371,11 +390,35 @@ fun ChatScreen(
 
         if (state.bolehKirim) {
             KomposerChat(
+                teks = teksPesan,
+                papanEmojiTerbuka = papanEmoji,
                 sedangKompres = sedangKompres,
-                onKetik = viewModel::ketikan,
-                onKirim = viewModel::kirimTeks,
-                onLampiran = { lembarSumber = true },
+                onTeksBerubah = { teksPesan = it; viewModel.ketikan(it) },
+                onToggleEmoji = {
+                    if (papanEmoji) {
+                        papanEmoji = false
+                        papanKetik?.show()
+                    } else {
+                        // Papan emoji MENGGANTIKAN papan ketik, tidak menumpuk
+                        // di atasnya — kalau keduanya terbuka, daftar pesan
+                        // terdorong sampai tak tersisa.
+                        papanKetik?.hide()
+                        papanEmoji = true
+                    }
+                },
+                onFokusIsian = { papanEmoji = false },
+                onKirim = {
+                    viewModel.kirimTeks(teksPesan)
+                    teksPesan = ""
+                },
+                onLampiran = { papanEmoji = false; lembarSumber = true },
             )
+            if (papanEmoji) {
+                PapanEmoji(
+                    onPilih = { teksPesan += it },
+                    onHapus = { teksPesan = hapusSatuKarakter(teksPesan) },
+                )
+            }
         } else {
             PitaModePengumuman()
         }
@@ -441,6 +484,7 @@ fun ChatScreen(
                     viewModel.toggleReaksi(pesan, emoji)
                     menuPesan = null
                 },
+                onSemuaEmoji = { pilihEmojiReaksi = pesan; menuPesan = null },
                 onBalas = { viewModel.setBalas(pesan); menuPesan = null },
                 onSalin = {
                     clipboard.setText(AnnotatedString(pesan.body))
@@ -468,6 +512,16 @@ fun ChatScreen(
                 }
             },
             dismissButton = { TextButton(onClick = { konfirmasiHapus = null }) { Text("Batal") } },
+        )
+    }
+
+    pilihEmojiReaksi?.let { pesan ->
+        LembarSemuaEmoji(
+            onPilih = { emoji ->
+                viewModel.toggleReaksi(pesan, emoji)
+                pilihEmojiReaksi = null
+            },
+            onTutup = { pilihEmojiReaksi = null },
         )
     }
 
@@ -514,6 +568,36 @@ fun ChatScreen(
             onTutup = { sheetInfo = false },
         )
     }
+    }
+}
+
+/**
+ * Papan emoji lengkap sebagai lembar, untuk memilih reaksi di luar enam
+ * pintasan. Papan yang sama dengan yang dipakai kotak ketik — satu tampilan,
+ * dua tempat pemakaian.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LembarSemuaEmoji(onPilih: (String) -> Unit, onTutup: () -> Unit) {
+    ModalBottomSheet(
+        onDismissRequest = onTutup,
+        containerColor = Color(0xFFF7F7F8),
+        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+    ) {
+        Column(Modifier.navigationBarsPadding()) {
+            Text(
+                "Pilih reaksi",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = TeksUtama,
+                modifier = Modifier.padding(start = 20.dp, bottom = 8.dp),
+            )
+            PapanEmoji(
+                onPilih = onPilih,
+                // Papan reaksi tidak punya teks untuk dihapus.
+                onHapus = {},
+            )
+        }
     }
 }
 
@@ -1151,16 +1235,19 @@ private fun KartuBalasComposer(target: PesanChat, onTutup: () -> Unit) {
 
 @Composable
 private fun KomposerChat(
+    teks: String,
+    papanEmojiTerbuka: Boolean,
     sedangKompres: Boolean,
-    onKetik: (String) -> Unit,
-    onKirim: (String) -> Unit,
+    onTeksBerubah: (String) -> Unit,
+    onToggleEmoji: () -> Unit,
+    onFokusIsian: () -> Unit,
+    onKirim: () -> Unit,
     onLampiran: () -> Unit,
 ) {
-    var teks by remember { mutableStateOf("") }
     Column(Modifier.fillMaxWidth().background(LatarBar)) {
         Box(Modifier.fillMaxWidth().height(0.5.dp).background(GarisTipis))
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 6.dp),
+            Modifier.fillMaxWidth().padding(start = 2.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
             verticalAlignment = Alignment.Bottom,
         ) {
             IconButton(onClick = onLampiran, enabled = !sedangKompres) {
@@ -1175,19 +1262,43 @@ private fun KomposerChat(
                     .weight(1f)
                     .padding(vertical = 4.dp)
                     .clip(RoundedCornerShape(18.dp))
-                    .background(Color.White)
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .background(Color.White),
             ) {
-                if (teks.isEmpty()) {
-                    Text("Ketik pesan…", fontSize = 16.sp, color = TeksSekunder)
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Box(Modifier.weight(1f).padding(start = 12.dp, top = 8.dp, bottom = 8.dp)) {
+                        if (teks.isEmpty()) {
+                            Text("Ketik pesan…", fontSize = 16.sp, color = TeksSekunder)
+                        }
+                        BasicTextField(
+                            value = teks,
+                            onValueChange = onTeksBerubah,
+                            textStyle = TextStyle(fontSize = 16.sp, color = TeksUtama),
+                            cursorBrush = SolidColor(BiruIos),
+                            maxLines = 5,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .onFocusChanged { if (it.isFocused) onFokusIsian() },
+                        )
+                    }
+                    // Tombol emoji di DALAM kolom ketik, seperti Telegram, dan
+                    // berganti jadi ikon papan ketik saat papan emoji terbuka —
+                    // satu tombol untuk bolak-balik, bukan dua.
+                    Box(
+                        Modifier
+                            .padding(end = 4.dp, bottom = 2.dp)
+                            .size(34.dp)
+                            .clip(CircleShape)
+                            .clickable(onClick = onToggleEmoji),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            if (papanEmojiTerbuka) Icons.Filled.Keyboard else Icons.Filled.EmojiEmotions,
+                            if (papanEmojiTerbuka) "Tutup papan emoji" else "Buka papan emoji",
+                            tint = if (papanEmojiTerbuka) BiruIos else TeksSekunder,
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
                 }
-                BasicTextField(
-                    value = teks,
-                    onValueChange = { teks = it; onKetik(it) },
-                    textStyle = TextStyle(fontSize = 16.sp, color = TeksUtama),
-                    maxLines = 5,
-                    modifier = Modifier.fillMaxWidth(),
-                )
             }
             Spacer(Modifier.width(6.dp))
             val bisaKirim = teks.isNotBlank()
@@ -1197,10 +1308,7 @@ private fun KomposerChat(
                     .size(34.dp)
                     .clip(CircleShape)
                     .background(if (bisaKirim) BiruIos else Color(0xFFC7C7CC))
-                    .clickable(enabled = bisaKirim) {
-                        onKirim(teks)
-                        teks = ""
-                    },
+                    .clickable(enabled = bisaKirim, onClick = onKirim),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(Icons.Filled.ArrowUpward, "Kirim", tint = Color.White, modifier = Modifier.size(20.dp))
