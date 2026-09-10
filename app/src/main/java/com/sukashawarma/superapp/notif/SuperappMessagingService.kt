@@ -15,6 +15,7 @@ import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import com.sukashawarma.superapp.R
 import com.sukashawarma.superapp.domain.session.AppSession
+import com.sukashawarma.superapp.feature.chat.ChatKehadiran
 import com.sukashawarma.superapp.presentation.MainActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -49,7 +50,22 @@ class SuperappMessagingService : FirebaseMessagingService() {
         // tidak sampai ke sini. Trigger karena itu menaruh rutenya di `url`.
         // `route` didahulukan supaya tetap benar bila edge function kelak
         // meneruskannya, tanpa perlu mengubah apa pun di sisi ini.
-        tampilkan(judul, isi, message.data["route"] ?: message.data["url"])
+        val mentah = message.data["route"] ?: message.data["url"]
+
+        // Chat dikenali dari url '/chat?from=<uuid>'. Bentuk itu dipilih karena
+        // `send-push` hanya meneruskan title/body/type/url ke FCM, jadi id
+        // pengirim harus menumpang salah satunya (lihat migrasi 20300210000000).
+        if (mentah != null && mentah.startsWith("/chat")) {
+            val pengirim = mentah.substringAfter("from=", "").takeIf { it.isNotBlank() }
+            // Jangan memberi tahu seseorang tentang pesannya sendiri, dan jangan
+            // berbunyi untuk percakapan yang sedang dibuka di layar.
+            if (pengirim == AppSession.staff.value?.id) return
+            if (ChatKehadiran.terbuka) return
+            tampilkan(judul, isi, NotifikasiTujuan.CHAT)
+            return
+        }
+
+        tampilkan(judul, isi, mentah)
     }
 
     private fun tampilkan(judul: String, isi: String, rute: String?) {
@@ -99,6 +115,7 @@ class SuperappMessagingService : FirebaseMessagingService() {
         private val RUTE_DIKENAL = setOf(
             NotifikasiTujuan.MANAGER_PERSETUJUAN,
             NotifikasiTujuan.MANAGER_WASTE,
+            NotifikasiTujuan.CHAT,
         )
 
         fun siapkanSaluran(context: Context) {
