@@ -21,15 +21,32 @@ object FotoChat {
 
         // Baca dimensi dulu supaya foto kamera 12 MP tidak di-decode penuh
         // hanya untuk dikecilkan lagi.
+        //
+        // JANGAN tambahkan `?: return null` di baris pembacaan dimensi. Dengan
+        // `inJustDecodeBounds = true`, decodeStream SELALU mengembalikan null —
+        // itu memang kontraknya, hasilnya dititipkan ke `batas`. Menyambungnya
+        // dengan elvis membuat setiap foto galeri ditolak sebagai "tidak bisa
+        // dibaca" padahal berkasnya sehat. Kegagalan yang sebenarnya terbaca
+        // dari outWidth/outHeight di bawah.
         val batas = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, batas) } ?: return null
+        try {
+            resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, batas) }
+        } catch (e: Exception) {
+            android.util.Log.e("FotoChat", "gagal membaca dimensi foto", e)
+            return null
+        }
         if (batas.outWidth <= 0 || batas.outHeight <= 0) return null
 
         var sampel = 1
         while (maxOf(batas.outWidth, batas.outHeight) / (sampel * 2) >= SISI_MAKS) sampel *= 2
 
         val opsi = BitmapFactory.Options().apply { inSampleSize = sampel }
-        val kasar = resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opsi) } ?: return null
+        val kasar = try {
+            resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opsi) }
+        } catch (e: Exception) {
+            android.util.Log.e("FotoChat", "gagal decode foto", e)
+            null
+        } ?: return null
 
         return kompres(kasar)
     }
