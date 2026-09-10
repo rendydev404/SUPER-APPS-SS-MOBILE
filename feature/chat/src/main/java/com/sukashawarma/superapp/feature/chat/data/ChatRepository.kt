@@ -59,7 +59,7 @@ object ChatRepository {
      * `chat_media_insert_self` dan trigger sama-sama menuntutnya.
      */
     suspend fun unggahFoto(senderId: String, webp: ByteArray): String =
-        StorageUtil.uploadWebp(BUCKET, "$senderId/${UUID.randomUUID()}.webp", webp)
+        StorageUtil.uploadWebp(BUCKET, "$senderId/${UUID.randomUUID()}.webp", webp, upsert = false)
 
     /** Hapus pesan milik sendiri. RLS menolak diam-diam untuk pesan orang lain. */
     suspend fun hapus(id: String) {
