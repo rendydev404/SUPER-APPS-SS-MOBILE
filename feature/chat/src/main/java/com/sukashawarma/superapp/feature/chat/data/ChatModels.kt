@@ -36,6 +36,14 @@ data class PesanChat(
      * orang yang sudah membacanya melihat jawaban tanpa pertanyaan.
      */
     val deletedAtMs: Long? = null,
+    /**
+     * Nama pengelola yang menghapus pesan ini, bila BUKAN pengirimnya sendiri.
+     *
+     * null pada pesan yang dihapus pemiliknya. Dipakai membedakan nisan biasa
+     * dari nisan hasil moderasi — tanpa itu, pengirimnya akan mengira dirinya
+     * sendiri yang menghapus.
+     */
+    val deletedByName: String? = null,
 )
 
 /**
@@ -117,6 +125,7 @@ fun parsePesanChat(o: JsonObject): PesanChat? {
             val nama = obj.get("nama")?.takeIf { !it.isJsonNull }?.asString ?: return@mapNotNull null
             Sebutan(id, nama)
         }.orEmpty(),
+        deletedByName = teks("deleted_by_name")?.ifBlank { null },
         deletedAtMs = teks("deleted_at")?.let {
             runCatching { OffsetDateTime.parse(it).toInstant().toEpochMilli() }.getOrNull()
         },
