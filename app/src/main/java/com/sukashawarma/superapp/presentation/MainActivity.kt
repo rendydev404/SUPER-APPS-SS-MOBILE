@@ -149,6 +149,7 @@ private fun RootNav() {
     }
 
     LocationPermissionGate(staff != null)
+    IzinNotifikasiGate(staff != null)
 
     val destination = resolveStartDestination(staff, mitraProfile, mitraLoadFailed)
     val isMitra = destination.isMitraArea
