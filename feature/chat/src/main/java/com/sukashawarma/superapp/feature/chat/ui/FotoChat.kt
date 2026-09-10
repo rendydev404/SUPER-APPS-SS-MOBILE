@@ -51,6 +51,51 @@ object FotoChat {
         return kompres(kasar)
     }
 
+    /**
+     * Foto grup: JPEG kecil, bukan WebP.
+     *
+     * Bucket `avatars` hanya menerima `image/jpeg` (lihat migrasi
+     * 20300208000000), dan 512 px sudah lebih dari cukup untuk lingkaran
+     * seukuran 80 dp di layar info grup.
+     */
+    fun bacaJpegKecil(context: Context, uri: Uri, sisi: Int = 512, mutu: Int = 82): ByteArray? {
+        val resolver = context.contentResolver
+        val batas = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        try {
+            resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, batas) }
+        } catch (e: Exception) {
+            android.util.Log.e("FotoChat", "gagal membaca dimensi foto grup", e)
+            return null
+        }
+        if (batas.outWidth <= 0 || batas.outHeight <= 0) return null
+
+        var sampel = 1
+        while (maxOf(batas.outWidth, batas.outHeight) / (sampel * 2) >= sisi) sampel *= 2
+        val opsi = BitmapFactory.Options().apply { inSampleSize = sampel }
+        val bitmap = try {
+            resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opsi) }
+        } catch (e: Exception) {
+            android.util.Log.e("FotoChat", "gagal decode foto grup", e)
+            null
+        } ?: return null
+
+        val skala = minOf(1f, sisi.toFloat() / maxOf(bitmap.width, bitmap.height))
+        val akhir = if (skala < 1f) {
+            Bitmap.createScaledBitmap(
+                bitmap,
+                (bitmap.width * skala).toInt().coerceAtLeast(1),
+                (bitmap.height * skala).toInt().coerceAtLeast(1),
+                true,
+            )
+        } else {
+            bitmap
+        }
+        val keluaran = ByteArrayOutputStream()
+        val sukses = akhir.compress(Bitmap.CompressFormat.JPEG, mutu, keluaran)
+        if (akhir !== bitmap) akhir.recycle()
+        return if (sukses) keluaran.toByteArray() else null
+    }
+
     /** Jalur kamera dalam aplikasi: bitmap sudah di tangan, tinggal dikecilkan. */
     fun kompres(sumber: Bitmap): ByteArray? {
         val terpanjang = maxOf(sumber.width, sumber.height)
