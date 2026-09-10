@@ -63,6 +63,8 @@ import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Campaign
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Close
@@ -131,6 +133,7 @@ import com.sukashawarma.superapp.core.camera.KameraFotoSheet
 import com.sukashawarma.superapp.core.ui.AvatarStaf
 import com.sukashawarma.superapp.core.ui.AvatarStorage
 import com.sukashawarma.superapp.domain.session.AppSession
+import com.sukashawarma.superapp.feature.chat.ChatBacaan
 import com.sukashawarma.superapp.feature.chat.ChatKehadiran
 import com.sukashawarma.superapp.feature.chat.data.ChatRepository
 import com.sukashawarma.superapp.feature.chat.data.PesanChat
@@ -166,6 +169,10 @@ private val TeksBanner = Color(0xFF6B5D2E)
 private val Merah = Color(0xFFFF3B30)
 
 /** Warna nama pengirim di grup — satu warna tetap per orang, seperti WA. */
+/** Cermin batas di `chat_edit_pesan`. Di sini hanya menentukan apakah tombolnya
+ *  TAMPIL; yang menolak sungguhan tetap database. */
+private const val BATAS_SUNTING_MS = 15L * 60 * 1000
+
 private val WarnaNama = listOf(
     Color(0xFFE542A3), Color(0xFF1F7AEC), Color(0xFFFA6533), Color(0xFF009688),
     Color(0xFF9C27B0), Color(0xFFD32F2F), Color(0xFF7CB342), Color(0xFFFF9800),
@@ -295,7 +302,13 @@ fun ChatScreen(
                     ChatKehadiran.masuk()
                     periksaIzinNotifikasi()
                 }
-                Lifecycle.Event.ON_PAUSE -> ChatKehadiran.keluar()
+                // Ditandai saat MENINGGALKAN layar, bukan saat masuk: pesan yang
+                // tiba selagi percakapan terbuka juga sudah terbaca, dan menandai
+                // di awal saja akan menyisakan lencana untuk pesan-pesan itu.
+                Lifecycle.Event.ON_PAUSE -> {
+                    ChatKehadiran.keluar()
+                    ChatBacaan.tandaiDibaca(context)
+                }
                 else -> Unit
             }
         }
@@ -305,6 +318,7 @@ fun ChatScreen(
         onDispose {
             pemilikDaurHidup.lifecycle.removeObserver(pengamat)
             ChatKehadiran.keluar()
+            ChatBacaan.tandaiDibaca(context)
         }
     }
 
@@ -354,6 +368,10 @@ fun ChatScreen(
 
     // Tombol kembali menutup papan emoji dulu — persis seperti ia menutup papan
     // ketik, bukan langsung meninggalkan percakapan.
+    BackHandler(enabled = state.suntingTarget != null) {
+        viewModel.setSunting(null)
+        ketikan.teks = ""
+    }
     BackHandler(enabled = papanEmoji) { papanEmoji = false }
     BackHandler(enabled = !papanEmoji, onBack = onBack)
 
@@ -506,6 +524,13 @@ fun ChatScreen(
             }
         }
 
+        state.suntingTarget?.let { target ->
+            KartuSuntingComposer(target) {
+                viewModel.setSunting(null)
+                ketikan.teks = ""
+            }
+        }
+
         state.balasTarget?.let { target ->
             KartuBalasComposer(target) { viewModel.setBalas(null) }
         }
@@ -530,9 +555,11 @@ fun ChatScreen(
                 },
                 onFokusIsian = { papanEmoji = false },
                 onKirim = {
-                    viewModel.kirimTeks(ketikan.teks)
+                    if (state.suntingTarget != null) viewModel.simpanSuntingan(ketikan.teks)
+                    else viewModel.kirimTeks(ketikan.teks)
                     ketikan.teks = ""
                 },
+                modeSunting = state.suntingTarget != null,
                 onLampiran = { papanEmoji = false; lembarSumber = true },
             )
             if (papanEmoji) {
@@ -601,6 +628,9 @@ fun ChatScreen(
                 milikSendiri = item.milikSendiri,
                 emojiTerpilih = state.reaksi[pesan.id]?.firstOrNull { it.userId == userId }?.emoji,
                 bolehHapus = item.milikSendiri,
+                // Foto pun boleh disunting — yang berubah keterangannya.
+                bolehSunting = item.milikSendiri &&
+                    System.currentTimeMillis() - pesan.createdAtMs <= BATAS_SUNTING_MS,
                 adaTeks = pesan.body.isNotBlank(),
                 onEmoji = { emoji ->
                     viewModel.toggleReaksi(pesan, emoji)
@@ -608,6 +638,11 @@ fun ChatScreen(
                 },
                 onSemuaEmoji = { pilihEmojiReaksi = pesan; menuPesan = null },
                 onBalas = { viewModel.setBalas(pesan); menuPesan = null },
+                onSunting = {
+                    ketikan.teks = pesan.body
+                    viewModel.setSunting(pesan)
+                    menuPesan = null
+                },
                 onSalin = {
                     clipboard.setText(AnnotatedString(pesan.body))
                     menuPesan = null
@@ -1220,6 +1255,15 @@ private fun Bubble(
                 )
                 Spacer(Modifier.width(6.dp))
             }
+            if (p.editedAtMs != null) {
+                Text(
+                    "diedit",
+                    fontSize = 10.sp,
+                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                    color = if (item.milikSendiri) Color(0xB3FFFFFF) else TeksSekunder,
+                    modifier = Modifier.padding(end = 5.dp, top = 2.dp),
+                )
+            }
             Text(
                 item.jam,
                 fontSize = 10.5.sp,
@@ -1501,6 +1545,47 @@ class IsiKetikan {
     var teks by mutableStateOf("")
 }
 
+/**
+ * Bilah penanda mode sunting. Warnanya oranye merek, bukan biru seperti kartu
+ * balas, supaya kedua keadaan itu tidak pernah tertukar sekilas — keduanya
+ * memakai kotak ketik yang sama dan hanya bilah ini yang membedakannya.
+ */
+@Composable
+private fun KartuSuntingComposer(target: PesanChat, onTutup: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(LatarBar)
+            .padding(start = 12.dp, end = 4.dp, top = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.width(3.dp).height(36.dp).clip(RoundedCornerShape(2.dp)).background(Color(0xFFEA580C)))
+        Column(Modifier.weight(1f).padding(horizontal = 8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Filled.Edit,
+                    null,
+                    tint = Color(0xFFEA580C),
+                    modifier = Modifier.size(13.dp),
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    "Mengedit pesan",
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFFEA580C),
+                    maxLines = 1,
+                )
+            }
+            Text(
+                snippetPesan(target.body, target.imagePath),
+                fontSize = 12.5.sp, color = TeksSekunder, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
+        }
+        IconButton(onClick = onTutup) { Icon(Icons.Filled.Close, "Batal mengedit", tint = TeksSekunder) }
+    }
+}
+
 @Composable
 private fun KartuBalasComposer(target: PesanChat, onTutup: () -> Unit) {
     Row(
@@ -1532,6 +1617,7 @@ private fun KomposerChat(
     onFokusIsian: () -> Unit,
     onKirim: () -> Unit,
     onLampiran: () -> Unit,
+    modeSunting: Boolean = false,
 ) {
     val teks = ketikan.teks
     Column(Modifier.fillMaxWidth().background(LatarBar)) {
@@ -1597,11 +1683,22 @@ private fun KomposerChat(
                     .padding(bottom = 6.dp)
                     .size(34.dp)
                     .clip(CircleShape)
-                    .background(if (bisaKirim) BiruIos else Color(0xFFC7C7CC))
+                    .background(
+                        when {
+                            !bisaKirim -> Color(0xFFC7C7CC)
+                            modeSunting -> Color(0xFFEA580C)
+                            else -> BiruIos
+                        }
+                    )
                     .clickable(enabled = bisaKirim, onClick = onKirim),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Filled.ArrowUpward, "Kirim", tint = Color.White, modifier = Modifier.size(20.dp))
+                Icon(
+                    if (modeSunting) Icons.Filled.Check else Icons.Filled.ArrowUpward,
+                    if (modeSunting) "Simpan suntingan" else "Kirim",
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp),
+                )
             }
         }
     }
