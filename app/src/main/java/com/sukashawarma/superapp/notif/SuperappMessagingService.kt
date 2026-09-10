@@ -85,6 +85,7 @@ class SuperappMessagingService : FirebaseMessagingService() {
                 isi = isi,
                 namaGrup = namaGrup,
                 fotoGrupPath = message.data["group_photo"]?.takeIf { it.isNotBlank() },
+                disebut = message.data["mention"] == "1",
             )
             return
         }
