@@ -194,17 +194,21 @@ data class Pengetik(val id: String, val nama: String, val avatar: String?)
 const val MAKS_WAJAH_PENGETIK = 3
 
 /**
- * Kalimat "sedang mengetik" yang tetap terbaca berapa pun jumlah orangnya.
+ * Nama-nama untuk baris pengetik di dasar percakapan.
  *
- * Di atas dua orang, nama ketiga dan seterusnya diringkas jadi hitungan — satu
- * baris yang memuat lima nama akan terpotong di tengah nama dan justru tidak
- * memberi tahu siapa pun.
+ * SENGAJA TANPA kata "sedang mengetik": baris itu sudah berisi wajah dan
+ * gelembung tiga titik beranimasi, yang mengatakan hal yang sama. Dengan
+ * verbanya, kalimatnya melewati lebar layar dan terpotong di tengah kata —
+ * "dan 2 lai..." — sehingga justru kehilangan bagian yang berguna.
+ *
+ * Di atas dua orang sisanya diringkas jadi "+N", supaya lebar baris punya
+ * batas atas yang pasti berapa pun ramainya grup.
  */
 fun labelPengetik(orang: List<Pengetik>): String? = when {
     orang.isEmpty() -> null
-    orang.size == 1 -> "${orang[0].nama} sedang mengetik…"
-    orang.size == 2 -> "${orang[0].nama} dan ${orang[1].nama} sedang mengetik…"
-    else -> "${orang[0].nama}, ${orang[1].nama}, dan ${orang.size - 2} lainnya sedang mengetik…"
+    orang.size == 1 -> orang[0].nama
+    orang.size == 2 -> "${orang[0].nama} dan ${orang[1].nama}"
+    else -> "${orang[0].nama}, ${orang[1].nama}, +${orang.size - 2}"
 }
 
 /** Versi pendek untuk subjudul header, yang ruangnya jauh lebih sempit. */
