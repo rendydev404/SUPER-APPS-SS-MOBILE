@@ -40,6 +40,8 @@ data class ChatState(
     val tertunda: List<KirimanTertunda> = emptyList(),
     val pengetik: List<Pengetik> = emptyList(),
     val balasTarget: PesanChat? = null,
+    /** Pesan yang sedang disunting. Non-null = komposer berada dalam mode sunting. */
+    val suntingTarget: PesanChat? = null,
     /** Reaksi dikelompokkan per id pesan supaya bubble tinggal melihat miliknya. */
     val reaksi: Map<String, List<ReaksiPesan>> = emptyMap(),
     val pengaturan: PengaturanGrup = PengaturanGrup(),
@@ -63,6 +65,9 @@ class ChatViewModel : ViewModel() {
     val state: StateFlow<ChatState> = _state
 
     private val pelacak = PelacakPengetik()
+
+    private val _pesanGalat = kotlinx.coroutines.flow.MutableSharedFlow<String>(extraBufferCapacity = 4)
+    val pesanGalat: kotlinx.coroutines.flow.SharedFlow<String> = _pesanGalat
 
     private val userId: String get() = AppSession.staff.value?.id.orEmpty()
     private val namaSendiri: String get() = AppSession.staff.value?.namaTampil.orEmpty()
@@ -148,6 +153,56 @@ class ChatViewModel : ViewModel() {
 
     fun setBalas(pesan: PesanChat?) {
         _state.value = _state.value.copy(balasTarget = pesan)
+    }
+
+    fun setSunting(pesan: PesanChat?) {
+        // Menyunting dan membalas tidak bisa berjalan bersamaan: keduanya memakai
+        // kotak ketik yang sama, dan menyimpan keduanya hanya melahirkan keadaan
+        // yang mustahil dijelaskan ke pengguna.
+        _state.value = _state.value.copy(suntingTarget = pesan, balasTarget = null)
+    }
+
+    /**
+     * Simpan hasil suntingan. Perubahannya ditempel duluan ke daftar supaya
+     * terasa seketika; kalau server menolak (mis. lewat 15 menit), daftar dimuat
+     * ulang dan alasannya disampaikan lewat [pesanGalat].
+     */
+    fun simpanSuntingan(teksBaru: String) {
+        val target = _state.value.suntingTarget ?: return
+        val bersih = teksBaru.trim()
+        if (bersih == target.body) {
+            _state.value = _state.value.copy(suntingTarget = null)
+            return
+        }
+        _state.value = _state.value.copy(
+            suntingTarget = null,
+            pesan = _state.value.pesan.map {
+                if (it.id == target.id) it.copy(body = bersih, editedAtMs = System.currentTimeMillis())
+                else it
+            },
+        )
+        viewModelScope.launch {
+            try {
+                ChatRepository.suntingPesan(target.id, bersih)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.e("ChatViewModel", "sunting gagal", e)
+                _pesanGalat.tryEmit(pesanRingkas(e))
+                muatPesan()
+            }
+        }
+    }
+
+    /** Galat server sering datang sebagai JSON PostgREST; yang berguna bagi
+     *  pengguna hanya kalimat di dalamnya. */
+    private fun pesanRingkas(e: Exception): String {
+        val mentah = e.message ?: return "Gagal menyunting pesan."
+        val kunci = "\"message\":\""
+        val mulai = mentah.indexOf(kunci)
+        if (mulai < 0) return mentah.take(140)
+        val sisa = mentah.substring(mulai + kunci.length)
+        return sisa.substringBefore("\"").ifBlank { "Gagal menyunting pesan." }
     }
 
     fun kirimTeks(teks: String) {
