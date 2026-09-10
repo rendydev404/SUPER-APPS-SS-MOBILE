@@ -20,8 +20,47 @@ data class PesanChat(
     val replyToId: String?,
     val replyToName: String?,
     val replyToSnippet: String?,
+    /** Foto pesan yang dibalas, supaya kartu kutipan bisa menampilkan gambarnya
+     *  — bukan sekadar teks keterangan yang membuat balasan foto tak dikenali. */
+    val replyToImage: String?,
     val createdAtMs: Long,
 )
+
+/** Satu reaksi emoji pada sebuah pesan. Satu orang hanya punya satu per pesan. */
+data class ReaksiPesan(
+    val messageId: String,
+    val userId: String,
+    val userName: String,
+    val emoji: String,
+)
+
+/** Pengaturan grup, baris tunggal `chat_settings`. */
+data class PengaturanGrup(
+    val namaGrup: String = "Chat Tim",
+    val deskripsi: String = "Ruang obrolan seluruh tim. Pesan hilang setelah 24 jam.",
+    val hanyaAdmin: Boolean = false,
+    val diubahOleh: String? = null,
+)
+
+fun parseReaksi(o: JsonObject): ReaksiPesan? {
+    fun teks(k: String): String? = o.get(k)?.takeIf { !it.isJsonNull }?.asString
+    return ReaksiPesan(
+        messageId = teks("message_id") ?: return null,
+        userId = teks("user_id") ?: return null,
+        userName = teks("user_name").orEmpty(),
+        emoji = teks("emoji") ?: return null,
+    )
+}
+
+fun parsePengaturan(o: JsonObject): PengaturanGrup {
+    fun teks(k: String): String? = o.get(k)?.takeIf { !it.isJsonNull }?.asString
+    return PengaturanGrup(
+        namaGrup = teks("nama_grup")?.ifBlank { null } ?: "Chat Tim",
+        deskripsi = teks("deskripsi").orEmpty(),
+        hanyaAdmin = o.get("hanya_admin")?.takeIf { !it.isJsonNull }?.asBoolean ?: false,
+        diubahOleh = teks("diubah_oleh"),
+    )
+}
 
 /** Parsing satu baris JSON PostgREST -> [PesanChat]. null bila baris tidak utuh. */
 fun parsePesanChat(o: JsonObject): PesanChat? {
@@ -46,6 +85,7 @@ fun parsePesanChat(o: JsonObject): PesanChat? {
         replyToId = teks("reply_to_id"),
         replyToName = teks("reply_to_name"),
         replyToSnippet = teks("reply_to_snippet"),
+        replyToImage = teks("reply_to_image"),
         createdAtMs = createdAtMs,
     )
 }
