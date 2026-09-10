@@ -199,19 +199,14 @@ class ChatLogicTest {
     }
 
     @Test
-    fun `label pengetik meringkas nama ketiga dan seterusnya jadi hitungan`() {
+    fun `baris pengetik menyebut nama tanpa verba dan meringkas sisanya`() {
         fun orang(vararg nama: String) = nama.map { Pengetik(it, it, null) }
         assertNull(labelPengetik(emptyList()))
-        assertEquals("Budi sedang mengetik…", labelPengetik(orang("Budi")))
-        assertEquals("Budi dan Sari sedang mengetik…", labelPengetik(orang("Budi", "Sari")))
-        assertEquals(
-            "Budi, Sari, dan 1 lainnya sedang mengetik…",
-            labelPengetik(orang("Budi", "Sari", "Andi")),
-        )
-        assertEquals(
-            "Budi, Sari, dan 3 lainnya sedang mengetik…",
-            labelPengetik(orang("Budi", "Sari", "Andi", "Rina", "Toni")),
-        )
+        // Verba "sedang mengetik" ditanggung wajah dan titik-titik di sebelahnya.
+        assertEquals("Budi", labelPengetik(orang("Budi")))
+        assertEquals("Budi dan Sari", labelPengetik(orang("Budi", "Sari")))
+        assertEquals("Budi, Sari, +1", labelPengetik(orang("Budi", "Sari", "Andi")))
+        assertEquals("Budi, Sari, +3", labelPengetik(orang("Budi", "Sari", "Andi", "Rina", "Toni")))
     }
 
     @Test
