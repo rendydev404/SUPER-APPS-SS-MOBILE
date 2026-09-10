@@ -4,8 +4,11 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sukashawarma.superapp.data.remote.Postgrest
+import com.sukashawarma.superapp.data.remote.Realtime
 import com.sukashawarma.superapp.data.remote.optString
 import com.sukashawarma.superapp.domain.model.StaffProfile
+import com.sukashawarma.superapp.feature.chat.ChatBacaan
+import com.sukashawarma.superapp.feature.chat.data.ChatRepository
 import com.sukashawarma.superapp.domain.session.AppSession
 import com.sukashawarma.superapp.domain.util.JakartaTime
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -38,6 +41,8 @@ data class HomeUiState(
     val kirimanMenunggu: Int? = null,
     val wasteMenunggu: Int? = null,
     val pettyCashButuhAksi: Int? = null,
+    /** Pesan Chat Tim yang belum dibaca di perangkat ini. 0 = tidak ada lencana. */
+    val chatBelumDibaca: Int = 0,
     val memuatSorotan: Boolean = true,
 ) {
     /** Jam absen terakhir hari ini dalam WIB, mis. "07:12". */
@@ -99,6 +104,38 @@ class HomeViewModel : ViewModel() {
      * crew tidak pernah menembak tabel waste dan manager tanpa outlet tidak
      * menembak monitoring stok.
      */
+    private var pemantauChat: kotlinx.coroutines.Job? = null
+
+    /**
+     * Menyalakan pemantau lencana Chat Tim.
+     *
+     * Angkanya disegarkan dua kali: sekali saat dipanggil (Beranda kembali
+     * terlihat — penandanya bisa saja baru berubah karena percakapan ditutup),
+     * dan setiap kali tabel pesan berubah selagi Beranda terbuka. Tanpa yang
+     * kedua, lencana baru muncul setelah pengguna keluar-masuk Beranda.
+     *
+     * Context diminta per panggilan, bukan disimpan: menyimpan Context di dalam
+     * ViewModel adalah cara paling mudah menahan Activity dari GC.
+     */
+    fun pantauChat(context: Context) {
+        hitungChat(context)
+        if (pemantauChat != null) return
+        pemantauChat = viewModelScope.launch {
+            Realtime.updates(ChatRepository.TABLE).collect { hitungChat(context) }
+        }
+    }
+
+    fun hitungChat(context: Context) {
+        val userId = AppSession.staff.value?.id ?: return
+        val app = context.applicationContext
+        viewModelScope.launch {
+            val jumlah = runCatching { ChatBacaan.hitungBelumDibaca(app, userId) }.getOrNull() ?: return@launch
+            if (jumlah != _state.value.chatBelumDibaca) {
+                _state.value = _state.value.copy(chatBelumDibaca = jumlah)
+            }
+        }
+    }
+
     private fun muatSorotan(staff: StaffProfile?) {
         val role = staff?.role
         val outletId = staff?.outletId
