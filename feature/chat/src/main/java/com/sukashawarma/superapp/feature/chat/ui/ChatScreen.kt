@@ -59,8 +59,8 @@ import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Campaign
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.PhotoCamera
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
@@ -214,10 +214,17 @@ fun ChatScreen(
     // Menu tekan-lama, konfirmasi hapus, dan pengaturan grup.
     var menuPesan by remember { mutableStateOf<PesanChat?>(null) }
     var konfirmasiHapus by remember { mutableStateOf<PesanChat?>(null) }
-    var sheetPengaturan by remember { mutableStateOf(false) }
+    var sheetReaksi by remember { mutableStateOf<PesanChat?>(null) }
+    var sheetInfo by remember { mutableStateOf(false) }
     var menyimpanPengaturan by remember { mutableStateOf(false) }
     var galatPengaturan by remember { mutableStateOf<String?>(null) }
     val clipboard = LocalClipboardManager.current
+
+    // Nama grup dititipkan ke penanda kehadiran supaya notifikasi memakai judul
+    // percakapan yang sama dengan yang dilihat pengguna di dalam aplikasi.
+    LaunchedEffect(state.pengaturan.namaGrup) {
+        ChatKehadiran.catatNamaGrup(state.pengaturan.namaGrup)
+    }
 
     // Selama menu tekan-lama terbuka, isi chat diburamkan supaya pesan yang
     // dipilih menonjol. Modifier.blur baru bekerja di Android 12+; di bawah itu
@@ -271,12 +278,12 @@ fun ChatScreen(
     ) {
         HeaderChat(
             judul = state.pengaturan.namaGrup,
+            fotoGrup = state.pengaturan.fotoGrup,
             subtitle = labelPengetik(state.namaPengetik)
                 ?: if (state.pengaturan.hanyaAdmin) "Mode pengumuman aktif"
                 else "Pesan hilang otomatis setelah 24 jam",
             subtitleAktif = state.namaPengetik.isNotEmpty(),
-            tampilkanPengaturan = state.pengelola,
-            onPengaturan = { galatPengaturan = null; sheetPengaturan = true },
+            onBukaInfo = { galatPengaturan = null; sheetInfo = true },
             onBack = onBack,
         )
 
@@ -330,7 +337,7 @@ fun ChatScreen(
                                 userId = userId,
                                 onBalas = { viewModel.setBalas(it) },
                                 onTekanLama = { menuPesan = it },
-                                onKetukReaksi = { menuPesan = it },
+                                onKetukReaksi = { sheetReaksi = it },
                                 onLompatKe = { idAsal ->
                                     val idx = itemTampil.indexOfFirst { it is ItemChat.Bubble && it.pesan.id == idAsal }
                                     if (idx >= 0) scope.launch { listState.animateScrollToItem(idx) }
@@ -464,23 +471,47 @@ fun ChatScreen(
         )
     }
 
-    if (sheetPengaturan) {
-        PengaturanGrupSheet(
+    sheetReaksi?.let { pesan ->
+        val daftar = state.reaksi[pesan.id].orEmpty()
+        if (daftar.isEmpty()) {
+            sheetReaksi = null
+        } else {
+            DaftarReaksiSheet(
+                reaksi = daftar,
+                // Avatar tidak disimpan per reaksi; diambil dari pesan yang masih
+                // hidup bila orangnya pernah mengirim, selain itu huruf awal nama.
+                avatarPerUser = remember(state.pesan) {
+                    state.pesan.associate { it.senderId to it.senderAvatar }
+                },
+                userId = userId,
+                onCabut = {
+                    val emojiku = daftar.firstOrNull { it.userId == userId }?.emoji
+                    if (emojiku != null) viewModel.toggleReaksi(pesan, emojiku)
+                    sheetReaksi = null
+                },
+                onTutup = { sheetReaksi = null },
+            )
+        }
+    }
+
+    if (sheetInfo) {
+        InfoGrupSheet(
             awal = state.pengaturan,
+            bolehSunting = state.pengelola,
             menyimpan = menyimpanPengaturan,
             galat = galatPengaturan,
-            onSimpan = { nama, deskripsi, hanyaAdmin ->
+            onSimpan = { nama, deskripsi, hanyaAdmin, fotoJpeg, hapusFoto ->
                 menyimpanPengaturan = true
-                viewModel.simpanPengaturan(nama, deskripsi, hanyaAdmin) { galat ->
+                viewModel.simpanPengaturan(nama, deskripsi, hanyaAdmin, fotoJpeg, hapusFoto) { galat ->
                     menyimpanPengaturan = false
                     galatPengaturan = galat
                     if (galat == null) {
-                        sheetPengaturan = false
+                        sheetInfo = false
                         Toast.makeText(context, "Pengaturan grup tersimpan.", Toast.LENGTH_SHORT).show()
                     }
                 }
             },
-            onTutup = { sheetPengaturan = false },
+            onTutup = { sheetInfo = false },
         )
     }
     }
@@ -540,48 +571,71 @@ private fun BarisPengetik(nama: List<String>) {
 @Composable
 private fun HeaderChat(
     judul: String,
+    fotoGrup: String?,
     subtitle: String,
     subtitleAktif: Boolean,
-    tampilkanPengaturan: Boolean,
-    onPengaturan: () -> Unit,
+    onBukaInfo: () -> Unit,
     onBack: () -> Unit,
 ) {
     Column(Modifier.fillMaxWidth().background(LatarBar).statusBarsPadding()) {
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 6.dp),
+            Modifier.fillMaxWidth().padding(start = 2.dp, end = 12.dp, top = 4.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBackIos, "Kembali", tint = BiruIos)
             }
-            Box(
-                Modifier.size(38.dp).clip(CircleShape).background(Color(0xFFD8E7FB)),
-                contentAlignment = Alignment.Center,
+            // Seluruh blok identitas grup dapat diketuk untuk membuka info —
+            // kebiasaan iOS Messages, dan sekaligus membuat pengaturan bisa
+            // ditemukan tanpa ikon gerigi tambahan di pojok.
+            Row(
+                Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable(onClick = onBukaInfo)
+                    .padding(vertical = 4.dp, horizontal = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(Icons.Filled.Groups, null, tint = BiruIos, modifier = Modifier.size(22.dp))
-            }
-            Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    judul,
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = TeksUtama,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    subtitle,
-                    fontSize = 12.sp,
-                    color = if (subtitleAktif) BiruIos else TeksSekunder,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            if (tampilkanPengaturan) {
-                IconButton(onClick = onPengaturan) {
-                    Icon(Icons.Filled.Tune, "Pengaturan grup", tint = BiruIos)
+                Box(
+                    Modifier.size(36.dp).clip(CircleShape).background(Color(0xFFD8E7FB)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (fotoGrup != null) {
+                        AsyncImage(
+                            model = AvatarStorage.url(fotoGrup),
+                            imageLoader = AvatarStorage.imageLoader(LocalContext.current),
+                            contentDescription = "Foto grup $judul",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.size(36.dp),
+                        )
+                    } else {
+                        Icon(Icons.Filled.Groups, null, tint = BiruIos, modifier = Modifier.size(21.dp))
+                    }
                 }
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        judul,
+                        fontSize = 16.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TeksUtama,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        subtitle,
+                        fontSize = 11.5.sp,
+                        color = if (subtitleAktif) BiruIos else TeksSekunder,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Icon(
+                    Icons.Filled.ChevronRight,
+                    null,
+                    tint = Color(0xFFC7C7CC),
+                    modifier = Modifier.size(20.dp),
+                )
             }
         }
         Box(Modifier.fillMaxWidth().height(0.5.dp).background(GarisTipis))
