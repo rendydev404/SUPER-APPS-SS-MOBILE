@@ -24,6 +24,8 @@ data class PesanChat(
      *  — bukan sekadar teks keterangan yang membuat balasan foto tak dikenali. */
     val replyToImage: String?,
     val createdAtMs: Long,
+    /** Kapan isi pesan terakhir disunting. null = belum pernah. */
+    val editedAtMs: Long? = null,
 )
 
 /** Satu reaksi emoji pada sebuah pesan. Satu orang hanya punya satu per pesan. */
@@ -90,6 +92,9 @@ fun parsePesanChat(o: JsonObject): PesanChat? {
         replyToSnippet = teks("reply_to_snippet"),
         replyToImage = teks("reply_to_image"),
         createdAtMs = createdAtMs,
+        editedAtMs = teks("edited_at")?.let {
+            runCatching { OffsetDateTime.parse(it).toInstant().toEpochMilli() }.getOrNull()
+        },
     )
 }
 
