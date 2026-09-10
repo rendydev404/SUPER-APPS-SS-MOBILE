@@ -265,7 +265,7 @@ fun ChatScreen(
             }
 
             // Tombol lompat ke bawah + badge pesan baru, gaya iOS.
-            AnimatedVisibility(
+            androidx.compose.animation.AnimatedVisibility(
                 visible = !diBawah && !state.memuat,
                 enter = fadeIn() + slideInVertically { it / 2 },
                 exit = fadeOut() + slideOutVertically { it / 2 },
@@ -279,7 +279,9 @@ fun ChatScreen(
 
         // Bubble "sedang mengetik" ala WA: tiga titik beranimasi di alur chat,
         // muncul-hilang dengan slide+fade dan mendorong isi ke atas.
-        AnimatedVisibility(
+        // Fully-qualified: di dalam ColumnScope, nama pendeknya tertangkap
+        // overload member yang tidak bisa dipanggil lewat receiver implisit.
+        androidx.compose.animation.AnimatedVisibility(
             visible = state.namaPengetik.isNotEmpty(),
             enter = fadeIn() + slideInVertically { it },
             exit = fadeOut() + slideOutVertically { it },
