@@ -119,12 +119,7 @@ object ChatNotifikasi {
             .addAction(aksiTandaiDibaca(context))
             .build()
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
-            PackageManager.PERMISSION_GRANTED
-        ) {
-            return
-        }
+        if (!bolehTampil(context)) return
         NotificationManagerCompat.from(context).notify(ID_NOTIF, notif)
     }
 
@@ -248,13 +243,30 @@ object ChatNotifikasi {
             .setSilent(true)
             .build()
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
-            PackageManager.PERMISSION_GRANTED
-        ) {
-            return
-        }
+        if (!bolehTampil(context)) return
         NotificationManagerCompat.from(context).notify(ID_NOTIF, notif)
+    }
+
+    /**
+     * Penjaga izin, dengan JEJAK LOG.
+     *
+     * Versi sebelumnya hanya `return` diam-diam saat izin tidak ada. Akibatnya
+     * notifikasi yang hilang tidak meninggalkan bekas apa pun di Logcat, dan
+     * penelusurannya berakhir menebak-nebak ke arah server padahal masalahnya
+     * ada di perangkat. Satu baris peringatan ini yang membedakan.
+     */
+    private fun bolehTampil(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return true
+        val punya = ActivityCompat.checkSelfPermission(
+            context, Manifest.permission.POST_NOTIFICATIONS,
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!punya) {
+            android.util.Log.w(
+                "ChatNotifikasi",
+                "Notifikasi chat dibatalkan: izin POST_NOTIFICATIONS belum diberikan.",
+            )
+        }
+        return punya
     }
 
     fun tutup(context: Context) {
@@ -275,12 +287,7 @@ object ChatNotifikasi {
             .setSilent(true)
             .setContentIntent(intentBuka(context))
             .build()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
-            PackageManager.PERMISSION_GRANTED
-        ) {
-            return
-        }
+        if (!bolehTampil(context)) return
         NotificationManagerCompat.from(context).notify(ID_NOTIF, notif)
     }
 
