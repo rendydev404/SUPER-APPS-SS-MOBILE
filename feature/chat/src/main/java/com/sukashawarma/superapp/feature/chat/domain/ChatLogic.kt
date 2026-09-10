@@ -123,7 +123,11 @@ class PelacakPengetik {
     }
 
     private val aktif = LinkedHashMap<String, Pair<String, Long>>() // id -> (nama, terakhirMs)
-    private var terakhirKirimMs: Long = 0
+
+    // Bukan 0: dengan 0, ketikan pertama setelah aplikasi baru dibuka (nowMs
+    // kecil di jam yang dimulai dari epoch mana pun) bisa tertahan 3 detik.
+    // Sinyal pertama harus selalu lolos.
+    private var terakhirKirimMs: Long = Long.MIN_VALUE / 2
 
     /** true bila giliran ini pantas memancarkan sinyal typing lagi. */
     fun bolehKirim(nowMs: Long): Boolean {
