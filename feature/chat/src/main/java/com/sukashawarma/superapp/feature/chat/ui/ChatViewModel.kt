@@ -6,7 +6,9 @@ import com.google.gson.JsonObject
 import com.sukashawarma.superapp.data.remote.Realtime
 import com.sukashawarma.superapp.domain.session.AppSession
 import com.sukashawarma.superapp.feature.chat.data.ChatRepository
+import com.sukashawarma.superapp.feature.chat.data.PengaturanGrup
 import com.sukashawarma.superapp.feature.chat.data.PesanChat
+import com.sukashawarma.superapp.feature.chat.data.ReaksiPesan
 import com.sukashawarma.superapp.feature.chat.domain.PelacakPengetik
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -35,7 +37,15 @@ data class ChatState(
     val tertunda: List<KirimanTertunda> = emptyList(),
     val namaPengetik: List<String> = emptyList(),
     val balasTarget: PesanChat? = null,
-)
+    /** Reaksi dikelompokkan per id pesan supaya bubble tinggal melihat miliknya. */
+    val reaksi: Map<String, List<ReaksiPesan>> = emptyMap(),
+    val pengaturan: PengaturanGrup = PengaturanGrup(),
+    /** true bila akun ini boleh mengubah pengaturan grup (developer/admin/HR). */
+    val pengelola: Boolean = false,
+) {
+    /** Mode pengumuman menutup kotak ketik untuk yang bukan pengelola. */
+    val bolehKirim: Boolean get() = !pengaturan.hanyaAdmin || pengelola
+}
 
 class ChatViewModel : ViewModel() {
 
@@ -62,7 +72,11 @@ class ChatViewModel : ViewModel() {
         // pertama saat sambungan terbuka sekaligus mengejar yang terlewat
         // selama offline.
         viewModelScope.launch {
-            Realtime.updates(ChatRepository.TABLE).collect { muatUlang() }
+            Realtime.updates(
+                ChatRepository.TABLE,
+                ChatRepository.TABLE_REAKSI,
+                ChatRepository.TABLE_PENGATURAN,
+            ).collect { muatUlang() }
         }
 
         // Sinyal typing dari klien lain (broadcast murni, tanpa database).
@@ -194,11 +208,82 @@ class ChatViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Pasang/ganti/cabut reaksi. Dioptimiskan di layar lebih dulu supaya emoji
+     * langsung menempel saat ditekan; sinyal realtime yang menyusul akan
+     * menyamakan dengan kebenaran server.
+     */
+    fun toggleReaksi(pesan: PesanChat, emoji: String) {
+        val id = userId
+        if (id.isBlank()) return
+        val sekarang = _state.value.reaksi[pesan.id].orEmpty()
+        val milikku = sekarang.firstOrNull { it.userId == id }
+        val target = if (milikku?.emoji == emoji) null else emoji
+
+        val baru = sekarang.filterNot { it.userId == id } +
+            listOfNotNull(target?.let { ReaksiPesan(pesan.id, id, namaSendiri, it) })
+        _state.value = _state.value.copy(
+            reaksi = _state.value.reaksi + (pesan.id to baru),
+        )
+
+        viewModelScope.launch {
+            try {
+                ChatRepository.setReaksi(pesan.id, target, id)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.e("ChatViewModel", "reaksi gagal", e)
+                muatUlang()
+            }
+        }
+    }
+
+    fun simpanPengaturan(
+        nama: String,
+        deskripsi: String,
+        hanyaAdmin: Boolean,
+        onSelesai: (String?) -> Unit,
+    ) {
+        viewModelScope.launch {
+            try {
+                ChatRepository.simpanPengaturan(nama, deskripsi, hanyaAdmin, namaSendiri)
+                muatUlang()
+                onSelesai(null)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.e("ChatViewModel", "simpan pengaturan gagal", e)
+                onSelesai(e.message ?: "Gagal menyimpan pengaturan.")
+            }
+        }
+    }
+
     fun muatUlang(awal: Boolean = false) {
         if (awal) _state.value = _state.value.copy(memuat = true)
         viewModelScope.launch {
             try {
                 val pesan = ChatRepository.ambilPesan()
+
+                // Reaksi dan pengaturan diambil dengan penjaga sendiri: keduanya
+                // datang dari migrasi yang lebih baru, dan chat harus tetap jalan
+                // di perangkat yang databasenya belum diperbarui.
+                val reaksi = try {
+                    ChatRepository.ambilReaksi().groupBy { it.messageId }
+                } catch (e: Exception) {
+                    android.util.Log.w("ChatViewModel", "reaksi tidak tersedia: ${e.message}")
+                    _state.value.reaksi
+                }
+                val pengaturan = try {
+                    ChatRepository.ambilPengaturan()
+                } catch (e: Exception) {
+                    android.util.Log.w("ChatViewModel", "pengaturan tidak tersedia: ${e.message}")
+                    _state.value.pengaturan
+                }
+                _state.value = _state.value.copy(
+                    reaksi = reaksi,
+                    pengaturan = pengaturan,
+                    pengelola = AppSession.staff.value?.roleRaw in ChatRepository.ROLE_PENGELOLA,
+                )
                 // Orang yang pesannya baru tiba jelas sudah selesai mengetik.
                 pesan.filter { it.createdAtMs > maksCreatedMs }.forEach { pelacak.selesai(it.senderId) }
                 maksCreatedMs = pesan.maxOfOrNull { it.createdAtMs } ?: maksCreatedMs
