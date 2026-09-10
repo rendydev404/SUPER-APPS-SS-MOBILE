@@ -39,6 +39,9 @@ dependencies {
     implementation(project(":core:roles"))
     implementation(project(":core:network"))
     implementation(project(":core:storage"))
+    // Kamera dalam aplikasi untuk opsi "Kamera" di lembar lampiran, sama seperti
+    // yang dipakai Profil dan Stok.
+    implementation(project(":core:camera"))
     // Foto di bubble chat dimuat dengan ImageLoader bersama milik core:ui
     // (bucket privat butuh Authorization); versi coil harus sama dengannya.
     implementation("io.coil-kt:coil-compose:2.5.0")
