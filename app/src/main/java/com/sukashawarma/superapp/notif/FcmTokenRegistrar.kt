@@ -60,6 +60,20 @@ object FcmTokenRegistrar {
                 },
             )
             Log.d(TAG, "Token terdaftar untuk staf=$stafId outlet=$outletId")
+
+            // Daftar KEDUA, khusus chat. `fcm_tokens` dipakai bersama app POS,
+            // dan mengirim pesan chat ke seluruh isinya membuat setiap pesan
+            // mendarat di HP kasir — POS bahkan membacanya sebagai "pesan dari
+            // owner" karena kiriman broadcast bertipe sama. `chat_push_tokens`
+            // hanya diisi aplikasi ini, jadi push chat berhenti di sini.
+            try {
+                Postgrest.rpc(
+                    "register_chat_push_token",
+                    JsonObject().apply { addProperty("p_token", token) },
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Pendaftaran token chat ditolak server", e)
+            }
         } catch (e: Exception) {
             // Gagal mendaftar tidak boleh mengganggu apa pun; pengguna tetap bisa
             // bekerja, hanya tidak menerima notifikasi sampai percobaan berikutnya.
