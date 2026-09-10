@@ -97,6 +97,16 @@ object ChatNotifikasi {
     @Volatile
     private var namaGrupTerakhir: String = "Chat Tim"
 
+    /**
+     * Apakah pesan terakhir menyebut nama pengguna.
+     *
+     * Disimpan supaya balasan langsung dari bilah notifikasi menyusun ulang
+     * notifikasi yang sama tanpa kehilangan penandanya — [bangun] dipakai kedua
+     * jalur, dan tanpa ini penanda '@' lenyap begitu pengguna membalas.
+     */
+    @Volatile
+    private var disebutTerakhir: Boolean = false
+
     /** Foto grup yang sudah diunduh, agar tidak diambil ulang tiap pesan. */
     @Volatile
     private var fotoGrupPathTerakhir: String? = null
@@ -111,9 +121,11 @@ object ChatNotifikasi {
         isi: String,
         namaGrup: String,
         fotoGrupPath: String? = null,
+        disebut: Boolean = false,
     ) {
         siapkanSaluran(context)
         namaGrupTerakhir = namaGrup
+        disebutTerakhir = disebut
 
         synchronized(riwayat) {
             riwayat.addLast(Triple(pengirim, isi, System.currentTimeMillis()))
@@ -156,6 +168,11 @@ object ChatNotifikasi {
             .setSmallIcon(R.mipmap.ic_launcher)
             .setLargeIcon(foto)
             .setStyle(gaya)
+            // Penanda di kepala notifikasi, bukan sisipan ke dalam teks pesan:
+            // MessagingStyle sudah menulis nama pengirim di depan isinya, jadi
+            // "X menyebut Anda: ..." di dalam body akan menyebut namanya dua
+            // kali dalam satu baris.
+            .apply { if (disebutTerakhir) setSubText("Menyebut Anda") }
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
@@ -280,6 +297,7 @@ object ChatNotifikasi {
 
     fun tutup(context: Context) {
         synchronized(riwayat) { riwayat.clear() }
+        disebutTerakhir = false
         NotificationManagerCompat.from(context).cancel(ID_NOTIF)
     }
 
