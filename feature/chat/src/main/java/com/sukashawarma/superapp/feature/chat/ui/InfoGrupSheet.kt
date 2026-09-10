@@ -21,11 +21,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
@@ -261,13 +263,30 @@ fun InfoGrupSheet(
                                 modifier = Modifier.padding(14.dp),
                             )
 
-                            else -> anggota.forEach { a ->
-                                PemisahAnggota()
-                                BarisAnggota(
-                                    anggota = a,
-                                    akuSendiri = a.id == userId,
-                                    onKlik = { onKlikAnggota(a) },
-                                )
+                            // LazyColumn, BUKAN forEach di dalam Column.
+                            //
+                            // Lembar ini digulir dengan `verticalScroll`, yang
+                            // menyusun seluruh anaknya sekaligus. Dengan daftar
+                            // se-perusahaan, membuka accordion berarti menyusun
+                            // ratusan baris DAN menembakkan ratusan permintaan
+                            // foto dalam satu frame — persis jeda yang terasa.
+                            // Dibatasi tingginya supaya punya batas terukur
+                            // (LazyColumn menolak diukur dengan tinggi tak
+                            // terhingga milik induk yang menggulir).
+                            else -> LazyColumn(Modifier.heightIn(max = 340.dp)) {
+                                items(
+                                    count = anggota.size,
+                                    key = { i -> anggota[i].id },
+                                    contentType = { "anggota" },
+                                ) { i ->
+                                    val a = anggota[i]
+                                    PemisahAnggota()
+                                    BarisAnggota(
+                                        anggota = a,
+                                        akuSendiri = a.id == userId,
+                                        onKlik = { onKlikAnggota(a) },
+                                    )
+                                }
                             }
                         }
                     }
