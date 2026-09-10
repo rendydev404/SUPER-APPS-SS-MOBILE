@@ -156,6 +156,24 @@ object ChatRepository {
         }
     }
 
+    /**
+     * Sunting isi pesan sendiri lewat RPC `chat_edit_pesan`.
+     *
+     * BUKAN PATCH ke tabel: `chat_messages` sengaja tanpa policy UPDATE, karena
+     * policy per-baris akan sekaligus membuka `sender_id` dan `created_at` untuk
+     * ditimpa. RPC-nya hanya menyentuh kolom `body` dan menegakkan sendiri batas
+     * 15 menitnya — lihat migrasi 20300214000000.
+     */
+    suspend fun suntingPesan(id: String, body: String) {
+        Postgrest.rpc(
+            "chat_edit_pesan",
+            JsonObject().apply {
+                addProperty("p_id", id)
+                addProperty("p_body", body)
+            },
+        )
+    }
+
     /** Hapus pesan milik sendiri. RLS menolak diam-diam untuk pesan orang lain. */
     suspend fun hapus(id: String) {
         Postgrest.delete(TABLE, listOf("id" to "eq.$id"))
