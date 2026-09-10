@@ -116,7 +116,18 @@ fun PapanEmoji(
                     start = 8.dp, end = 8.dp, top = 8.dp, bottom = 56.dp,
                 ),
             ) {
-                items(semua, key = { it + semua.indexOf(it) }) { emoji ->
+                // Kunci memakai INDEKS, bukan `semua.indexOf(emoji)`.
+                // `indexOf` memindai seluruh daftar untuk setiap petak yang
+                // disusun; pada ~900 emoji itu perilaku kuadratik, dan tersaji
+                // tepat saat papan dibuka — jeda yang paling terasa di HP lemah.
+                // Indeks juga sudah unik dengan sendirinya, termasuk untuk emoji
+                // yang muncul di dua kelompok.
+                items(
+                    count = semua.size,
+                    key = { it },
+                    contentType = { "emoji" },
+                ) { indeks ->
+                    val emoji = semua[indeks]
                     Box(
                         Modifier
                             .aspectRatio(1f)
