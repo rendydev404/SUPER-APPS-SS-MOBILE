@@ -23,6 +23,9 @@ data class KirimanTertunda(
     val replyTo: PesanChat?,
     val dibuatMs: Long,
     val gagal: Boolean = false,
+    /** Alasan gagal, sudah dipendekkan untuk ditampilkan di bawah bubble.
+     *  Tanpa ini kegagalan unggah hanya terlihat di Logcat. */
+    val alasanGagal: String? = null,
 )
 
 data class ChatState(
@@ -139,7 +142,9 @@ class ChatViewModel : ViewModel() {
     fun ulangi(kunci: String) {
         val kiriman = _state.value.tertunda.firstOrNull { it.kunci == kunci } ?: return
         _state.value = _state.value.copy(
-            tertunda = _state.value.tertunda.map { if (it.kunci == kunci) it.copy(gagal = false) else it },
+            tertunda = _state.value.tertunda.map {
+                if (it.kunci == kunci) it.copy(gagal = false, alasanGagal = null) else it
+            },
         )
         proses(kiriman)
     }
@@ -164,9 +169,10 @@ class ChatViewModel : ViewModel() {
                 throw e
             } catch (e: Exception) {
                 android.util.Log.e("ChatViewModel", "kirim gagal", e)
+                val alasan = (e.message ?: e::class.java.simpleName).take(160)
                 _state.value = _state.value.copy(
                     tertunda = _state.value.tertunda.map {
-                        if (it.kunci == kiriman.kunci) it.copy(gagal = true) else it
+                        if (it.kunci == kiriman.kunci) it.copy(gagal = true, alasanGagal = alasan) else it
                     },
                 )
             }
