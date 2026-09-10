@@ -16,6 +16,19 @@ object ChatKehadiran {
     var terbuka: Boolean = false
         private set
 
+    /**
+     * Nama grup terakhir yang diketahui, dipakai sebagai judul percakapan di
+     * notifikasi. Pengelola bisa menggantinya kapan saja, dan notifikasi tidak
+     * punya jalur sendiri untuk membacanya dari server.
+     */
+    @Volatile
+    var namaGrup: String = "Chat Tim"
+        private set
+
+    fun catatNamaGrup(nama: String) {
+        if (nama.isNotBlank()) namaGrup = nama
+    }
+
     fun masuk() {
         terbuka = true
     }
