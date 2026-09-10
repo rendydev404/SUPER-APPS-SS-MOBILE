@@ -166,20 +166,61 @@ class ChatLogicTest {
     @Test
     fun `pengetik hilang setelah 5 detik hening atau saat pesannya tiba`() {
         val p = PelacakPengetik()
-        p.catat("a", "Budi", 0)
-        p.catat("b", "Sari", 1_000)
-        assertEquals(listOf("Budi", "Sari"), p.namaAktif(4_000))
-        assertEquals(listOf("Sari"), p.namaAktif(5_500))
+        p.catat("a", "Budi", null, 0)
+        p.catat("b", "Sari", null, 1_000)
+        assertEquals(listOf("Budi", "Sari"), p.aktif(4_000).map { it.nama })
+        assertEquals(listOf("Sari"), p.aktif(5_500).map { it.nama })
         p.selesai("b")
-        assertEquals(emptyList<String>(), p.namaAktif(5_600))
+        assertEquals(emptyList<String>(), p.aktif(5_600).map { it.nama })
     }
 
     @Test
-    fun `label pengetik satu dua dan banyak orang`() {
+    fun `sinyal berulang tidak menukar urutan orang yang sedang mengetik`() {
+        val p = PelacakPengetik()
+        p.catat("a", "Budi", null, 0)
+        p.catat("b", "Sari", null, 500)
+        // Budi mengetik terus; urutannya harus tetap, bukan melompat ke belakang.
+        p.catat("a", "Budi", null, 3_000)
+        assertEquals(listOf("Budi", "Sari"), p.aktif(4_000).map { it.nama })
+    }
+
+    @Test
+    fun `jumlah pengetik yang dilacak dibatasi`() {
+        val p = PelacakPengetik()
+        repeat(PelacakPengetik.MAKS_DILACAK + 5) { i -> p.catat("id$i", "Orang $i", null, 0) }
+        assertEquals(PelacakPengetik.MAKS_DILACAK, p.aktif(1_000).size)
+    }
+
+    @Test
+    fun `wajah pengetik ikut dibawa sinyalnya`() {
+        val p = PelacakPengetik()
+        p.catat("a", "Budi", "avatars/a/x.jpg", 0)
+        assertEquals("avatars/a/x.jpg", p.aktif(100).single().avatar)
+    }
+
+    @Test
+    fun `label pengetik meringkas nama ketiga dan seterusnya jadi hitungan`() {
+        fun orang(vararg nama: String) = nama.map { Pengetik(it, it, null) }
         assertNull(labelPengetik(emptyList()))
-        assertEquals("Budi sedang mengetik…", labelPengetik(listOf("Budi")))
-        assertEquals("Budi dan Sari sedang mengetik…", labelPengetik(listOf("Budi", "Sari")))
-        assertEquals("3 orang sedang mengetik…", labelPengetik(listOf("a", "b", "c")))
+        assertEquals("Budi sedang mengetik…", labelPengetik(orang("Budi")))
+        assertEquals("Budi dan Sari sedang mengetik…", labelPengetik(orang("Budi", "Sari")))
+        assertEquals(
+            "Budi, Sari, dan 1 lainnya sedang mengetik…",
+            labelPengetik(orang("Budi", "Sari", "Andi")),
+        )
+        assertEquals(
+            "Budi, Sari, dan 3 lainnya sedang mengetik…",
+            labelPengetik(orang("Budi", "Sari", "Andi", "Rina", "Toni")),
+        )
+    }
+
+    @Test
+    fun `label header memakai hitungan saja begitu lebih dari satu orang`() {
+        fun orang(vararg nama: String) = nama.map { Pengetik(it, it, null) }
+        assertNull(labelPengetikPendek(emptyList()))
+        assertEquals("Budi sedang mengetik…", labelPengetikPendek(orang("Budi")))
+        assertEquals("2 orang sedang mengetik…", labelPengetikPendek(orang("Budi", "Sari")))
+        assertEquals("4 orang sedang mengetik…", labelPengetikPendek(orang("a", "b", "c", "d")))
     }
 
     // -- parsing -------------------------------------------------------------
