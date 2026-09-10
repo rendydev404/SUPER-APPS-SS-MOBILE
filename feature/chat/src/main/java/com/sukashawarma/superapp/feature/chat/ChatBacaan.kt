@@ -72,4 +72,30 @@ object ChatBacaan {
             ),
         ).size()
     }
+
+    /**
+     * Adakah pesan belum dibaca yang menyebut orang ini.
+     *
+     * Penyaringannya dikerjakan DATABASE lewat operator `cs` (jsonb contains),
+     * bukan dengan menarik pesannya lalu memeriksa satu per satu di aplikasi.
+     * Beranda memanggil ini setiap kali ada pesan masuk; menariknya ke perangkat
+     * berarti membayar seluruh percakapan hanya untuk menjawab satu ya/tidak.
+     *
+     * `limit=1` karena jawabannya memang cuma ada/tidak — jumlahnya tidak
+     * menambah apa pun pada penanda yang digambar.
+     */
+    suspend fun adaSebutan(context: Context, userId: String): Boolean {
+        if (userId.isBlank()) return false
+        val batas = Instant.ofEpochMilli(terakhirDibaca(context)).toString()
+        return Postgrest.select(
+            ChatRepository.TABLE,
+            listOf(
+                "select" to "id",
+                "created_at" to "gt.$batas",
+                "sender_id" to "neq.$userId",
+                "mentions" to "cs.[{\"id\":\"$userId\"}]",
+                "limit" to "1",
+            ),
+        ).size() > 0
+    }
 }
