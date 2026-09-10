@@ -10,6 +10,7 @@ import com.sukashawarma.superapp.feature.chat.data.PengaturanGrup
 import com.sukashawarma.superapp.feature.chat.data.PesanChat
 import com.sukashawarma.superapp.feature.chat.data.ReaksiPesan
 import com.sukashawarma.superapp.feature.chat.domain.PelacakPengetik
+import com.sukashawarma.superapp.feature.chat.domain.Pengetik
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -36,7 +37,7 @@ data class ChatState(
     val galat: String? = null,
     val pesan: List<PesanChat> = emptyList(),
     val tertunda: List<KirimanTertunda> = emptyList(),
-    val namaPengetik: List<String> = emptyList(),
+    val pengetik: List<Pengetik> = emptyList(),
     val balasTarget: PesanChat? = null,
     /** Reaksi dikelompokkan per id pesan supaya bubble tinggal melihat miliknya. */
     val reaksi: Map<String, List<ReaksiPesan>> = emptyMap(),
@@ -93,8 +94,9 @@ class ChatViewModel : ViewModel() {
                     ?.getAsJsonObject("payload") ?: return@collect
                 val id = isi.get("id")?.takeIf { !it.isJsonNull }?.asString ?: return@collect
                 val nama = isi.get("nama")?.takeIf { !it.isJsonNull }?.asString ?: return@collect
+                val avatar = isi.get("avatar")?.takeIf { !it.isJsonNull }?.asString
                 if (id == userId) return@collect
-                pelacak.catat(id, nama, System.currentTimeMillis())
+                pelacak.catat(id, nama, avatar, System.currentTimeMillis())
                 segarkanPengetik()
             }
         }
@@ -111,8 +113,8 @@ class ChatViewModel : ViewModel() {
                 // Tidur TANPA BATAS sampai ada yang mengetik: `first` menunggu
                 // perubahan state, bukan berdetak. Nol pekerjaan saat grup sepi,
                 // dan grup memang sepi hampir sepanjang waktu.
-                _state.first { it.namaPengetik.isNotEmpty() }
-                while (isActive && _state.value.namaPengetik.isNotEmpty()) {
+                _state.first { it.pengetik.isNotEmpty() }
+                while (isActive && _state.value.pengetik.isNotEmpty()) {
                     delay(1_000)
                     segarkanPengetik()
                 }
@@ -121,8 +123,8 @@ class ChatViewModel : ViewModel() {
     }
 
     private fun segarkanPengetik() {
-        val nama = pelacak.namaAktif(System.currentTimeMillis())
-        if (nama != _state.value.namaPengetik) _state.value = _state.value.copy(namaPengetik = nama)
+        val orang = pelacak.aktif(System.currentTimeMillis())
+        if (orang != _state.value.pengetik) _state.value = _state.value.copy(pengetik = orang)
     }
 
     /** Dipanggil setiap isi kotak ketik berubah; memancarkan sinyal typing
@@ -133,6 +135,9 @@ class ChatViewModel : ViewModel() {
         val payload = JsonObject().apply {
             addProperty("id", userId)
             addProperty("nama", namaSendiri)
+            // Wajah ikut dikirim supaya penerima bisa menumpuknya tanpa perlu
+            // membaca tabel staff — yang RLS-nya memang tidak membukanya.
+            AppSession.staff.value?.avatarUrl?.let { addProperty("avatar", it) }
         }
         Realtime.sendBroadcast(KANAL_TYPING, "typing", payload)
     }
