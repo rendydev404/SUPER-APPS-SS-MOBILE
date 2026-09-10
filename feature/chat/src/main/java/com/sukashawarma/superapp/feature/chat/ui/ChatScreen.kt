@@ -1428,25 +1428,66 @@ private fun Bubble(
             )
         }
 
-        // NISAN. Kutipan, foto, sebutan, dan penanda "diedit" semuanya
-        // dilewati: yang tersisa dari pesan ini memang tinggal keterangan bahwa
-        // ia pernah ada.
+        // NISAN, sebagai CABANG — bukan `return` dari dalam lambda ini.
+        //
+        // Compose membungkus badan lambda composable dengan pasangan
+        // startGroup/endGroup. Keluar lebih awal dari tengahnya membuat
+        // endGroup-nya terlewat dan tumpukan komposernya rusak; gejalanya bukan
+        // salah gambar melainkan IndexOutOfBoundsException di Stack.pop, satu
+        // frame kemudian, jauh dari tempat kesalahannya.
         if (p.deletedAtMs != null) {
+            NisanPesan(jam = item.jam, diBubbleSendiri = item.milikSendiri)
+        } else {
+            if (p.replyToId != null || p.replyToSnippet != null) {
+                KutipanReply(
+                    nama = p.replyToName ?: "Pesan",
+                    snippet = p.replyToSnippet.orEmpty(),
+                    fotoPath = p.replyToImage,
+                    diBubbleSendiri = item.milikSendiri,
+                    modifier = Modifier
+                        .padding(bottom = 4.dp)
+                        .clickable(enabled = p.replyToId != null) { p.replyToId?.let(onLompatKe) },
+                )
+            }
+
+            if (p.imagePath != null) {
+                AsyncImage(
+                    model = ChatRepository.urlFoto(p.imagePath),
+                    imageLoader = AvatarStorage.imageLoader(LocalContext.current),
+                    contentDescription = "Foto dari ${p.senderName}",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .padding(bottom = if (p.body.isNotBlank()) 4.dp else 0.dp)
+                        .width(240.dp)
+                        .heightIn(min = 140.dp, max = 320.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (item.milikSendiri) Color(0x33FFFFFF) else Color(0x11000000))
+                        .clickable(onClick = onKlikFoto),
+                )
+            }
+
             Row(verticalAlignment = Alignment.Bottom) {
-                Icon(
-                    Icons.Filled.Block,
-                    null,
-                    tint = if (item.milikSendiri) Color(0xB3FFFFFF) else TeksSekunder,
-                    modifier = Modifier.padding(end = 5.dp, bottom = 2.dp).size(14.dp),
-                )
-                Text(
-                    "Pesan ini telah dihapus",
-                    fontSize = 15.sp,
-                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
-                    color = if (item.milikSendiri) Color(0xCCFFFFFF) else TeksSekunder,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                Spacer(Modifier.width(6.dp))
+                if (p.body.isNotBlank()) {
+                    TeksBubble(
+                        body = p.body,
+                        sebutan = p.mentions,
+                        warnaTeks = warnaTeks,
+                        diBubbleSendiri = item.milikSendiri,
+                        onKlikSebutan = onKlikSebutan,
+                        onTekanLama = onTekanLama,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                }
+                if (p.editedAtMs != null) {
+                    Text(
+                        "diedit",
+                        fontSize = 10.sp,
+                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                        color = if (item.milikSendiri) Color(0xB3FFFFFF) else TeksSekunder,
+                        modifier = Modifier.padding(end = 5.dp, top = 2.dp),
+                    )
+                }
                 Text(
                     item.jam,
                     fontSize = 10.5.sp,
@@ -1454,66 +1495,36 @@ private fun Bubble(
                     modifier = Modifier.padding(top = 2.dp),
                 )
             }
-            return@Column
         }
+    }
+}
 
-        if (p.replyToId != null || p.replyToSnippet != null) {
-            KutipanReply(
-                nama = p.replyToName ?: "Pesan",
-                snippet = p.replyToSnippet.orEmpty(),
-                fotoPath = p.replyToImage,
-                diBubbleSendiri = item.milikSendiri,
-                modifier = Modifier
-                    .padding(bottom = 4.dp)
-                    .clickable(enabled = p.replyToId != null) { p.replyToId?.let(onLompatKe) },
-            )
-        }
-
-        if (p.imagePath != null) {
-            AsyncImage(
-                model = ChatRepository.urlFoto(p.imagePath),
-                imageLoader = AvatarStorage.imageLoader(LocalContext.current),
-                contentDescription = "Foto dari ${p.senderName}",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .padding(bottom = if (p.body.isNotBlank()) 4.dp else 0.dp)
-                    .width(240.dp)
-                    .heightIn(min = 140.dp, max = 320.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(if (item.milikSendiri) Color(0x33FFFFFF) else Color(0x11000000))
-                    .clickable(onClick = onKlikFoto),
-            )
-        }
-
-        Row(verticalAlignment = Alignment.Bottom) {
-            if (p.body.isNotBlank()) {
-                TeksBubble(
-                    body = p.body,
-                    sebutan = p.mentions,
-                    warnaTeks = warnaTeks,
-                    diBubbleSendiri = item.milikSendiri,
-                    onKlikSebutan = onKlikSebutan,
-                    onTekanLama = onTekanLama,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                Spacer(Modifier.width(6.dp))
-            }
-            if (p.editedAtMs != null) {
-                Text(
-                    "diedit",
-                    fontSize = 10.sp,
-                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
-                    color = if (item.milikSendiri) Color(0xB3FFFFFF) else TeksSekunder,
-                    modifier = Modifier.padding(end = 5.dp, top = 2.dp),
-                )
-            }
-            Text(
-                item.jam,
-                fontSize = 10.5.sp,
-                color = if (item.milikSendiri) Color(0xB3FFFFFF) else TeksSekunder,
-                modifier = Modifier.padding(top = 2.dp),
-            )
-        }
+/**
+ * Yang tersisa dari pesan yang dihapus: keterangan bahwa ia pernah ada.
+ *
+ * Kutipan, foto, sebutan, dan penanda "diedit" tidak ikut digambar — tidak ada
+ * lagi isinya untuk dirujuk.
+ */
+@Composable
+private fun NisanPesan(jam: String, diBubbleSendiri: Boolean) {
+    val warna = if (diBubbleSendiri) Color(0xCCFFFFFF) else TeksSekunder
+    val warnaJam = if (diBubbleSendiri) Color(0xB3FFFFFF) else TeksSekunder
+    Row(verticalAlignment = Alignment.Bottom) {
+        Icon(
+            Icons.Filled.Block,
+            null,
+            tint = warnaJam,
+            modifier = Modifier.padding(end = 5.dp, bottom = 2.dp).size(14.dp),
+        )
+        Text(
+            "Pesan ini telah dihapus",
+            fontSize = 15.sp,
+            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+            color = warna,
+            modifier = Modifier.weight(1f, fill = false),
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(jam, fontSize = 10.5.sp, color = warnaJam, modifier = Modifier.padding(top = 2.dp))
     }
 }
 
