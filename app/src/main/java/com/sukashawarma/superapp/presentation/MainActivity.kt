@@ -49,6 +49,7 @@ import com.sukashawarma.superapp.presentation.login.LoginScreen
 import com.sukashawarma.superapp.presentation.settings.SettingsScreen
 import com.sukashawarma.superapp.presentation.mitra.MitraDashboardScaffold
 import com.sukashawarma.superapp.presentation.mitra.MitraLoadErrorScreen
+import com.sukashawarma.superapp.feature.chat.ui.ChatScreen
 import com.sukashawarma.superapp.feature.profil.ui.ProfilScreen
 import com.sukashawarma.superapp.presentation.mitra.MitraNoProfileScreen
 import com.sukashawarma.superapp.presentation.theme.SukaSuperappTheme
@@ -67,6 +68,7 @@ object Routes {
     const val MITRA_LOAD_ERROR = "mitra_load_error"
     const val SETTINGS = "settings"
     const val PROFIL = "profil"
+    const val CHAT = "chat"
 }
 
 class MainActivity : FragmentActivity() {
@@ -174,6 +176,12 @@ private fun RootNav() {
             ProfilScreen(onExit = { navController.popBackStack() })
         }
 
+        // Chat Tim juga berlaku untuk setiap pemegang akun — alasan penempatan
+        // yang sama dengan PROFIL di atas.
+        composable(Routes.CHAT) {
+            ChatScreen(onBack = { navController.popBackStack() })
+        }
+
         composable(Routes.LOGIN) {
             // Sengaja TIDAK navigate() di sini. Saat callback ini jalan, recomposition
             // belum sempat berjalan, jadi graph di NavController MASIH graph sesi-kosong
@@ -215,6 +223,7 @@ private fun RootNav() {
                     onOpenDistribusi = { navController.navigate(Routes.DISTRIBUSI) },
                     onOpenManager = { navController.navigate(Routes.MANAGER) },
                     onOpenLeader = { navController.navigate(Routes.LEADER) },
+                    onOpenChat = { navController.navigate(Routes.CHAT) },
                     onOpenSettings = { navController.navigate(Routes.SETTINGS) },
                     onOpenProfil = { navController.navigate(Routes.PROFIL) },
                     onLoggedOut = { navController.navigate(Routes.LOGIN) { popUpTo(0) } }
