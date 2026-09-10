@@ -3,6 +3,7 @@ package com.sukashawarma.superapp.feature.chat.ui
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
+import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -57,6 +58,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBackIos
 import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.Campaign
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
@@ -73,6 +77,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -84,6 +89,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -109,8 +115,10 @@ import com.sukashawarma.superapp.core.camera.KameraFotoSheet
 import com.sukashawarma.superapp.core.ui.AvatarStaf
 import com.sukashawarma.superapp.core.ui.AvatarStorage
 import com.sukashawarma.superapp.domain.session.AppSession
+import com.sukashawarma.superapp.feature.chat.ChatKehadiran
 import com.sukashawarma.superapp.feature.chat.data.ChatRepository
 import com.sukashawarma.superapp.feature.chat.data.PesanChat
+import com.sukashawarma.superapp.feature.chat.data.ReaksiPesan
 import com.sukashawarma.superapp.feature.chat.domain.ItemChat
 import com.sukashawarma.superapp.feature.chat.domain.PosisiGrup
 import com.sukashawarma.superapp.feature.chat.domain.indeksWarnaNama
@@ -203,6 +211,26 @@ fun ChatScreen(
         else Toast.makeText(context, "Izin kamera diperlukan untuk memotret.", Toast.LENGTH_SHORT).show()
     }
 
+    // Menu tekan-lama, konfirmasi hapus, dan pengaturan grup.
+    var menuPesan by remember { mutableStateOf<PesanChat?>(null) }
+    var konfirmasiHapus by remember { mutableStateOf<PesanChat?>(null) }
+    var sheetPengaturan by remember { mutableStateOf(false) }
+    var menyimpanPengaturan by remember { mutableStateOf(false) }
+    var galatPengaturan by remember { mutableStateOf<String?>(null) }
+    val clipboard = LocalClipboardManager.current
+
+    // Selama menu tekan-lama terbuka, isi chat diburamkan supaya pesan yang
+    // dipilih menonjol. Modifier.blur baru bekerja di Android 12+; di bawah itu
+    // scrim gelap milik menu yang menanggung seluruh pemisahannya.
+    val buramkan = menuPesan != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+
+    // Notifikasi pesan masuk ditahan selama layar ini terbuka — pesan yang
+    // sedang dibaca tidak perlu diumumkan lagi di baki notifikasi.
+    DisposableEffect(Unit) {
+        ChatKehadiran.masuk()
+        onDispose { ChatKehadiran.keluar() }
+    }
+
     // Daftar item (bubble + pemisah), terbaru DULU karena LazyColumn reverseLayout.
     val itemTampil = remember(state.pesan, userId) {
         susunItemChat(state.pesan, userId, System.currentTimeMillis()).reversed()
@@ -237,13 +265,18 @@ fun ChatScreen(
     Column(
         Modifier
             .fillMaxSize()
+            .then(if (buramkan) Modifier.blur(16.dp) else Modifier)
             .imePadding()
             .navigationBarsPadding(),
     ) {
         HeaderChat(
+            judul = state.pengaturan.namaGrup,
             subtitle = labelPengetik(state.namaPengetik)
-                ?: "Pesan hilang otomatis setelah 24 jam",
+                ?: if (state.pengaturan.hanyaAdmin) "Mode pengumuman aktif"
+                else "Pesan hilang otomatis setelah 24 jam",
             subtitleAktif = state.namaPengetik.isNotEmpty(),
+            tampilkanPengaturan = state.pengelola,
+            onPengaturan = { galatPengaturan = null; sheetPengaturan = true },
             onBack = onBack,
         )
 
@@ -293,8 +326,11 @@ fun ChatScreen(
                             is ItemChat.Pemisah -> PemisahTanggal(item.label)
                             is ItemChat.Bubble -> BarisBubble(
                                 item = item,
+                                reaksi = state.reaksi[item.pesan.id].orEmpty(),
+                                userId = userId,
                                 onBalas = { viewModel.setBalas(it) },
-                                onHapus = { viewModel.hapus(it) },
+                                onTekanLama = { menuPesan = it },
+                                onKetukReaksi = { menuPesan = it },
                                 onLompatKe = { idAsal ->
                                     val idx = itemTampil.indexOfFirst { it is ItemChat.Bubble && it.pesan.id == idAsal }
                                     if (idx >= 0) scope.launch { listState.animateScrollToItem(idx) }
@@ -326,12 +362,16 @@ fun ChatScreen(
             KartuBalasComposer(target) { viewModel.setBalas(null) }
         }
 
-        KomposerChat(
-            sedangKompres = sedangKompres,
-            onKetik = viewModel::ketikan,
-            onKirim = viewModel::kirimTeks,
-            onLampiran = { lembarSumber = true },
-        )
+        if (state.bolehKirim) {
+            KomposerChat(
+                sedangKompres = sedangKompres,
+                onKetik = viewModel::ketikan,
+                onKirim = viewModel::kirimTeks,
+                onLampiran = { lembarSumber = true },
+            )
+        } else {
+            PitaModePengumuman()
+        }
     }
 
     if (lembarSumber) {
@@ -379,6 +419,91 @@ fun ChatScreen(
             onBatal = { fotoPratinjau = null },
         )
     }
+
+    menuPesan?.let { pesan ->
+        val item = itemTampil.filterIsInstance<ItemChat.Bubble>().firstOrNull { it.pesan.id == pesan.id }
+        if (item == null) {
+            menuPesan = null
+        } else {
+            MenuPesanPopup(
+                milikSendiri = item.milikSendiri,
+                emojiTerpilih = state.reaksi[pesan.id]?.firstOrNull { it.userId == userId }?.emoji,
+                bolehHapus = item.milikSendiri,
+                adaTeks = pesan.body.isNotBlank(),
+                onEmoji = { emoji ->
+                    viewModel.toggleReaksi(pesan, emoji)
+                    menuPesan = null
+                },
+                onBalas = { viewModel.setBalas(pesan); menuPesan = null },
+                onSalin = {
+                    clipboard.setText(AnnotatedString(pesan.body))
+                    menuPesan = null
+                },
+                onHapus = { konfirmasiHapus = pesan; menuPesan = null },
+                onTutup = { menuPesan = null },
+                bubble = {
+                    // Bubble yang sama persis, tanpa identitas berulang supaya
+                    // fokusnya pada isi pesan yang sedang dipilih.
+                    Bubble(item = item.copy(tampilkanIdentitas = false), onLompatKe = {})
+                },
+            )
+        }
+    }
+
+    konfirmasiHapus?.let { pesan ->
+        AlertDialog(
+            onDismissRequest = { konfirmasiHapus = null },
+            title = { Text("Hapus pesan?") },
+            text = { Text("Pesan dihapus untuk semua orang di ruang ini.") },
+            confirmButton = {
+                TextButton(onClick = { konfirmasiHapus = null; viewModel.hapus(pesan) }) {
+                    Text("Hapus", color = Merah)
+                }
+            },
+            dismissButton = { TextButton(onClick = { konfirmasiHapus = null }) { Text("Batal") } },
+        )
+    }
+
+    if (sheetPengaturan) {
+        PengaturanGrupSheet(
+            awal = state.pengaturan,
+            menyimpan = menyimpanPengaturan,
+            galat = galatPengaturan,
+            onSimpan = { nama, deskripsi, hanyaAdmin ->
+                menyimpanPengaturan = true
+                viewModel.simpanPengaturan(nama, deskripsi, hanyaAdmin) { galat ->
+                    menyimpanPengaturan = false
+                    galatPengaturan = galat
+                    if (galat == null) {
+                        sheetPengaturan = false
+                        Toast.makeText(context, "Pengaturan grup tersimpan.", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            },
+            onTutup = { sheetPengaturan = false },
+        )
+    }
+    }
+}
+
+/** Pengganti kotak ketik saat mode pengumuman menyala bagi yang bukan pengelola. */
+@Composable
+private fun PitaModePengumuman() {
+    Column(Modifier.fillMaxWidth().background(LatarBar)) {
+        Box(Modifier.fillMaxWidth().height(0.5.dp).background(GarisTipis))
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            Icon(Icons.Filled.Campaign, null, tint = TeksSekunder, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(
+                "Hanya pengelola yang dapat mengirim pesan",
+                fontSize = 13.sp,
+                color = TeksSekunder,
+            )
+        }
     }
 }
 
@@ -413,7 +538,14 @@ private fun BarisPengetik(nama: List<String>) {
 /* ---------- Header ---------- */
 
 @Composable
-private fun HeaderChat(subtitle: String, subtitleAktif: Boolean, onBack: () -> Unit) {
+private fun HeaderChat(
+    judul: String,
+    subtitle: String,
+    subtitleAktif: Boolean,
+    tampilkanPengaturan: Boolean,
+    onPengaturan: () -> Unit,
+    onBack: () -> Unit,
+) {
     Column(Modifier.fillMaxWidth().background(LatarBar).statusBarsPadding()) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 6.dp),
@@ -430,7 +562,14 @@ private fun HeaderChat(subtitle: String, subtitleAktif: Boolean, onBack: () -> U
             }
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
-                Text("Chat Tim", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = TeksUtama)
+                Text(
+                    judul,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = TeksUtama,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
                 Text(
                     subtitle,
                     fontSize = 12.sp,
@@ -438,6 +577,11 @@ private fun HeaderChat(subtitle: String, subtitleAktif: Boolean, onBack: () -> U
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+            }
+            if (tampilkanPengaturan) {
+                IconButton(onClick = onPengaturan) {
+                    Icon(Icons.Filled.Tune, "Pengaturan grup", tint = BiruIos)
+                }
             }
         }
         Box(Modifier.fillMaxWidth().height(0.5.dp).background(GarisTipis))
@@ -450,21 +594,20 @@ private fun HeaderChat(subtitle: String, subtitleAktif: Boolean, onBack: () -> U
 @Composable
 private fun BarisBubble(
     item: ItemChat.Bubble,
+    reaksi: List<ReaksiPesan>,
+    userId: String,
     onBalas: (PesanChat) -> Unit,
-    onHapus: (PesanChat) -> Unit,
+    onTekanLama: (PesanChat) -> Unit,
     onLompatKe: (String) -> Unit,
+    onKetukReaksi: (PesanChat) -> Unit,
 ) {
     val p = item.pesan
     val haptic = LocalHapticFeedback.current
-    val clipboard = LocalClipboardManager.current
 
     var geser by remember { mutableStateOf(0f) }
     val geserAnim by animateFloatAsState(geser, label = "geserBalas")
     var sudahHaptic by remember { mutableStateOf(false) }
     val ambang = 150f
-
-    var menuTerbuka by remember { mutableStateOf(false) }
-    var konfirmasiHapus by remember { mutableStateOf(false) }
 
     Box(
         Modifier
@@ -524,58 +667,63 @@ private fun BarisBubble(
                 Spacer(Modifier.width(6.dp))
             }
 
-            Box {
+            Column(horizontalAlignment = if (item.milikSendiri) Alignment.End else Alignment.Start) {
                 Bubble(
                     item = item,
                     onLompatKe = onLompatKe,
                     modifier = Modifier.combinedClickable(
                         onClick = {},
-                        onLongClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            menuTerbuka = true
-                        },
+                        onLongClick = { onTekanLama(p) },
                     ),
                 )
-                DropdownMenu(expanded = menuTerbuka, onDismissRequest = { menuTerbuka = false }) {
-                    DropdownMenuItem(
-                        text = { Text("Balas") },
-                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.Reply, null) },
-                        onClick = { menuTerbuka = false; onBalas(p) },
+                if (reaksi.isNotEmpty()) {
+                    KepingReaksi(
+                        reaksi = reaksi,
+                        userId = userId,
+                        modifier = Modifier
+                            .offset(y = (-6).dp)
+                            .padding(horizontal = 6.dp)
+                            .clickable { onKetukReaksi(p) },
                     )
-                    if (p.body.isNotBlank()) {
-                        DropdownMenuItem(
-                            text = { Text("Salin") },
-                            leadingIcon = { Icon(Icons.Filled.ContentCopy, null) },
-                            onClick = {
-                                menuTerbuka = false
-                                clipboard.setText(AnnotatedString(p.body))
-                            },
-                        )
-                    }
-                    if (item.milikSendiri) {
-                        DropdownMenuItem(
-                            text = { Text("Hapus", color = Merah) },
-                            leadingIcon = { Icon(Icons.Filled.Delete, null, tint = Merah) },
-                            onClick = { menuTerbuka = false; konfirmasiHapus = true },
-                        )
-                    }
                 }
             }
         }
     }
+}
 
-    if (konfirmasiHapus) {
-        AlertDialog(
-            onDismissRequest = { konfirmasiHapus = false },
-            title = { Text("Hapus pesan?") },
-            text = { Text("Pesan dihapus untuk semua orang di ruang ini.") },
-            confirmButton = {
-                TextButton(onClick = { konfirmasiHapus = false; onHapus(p) }) { Text("Hapus", color = Merah) }
-            },
-            dismissButton = {
-                TextButton(onClick = { konfirmasiHapus = false }) { Text("Batal") }
-            },
-        )
+/**
+ * Keping reaksi di bawah bubble: satu keping per emoji dengan jumlahnya, dan
+ * milik sendiri diberi lingkar biru supaya terlihat mana yang sudah dipilih.
+ */
+@Composable
+private fun KepingReaksi(
+    reaksi: List<ReaksiPesan>,
+    userId: String,
+    modifier: Modifier = Modifier,
+) {
+    val perEmoji = remember(reaksi) { reaksi.groupBy { it.emoji } }
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        perEmoji.forEach { (emoji, daftar) ->
+            val milikku = daftar.any { it.userId == userId }
+            Row(
+                Modifier
+                    .clip(RoundedCornerShape(11.dp))
+                    .background(if (milikku) Color(0xFFD8E7FB) else Color(0xFFF0F0F2))
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(emoji, fontSize = 12.sp)
+                if (daftar.size > 1) {
+                    Spacer(Modifier.width(3.dp))
+                    Text(
+                        daftar.size.toString(),
+                        fontSize = 11.sp,
+                        color = if (milikku) BiruIos else TeksSekunder,
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -629,6 +777,7 @@ private fun Bubble(
             KutipanReply(
                 nama = p.replyToName ?: "Pesan",
                 snippet = p.replyToSnippet.orEmpty(),
+                fotoPath = p.replyToImage,
                 diBubbleSendiri = item.milikSendiri,
                 modifier = Modifier
                     .padding(bottom = 4.dp)
@@ -675,33 +824,65 @@ private fun Bubble(
 private fun KutipanReply(
     nama: String,
     snippet: String,
+    fotoPath: String?,
     diBubbleSendiri: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val latar = if (diBubbleSendiri) Color(0x2EFFFFFF) else Color(0x0F000000)
     val warnaBar = if (diBubbleSendiri) Color.White else BiruIos
+    val warnaJudul = if (diBubbleSendiri) Color.White else BiruIos
+    val warnaIsi = if (diBubbleSendiri) Color(0xCCFFFFFF) else TeksSekunder
     Row(
         modifier
             .clip(RoundedCornerShape(8.dp))
             .background(latar)
-            .heightIn(min = 34.dp),
+            .heightIn(min = 38.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.width(3.dp).heightIn(min = 34.dp).background(warnaBar))
-        Column(Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
+        Box(Modifier.width(3.dp).heightIn(min = 38.dp).background(warnaBar))
+        Column(Modifier.weight(1f, fill = false).padding(horizontal = 8.dp, vertical = 4.dp)) {
             Text(
                 nama,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = if (diBubbleSendiri) Color.White else BiruIos,
+                color = warnaJudul,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(
-                snippet.ifBlank { "📷 Foto" },
-                fontSize = 12.sp,
-                color = if (diBubbleSendiri) Color(0xCCFFFFFF) else TeksSekunder,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // Balasan atas foto harus tetap terbaca sebagai foto walau
+                // keterangannya panjang — karena itu ikonnya berdiri sendiri di
+                // depan teks, bukan disisipkan ke dalam kalimatnya.
+                if (fotoPath != null) {
+                    Icon(
+                        Icons.Filled.PhotoCamera,
+                        null,
+                        tint = warnaIsi,
+                        modifier = Modifier.size(13.dp),
+                    )
+                    Spacer(Modifier.width(4.dp))
+                }
+                Text(
+                    snippet.ifBlank { if (fotoPath != null) "Foto" else "" },
+                    fontSize = 12.sp,
+                    color = warnaIsi,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        // Gambar kecilnya di ujung kanan, seperti kartu kutipan WhatsApp.
+        if (fotoPath != null) {
+            AsyncImage(
+                model = ChatRepository.urlFoto(fotoPath),
+                imageLoader = AvatarStorage.imageLoader(LocalContext.current),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .padding(end = 4.dp)
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color(0x1A000000)),
             )
         }
     }
@@ -741,6 +922,7 @@ private fun BubbleTertunda(
                     KutipanReply(
                         nama = it.senderName,
                         snippet = snippetPesan(it.body, it.imagePath),
+                        fotoPath = it.imagePath,
                         diBubbleSendiri = true,
                         modifier = Modifier.padding(bottom = 4.dp),
                     )
