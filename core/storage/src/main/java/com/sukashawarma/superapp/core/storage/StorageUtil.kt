@@ -22,20 +22,31 @@ object StorageUtil {
     suspend fun uploadJpeg(bucket: String, path: String, bytes: ByteArray): String =
         upload(bucket, path, bytes, jpegMedia)
 
-    /** Upload WebP — dipakai foto chat, yang dikompres WebP supaya ringan. */
-    suspend fun uploadWebp(bucket: String, path: String, bytes: ByteArray): String =
-        upload(bucket, path, bytes, webpMedia)
+    /**
+     * Upload WebP — dipakai foto chat, yang dikompres WebP supaya ringan.
+     *
+     * [upsert] default false di sini, berbeda dengan [uploadJpeg]. Menimpa objek
+     * menuntut policy UPDATE pada `storage.objects` (Supabase menjalankan
+     * INSERT ... ON CONFLICT DO UPDATE saat header `x-upsert` dikirim), dan
+     * bucket yang namanya per-pesan seperti `chat-media` sengaja TIDAK punya
+     * policy UPDATE: nama berkasnya UUID baru tiap kirim, jadi tidak ada yang
+     * perlu ditimpa — dan tanpa hak menimpa, foto yang sudah terkirim tidak bisa
+     * diganti isinya di belakang layar.
+     */
+    suspend fun uploadWebp(bucket: String, path: String, bytes: ByteArray, upsert: Boolean = false): String =
+        upload(bucket, path, bytes, webpMedia, upsert)
 
     private suspend fun upload(
         bucket: String,
         path: String,
         bytes: ByteArray,
         media: okhttp3.MediaType,
+        upsert: Boolean = true,
     ): String = withContext(Dispatchers.IO) {
         val url = "${SupabaseClient.BASE_URL}storage/v1/object/$bucket/$path"
         val req = Request.Builder()
             .url(url)
-            .header("x-upsert", "true")
+            .apply { if (upsert) header("x-upsert", "true") }
             .post(bytes.toRequestBody(media))
             .build()
         SupabaseClient.okHttpClient.newCall(req).execute().use { resp ->
