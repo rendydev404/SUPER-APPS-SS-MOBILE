@@ -236,6 +236,10 @@ fun ChatScreen(
     var sheetReaksi by remember { mutableStateOf<PesanChat?>(null) }
     var pilihEmojiReaksi by remember { mutableStateOf<PesanChat?>(null) }
     var sheetInfo by remember { mutableStateOf(false) }
+    // Siapa yang sedang dibuka kartu profilnya. Menyimpan id + snapshot nama/foto
+    // dari pesan, bukan objek anggotanya: orang yang sudah non-aktif tidak ada di
+    // daftar anggota, tapi pesannya masih ada dan fotonya tetap harus bisa dibuka.
+    var profilDibuka by remember { mutableStateOf<Triple<String, String, String?>?>(null) }
     var menyimpanPengaturan by remember { mutableStateOf(false) }
     var galatPengaturan by remember { mutableStateOf<String?>(null) }
     val clipboard = LocalClipboardManager.current
@@ -357,7 +361,7 @@ fun ChatScreen(
                 ?: if (state.pengaturan.hanyaAdmin) "Mode pengumuman aktif"
                 else "Pesan hilang otomatis setelah 24 jam",
             subtitleAktif = state.pengetik.isNotEmpty(),
-            onBukaInfo = { galatPengaturan = null; sheetInfo = true },
+            onBukaInfo = { galatPengaturan = null; sheetInfo = true; viewModel.muatAnggota() },
             onBack = onBack,
         )
 
@@ -426,6 +430,10 @@ fun ChatScreen(
                                 onBalas = { viewModel.setBalas(it) },
                                 onTekanLama = { menuPesan = it },
                                 onKetukReaksi = { sheetReaksi = it },
+                                onKlikPengirim = { pesan ->
+                                    profilDibuka = Triple(pesan.senderId, pesan.senderName, pesan.senderAvatar)
+                                    viewModel.muatAnggota()
+                                },
                                 onLompatKe = { idAsal ->
                                     val idx = itemTampil.indexOfFirst { it is ItemChat.Bubble && it.pesan.id == idAsal }
                                     if (idx >= 0) scope.launch { listState.animateScrollToItem(idx) }
@@ -636,6 +644,10 @@ fun ChatScreen(
             bolehSunting = state.pengelola,
             menyimpan = menyimpanPengaturan,
             galat = galatPengaturan,
+            anggota = state.anggota,
+            memuatAnggota = state.memuatAnggota,
+            userId = userId,
+            onKlikAnggota = { profilDibuka = Triple(it.id, it.nama, it.avatar) },
             onSimpan = { nama, deskripsi, hanyaAdmin, fotoJpeg, hapusFoto ->
                 menyimpanPengaturan = true
                 viewModel.simpanPengaturan(nama, deskripsi, hanyaAdmin, fotoJpeg, hapusFoto) { galat ->
@@ -648,6 +660,17 @@ fun ChatScreen(
                 }
             },
             onTutup = { sheetInfo = false },
+        )
+    }
+
+    profilDibuka?.let { (id, namaCadangan, avatarCadangan) ->
+        ProfilAnggotaSheet(
+            anggota = state.anggota.firstOrNull { it.id == id },
+            namaCadangan = namaCadangan,
+            avatarCadangan = avatarCadangan,
+            memuat = state.memuatAnggota,
+            akuSendiri = id == userId,
+            onTutup = { profilDibuka = null },
         )
     }
     }
@@ -932,6 +955,7 @@ private fun BarisBubble(
     onTekanLama: (PesanChat) -> Unit,
     onLompatKe: (String) -> Unit,
     onKetukReaksi: (PesanChat) -> Unit,
+    onKlikPengirim: (PesanChat) -> Unit,
 ) {
     val p = item.pesan
     val haptic = LocalHapticFeedback.current
@@ -995,7 +1019,10 @@ private fun BarisBubble(
                         AvatarStaf(
                             path = p.senderAvatar,
                             nama = p.senderName,
-                            modifier = Modifier.size(30.dp),
+                            modifier = Modifier
+                                .size(30.dp)
+                                .clip(CircleShape)
+                                .clickable { onKlikPengirim(p) },
                             ukuranHuruf = 13.sp,
                         )
                     }
