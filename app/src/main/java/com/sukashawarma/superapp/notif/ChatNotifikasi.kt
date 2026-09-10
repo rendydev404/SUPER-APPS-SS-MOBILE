@@ -62,10 +62,34 @@ object ChatNotifikasi {
     const val KUNCI_BALASAN = "balasan_chat"
     const val AKSI_BALAS = "com.sukashawarma.superapp.BALAS_CHAT"
 
+    /** Satu baris percakapan di dalam notifikasi. */
+    private data class Baris(
+        val nama: String,
+        val teks: String,
+        val waktu: Long,
+        /** Pesan ini menyebut nama pengguna. Ikut menentukan baris mana yang
+         *  boleh dibuang saat riwayatnya penuh. */
+        val disebut: Boolean = false,
+    )
+
     /** Riwayat singkat untuk MessagingStyle. Hanya di memori — notifikasi tidak
      *  perlu bertahan melewati matinya proses, dan isinya toh berumur 24 jam. */
-    private val riwayat = ArrayDeque<Triple<String, String, Long>>()
+    private val riwayat = ArrayDeque<Baris>()
     private const val MAKS_RIWAYAT = 6
+
+    /**
+     * Membuang baris terlama, tapi MENDAHULUKAN yang bukan sebutan.
+     *
+     * Tanpa aturan ini, obrolan biasa yang ramai akan mendorong keluar pesan
+     * yang menyebut nama pengguna — justru satu-satunya baris yang paling
+     * ingin dilihat orang saat membuka bilah notifikasi.
+     */
+    private fun rapikanRiwayat() {
+        while (riwayat.size > MAKS_RIWAYAT) {
+            val korban = riwayat.indexOfFirst { !it.disebut }
+            riwayat.removeAt(if (korban >= 0) korban else 0)
+        }
+    }
 
     fun siapkanSaluran(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
@@ -125,11 +149,15 @@ object ChatNotifikasi {
     ) {
         siapkanSaluran(context)
         namaGrupTerakhir = namaGrup
-        disebutTerakhir = disebut
+        // MENEMPEL, tidak ditimpa. Pesan biasa yang menyusul tidak boleh
+        // menghapus penanda sebutan — itu persis kejadian yang membuat orang
+        // melewatkan panggilan namanya. Penandanya baru padam saat chat dibuka
+        // atau ditandai dibaca, yaitu di [tutup].
+        if (disebut) disebutTerakhir = true
 
         synchronized(riwayat) {
-            riwayat.addLast(Triple(pengirim, isi, System.currentTimeMillis()))
-            while (riwayat.size > MAKS_RIWAYAT) riwayat.removeFirst()
+            riwayat.addLast(Baris(pengirim, isi, System.currentTimeMillis(), disebut))
+            rapikanRiwayat()
         }
 
         val foto = fotoGrup(context, fotoGrupPath)
@@ -151,8 +179,15 @@ object ChatNotifikasi {
         foto: Bitmap?,
     ): NotificationCompat.Builder {
         val aku = Person.Builder().setName("Anda").setKey("aku").build()
+        // Penanda sebutan ditempel ke JUDUL PERCAKAPAN.
+        //
+        // Bukan `setSubText`: begitu notifikasi ditautkan ke pintasan
+        // percakapan — yang kita lakukan demi foto grup dan tombol balas —
+        // Android mengunci kepala notifikasinya untuk judul percakapan dan
+        // membuang subText tanpa jejak. Penandanya digambar, lalu hilang.
+        val judul = if (disebutTerakhir) "$namaGrup · Menyebut Anda" else namaGrup
         val gaya = NotificationCompat.MessagingStyle(aku)
-            .setConversationTitle(namaGrup)
+            .setConversationTitle(judul)
             .setGroupConversation(true)
         synchronized(riwayat) {
             riwayat.forEach { (nama, teks, waktu) ->
@@ -168,11 +203,6 @@ object ChatNotifikasi {
             .setSmallIcon(R.mipmap.ic_launcher)
             .setLargeIcon(foto)
             .setStyle(gaya)
-            // Penanda di kepala notifikasi, bukan sisipan ke dalam teks pesan:
-            // MessagingStyle sudah menulis nama pengirim di depan isinya, jadi
-            // "X menyebut Anda: ..." di dalam body akan menyebut namanya dua
-            // kali dalam satu baris.
-            .apply { if (disebutTerakhir) setSubText("Menyebut Anda") }
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
@@ -223,6 +253,12 @@ object ChatNotifikasi {
      * disegarkan.
      */
     private fun pastikanPintasan(context: Context, namaGrup: String, foto: Bitmap?) {
+        // Label pintasan ikut diberi penanda. Pada sebagian peluncur, label
+        // inilah — bukan judul percakapan — yang dipakai sebagai kepala
+        // notifikasi; menyamakan keduanya membuat penandanya muncul di mana pun
+        // notifikasinya digambar.
+        @Suppress("NAME_SHADOWING")
+        val namaGrup = if (disebutTerakhir) "$namaGrup · Menyebut Anda" else namaGrup
         try {
             val orangGrup = Person.Builder()
                 .setName(namaGrup)
@@ -261,8 +297,8 @@ object ChatNotifikasi {
      */
     fun tampilkanBalasanTerkirim(context: Context, teks: String) {
         synchronized(riwayat) {
-            riwayat.addLast(Triple("Anda", teks, System.currentTimeMillis()))
-            while (riwayat.size > MAKS_RIWAYAT) riwayat.removeFirst()
+            riwayat.addLast(Baris("Anda", teks, System.currentTimeMillis()))
+            rapikanRiwayat()
         }
         val notif = bangun(context, namaGrupTerakhir, fotoGrupBitmap)
             // Balasan sendiri tidak perlu berbunyi lagi.
