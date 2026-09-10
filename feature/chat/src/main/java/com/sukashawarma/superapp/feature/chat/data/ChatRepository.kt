@@ -49,11 +49,29 @@ object ChatRepository {
      * dari sesi — klien sengaja tidak mengirim sender_*; apa pun yang dikirim
      * akan ditimpa server (lihat migrasi 20300209000000).
      */
-    suspend fun kirim(body: String, imagePath: String? = null, replyToId: String? = null): PesanChat {
+    suspend fun kirim(
+        body: String,
+        imagePath: String? = null,
+        replyToId: String? = null,
+        mentions: List<Sebutan> = emptyList(),
+    ): PesanChat {
         val row = JsonObject().apply {
             addProperty("body", body)
             imagePath?.let { addProperty("image_path", it) }
             replyToId?.let { addProperty("reply_to_id", it) }
+            if (mentions.isNotEmpty()) {
+                add("mentions", com.google.gson.JsonArray().apply {
+                    // Dibatasi 20, sama dengan CHECK di database. Menahannya di
+                    // sini membuat kelebihannya terpotong rapi alih-alih membuat
+                    // seluruh pesan ditolak server.
+                    mentions.distinctBy { it.id }.take(20).forEach { m ->
+                        add(JsonObject().apply {
+                            addProperty("id", m.id)
+                            addProperty("nama", m.nama)
+                        })
+                    }
+                })
+            }
         }
         val res = Postgrest.insert(TABLE, row)
         return res.firstOrNull()?.asJsonObject?.let(::parsePesanChat)
