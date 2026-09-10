@@ -75,7 +75,14 @@ class SuperappMessagingService : FirebaseMessagingService() {
                 Log.d(TAG, "Push chat dilewati: layar chat sedang terlihat.")
                 return
             }
-            Log.d(TAG, "Push chat diterima, notifikasi disusun.")
+            // Seluruh kunci payload dicatat, bukan hanya yang dipakai. Penanda
+            // sebutan lahir tiga lapis di atas sini (trigger -> edge function ->
+            // FCM); tanpa jejak isi payload yang benar-benar sampai, "penanda
+            // tidak muncul" mustahil dibedakan dari "penanda tidak pernah
+            // dikirim".
+            // Isi pesannya TIDAK ikut dicatat — jejak notifikasi tidak boleh
+            // menumpahkan percakapan orang ke Logcat.
+            Log.d(TAG, "Push chat diterima, disebut=" + (message.data["mention"] == "1"))
 
             val namaGrup = message.data["title"]?.takeIf { it.isNotBlank() } ?: ChatKehadiran.namaGrup
             val pengirim = message.data["sender"]?.takeIf { it.isNotBlank() } ?: judul
