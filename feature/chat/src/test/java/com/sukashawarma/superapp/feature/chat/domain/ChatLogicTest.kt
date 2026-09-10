@@ -119,6 +119,17 @@ class ChatLogicTest {
     }
 
     @Test
+    fun `jam bubble diformat sekali di sini, bukan di dalam composable`() {
+        val jam = java.time.ZonedDateTime.of(2026, 9, 10, 7, 5, 0, 0, zona)
+        val now = jam.toInstant().toEpochMilli() + 60_000
+        val items = susunItemChat(
+            listOf(pesan("1", "a", jam.toInstant().toEpochMilli())),
+            userId = "x", nowMs = now, zona = zona,
+        )
+        assertEquals("07:05", items.filterIsInstance<ItemChat.Bubble>().single().jam)
+    }
+
+    @Test
     fun `label tanggal hari ini dan kemarin berbahasa manusia`() {
         val hariIni = java.time.LocalDate.of(2026, 9, 10)
         assertEquals("Hari Ini", labelTanggal(hariIni, hariIni))
