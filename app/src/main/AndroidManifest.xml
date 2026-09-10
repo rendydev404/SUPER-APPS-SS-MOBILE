@@ -101,5 +101,17 @@
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
+
+        <!-- Balasan yang diketik langsung di bilah notifikasi chat.
+             exported="false": hanya sistem notifikasi (lewat PendingIntent milik
+             aplikasi ini) yang boleh memicunya, bukan aplikasi lain. -->
+        <receiver
+            android:name=".notif.BalasChatReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.sukashawarma.superapp.BALAS_CHAT" />
+                <action android:name="com.sukashawarma.superapp.TANDAI_DIBACA_CHAT" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>
