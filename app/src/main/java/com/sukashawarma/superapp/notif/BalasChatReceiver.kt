@@ -54,7 +54,7 @@ class BalasChatReceiver : BroadcastReceiver() {
         lingkup.launch {
             try {
                 ChatRepository.kirim(teks)
-                ChatNotifikasi.tampilkanBalasanTerkirim(app, teks, "Chat Tim")
+                ChatNotifikasi.tampilkanBalasanTerkirim(app, teks)
             } catch (e: Exception) {
                 android.util.Log.e("BalasChatReceiver", "balas dari notifikasi gagal", e)
                 ChatNotifikasi.tampilkanGagal(app, e.message ?: "Coba lagi dari dalam aplikasi.")
