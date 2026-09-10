@@ -43,6 +43,9 @@ data class HomeUiState(
     val pettyCashButuhAksi: Int? = null,
     /** Pesan Chat Tim yang belum dibaca di perangkat ini. 0 = tidak ada lencana. */
     val chatBelumDibaca: Int = 0,
+    /** Ada pesan belum dibaca yang menyebut nama pengguna. Menaikkan lencana
+     *  dari sekadar "ada pesan baru" menjadi "ada yang memanggil Anda". */
+    val chatAdaSebutan: Boolean = false,
     val memuatSorotan: Boolean = true,
 ) {
     /** Jam absen terakhir hari ini dalam WIB, mis. "07:12". */
@@ -130,8 +133,14 @@ class HomeViewModel : ViewModel() {
         val app = context.applicationContext
         viewModelScope.launch {
             val jumlah = runCatching { ChatBacaan.hitungBelumDibaca(app, userId) }.getOrNull() ?: return@launch
-            if (jumlah != _state.value.chatBelumDibaca) {
-                _state.value = _state.value.copy(chatBelumDibaca = jumlah)
+            // Sebutan hanya ditanyakan bila memang ADA yang belum dibaca. Tanpa
+            // pesan baru, jawabannya sudah pasti tidak — dan permintaan kedua
+            // ini ikut berjalan setiap kali ada pesan masuk di grup.
+            val disebut = jumlah > 0 &&
+                runCatching { ChatBacaan.adaSebutan(app, userId) }.getOrDefault(false)
+            val kini = _state.value
+            if (jumlah != kini.chatBelumDibaca || disebut != kini.chatAdaSebutan) {
+                _state.value = kini.copy(chatBelumDibaca = jumlah, chatAdaSebutan = disebut)
             }
         }
     }
