@@ -139,9 +139,15 @@ class PelacakPengetik {
     companion object {
         const val JEDA_KIRIM_MS: Long = 3_000
         const val TIMEOUT_MS: Long = 5_000
+
+        /** Batas orang yang dilacak sekaligus. Layar hanya sanggup menampilkan
+         *  segelintir wajah, dan tanpa batas ini satu grup besar bisa menumpuk
+         *  entri tanpa akhir hanya karena semua orang ikut mengetik. */
+        const val MAKS_DILACAK = 10
     }
 
-    private val aktif = LinkedHashMap<String, Pair<String, Long>>() // id -> (nama, terakhirMs)
+    private val aktif = LinkedHashMap<String, Pengetik>()
+    private val terakhirTerlihat = HashMap<String, Long>()
 
     // Bukan 0: dengan 0, ketikan pertama setelah aplikasi baru dibuka (nowMs
     // kecil di jam yang dimulai dari epoch mana pun) bisa tertahan 3 detik.
@@ -155,26 +161,55 @@ class PelacakPengetik {
         return true
     }
 
-    fun catat(id: String, nama: String, nowMs: Long) {
-        aktif[id] = nama to nowMs
+    /**
+     * Mencatat satu sinyal. Urutan kemunculan SENGAJA dipertahankan: menaruh
+     * ulang kunci yang sudah ada di LinkedHashMap tidak memindahkannya ke
+     * belakang, jadi wajah dan nama tidak bertukar tempat setiap tiga detik
+     * selagi orangnya masih mengetik.
+     */
+    fun catat(id: String, nama: String, avatar: String?, nowMs: Long) {
+        if (id !in aktif && aktif.size >= MAKS_DILACAK) return
+        aktif[id] = Pengetik(id, nama, avatar)
+        terakhirTerlihat[id] = nowMs
     }
 
     /** Sesuai kedatangan pesan dari orang itu: dia jelas sudah selesai mengetik. */
     fun selesai(id: String) {
         aktif.remove(id)
+        terakhirTerlihat.remove(id)
     }
 
-    /** Nama-nama yang masih dianggap mengetik, urut kedatangan sinyal. */
-    fun namaAktif(nowMs: Long): List<String> {
-        aktif.entries.removeAll { (_, v) -> nowMs - v.second > TIMEOUT_MS }
-        return aktif.values.map { it.first }
+    /** Yang masih dianggap mengetik, urut kedatangan sinyal pertamanya. */
+    fun aktif(nowMs: Long): List<Pengetik> {
+        val kedaluwarsa = terakhirTerlihat.filterValues { nowMs - it > TIMEOUT_MS }.keys
+        kedaluwarsa.forEach { aktif.remove(it); terakhirTerlihat.remove(it) }
+        return aktif.values.toList()
     }
 }
 
-/** "Budi sedang mengetik…" / "Budi dan Sari sedang mengetik…" / "3 orang sedang mengetik…". */
-fun labelPengetik(nama: List<String>): String? = when {
-    nama.isEmpty() -> null
-    nama.size == 1 -> "${nama[0]} sedang mengetik…"
-    nama.size == 2 -> "${nama[0]} dan ${nama[1]} sedang mengetik…"
-    else -> "${nama.size} orang sedang mengetik…"
+/** Seorang yang sedang mengetik, beserta wajahnya untuk ditumpuk di layar. */
+data class Pengetik(val id: String, val nama: String, val avatar: String?)
+
+/** Wajah yang ditumpuk paling banyak sekian; sisanya diwakili angka. */
+const val MAKS_WAJAH_PENGETIK = 3
+
+/**
+ * Kalimat "sedang mengetik" yang tetap terbaca berapa pun jumlah orangnya.
+ *
+ * Di atas dua orang, nama ketiga dan seterusnya diringkas jadi hitungan — satu
+ * baris yang memuat lima nama akan terpotong di tengah nama dan justru tidak
+ * memberi tahu siapa pun.
+ */
+fun labelPengetik(orang: List<Pengetik>): String? = when {
+    orang.isEmpty() -> null
+    orang.size == 1 -> "${orang[0].nama} sedang mengetik…"
+    orang.size == 2 -> "${orang[0].nama} dan ${orang[1].nama} sedang mengetik…"
+    else -> "${orang[0].nama}, ${orang[1].nama}, dan ${orang.size - 2} lainnya sedang mengetik…"
+}
+
+/** Versi pendek untuk subjudul header, yang ruangnya jauh lebih sempit. */
+fun labelPengetikPendek(orang: List<Pengetik>): String? = when {
+    orang.isEmpty() -> null
+    orang.size == 1 -> "${orang[0].nama} sedang mengetik…"
+    else -> "${orang.size} orang sedang mengetik…"
 }
