@@ -238,15 +238,27 @@ class ChatViewModel : ViewModel() {
         }
     }
 
+    /**
+     * [fotoBaru] = JPEG yang baru dipilih; [hapusFoto] = kembalikan ke ikon
+     * bawaan. Keduanya null/false berarti foto yang sekarang dibiarkan apa
+     * adanya — menyimpan nama grup tidak boleh ikut menghapus fotonya.
+     */
     fun simpanPengaturan(
         nama: String,
         deskripsi: String,
         hanyaAdmin: Boolean,
+        fotoBaru: ByteArray? = null,
+        hapusFoto: Boolean = false,
         onSelesai: (String?) -> Unit,
     ) {
         viewModelScope.launch {
             try {
-                ChatRepository.simpanPengaturan(nama, deskripsi, hanyaAdmin, namaSendiri)
+                val path = when {
+                    fotoBaru != null -> ChatRepository.unggahFotoGrup(userId, fotoBaru)
+                    hapusFoto -> ""
+                    else -> null
+                }
+                ChatRepository.simpanPengaturan(nama, deskripsi, hanyaAdmin, namaSendiri, path)
                 muatUlang()
                 onSelesai(null)
             } catch (e: kotlinx.coroutines.CancellationException) {
