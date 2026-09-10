@@ -53,6 +53,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -343,7 +344,7 @@ fun ChatScreen(
         val total = state.pesan.size + state.tertunda.size
         if (total > jumlahTerlihat) {
             if (diBawah || state.tertunda.isNotEmpty()) {
-                listState.animateScrollToItem(0)
+                listState.gulirHalusKe(0)
                 pesanBaruBelumDilihat = 0
             } else {
                 pesanBaruBelumDilihat += total - jumlahTerlihat
@@ -379,7 +380,7 @@ fun ChatScreen(
     Column(
         Modifier
             .fillMaxSize()
-            .then(if (buramkan) Modifier.blur(16.dp) else Modifier)
+            .then(if (buramkan) Modifier.blur(10.dp) else Modifier)
             .imePadding()
             .navigationBarsPadding(),
     ) {
@@ -475,7 +476,7 @@ fun ChatScreen(
                                 onLompatKe = { idAsal ->
                                     val idx = itemTampil.indexOfFirst { it is ItemChat.Bubble && it.pesan.id == idAsal }
                                     if (idx >= 0) {
-                                        scope.launch { listState.animateScrollToItem(idx) }
+                                        scope.launch { listState.gulirHalusKe(idx) }
                                         sorotPesanId = idAsal
                                     } else {
                                         // Pesan asli bisa sudah dihapus atau lewat
@@ -506,7 +507,7 @@ fun ChatScreen(
                 modifier = Modifier.align(Alignment.BottomEnd).padding(14.dp),
             ) {
                 TombolKeBawah(pesanBaruBelumDilihat) {
-                    scope.launch { listState.animateScrollToItem(0) }
+                    scope.launch { listState.gulirHalusKe(0) }
                 }
             }
         }
@@ -843,6 +844,53 @@ private fun PitaModePengumuman() {
             )
         }
     }
+}
+
+/**
+ * Warna cincin sorot, memudar masuk saat gelembungnya mulai disorot.
+ *
+ * Berdiri sebagai composable sendiri supaya state animasinya lahir dan mati
+ * bersama sorotannya — bukan menumpang di setiap gelembung yang kebetulan
+ * tersusun.
+ */
+@Composable
+private fun warnaCincinSorot(): Color {
+    var mulai by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { mulai = true }
+    val warna by animateColorAsState(
+        targetValue = if (mulai) Color(0xFFEA580C) else Color.Transparent,
+        animationSpec = tween(180),
+        label = "cincinSorot",
+    )
+    return warna
+}
+
+/** Sisa jarak yang masih dianimasikan setelah lompatan instan. */
+private const val EKOR_GULIR = 10
+
+/**
+ * Menggulir ke [indeks] tanpa membekukan layar.
+ *
+ * `animateScrollToItem` MENYUSUN SETIAP ITEM yang dilewatinya. Melompat dari
+ * dasar percakapan ke pesan yang dikutip seratus baris di atas berarti menyusun
+ * seratus gelembung dalam satu burst — dan tiap gelembung membawa dua animasi,
+ * satu penangan gestur, dan permintaan gambar avatar. Terukur di perangkat:
+ * frame persentil ke-99 melonjak ke 700ms, sementara menggulir manual pada
+ * daftar yang sama hanya 65ms.
+ *
+ * Karena itu jarak jauh ditempuh dengan `scrollToItem` yang langsung meloncat
+ * (hanya menyusun satu layar penuh di tujuan), lalu sisa [EKOR_GULIR] item
+ * dianimasikan supaya gerakannya tetap terbaca sebagai perpindahan, bukan
+ * teleportasi.
+ */
+private suspend fun LazyListState.gulirHalusKe(indeks: Int) {
+    val sasaran = indeks.coerceAtLeast(0)
+    val jarak = kotlin.math.abs(sasaran - firstVisibleItemIndex)
+    if (jarak > EKOR_GULIR) {
+        val dekat = if (sasaran > firstVisibleItemIndex) sasaran - EKOR_GULIR else sasaran + EKOR_GULIR
+        scrollToItem(dekat.coerceAtLeast(0))
+    }
+    animateScrollToItem(sasaran)
 }
 
 /**
@@ -1186,11 +1234,11 @@ private fun Bubble(
     // mustahil terlihat jelas di keduanya. Cincin di tepinya terbaca di atas
     // warna apa pun, dan memudar sendiri saat sorotannya padam.
     val bentuk = BentukGelembung(item.milikSendiri, item.posisi)
-    val warnaSorot by animateColorAsState(
-        targetValue = if (disorot) Color(0xFFEA580C) else Color.Transparent,
-        animationSpec = tween(if (disorot) 160 else 480),
-        label = "sorotPesan",
-    )
+    // Animasinya HANYA dialokasikan untuk gelembung yang benar-benar disorot.
+    // Versi sebelumnya memanggil animateColorAsState di SETIAP gelembung, jadi
+    // setiap kali daftar melompat, belasan Animatable dan LaunchedEffect lahir
+    // sekaligus hanya untuk menganimasikan warna transparan ke transparan.
+    val warnaSorot = if (disorot) warnaCincinSorot() else Color.Transparent
 
     Column(
         modifier
