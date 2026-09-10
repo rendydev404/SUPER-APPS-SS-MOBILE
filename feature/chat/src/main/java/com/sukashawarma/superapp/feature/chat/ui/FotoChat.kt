@@ -31,17 +31,22 @@ object FotoChat {
         val opsi = BitmapFactory.Options().apply { inSampleSize = sampel }
         val kasar = resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opsi) } ?: return null
 
-        val terpanjang = maxOf(kasar.width, kasar.height)
+        return kompres(kasar)
+    }
+
+    /** Jalur kamera dalam aplikasi: bitmap sudah di tangan, tinggal dikecilkan. */
+    fun kompres(sumber: Bitmap): ByteArray? {
+        val terpanjang = maxOf(sumber.width, sumber.height)
         val bitmap = if (terpanjang > SISI_MAKS) {
             val skala = SISI_MAKS.toFloat() / terpanjang
             Bitmap.createScaledBitmap(
-                kasar,
-                (kasar.width * skala).toInt().coerceAtLeast(1),
-                (kasar.height * skala).toInt().coerceAtLeast(1),
+                sumber,
+                (sumber.width * skala).toInt().coerceAtLeast(1),
+                (sumber.height * skala).toInt().coerceAtLeast(1),
                 true,
-            ).also { if (it !== kasar) kasar.recycle() }
+            )
         } else {
-            kasar
+            sumber
         }
 
         val keluaran = ByteArrayOutputStream()
@@ -52,7 +57,9 @@ object FotoChat {
             Bitmap.CompressFormat.WEBP
         }
         val sukses = bitmap.compress(format, KUALITAS, keluaran)
-        bitmap.recycle()
+        // Bitmap hasil penyekalaan boleh dibuang; sumbernya milik pemanggil
+        // (jalur kamera masih memakainya untuk pratinjau).
+        if (bitmap !== sumber) bitmap.recycle()
         return if (sukses) keluaran.toByteArray() else null
     }
 }
