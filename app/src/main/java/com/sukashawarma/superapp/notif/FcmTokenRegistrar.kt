@@ -51,6 +51,10 @@ object FcmTokenRegistrar {
             Log.e(TAG, "Gagal mengambil token FCM", e)
             return
         }
+        // DUA pendaftaran yang BERDIRI SENDIRI. Sempat ditulis bersarang, dan itu
+        // salah: kegagalan pada daftar bersama POS (`fcm_tokens`) ikut membatalkan
+        // pendaftaran daftar chat, sehingga perangkat diam-diam berhenti menerima
+        // pesan chat gara-gara masalah di jalur yang sama sekali lain.
         try {
             Postgrest.rpc(
                 "register_fcm_token",
@@ -59,25 +63,25 @@ object FcmTokenRegistrar {
                     if (outletId != null) addProperty("p_outlet_id", outletId)
                 },
             )
-            Log.d(TAG, "Token terdaftar untuk staf=$stafId outlet=$outletId")
-
-            // Daftar KEDUA, khusus chat. `fcm_tokens` dipakai bersama app POS,
-            // dan mengirim pesan chat ke seluruh isinya membuat setiap pesan
-            // mendarat di HP kasir — POS bahkan membacanya sebagai "pesan dari
-            // owner" karena kiriman broadcast bertipe sama. `chat_push_tokens`
-            // hanya diisi aplikasi ini, jadi push chat berhenti di sini.
-            try {
-                Postgrest.rpc(
-                    "register_chat_push_token",
-                    JsonObject().apply { addProperty("p_token", token) },
-                )
-            } catch (e: Exception) {
-                Log.e(TAG, "Pendaftaran token chat ditolak server", e)
-            }
+            Log.d(TAG, "Token umum terdaftar untuk staf=$stafId outlet=$outletId")
         } catch (e: Exception) {
             // Gagal mendaftar tidak boleh mengganggu apa pun; pengguna tetap bisa
             // bekerja, hanya tidak menerima notifikasi sampai percobaan berikutnya.
-            Log.e(TAG, "Pendaftaran token FCM ditolak server", e)
+            Log.e(TAG, "Pendaftaran token umum ditolak server", e)
+        }
+
+        // Daftar khusus chat. `fcm_tokens` dipakai bersama app POS, dan mengirim
+        // pesan chat ke seluruh isinya membuat setiap pesan mendarat di HP kasir
+        // — POS bahkan membacanya sebagai "pesan dari owner". `chat_push_tokens`
+        // hanya diisi aplikasi ini, jadi push chat berhenti di sini.
+        try {
+            Postgrest.rpc(
+                "register_chat_push_token",
+                JsonObject().apply { addProperty("p_token", token) },
+            )
+            Log.d(TAG, "Token chat terdaftar untuk staf=$stafId")
+        } catch (e: Exception) {
+            Log.e(TAG, "Pendaftaran token chat ditolak server", e)
         }
     }
 
