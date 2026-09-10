@@ -10,6 +10,7 @@ import com.sukashawarma.superapp.feature.chat.data.ChatRepository
 import com.sukashawarma.superapp.feature.chat.data.PengaturanGrup
 import com.sukashawarma.superapp.feature.chat.data.PesanChat
 import com.sukashawarma.superapp.feature.chat.data.ReaksiPesan
+import com.sukashawarma.superapp.feature.chat.data.Sebutan
 import com.sukashawarma.superapp.feature.chat.domain.PelacakPengetik
 import com.sukashawarma.superapp.feature.chat.domain.Pengetik
 import kotlinx.coroutines.delay
@@ -27,6 +28,9 @@ data class KirimanTertunda(
     val fotoWebp: ByteArray?,
     val replyTo: PesanChat?,
     val dibuatMs: Long,
+    /** Orang yang disebut; ikut bertahan agar kiriman yang diulang tetap
+     *  memberi tahu orang yang sama. */
+    val mentions: List<Sebutan> = emptyList(),
     val gagal: Boolean = false,
     /** Alasan gagal, sudah dipendekkan untuk ditampilkan di bawah bubble.
      *  Tanpa ini kegagalan unggah hanya terlihat di Logcat. */
@@ -205,7 +209,7 @@ class ChatViewModel : ViewModel() {
         return sisa.substringBefore("\"").ifBlank { "Gagal menyunting pesan." }
     }
 
-    fun kirimTeks(teks: String) {
+    fun kirimTeks(teks: String, sebutan: List<Sebutan> = emptyList()) {
         val bersih = teks.trim()
         if (bersih.isEmpty()) return
         antre(KirimanTertunda(
@@ -214,16 +218,18 @@ class ChatViewModel : ViewModel() {
             fotoWebp = null,
             replyTo = _state.value.balasTarget,
             dibuatMs = System.currentTimeMillis(),
+            mentions = sebutan,
         ))
     }
 
-    fun kirimFoto(webp: ByteArray, keterangan: String) {
+    fun kirimFoto(webp: ByteArray, keterangan: String, sebutan: List<Sebutan> = emptyList()) {
         antre(KirimanTertunda(
             kunci = UUID.randomUUID().toString(),
             body = keterangan.trim(),
             fotoWebp = webp,
             replyTo = _state.value.balasTarget,
             dibuatMs = System.currentTimeMillis(),
+            mentions = sebutan,
         ))
     }
 
@@ -253,7 +259,7 @@ class ChatViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 val path = kiriman.fotoWebp?.let { ChatRepository.unggahFoto(userId, it) }
-                val tersimpan = ChatRepository.kirim(kiriman.body, path, kiriman.replyTo?.id)
+                val tersimpan = ChatRepository.kirim(kiriman.body, path, kiriman.replyTo?.id, kiriman.mentions)
                 _state.value = _state.value.copy(
                     tertunda = _state.value.tertunda.filterNot { it.kunci == kiriman.kunci },
                     // Langsung ditempel supaya bubble tidak "hilang sekejap" menunggu
