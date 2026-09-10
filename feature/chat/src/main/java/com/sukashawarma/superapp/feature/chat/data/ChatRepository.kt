@@ -192,9 +192,12 @@ object ChatRepository {
         )
     }
 
-    /** Hapus pesan milik sendiri. RLS menolak diam-diam untuk pesan orang lain. */
-    suspend fun hapus(id: String) {
-        Postgrest.delete(TABLE, listOf("id" to "eq.$id"))
+    /**
+     * Hapus pesan milik sendiri — barisnya TETAP ADA sebagai nisan, isinya yang
+     * dibuang. Lewat RPC, bukan DELETE: lihat migrasi 20300216000000.
+     */
+    suspend fun hapusPesan(id: String) {
+        Postgrest.rpc("chat_hapus_pesan", JsonObject().apply { addProperty("p_id", id) })
     }
 
     /** URL yang bisa dimuat Coil untuk `image_path` ("chat-media/<uid>/<file>.webp").
