@@ -1,0 +1,58 @@
+package com.sukashawarma.superapp.feature.chat.ui
+
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
+import android.os.Build
+import java.io.ByteArrayOutputStream
+
+/**
+ * Kompresi foto chat: sisi terpanjang 1600 px, WebP kualitas 85 — masih tajam
+ * di layar ponsel mana pun tapi biasanya tinggal 100-300 KB. WEBP_LOSSY baru
+ * ada di API 30; di bawah itu konstanta WEBP lama (juga lossy) yang dipakai.
+ */
+object FotoChat {
+    private const val SISI_MAKS = 1600
+    private const val KUALITAS = 85
+
+    fun kompres(context: Context, uri: Uri): ByteArray? {
+        val resolver = context.contentResolver
+
+        // Baca dimensi dulu supaya foto kamera 12 MP tidak di-decode penuh
+        // hanya untuk dikecilkan lagi.
+        val batas = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, batas) } ?: return null
+        if (batas.outWidth <= 0 || batas.outHeight <= 0) return null
+
+        var sampel = 1
+        while (maxOf(batas.outWidth, batas.outHeight) / (sampel * 2) >= SISI_MAKS) sampel *= 2
+
+        val opsi = BitmapFactory.Options().apply { inSampleSize = sampel }
+        val kasar = resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opsi) } ?: return null
+
+        val terpanjang = maxOf(kasar.width, kasar.height)
+        val bitmap = if (terpanjang > SISI_MAKS) {
+            val skala = SISI_MAKS.toFloat() / terpanjang
+            Bitmap.createScaledBitmap(
+                kasar,
+                (kasar.width * skala).toInt().coerceAtLeast(1),
+                (kasar.height * skala).toInt().coerceAtLeast(1),
+                true,
+            ).also { if (it !== kasar) kasar.recycle() }
+        } else {
+            kasar
+        }
+
+        val keluaran = ByteArrayOutputStream()
+        @Suppress("DEPRECATION")
+        val format = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            Bitmap.CompressFormat.WEBP_LOSSY
+        } else {
+            Bitmap.CompressFormat.WEBP
+        }
+        val sukses = bitmap.compress(format, KUALITAS, keluaran)
+        bitmap.recycle()
+        return if (sukses) keluaran.toByteArray() else null
+    }
+}
