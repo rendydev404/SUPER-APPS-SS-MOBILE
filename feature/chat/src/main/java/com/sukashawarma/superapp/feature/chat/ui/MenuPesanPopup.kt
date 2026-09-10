@@ -34,6 +34,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Reply
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Icon
@@ -69,6 +70,7 @@ import androidx.compose.ui.unit.sp
 val EMOJI_REAKSI = listOf("👍", "❤️", "😂", "😮", "😢", "🙏")
 
 private val PutihKartu = Color(0xFFF7F7F8)
+private val AbuIkonMenu = Color(0xFF8E8E93)
 private val TeksAksi = Color(0xFF000000)
 private val MerahAksi = Color(0xFFFF3B30)
 private val GarisAksi = Color(0x1F3C3C43)
@@ -80,6 +82,7 @@ fun MenuPesanPopup(
     bolehHapus: Boolean,
     adaTeks: Boolean,
     onEmoji: (String) -> Unit,
+    onSemuaEmoji: () -> Unit,
     onBalas: () -> Unit,
     onSalin: () -> Unit,
     onHapus: () -> Unit,
@@ -122,10 +125,14 @@ fun MenuPesanPopup(
                 exit = fadeOut(tween(90)) + scaleOut(targetScale = 0.9f),
             ) {
                 Column(horizontalAlignment = if (milikSendiri) Alignment.End else Alignment.Start) {
-                    BarisEmoji(emojiTerpilih) { emoji ->
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onEmoji(emoji)
-                    }
+                    BarisEmoji(
+                        terpilih = emojiTerpilih,
+                        onPilih = { emoji ->
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onEmoji(emoji)
+                        },
+                        onSemuaEmoji = onSemuaEmoji,
+                    )
                     Spacer(Modifier.height(12.dp))
 
                     // Bubble aslinya digambar ulang di sini supaya terlihat
@@ -149,7 +156,7 @@ fun MenuPesanPopup(
 }
 
 @Composable
-private fun BarisEmoji(terpilih: String?, onPilih: (String) -> Unit) {
+private fun BarisEmoji(terpilih: String?, onPilih: (String) -> Unit, onSemuaEmoji: () -> Unit) {
     Row(
         Modifier
             .clip(RoundedCornerShape(26.dp))
@@ -176,6 +183,19 @@ private fun BarisEmoji(terpilih: String?, onPilih: (String) -> Unit) {
             ) {
                 Text(emoji, fontSize = 24.sp)
             }
+        }
+        // Enam pintasan tidak akan pernah cukup; tombol ini membuka papan emoji
+        // yang sama dengan yang dipakai kotak ketik — logika Telegram.
+        Box(
+            Modifier
+                .padding(start = 2.dp)
+                .size(42.dp)
+                .clip(CircleShape)
+                .background(Color(0xFFF0F0F2))
+                .clickable(onClick = onSemuaEmoji),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Filled.Add, "Emoji lainnya", tint = AbuIkonMenu, modifier = Modifier.size(21.dp))
         }
     }
 }
