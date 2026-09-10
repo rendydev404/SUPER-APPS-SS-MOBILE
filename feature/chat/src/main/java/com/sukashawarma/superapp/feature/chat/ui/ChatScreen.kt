@@ -744,7 +744,9 @@ fun ChatScreen(
             MenuPesanPopup(
                 milikSendiri = item.milikSendiri,
                 emojiTerpilih = state.reaksi[pesan.id]?.firstOrNull { it.userId == userId }?.emoji,
-                bolehHapus = item.milikSendiri,
+                // Pengelola grup boleh menghapus pesan siapa pun; server yang
+                // menegakkannya, di sini tombolnya saja yang ikut dibuka.
+                bolehHapus = item.milikSendiri || state.pengelola,
                 // Foto pun boleh disunting — yang berubah keterangannya.
                 bolehSunting = item.milikSendiri &&
                     System.currentTimeMillis() - pesan.createdAtMs <= BATAS_SUNTING_MS,
@@ -778,8 +780,19 @@ fun ChatScreen(
     konfirmasiHapus?.let { pesan ->
         AlertDialog(
             onDismissRequest = { konfirmasiHapus = null },
-            title = { Text("Hapus pesan?") },
-            text = { Text("Pesan dihapus untuk semua orang di ruang ini.") },
+            title = { Text(if (pesan.senderId == userId) "Hapus pesan?" else "Hapus pesan ${pesan.senderName}?") },
+            text = {
+                Text(
+                    if (pesan.senderId == userId) {
+                        "Pesan dihapus untuk semua orang di ruang ini."
+                    } else {
+                        // Dikatakan di muka bahwa namanya akan tertulis di sana.
+                        // Menghapus pesan orang lain diam-diam bukan pilihan yang
+                        // boleh diambil tanpa tahu konsekuensinya.
+                        "Pesan dihapus untuk semua orang, dan nisannya akan menyebut Anda sebagai penghapusnya."
+                    }
+                )
+            },
             confirmButton = {
                 TextButton(onClick = { konfirmasiHapus = null; viewModel.hapus(pesan) }) {
                     Text("Hapus", color = Merah)
@@ -1436,7 +1449,11 @@ private fun Bubble(
         // salah gambar melainkan IndexOutOfBoundsException di Stack.pop, satu
         // frame kemudian, jauh dari tempat kesalahannya.
         if (p.deletedAtMs != null) {
-            NisanPesan(jam = item.jam, diBubbleSendiri = item.milikSendiri)
+            NisanPesan(
+                jam = item.jam,
+                olehPengelola = p.deletedByName,
+                diBubbleSendiri = item.milikSendiri,
+            )
         } else {
             if (p.replyToId != null || p.replyToSnippet != null) {
                 KutipanReply(
@@ -1506,7 +1523,7 @@ private fun Bubble(
  * lagi isinya untuk dirujuk.
  */
 @Composable
-private fun NisanPesan(jam: String, diBubbleSendiri: Boolean) {
+private fun NisanPesan(jam: String, olehPengelola: String?, diBubbleSendiri: Boolean) {
     val warna = if (diBubbleSendiri) Color(0xCCFFFFFF) else TeksSekunder
     val warnaJam = if (diBubbleSendiri) Color(0xB3FFFFFF) else TeksSekunder
     Row(verticalAlignment = Alignment.Bottom) {
@@ -1517,7 +1534,12 @@ private fun NisanPesan(jam: String, diBubbleSendiri: Boolean) {
             modifier = Modifier.padding(end = 5.dp, bottom = 2.dp).size(14.dp),
         )
         Text(
-            "Pesan ini telah dihapus",
+            // Dihapus pengelola dituliskan apa adanya, lengkap dengan namanya.
+            // Moderasi yang tak bernama membuat pengirimnya mengira dirinya
+            // sendiri yang menghapus, dan pembaca lain tidak tahu ada yang
+            // dibersihkan.
+            if (olehPengelola != null) "Pesan ini dihapus oleh $olehPengelola"
+            else "Pesan ini telah dihapus",
             fontSize = 15.sp,
             fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
             color = warna,
