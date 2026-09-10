@@ -18,14 +18,18 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Campaign
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Switch
@@ -52,7 +56,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.sukashawarma.superapp.core.ui.AvatarStorage
+import com.sukashawarma.superapp.core.ui.AvatarStaf
+import com.sukashawarma.superapp.feature.chat.data.AnggotaGrup
 import com.sukashawarma.superapp.feature.chat.data.PengaturanGrup
+import com.sukashawarma.superapp.feature.chat.data.labelRole
 
 /**
  * Info grup bergaya iOS (Settings "inset grouped"): kartu putih membulat di
@@ -75,6 +82,10 @@ fun InfoGrupSheet(
     bolehSunting: Boolean,
     menyimpan: Boolean,
     galat: String?,
+    anggota: List<AnggotaGrup>,
+    memuatAnggota: Boolean,
+    userId: String,
+    onKlikAnggota: (AnggotaGrup) -> Unit,
     onSimpan: (nama: String, deskripsi: String, hanyaAdmin: Boolean, fotoJpeg: ByteArray?, hapusFoto: Boolean) -> Unit,
     onTutup: () -> Unit,
 ) {
@@ -110,6 +121,9 @@ fun InfoGrupSheet(
         Column(
             Modifier
                 .fillMaxWidth()
+                // Daftar anggota membuat lembar ini jauh melampaui tinggi layar;
+                // tanpa gulir, tombol Simpan dan sebagian anggota tak terjangkau.
+                .verticalScroll(rememberScrollState())
                 .imePadding()
                 .navigationBarsPadding()
                 .padding(horizontal = 16.dp)
@@ -194,6 +208,43 @@ fun InfoGrupSheet(
                         isi = if (hanyaAdmin) "Hanya pengelola yang dapat mengirim pesan."
                         else "Semua orang di perusahaan dapat mengirim pesan.",
                     )
+                }
+            }
+
+            Spacer(Modifier.height(18.dp))
+            LabelBagian(
+                if (anggota.isEmpty()) "Anggota" else "${anggota.size} anggota",
+            )
+            Kartu {
+                when {
+                    memuatAnggota && anggota.isEmpty() -> Row(
+                        Modifier.fillMaxWidth().padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        CircularProgressIndicator(
+                            color = BiruIosInfo,
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Text("Memuat anggota…", fontSize = 14.sp, color = AbuInfo)
+                    }
+
+                    anggota.isEmpty() -> Text(
+                        "Daftar anggota belum tersedia.",
+                        fontSize = 14.sp,
+                        color = AbuInfo,
+                        modifier = Modifier.padding(14.dp),
+                    )
+
+                    else -> anggota.forEachIndexed { i, a ->
+                        if (i > 0) PemisahAnggota()
+                        BarisAnggota(
+                            anggota = a,
+                            akuSendiri = a.id == userId,
+                            onKlik = { onKlikAnggota(a) },
+                        )
+                    }
                 }
             }
 
@@ -291,6 +342,70 @@ private fun FotoGrupBesar(
             }
         }
     }
+}
+
+/**
+ * Satu baris anggota, bentuk daftar iOS: foto, nama, keterangan tipis di
+ * bawahnya, dan chevron di ujung yang menandakan barisnya bisa dibuka.
+ */
+@Composable
+private fun BarisAnggota(anggota: AnggotaGrup, akuSendiri: Boolean, onKlik: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onKlik)
+            .padding(horizontal = 14.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AvatarStaf(
+            path = anggota.avatar,
+            nama = anggota.nama,
+            modifier = Modifier.size(38.dp),
+            ukuranHuruf = 15.sp,
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    anggota.nama,
+                    fontSize = 15.sp,
+                    color = Color.Black,
+                    maxLines = 1,
+                )
+                if (akuSendiri) {
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        "Anda",
+                        fontSize = 10.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = BiruIosInfo,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color(0x1F007AFF))
+                            .padding(horizontal = 5.dp, vertical = 1.dp),
+                    )
+                }
+            }
+            Text(
+                listOfNotNull(labelRole(anggota.role), anggota.outlet?.takeIf { it.isNotBlank() })
+                    .joinToString(" · "),
+                fontSize = 12.sp,
+                color = AbuInfo,
+                maxLines = 1,
+            )
+        }
+        Icon(
+            Icons.Filled.ChevronRight,
+            null,
+            tint = Color(0xFFC7C7CC),
+            modifier = Modifier.size(18.dp),
+        )
+    }
+}
+
+@Composable
+private fun PemisahAnggota() {
+    Box(Modifier.fillMaxWidth().padding(start = 64.dp).height(0.5.dp).background(PemisahInfo))
 }
 
 @Composable
