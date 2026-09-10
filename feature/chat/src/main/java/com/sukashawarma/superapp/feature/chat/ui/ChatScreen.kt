@@ -66,6 +66,7 @@ import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.filled.AlternateEmail
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Edit
@@ -1205,6 +1206,10 @@ private fun BarisBubble(
     disorot: Boolean,
 ) {
     val p = item.pesan
+    // Nisan tidak bisa dibalas, ditanggapi, disalin, atau disunting — tidak ada
+    // lagi isinya untuk diperlakukan begitu. Gestur dan menunya dimatikan di
+    // sini, bukan disembunyikan satu per satu di dalam menu.
+    val terhapus = p.deletedAtMs != null
     val haptic = LocalHapticFeedback.current
 
     var geser by remember { mutableStateOf(0f) }
@@ -1216,7 +1221,7 @@ private fun BarisBubble(
         Modifier
             .fillMaxWidth()
             .padding(vertical = if (item.posisi == PosisiGrup.TENGAH || item.posisi == PosisiGrup.AKHIR) 1.dp else 3.dp)
-            .pointerInput(p.id) {
+            .then(if (terhapus) Modifier else Modifier.pointerInput(p.id) {
                 detectHorizontalDragGestures(
                     onDragEnd = {
                         if (geser >= ambang) onBalas(p)
@@ -1233,7 +1238,7 @@ private fun BarisBubble(
                         sudahHaptic = true
                     }
                 }
-            },
+            }),
     ) {
         // Ikon balas yang muncul di belakang selama digeser.
         Icon(
@@ -1286,14 +1291,14 @@ private fun BarisBubble(
                     // sehingga tekan-lama di atasnya tidak lagi sampai ke
                     // `combinedClickable` di bawah ini. Jalur itu karena itu
                     // diteruskan langsung ke bubble.
-                    onTekanLama = { onTekanLama(p) },
+                    onTekanLama = { if (!terhapus) onTekanLama(p) },
                     disorot = disorot,
-                    modifier = Modifier.combinedClickable(
+                    modifier = if (terhapus) Modifier else Modifier.combinedClickable(
                         onClick = {},
                         onLongClick = { onTekanLama(p) },
                     ),
                 )
-                if (reaksi.isNotEmpty()) {
+                if (reaksi.isNotEmpty() && !terhapus) {
                     KepingReaksi(
                         reaksi = reaksi,
                         userId = userId,
@@ -1421,6 +1426,35 @@ private fun Bubble(
                 color = warnaNama(p.senderId),
                 modifier = Modifier.padding(bottom = 2.dp),
             )
+        }
+
+        // NISAN. Kutipan, foto, sebutan, dan penanda "diedit" semuanya
+        // dilewati: yang tersisa dari pesan ini memang tinggal keterangan bahwa
+        // ia pernah ada.
+        if (p.deletedAtMs != null) {
+            Row(verticalAlignment = Alignment.Bottom) {
+                Icon(
+                    Icons.Filled.Block,
+                    null,
+                    tint = if (item.milikSendiri) Color(0xB3FFFFFF) else TeksSekunder,
+                    modifier = Modifier.padding(end = 5.dp, bottom = 2.dp).size(14.dp),
+                )
+                Text(
+                    "Pesan ini telah dihapus",
+                    fontSize = 15.sp,
+                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                    color = if (item.milikSendiri) Color(0xCCFFFFFF) else TeksSekunder,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    item.jam,
+                    fontSize = 10.5.sp,
+                    color = if (item.milikSendiri) Color(0xB3FFFFFF) else TeksSekunder,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+            return@Column
         }
 
         if (p.replyToId != null || p.replyToSnippet != null) {
