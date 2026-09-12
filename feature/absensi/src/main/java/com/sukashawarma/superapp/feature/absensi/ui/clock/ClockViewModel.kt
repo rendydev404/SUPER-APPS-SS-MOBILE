@@ -513,6 +513,8 @@ class ClockViewModel(
         addProperty("ts_client", tsClientIso)
         addProperty("from_queue", attemptCount > 0)
         addProperty("is_manual_button", isManualButton)
+        // Retry offline dikirim lewat endpoint web, tetapi asal kejadian tetap HP native.
+        addProperty("source", "native")
     }
 
     private fun setResult(ok: Boolean, message: String, phase: ClockPhase) {
