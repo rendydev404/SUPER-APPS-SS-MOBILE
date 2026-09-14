@@ -11,6 +11,10 @@ import com.sukashawarma.superapp.feature.absensi.notif.AbsenReminder
 import com.sukashawarma.superapp.feature.distribusi.data.VerifikasiDraftStore
 import com.sukashawarma.superapp.notif.FcmTokenRegistrar
 import com.sukashawarma.superapp.notif.SuperappMessagingService
+import com.sukashawarma.superapp.data.location.LocationTrackingPrefs
+import com.sukashawarma.superapp.data.remote.SessionTokenHolder
+import com.sukashawarma.superapp.core.update.AppUpdateManager
+import com.sukashawarma.superapp.core.update.UpdateRealtimeManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -28,6 +32,11 @@ class SuperappApplication : Application() {
         VerifikasiDraftStore.init(this)
         SupabaseClient.onRefreshNeeded = { AuthSessionManager.refresh() }
         NetworkMonitor.init(this)
+
+        // Inisialisasi Update Manager dan WebSocket Realtime untuk update otomatis
+        AppUpdateManager.initialize(this)
+        UpdateRealtimeManager.start()
+
         // Sesi habis / logout: pelacakan lokasi kehilangan `outlet_staff_id` tujuannya,
         // jadi harus mati bersama sesi, bukan menunggu user mematikannya manual.
         AppSession.onSignOut = { LocationTracking.stop(this) }
@@ -57,6 +66,13 @@ class SuperappApplication : Application() {
                 .distinctUntilChangedBy { it.id }
                 .collect { staf ->
                     FcmTokenRegistrar.daftarkan(applicationContext, staf.id, staf.outletId)
+                    LocationTrackingPrefs.saveSession(
+                        applicationContext,
+                        staf.id,
+                        staf.outletId,
+                        SessionTokenHolder.accessToken,
+                        SessionTokenHolder.refreshToken
+                    )
                 }
         }
     }

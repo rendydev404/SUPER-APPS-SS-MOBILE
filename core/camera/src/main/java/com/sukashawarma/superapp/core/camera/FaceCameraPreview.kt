@@ -64,7 +64,8 @@ fun FaceCameraPreview(
         }
 
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
-        val executor = ContextCompat.getMainExecutor(context)
+        val mainExecutor = ContextCompat.getMainExecutor(context)
+        val analysisExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
         var disposed = false
 
         cameraProviderFuture.addListener({
@@ -79,7 +80,7 @@ fun FaceCameraPreview(
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                     .build()
                     .also {
-                        it.setAnalyzer(executor, FaceDetectionAnalyzer(
+                        it.setAnalyzer(analysisExecutor, FaceDetectionAnalyzer(
                             needsCrop = { currentNeedsCrop() },
                             onResult = { frame -> currentOnFrame(frame) }
                         ))
@@ -99,10 +100,11 @@ fun FaceCameraPreview(
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to bind camera to lifecycle", e)
             }
-        }, executor)
+        }, mainExecutor)
 
         onDispose {
             disposed = true
+            analysisExecutor.shutdown()
             try {
                 val cameraProvider = ProcessCameraProvider.getInstance(context).get()
                 cameraProvider.unbindAll()

@@ -18,3 +18,5 @@ local.properties
 *.log
 .codegraph/
 stitch-reference/
+*.fbf
+/*.png

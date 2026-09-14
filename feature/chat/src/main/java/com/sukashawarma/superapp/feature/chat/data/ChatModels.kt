@@ -66,11 +66,13 @@ data class ReaksiPesan(
 /** Pengaturan grup, baris tunggal `chat_settings`. */
 data class PengaturanGrup(
     val namaGrup: String = "Chat Tim",
-    val deskripsi: String = "Ruang obrolan seluruh tim. Pesan hilang setelah 24 jam.",
+    val deskripsi: String = "Ruang obrolan seluruh tim. Pesan terhapus otomatis setiap 03:00 AM.",
     val hanyaAdmin: Boolean = false,
     val diubahOleh: String? = null,
     /** Path objek di bucket `avatars` — bukan `chat-media`, yang disapu tiap jam. */
     val fotoGrup: String? = null,
+    /** ID wallpaper pilihan. Bawaan "default" (latar putih polos). */
+    val wallpaper: String = "default",
 )
 
 fun parseReaksi(o: JsonObject): ReaksiPesan? {
@@ -91,6 +93,7 @@ fun parsePengaturan(o: JsonObject): PengaturanGrup {
         hanyaAdmin = o.get("hanya_admin")?.takeIf { !it.isJsonNull }?.asBoolean ?: false,
         diubahOleh = teks("diubah_oleh"),
         fotoGrup = teks("foto_grup"),
+        wallpaper = teks("wallpaper")?.ifBlank { null } ?: "default",
     )
 }
 
@@ -149,7 +152,13 @@ data class AnggotaGrup(
     val avatar: String?,
     val role: String?,
     val outlet: String?,
-)
+) {
+    /**
+     * Nama yang tampil ke layar: username jika diisi, atau nama resmi bila kosong.
+     */
+    val namaTampil: String
+        get() = username?.takeIf { it.isNotBlank() } ?: nama
+}
 
 fun parseAnggota(o: JsonObject): AnggotaGrup? {
     fun teks(k: String): String? = o.get(k)?.takeIf { !it.isJsonNull }?.asString

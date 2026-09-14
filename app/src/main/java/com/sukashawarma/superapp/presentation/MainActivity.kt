@@ -54,6 +54,11 @@ import com.sukashawarma.superapp.feature.chat.ui.ChatScreen
 import com.sukashawarma.superapp.feature.profil.ui.ProfilScreen
 import com.sukashawarma.superapp.presentation.mitra.MitraNoProfileScreen
 import com.sukashawarma.superapp.presentation.theme.SukaSuperappTheme
+import androidx.compose.ui.platform.LocalContext
+import com.sukashawarma.superapp.core.update.AppUpdateManager
+import com.sukashawarma.superapp.core.update.ui.AppUpdateIndicator
+import com.sukashawarma.superapp.core.update.ui.AppUpdateSuccessIndicator
+import com.sukashawarma.superapp.core.update.ui.DraggableUpdateOverlay
 import kotlinx.coroutines.launch
 
 object Routes {
@@ -76,6 +81,7 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         bacaTujuanNotifikasi(intent)
+        handleInstallStatus(intent)
         setContent {
             SukaSuperappTheme {
                 RootNav()
@@ -92,20 +98,42 @@ class MainActivity : FragmentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         bacaTujuanNotifikasi(intent)
+        handleInstallStatus(intent)
+    }
+
+    private fun handleInstallStatus(intent: Intent?) {
+        if (intent == null || !intent.hasExtra(android.content.pm.PackageInstaller.EXTRA_STATUS)) return
+        val status = intent.getIntExtra(
+            android.content.pm.PackageInstaller.EXTRA_STATUS,
+            android.content.pm.PackageInstaller.STATUS_FAILURE
+        )
+        if (status == android.content.pm.PackageInstaller.STATUS_PENDING_USER_ACTION) {
+            val confirmIntent = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                intent.getParcelableExtra(Intent.EXTRA_INTENT)
+            }
+            if (confirmIntent != null) {
+                confirmIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                startActivity(confirmIntent)
+            }
+        } else if (status == android.content.pm.PackageInstaller.STATUS_SUCCESS) {
+            com.sukashawarma.superapp.core.update.AppUpdateManager.onUpdateSuccessfullyApplied()
+        } else {
+            com.sukashawarma.superapp.core.update.AppUpdateManager.handleInstallStatus(applicationContext, intent)
+        }
     }
 
     private fun bacaTujuanNotifikasi(intent: Intent?) {
         NotifikasiTujuan.set(intent?.getStringExtra(NotifikasiTujuan.EXTRA_RUTE))
     }
 
-    /** Mengunci ulang aplikasi ketika Activity benar-benar ditutup, termasuk saat task
-     * dihapus dari Recent Apps. Credential biometrik tetap dipertahankan oleh AuthPrefs;
-     * recreate karena rotasi tidak dianggap logout. */
-    override fun onDestroy() {
-        if (isFinishing && !isChangingConfigurations) {
-            AppSession.signOut()
-        }
-        super.onDestroy()
+    override fun onResume() {
+        super.onResume()
+        val nm = getSystemService(android.content.Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
+        nm?.cancel(com.sukashawarma.superapp.core.update.AppUpdateRelaunchReceiver.NOTIFICATION_ID)
+        com.sukashawarma.superapp.core.update.AppUpdateManager.resumeAfterInstallPermission(this)
     }
 }
 
@@ -117,8 +145,22 @@ private fun RootNav() {
     val mitraProfile by AppSession.mitraProfile.collectAsState()
     val mitraLoadFailed by AppSession.mitraLoadFailed.collectAsState()
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
+    val updateManifest by AppUpdateManager.availableUpdate.collectAsState()
+    val updateDownloadState by AppUpdateManager.downloadState.collectAsState()
+    val updateDownloadPayload by AppUpdateManager.downloadPayload.collectAsState()
+    val updateDownloadPayloadSize by AppUpdateManager.downloadPayloadSizeBytes.collectAsState()
+    val updateDownloadProgress by AppUpdateManager.downloadProgress.collectAsState()
+    val recentlyInstalledVersion by AppUpdateManager.recentlyInstalledVersion.collectAsState()
 
+    // Otomatis terapkan update begitu siap dipasang tanpa harus diklik user
+    LaunchedEffect(updateDownloadState) {
+        if (updateDownloadState == AppUpdateManager.DownloadState.READY_TO_INSTALL) {
+            kotlinx.coroutines.delay(1200)
+            AppUpdateManager.installDownloadedApk(context)
+        }
+    }
 
     if (loading) {
         Box(
@@ -177,95 +219,130 @@ private fun RootNav() {
         navController.navigate(Routes.MANAGER)
     }
 
-    NavHost(navController = navController, startDestination = routeFor(destination)) {
-        // Didaftarkan di luar percabangan mitra: profil adalah satu-satunya halaman
-        // yang berlaku untuk SETIAP pemegang akun, termasuk mitra. Menaruhnya di
-        // cabang non-mitra saja akan membuat navigate("profil") dari dashboard mitra
-        // melempar IllegalArgumentException karena rutenya tidak ada di graph itu.
-        composable(Routes.PROFIL) {
-            ProfilScreen(onExit = { navController.popBackStack() })
-        }
+    Box(modifier = Modifier.fillMaxSize()) {
+        NavHost(navController = navController, startDestination = routeFor(destination)) {
+            // Didaftarkan di luar percabangan mitra: profil adalah satu-satunya halaman
+            // yang berlaku untuk SETIAP pemegang akun, termasuk mitra. Menaruhnya di
+            // cabang non-mitra saja akan membuat navigate("profil") dari dashboard mitra
+            // melempar IllegalArgumentException karena rutenya tidak ada di graph itu.
+            composable(Routes.PROFIL) {
+                ProfilScreen(onExit = { navController.popBackStack() })
+            }
 
-        // Chat Tim juga berlaku untuk setiap pemegang akun — alasan penempatan
-        // yang sama dengan PROFIL di atas.
-        composable(Routes.CHAT) {
-            // Membuka ruangnya berarti pesannya sudah terbaca; notifikasi
-            // percakapan yang masih menggantung ditutup di sini.
-            val konteks = androidx.compose.ui.platform.LocalContext.current
-            LaunchedEffect(Unit) { ChatNotifikasi.tutup(konteks) }
-            ChatScreen(onBack = { navController.popBackStack() })
-        }
+            // Chat Tim juga berlaku untuk setiap pemegang akun — alasan penempatan
+            // yang sama dengan PROFIL di atas.
+            composable(Routes.CHAT) {
+                // Membuka ruangnya berarti pesannya sudah terbaca; notifikasi
+                // percakapan yang masih menggantung ditutup di sini.
+                val konteks = androidx.compose.ui.platform.LocalContext.current
+                LaunchedEffect(Unit) { ChatNotifikasi.tutup(konteks) }
+                ChatScreen(onBack = { navController.popBackStack() })
+            }
 
-        composable(Routes.LOGIN) {
-            // Sengaja TIDAK navigate() di sini. Saat callback ini jalan, recomposition
-            // belum sempat berjalan, jadi graph di NavController MASIH graph sesi-kosong
-            // (tanpa rute mitra) dan navigate("mitra") akan melempar IllegalArgumentException.
-            // Begitu AppSession terisi, `destination` + `isMitra` berubah, NavHost menyusun
-            // graph baru, dan setGraph memindahkan sendiri ke start destination yang baru.
-            LoginScreen(onLoggedIn = {})
-        }
+            composable(Routes.LOGIN) {
+                // Sengaja TIDAK navigate() di sini. Saat callback ini jalan, recomposition
+                // belum sempat berjalan, jadi graph di NavController MASIH graph sesi-kosong
+                // (tanpa rute mitra) dan navigate("mitra") akan melempar IllegalArgumentException.
+                // Begitu AppSession terisi, `destination` + `isMitra` berubah, NavHost menyusun
+                // graph baru, dan setGraph memindahkan sendiri ke start destination yang baru.
+                LoginScreen(onLoggedIn = {})
+            }
 
-        if (isMitra) {
-            // HOME, ABSENSI & STOK sengaja TIDAK didaftarkan untuk mitra — tak ada jalan ke
-            // sana lewat Back maupun deep link. Cermin route-guard web (RoleContext.tsx).
-            composable(Routes.MITRA) {
-                MitraDashboardScaffold(
-                    onOpenProfil = { navController.navigate(Routes.PROFIL) },
-                    onLoggedOut = {
+            if (isMitra) {
+                // HOME, ABSENSI & STOK sengaja TIDAK didaftarkan untuk mitra — tak ada jalan ke
+                // sana lewat Back maupun deep link. Cermin route-guard web (RoleContext.tsx).
+                composable(Routes.MITRA) {
+                    MitraDashboardScaffold(
+                        onOpenProfil = { navController.navigate(Routes.PROFIL) },
+                        onLoggedOut = {
+                            navController.navigate(Routes.LOGIN) { popUpTo(0) }
+                        },
+                    )
+                }
+                composable(Routes.MITRA_NO_PROFILE) {
+                    MitraNoProfileScreen(onLoggedOut = {
                         navController.navigate(Routes.LOGIN) { popUpTo(0) }
-                    },
+                    })
+                }
+                composable(Routes.MITRA_LOAD_ERROR) {
+                    MitraLoadErrorScreen(
+                        onRetry = { scope.launch { AppSession.retryLoadMitraProfile() } },
+                        onLoggedOut = {
+                            navController.navigate(Routes.LOGIN) { popUpTo(0) }
+                        },
+                    )
+                }
+            } else {
+                composable(Routes.HOME) {
+                    HomeScreen(
+                        onOpenAbsensi = { navController.navigate(Routes.ABSENSI) },
+                        onOpenStok = { navController.navigate(Routes.STOK) },
+                        onOpenDistribusi = { navController.navigate(Routes.DISTRIBUSI) },
+                        onOpenManager = { navController.navigate(Routes.MANAGER) },
+                        onOpenLeader = { navController.navigate(Routes.LEADER) },
+                        onOpenChat = { navController.navigate(Routes.CHAT) },
+                        onOpenSettings = { navController.navigate(Routes.SETTINGS) },
+                        onOpenProfil = { navController.navigate(Routes.PROFIL) },
+                        onLoggedOut = { navController.navigate(Routes.LOGIN) { popUpTo(0) } }
+                    )
+                }
+                composable(Routes.SETTINGS) {
+                    SettingsScreen(onBack = { navController.popBackStack() })
+                }
+                composable(Routes.ABSENSI) {
+                    AbsensiNavGraph(onExit = { navController.popBackStack() })
+                }
+                composable(Routes.STOK) {
+                    StokNavGraph(onExit = { navController.popBackStack() })
+                }
+                composable(Routes.DISTRIBUSI) {
+                    DistribusiNavGraph(onExit = { navController.popBackStack() })
+                }
+                composable(Routes.LEADER) {
+                    LeaderNavGraph(onExit = { navController.popBackStack() })
+                }
+                composable(Routes.MANAGER) {
+                    ManagerNavGraph(
+                        onExit = { navController.popBackStack() },
+                        tujuanAwal = tujuanManager,
+                    )
+                    // Dikosongkan setelah dipakai supaya membuka modul Manager lewat
+                    // Beranda tetap mendarat di Overview seperti biasa.
+                    LaunchedEffect(Unit) { tujuanManager = null }
+                }
+            }
+        }
+
+        // Overlay update non-intrusif di atas seluruh navigasi
+        if (recentlyInstalledVersion != null) {
+            DraggableUpdateOverlay {
+                AppUpdateSuccessIndicator(
+                    versionName = recentlyInstalledVersion!!,
+                    onDismiss = { AppUpdateManager.acknowledgeRecentInstall(context) }
                 )
             }
-            composable(Routes.MITRA_NO_PROFILE) {
-                MitraNoProfileScreen(onLoggedOut = {
-                    navController.navigate(Routes.LOGIN) { popUpTo(0) }
-                })
-            }
-            composable(Routes.MITRA_LOAD_ERROR) {
-                MitraLoadErrorScreen(
-                    onRetry = { scope.launch { AppSession.retryLoadMitraProfile() } },
-                    onLoggedOut = {
-                        navController.navigate(Routes.LOGIN) { popUpTo(0) }
-                    },
+        } else updateManifest?.let { manifest ->
+            DraggableUpdateOverlay {
+                AppUpdateIndicator(
+                    manifest = manifest,
+                    downloadState = updateDownloadState,
+                    downloadPayload = updateDownloadPayload,
+                    downloadPayloadSizeBytes = updateDownloadPayloadSize,
+                    downloadProgress = updateDownloadProgress,
+                    onAction = {
+                        when (updateDownloadState) {
+                            AppUpdateManager.DownloadState.IDLE,
+                            AppUpdateManager.DownloadState.FAILED ->
+                                AppUpdateManager.startDownload(context, manifest)
+                            AppUpdateManager.DownloadState.READY_TO_INSTALL ->
+                                AppUpdateManager.installDownloadedApk(context)
+                            AppUpdateManager.DownloadState.AWAITING_USER_ACTION ->
+                                AppUpdateManager.continueInstallWithUserAction(context)
+                            AppUpdateManager.DownloadState.DOWNLOADING,
+                            AppUpdateManager.DownloadState.INSTALLING -> Unit
+                        }
+                    }
                 )
-            }
-        } else {
-            composable(Routes.HOME) {
-                HomeScreen(
-                    onOpenAbsensi = { navController.navigate(Routes.ABSENSI) },
-                    onOpenStok = { navController.navigate(Routes.STOK) },
-                    onOpenDistribusi = { navController.navigate(Routes.DISTRIBUSI) },
-                    onOpenManager = { navController.navigate(Routes.MANAGER) },
-                    onOpenLeader = { navController.navigate(Routes.LEADER) },
-                    onOpenChat = { navController.navigate(Routes.CHAT) },
-                    onOpenSettings = { navController.navigate(Routes.SETTINGS) },
-                    onOpenProfil = { navController.navigate(Routes.PROFIL) },
-                    onLoggedOut = { navController.navigate(Routes.LOGIN) { popUpTo(0) } }
-                )
-            }
-            composable(Routes.SETTINGS) {
-                SettingsScreen(onBack = { navController.popBackStack() })
-            }
-            composable(Routes.ABSENSI) {
-                AbsensiNavGraph(onExit = { navController.popBackStack() })
-            }
-            composable(Routes.STOK) {
-                StokNavGraph(onExit = { navController.popBackStack() })
-            }
-            composable(Routes.DISTRIBUSI) {
-                DistribusiNavGraph(onExit = { navController.popBackStack() })
-            }
-            composable(Routes.LEADER) {
-                LeaderNavGraph(onExit = { navController.popBackStack() })
-            }
-            composable(Routes.MANAGER) {
-                ManagerNavGraph(
-                    onExit = { navController.popBackStack() },
-                    tujuanAwal = tujuanManager,
-                )
-                // Dikosongkan setelah dipakai supaya membuka modul Manager lewat
-                // Beranda tetap mendarat di Overview seperti biasa.
-                LaunchedEffect(Unit) { tujuanManager = null }
             }
         }
     }

@@ -116,7 +116,7 @@ private enum class TabStok(
     NILAI_PERSEDIAAN("Nilai Stok", "Nilai Persediaan", Icons.Default.Savings),
     HPP_MENU("HPP Menu", "HPP Setiap Menu", Icons.Default.Calculate),
     LAPORAN_PENJUALAN("Penjualan", "Laporan Penjualan", Icons.Default.TrendingUp),
-    PLAFON("Plafon", "Plafon & Belanja Outlet", Icons.Default.AccountBalanceWallet),
+    PLAFON("Plafon & Belanja", "Plafon & Belanja Outlet", Icons.Default.AccountBalanceWallet),
     ARUS_BARANG("In/Out", "Inbound / Outbound", Icons.Default.ImportExport),
     THRESHOLD("Threshold", "Pengaturan Threshold", Icons.Default.Tune),
 }
@@ -165,12 +165,12 @@ private fun tujuanUntukPeran(): List<TabStok> {
         add(TabStok.PERSETUJUAN_OPNAME)
         if (bolehHarga) add(TabStok.HARGA)
 
-        // Kelompok "ANALISIS & LAPORAN" web, urutannya mengikuti AppSidebar.tsx.
+        // Kelompok "ANALISIS & LAPORAN" web, urutannya mengikuti AppSidebar.tsx & BottomNav.
         // Tiap menu punya daftar peran sendiri — lihat StokAkses.
+        if (StokAkses.melihatPlafonBelanja(role)) add(TabStok.PLAFON)
         if (StokAkses.melihatNilaiPersediaan(role)) add(TabStok.NILAI_PERSEDIAAN)
         if (StokAkses.melihatHppMenu(role)) add(TabStok.HPP_MENU)
         if (StokAkses.melihatLaporanPenjualan(role)) add(TabStok.LAPORAN_PENJUALAN)
-        if (StokAkses.melihatPlafonBelanja(role)) add(TabStok.PLAFON)
         if (StokAkses.melihatInboundOutbound(role)) add(TabStok.ARUS_BARANG)
         if (StokAkses.melihatThreshold(role)) add(TabStok.THRESHOLD)
     }
@@ -284,7 +284,7 @@ fun StokShell(
                     else KeadaanTidakBerhak("Laporan penjualan hanya untuk kantor dan gudang pusat.")
                 TabStok.PLAFON ->
                     if (StokAkses.melihatPlafonBelanja(peran)) PlafonBelanjaScreen(onBack = { tab = tabs.first() })
-                    else KeadaanTidakBerhak("Plafon belanja hanya untuk kantor dan gudang pusat.")
+                    else KeadaanTidakBerhak("Plafon belanja hanya untuk pimpinan, pengawas, dan kantor pusat.")
                 TabStok.ARUS_BARANG ->
                     if (StokAkses.melihatInboundOutbound(peran)) ArusBarangScreen(onBack = { tab = tabs.first() })
                     else KeadaanTidakBerhak("Arus barang hanya untuk staff gudang pusat.")
@@ -319,11 +319,11 @@ private val KELOMPOK_MENU_STOK = listOf(
         TabStok.PERSETUJUAN_OPNAME,
     ),
     "Analisis & Laporan" to listOf(
+        TabStok.PLAFON,
         TabStok.HARGA,
         TabStok.NILAI_PERSEDIAAN,
         TabStok.HPP_MENU,
         TabStok.LAPORAN_PENJUALAN,
-        TabStok.PLAFON,
         TabStok.ARUS_BARANG,
         TabStok.THRESHOLD,
     ),

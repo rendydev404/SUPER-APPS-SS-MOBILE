@@ -40,17 +40,8 @@ data class AttendanceOutletsUiState(
 }
 
 /** Jarak dalam teks pendek — cermin `formatDistanceMeters(m, true)` di web. */
-fun formatDistanceShort(meters: Double): String = if (meters >= 1000) {
-    val km = meters / 1000.0
-    "${trimZero(km)}km"
-} else {
-    "${trimZero(meters)}m"
-}
+fun formatDistanceShort(meters: Double): String = GpsMath.formatDistanceShort(meters)
 
-private fun trimZero(value: Double): String {
-    val text = String.format(java.util.Locale.US, "%.1f", value)
-    return text.removeSuffix(".0")
-}
 
 /**
  * Role yang boleh absen di outlet mana pun meski `staff_outlets` cuma berisi satu baris —

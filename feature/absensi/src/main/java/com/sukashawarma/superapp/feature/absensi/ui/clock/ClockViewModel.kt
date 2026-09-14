@@ -25,10 +25,15 @@ import com.sukashawarma.superapp.domain.model.ClockPhase
 import com.sukashawarma.superapp.domain.model.ClockResult
 import com.sukashawarma.superapp.domain.usecase.AttendanceGates
 import com.sukashawarma.superapp.domain.usecase.NextAction
+import com.sukashawarma.superapp.feature.absensi.usecase.SubmitAttendanceUseCase
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import java.io.File
 import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
@@ -61,8 +66,20 @@ class ClockViewModel(
     val state: StateFlow<ClockUiState> = _state
 
     private var livenessDetector: LivenessDetector? = null
+    private var livenessTimeoutJob: Job? = null
+    private val flushMutex = Mutex()
     private var pendingManualButton = false
     private var geofenceRadiusM = GpsMath.GEOFENCE_RADIUS_M
+
+    private fun startLivenessTimeout() {
+        livenessTimeoutJob?.cancel()
+        livenessTimeoutJob = viewModelScope.launch {
+            delay(15000L)
+            if (_state.value.phase == ClockPhase.LIVENESS) {
+                showCameraGuidance("Waktu verifikasi habis. Silakan coba kembali.")
+            }
+        }
+    }
 
     init {
         checkLocation()
@@ -193,13 +210,13 @@ class ClockViewModel(
             return
         }
         if (!GpsMath.isGpsAccuracyAcceptable(fix.accuracyM)) {
-            setResult(false, "Akurasi GPS terlalu rendah (${fix.accuracyM.toInt()} m). Aktifkan Lokasi Akurat.", ClockPhase.LOCATION_INVALID)
+            setResult(false, "Akurasi GPS terlalu rendah (${GpsMath.formatDistance(fix.accuracyM.toDouble())}). Aktifkan Lokasi Akurat.", ClockPhase.LOCATION_INVALID)
             return
         }
         val dist = GpsMath.haversineMeters(outletCoords, deviceCoords)
         _state.value = _state.value.copy(gpsDistanceM = dist)
         if (!GpsMath.isWithinGeofence(outletCoords, deviceCoords, fix.accuracyM, geofenceRadiusM)) {
-            setResult(false, "Di luar jangkauan (jarak ${dist.toInt()} m). Silakan mendekat ke area kasir.", ClockPhase.LOCATION_INVALID)
+            setResult(false, "Di luar jangkauan (jarak ${GpsMath.formatDistance(dist)}). Silakan mendekat ke area kasir.", ClockPhase.LOCATION_INVALID)
             return
         }
         // Terkunci: siklus clock-in/out berikutnya di sesi ini tidak perlu menampilkan
@@ -273,13 +290,13 @@ class ClockViewModel(
     }
 
     private suspend fun proceedAfterIdentified(staffId: String, staffName: String) {
-        val next = AttendanceGates.decideAction(staffId)
+        val next = AttendanceGates.decideAction(staffId, db.pendingAttendanceDao())
         if (next == NextAction.DONE) {
             setResult(true, "$staffName sudah absen masuk & keluar hari ini", ClockPhase.RESULT)
             scheduleReset(2500)
             return
         }
-        if (next == NextAction.OUT) {
+        if (next == NextAction.OUT && NetworkMonitor.isOnline.value) {
             checkoutBlockMessage()?.let { message ->
                 setResult(false, message, ClockPhase.RESULT)
                 scheduleReset(3500)
@@ -295,6 +312,7 @@ class ClockViewModel(
         )
         delay(900)
         _state.value = _state.value.copy(phase = ClockPhase.LIVENESS)
+        startLivenessTimeout()
     }
 
     /** Dipanggil per-frame saat phase LIVENESS. Throttle (~5 FPS) di sisi pemanggil. */
@@ -316,6 +334,7 @@ class ClockViewModel(
         val passed = detector.feed(FaceSignal(frame.signal.yawDeg, frame.signal.faceCount))
         if (!passed) return
 
+        livenessTimeoutJob?.cancel()
         busy.set(true)
         viewModelScope.launch {
             try {
@@ -331,7 +350,11 @@ class ClockViewModel(
     fun doSubmitManual(staffId: String, staffName: String) {
         if (busy.get()) return
         val phase = _state.value.phase
-        if (phase != ClockPhase.IDLE && phase != ClockPhase.RESULT && phase != ClockPhase.LOCATING) return
+        if (phase != ClockPhase.IDLE && phase != ClockPhase.RESULT) return
+        if (_state.value.outletCoords != null && _state.value.deviceCoords == null) {
+            setResult(false, "Menunggu koordinat GPS perangkat. Pastikan GPS aktif.", ClockPhase.LOCATION_INVALID)
+            return
+        }
         busy.set(true)
         viewModelScope.launch {
             try {
@@ -343,13 +366,13 @@ class ClockViewModel(
     }
 
     private suspend fun proceedManualAfterIdentified(staffId: String, staffName: String) {
-        val next = AttendanceGates.decideAction(staffId)
+        val next = AttendanceGates.decideAction(staffId, db.pendingAttendanceDao())
         if (next == NextAction.DONE) {
             setResult(true, "$staffName sudah absen masuk & keluar hari ini", ClockPhase.RESULT)
             scheduleReset(2500)
             return
         }
-        if (next == NextAction.OUT) {
+        if (next == NextAction.OUT && NetworkMonitor.isOnline.value) {
             checkoutBlockMessage()?.let { message ->
                 setResult(false, message, ClockPhase.RESULT)
                 scheduleReset(3500)
@@ -409,7 +432,18 @@ class ClockViewModel(
         )
 
         if (!NetworkMonitor.isOnline.value) {
-            db.pendingAttendanceDao().insert(entity)
+            val localPath = jpegBytes?.let { bytes ->
+                try {
+                    val dir = File(getApplication<Application>().cacheDir, "offline_selfies")
+                    if (!dir.exists()) dir.mkdirs()
+                    val file = File(dir, "$id.jpg")
+                    file.writeBytes(bytes)
+                    file.absolutePath
+                } catch (_: Exception) {
+                    null
+                }
+            }
+            db.pendingAttendanceDao().insert(entity.copy(selfiePath = localPath))
             setResult(true, if (s.action == "in") "Selamat bekerja! (Offline)" else "Hati-hati di jalan! (Offline)", ClockPhase.RESULT)
             scheduleReset(2500)
             return
@@ -425,9 +459,20 @@ class ClockViewModel(
             }
         }
         val res = try {
-            com.sukashawarma.superapp.feature.absensi.usecase.SubmitAttendanceUseCase(entity.copy(selfiePath = selfiePath))
+            SubmitAttendanceUseCase(entity.copy(selfiePath = selfiePath))
         } catch (e: Exception) {
-            db.pendingAttendanceDao().insert(entity)
+            val localPath = jpegBytes?.let { bytes ->
+                try {
+                    val dir = File(getApplication<Application>().cacheDir, "offline_selfies")
+                    if (!dir.exists()) dir.mkdirs()
+                    val file = File(dir, "$id.jpg")
+                    file.writeBytes(bytes)
+                    file.absolutePath
+                } catch (_: Exception) {
+                    null
+                }
+            }
+            db.pendingAttendanceDao().insert(entity.copy(selfiePath = localPath))
             setResult(true, if (s.action == "in") "Selamat bekerja! (Tersimpan offline)" else "Hati-hati di jalan! (Tersimpan offline)", ClockPhase.RESULT)
             scheduleReset(2500)
             return
@@ -483,19 +528,67 @@ class ClockViewModel(
     }
 
     private suspend fun flushQueue() {
-        val pending = db.pendingAttendanceDao().getAll()
-        for (item in pending) {
-            try {
-                val res = AbsensiWebApi.submitAttendance(item.toPayload())
-                if (res.ok || res.reason == "unauthenticated") {
-                    // unauthenticated di sini berarti API key salah secara permanen (bukan
-                    // transient) -- tetap dibuang supaya antrean tak macet selamanya di baris
-                    // yang tak akan pernah sukses. Kasus lain dibiarkan, coba lagi nanti.
-                    db.pendingAttendanceDao().delete(item.id)
+        if (!flushMutex.tryLock()) return
+        try {
+            val pending = db.pendingAttendanceDao().getAll()
+            val unrecoverableErrors = setOf(
+                "unauthenticated",
+                "forbidden_role",
+                "cross_outlet",
+                "not_enrolled",
+                "fake_gps_detected",
+                "teleportation_detected",
+                "staff_not_found",
+                "staff_inactive"
+            )
+            for (item in pending) {
+                val localSelfie = item.selfiePath
+                try {
+                    var currentItem = item
+                    if (localSelfie != null && (localSelfie.startsWith("/") || localSelfie.contains("offline_selfies"))) {
+                        val file = File(localSelfie)
+                        if (file.exists()) {
+                            val uploadedPath = try {
+                                val bytes = file.readBytes()
+                                StorageUtil.uploadJpeg("selfies", "${item.outletId}/${item.id}.jpg", bytes).removePrefix("selfies/")
+                            } catch (_: Exception) {
+                                null
+                            }
+                            if (uploadedPath != null) {
+                                file.delete()
+                                currentItem = item.copy(selfiePath = uploadedPath)
+                                db.pendingAttendanceDao().insert(currentItem)
+                            }
+                        }
+                    }
+
+                    val res = SubmitAttendanceUseCase(currentItem)
+                    if (res.ok) {
+                        db.pendingAttendanceDao().delete(item.id)
+                        if (localSelfie != null) {
+                            runCatching { File(localSelfie).delete() }
+                        }
+                    } else if (res.reason in unrecoverableErrors || item.attemptCount >= 5) {
+                        db.pendingAttendanceDao().delete(item.id)
+                        if (localSelfie != null) {
+                            runCatching { File(localSelfie).delete() }
+                        }
+                    } else {
+                        db.pendingAttendanceDao().markFailedAttempt(item.id, res.reason)
+                    }
+                } catch (e: Exception) {
+                    if (item.attemptCount >= 5) {
+                        db.pendingAttendanceDao().delete(item.id)
+                        if (localSelfie != null) {
+                            runCatching { File(localSelfie).delete() }
+                        }
+                    } else {
+                        db.pendingAttendanceDao().markFailedAttempt(item.id, e.message)
+                    }
                 }
-            } catch (e: Exception) {
-                db.pendingAttendanceDao().markFailedAttempt(item.id, e.message)
             }
+        } finally {
+            flushMutex.unlock()
         }
     }
 
@@ -524,6 +617,7 @@ class ClockViewModel(
     /** Camera feedback stays non-blocking and clears itself after [GUIDANCE_READ_MS] — cukup
      *  lama utk terbaca jelas, lalu scanning otomatis lanjut tanpa perlu aksi user. */
     private fun showCameraGuidance(message: String) {
+        livenessTimeoutJob?.cancel()
         livenessDetector = null
         lastGuidanceAtMs = System.currentTimeMillis()
         _state.value = _state.value.copy(
@@ -543,6 +637,7 @@ class ClockViewModel(
     }
 
     private fun scheduleReset(delayMs: Long) {
+        livenessTimeoutJob?.cancel()
         viewModelScope.launch {
             delay(delayMs)
             livenessDetector = null
@@ -559,6 +654,11 @@ class ClockViewModel(
                 !bypassGeofence -> checkLocation()
             }
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        livenessTimeoutJob?.cancel()
     }
 }
 

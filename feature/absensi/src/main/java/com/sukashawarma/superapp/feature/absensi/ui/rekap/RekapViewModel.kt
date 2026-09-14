@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.sukashawarma.superapp.data.remote.Postgrest
 import com.sukashawarma.superapp.data.remote.SupabaseClient
 import com.sukashawarma.superapp.data.remote.optBoolean
+import com.sukashawarma.superapp.data.remote.optInt
 import com.sukashawarma.superapp.data.remote.optString
 import com.sukashawarma.superapp.domain.model.Role
 import com.sukashawarma.superapp.domain.session.AppSession
@@ -372,7 +373,19 @@ class RekapViewModel : ViewModel() {
                     )
                 }
 
-                val rows = (dbRows + virtualAlphas(dbRows, activeStaff, start, end))
+                val today = LocalDate.now(JakartaTime.ZONE)
+                val (jamMasuk, toleransiMenit) = loadConfig(outletId)
+                val jamMasukParts = jamMasuk.split(":").mapNotNull { it.toIntOrNull() }
+                val deadlineHour = jamMasukParts.getOrElse(0) { 8 }
+                val deadlineMinute = jamMasukParts.getOrElse(1) { 0 }
+                val deadline = today.atTime(deadlineHour, deadlineMinute)
+                    .plusMinutes(toleransiMenit.toLong())
+                    .atZone(JakartaTime.ZONE)
+                val isPastDeadlineToday = JakartaTime.now().isAfter(deadline)
+
+                val approvedLeaves = loadApprovedLeaves(start, end)
+
+                val rows = (dbRows + virtualAlphas(dbRows, activeStaff, start, end, isPastDeadlineToday, approvedLeaves))
                     .sortedByDescending { it.tsServer }
 
                 _state.value = _state.value.copy(
@@ -385,6 +398,48 @@ class RekapViewModel : ViewModel() {
             }
         }
     }
+
+    private suspend fun loadConfig(outletId: String): Pair<String, Int> {
+        val outletCfg = runCatching {
+            Postgrest.selectOne(
+                "outlet_attendance_config",
+                listOf("outlet_id" to "eq.$outletId", "select" to "jam_masuk,toleransi_menit"),
+            )
+        }.getOrNull()
+        if (outletCfg != null && !outletCfg.optString("jam_masuk").isNullOrBlank()) {
+            return Pair(
+                outletCfg.optString("jam_masuk") ?: "08:00",
+                outletCfg.optInt("toleransi_menit") ?: 15
+            )
+        }
+        val globalCfg = runCatching {
+            Postgrest.selectOne("global_settings", listOf("key" to "eq.global_attendance_config", "select" to "value"))
+        }.getOrNull()?.get("value")?.takeIf { it.isJsonObject }?.asJsonObject
+        return Pair(
+            globalCfg?.optString("jam_masuk") ?: "08:00",
+            globalCfg?.optInt("toleransi_menit") ?: 15
+        )
+    }
+
+    private suspend fun loadApprovedLeaves(start: LocalDate, end: LocalDate): List<Triple<String, LocalDate, LocalDate>> = runCatching {
+        val startStr = start.toString()
+        val endStr = end.toString()
+        Postgrest.select(
+            "leave_requests",
+            listOf(
+                "status" to "eq.approved",
+                "start_date" to "lte.$endStr",
+                "end_date" to "gte.$startStr",
+                "select" to "staff_id,start_date,end_date"
+            )
+        ).mapNotNull { el ->
+            val o = el.asJsonObject
+            val sid = o.optString("staff_id") ?: return@mapNotNull null
+            val sDate = o.optString("start_date")?.let { LocalDate.parse(it) } ?: return@mapNotNull null
+            val eDate = o.optString("end_date")?.let { LocalDate.parse(it) } ?: return@mapNotNull null
+            Triple(sid, sDate, eDate)
+        }
+    }.getOrDefault(emptyList())
 
     /** Staf aktif outlet ini: penempatan utama + penempatan tambahan (`staff_outlets`). */
     private suspend fun loadActiveStaff(outletId: String): List<RekapOutletOption> {
@@ -418,15 +473,26 @@ class RekapViewModel : ViewModel() {
         activeStaff: List<RekapOutletOption>,
         start: LocalDate,
         end: LocalDate,
+        isPastDeadlineToday: Boolean,
+        approvedLeaves: List<Triple<String, LocalDate, LocalDate>>,
     ): List<AttendanceRow> {
         val today = LocalDate.now(JakartaTime.ZONE)
         val result = mutableListOf<AttendanceRow>()
         var day = start
         while (!day.isAfter(end)) {
             if (day.isAfter(today)) break
+            // Jika hari ini belum melewati batas jam masuk + toleransi, staf yang belum masuk
+            // belum dihitung sebagai Alpha (masih dalam jendela kedatangan kerja).
+            if (day == today && !isPastDeadlineToday) {
+                day = day.plusDays(1)
+                continue
+            }
             val checkedIn = rows.filter { it.type == "in" && it.date == day }.map { it.staffId }.toSet()
+            val staffOnLeave = approvedLeaves.filter { day >= it.second && !day.isAfter(it.third) }.map { it.first }.toSet()
+
             activeStaff.forEach { staff ->
-                if (staff.id !in checkedIn) {
+                // Staf tidak alpha jika sudah check-in atau sedang cuti/izin resmi yang disetujui
+                if (staff.id !in checkedIn && staff.id !in staffOnLeave) {
                     result += AttendanceRow(
                         id = "virtual-alpha-${staff.id}-$day",
                         type = "in",

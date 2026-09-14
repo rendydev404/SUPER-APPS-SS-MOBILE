@@ -59,6 +59,7 @@ import com.sukashawarma.superapp.data.remote.optString
 import com.sukashawarma.superapp.domain.util.JakartaTime
 import com.sukashawarma.superapp.domain.model.ClockPhase
 import com.sukashawarma.superapp.domain.model.Role
+import com.sukashawarma.superapp.domain.gps.GpsMath
 import com.sukashawarma.superapp.domain.session.AppSession
 import com.sukashawarma.superapp.presentation.components.FaceCameraPreview
 import com.sukashawarma.superapp.presentation.theme.*
@@ -817,6 +818,22 @@ private fun FaceMeshOverlay(
 }
 
 /**
+ * Memastikan setiap nilai jarak/akurasi >= 1000 m dalam pesan UI ditampilkan dengan satuan km.
+ * Contoh: "Di luar jangkauan (jarak 8502 m)" -> "Di luar jangkauan (jarak 8.5 km)"
+ */
+internal fun formatDistanceInMessage(message: String): String {
+    val regex = Regex("""\b(\d+(?:\.\d+)?)\s*m\b""", RegexOption.IGNORE_CASE)
+    return regex.replace(message) { match ->
+        val meters = match.groupValues[1].toDoubleOrNull()
+        if (meters != null && meters >= 1000.0) {
+            GpsMath.formatDistance(meters)
+        } else {
+            match.value
+        }
+    }
+}
+
+/**
  * Modern non-camera state overlay matching the design system
  */
 @Composable
@@ -878,7 +895,7 @@ private fun ClockModernOverlay(
                         textAlign = TextAlign.Center
                     )
                     Text(
-                        state.result?.message ?: "Lokasi Anda belum berada di area outlet.",
+                        formatDistanceInMessage(state.result?.message ?: "Lokasi Anda belum berada di area outlet."),
                         color = SukaOrange,
                         fontSize = 12.sp,
                         textAlign = TextAlign.Center
@@ -1533,7 +1550,7 @@ private fun ActionArea(
 
                 CameraFeedbackBanner(
                     visible = state.phase == ClockPhase.IDLE && resultOk == false,
-                    message = state.result?.message,
+                    message = state.result?.message?.let { formatDistanceInMessage(it) },
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .padding(18.dp),
@@ -1560,7 +1577,7 @@ private fun ActionArea(
                             state.phase == ClockPhase.RESULT && resultOk == true ->
                                 PillStatus(Icons.Filled.CheckCircle, Color(0xFF10B981), state.result?.message ?: "Absensi berhasil", false)
                             state.phase == ClockPhase.RESULT ->
-                                PillStatus(Icons.Filled.ErrorOutline, Color(0xFFEF4444), state.result?.message ?: "Absensi gagal, coba lagi", false)
+                                PillStatus(Icons.Filled.ErrorOutline, Color(0xFFEF4444), state.result?.message?.let { formatDistanceInMessage(it) } ?: "Absensi gagal, coba lagi", false)
                             else ->
                                 PillStatus(Icons.Filled.Face, SukaOrange, "Posisikan wajah di tengah", false)
                         }

@@ -23,6 +23,8 @@ import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import com.sukashawarma.superapp.data.remote.AuthSessionManager
+import com.sukashawarma.superapp.data.remote.SessionTokenHolder
 import com.sukashawarma.superapp.domain.session.AppSession
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -76,14 +78,14 @@ class LocationTrackingService : Service() {
         private const val GROUP_LAYANAN = "suka_layanan_latar"
         private const val NOTIF_ID = 4711
 
-        private const val INTERVAL_MOVING_MS = 10_000L
+        private const val INTERVAL_MOVING_MS = 3_000L
         private const val INTERVAL_IDLE_MS = 60_000L
 
         /** Ambang "bergerak". Di bawah ini GPS umumnya hanya derau saat orang berdiri diam. */
         private const val MOVING_SPEED_MPS = 0.7f
 
         /** Batas akurasi yang masih layak disimpan. Di atas ini bukan fix GPS. */
-        private const val MAX_ACCURACY_M = 150f
+        private const val MAX_ACCURACY_M = 100f
 
         private const val HEALTH_CHECK_MS = 60_000L
 
@@ -103,6 +105,7 @@ class LocationTrackingService : Service() {
     private var movingMode: Boolean? = null
     private var tracking = false
     private var lastFixAt = 0L
+    private var lastRecordedLocation: android.location.Location? = null
     private var healthJob: Job? = null
     private var sessionJob: Job? = null
     private var wakeLock: PowerManager.WakeLock? = null
@@ -121,9 +124,15 @@ class LocationTrackingService : Service() {
                 return
             }
 
-            val speed = if (location.hasSpeed()) location.speed else 0f
-            val moving = speed > MOVING_SPEED_MPS
+            val prev = lastRecordedLocation
+            val dtSec = if (prev != null) ((location.time - prev.time).coerceAtLeast(500L)) / 1000f else 1f
+            val distM = if (prev != null) location.distanceTo(prev) else 0f
+            val derivedSpeed = if (prev != null && dtSec > 0f) distM / dtSec else 0f
+            val speed = if (location.hasSpeed() && location.speed > 0f) location.speed else derivedSpeed
+            // Deteksi bergerak: baik dari hardware speed sensor maupun perpindahan jarak nyata
+            val moving = speed > MOVING_SPEED_MPS || distM > 8f
             if (moving != movingMode) requestUpdates(moving)
+            lastRecordedLocation = location
 
             val battery = readBattery()
             val point = TrackPoint(
@@ -131,7 +140,7 @@ class LocationTrackingService : Service() {
                 lng = location.longitude,
                 accuracyM = location.accuracy,
                 speedMps = speed,
-                headingDeg = if (location.hasBearing()) location.bearing else 0f,
+                headingDeg = if (location.hasBearing()) location.bearing else (if (prev != null && distM > 3f) prev.bearingTo(location) else 0f),
                 altitudeM = if (location.hasAltitude()) location.altitude else 0.0,
                 batteryPct = battery.first,
                 isCharging = battery.second,
@@ -165,6 +174,7 @@ class LocationTrackingService : Service() {
 
         if (intent?.action == ACTION_STOP) {
             LocationTrackingPrefs.setEnabled(this, false)
+            LocationTrackingPrefs.clearSession(this)
             LocationTracking.cancelWatchdog(this)
             stopTracking()
             return START_NOT_STICKY
@@ -262,12 +272,33 @@ class LocationTrackingService : Service() {
         wakeLock = null
     }
 
-    /** Service hanya memakai sesi yang sudah aktif di memory. Service tidak pernah
-     *  melakukan login atau membuka refresh token secara diam-diam. */
+    /** Service memulihkan sesi dari memori atau dari prefs tersimpan saat proses dibangun ulang oleh sistem. */
     private fun ensureSession() {
         if (sessionJob?.isActive == true) return
         sessionJob = scope.launch {
             if (AppSession.staff.value == null) {
+                val savedStaffId = LocationTrackingPrefs.getStaffId(this@LocationTrackingService)
+                val savedRefreshToken = LocationTrackingPrefs.getRefreshToken(this@LocationTrackingService)
+                if (savedStaffId != null && savedRefreshToken != null) {
+                    if (SessionTokenHolder.refreshToken == null) {
+                        SessionTokenHolder.refreshToken = savedRefreshToken
+                    }
+                    if (SessionTokenHolder.accessToken == null) {
+                        SessionTokenHolder.accessToken = LocationTrackingPrefs.getAccessToken(this@LocationTrackingService)
+                    }
+                    val ok = AuthSessionManager.ensureAuthenticated()
+                    if (ok) {
+                        SessionTokenHolder.accessToken?.let {
+                            LocationTrackingPrefs.updateTokens(
+                                this@LocationTrackingService,
+                                it,
+                                SessionTokenHolder.refreshToken
+                            )
+                        }
+                        flushQueue()
+                        return@launch
+                    }
+                }
                 Log.w(TAG, "Sesi staff tidak aktif; titik tetap diantrekan")
             } else {
                 flushQueue()
@@ -314,11 +345,10 @@ class LocationTrackingService : Service() {
     private fun requestUpdates(moving: Boolean) {
         val interval = if (moving) INTERVAL_MOVING_MS else INTERVAL_IDLE_MS
         val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, interval)
-            .setMinUpdateIntervalMillis(interval / 2)
-            .setWaitForAccurateLocation(true)
-            // Filter jarak hanya saat bergerak. Saat diam, filter 15 m membuat perangkat
-            // tidak mengirim apa pun sehingga posisi di dashboard terlihat basi/hilang.
-            .setMinUpdateDistanceMeters(if (moving) 15f else 0f)
+            .setMinUpdateIntervalMillis(if (moving) 1_500L else 30_000L)
+            .setWaitForAccurateLocation(false)
+            // Filter jarak hanya saat bergerak. 3m saat bergerak agar lekukan jalan terekam presisi.
+            .setMinUpdateDistanceMeters(if (moving) 3f else 0f)
             .build()
         try {
             client.removeLocationUpdates(callback)
@@ -348,7 +378,7 @@ class LocationTrackingService : Service() {
                 if (pending.isEmpty()) return@withLock
                 val batch = pending.toList()
                 try {
-                    LocationTrackingRepository.push(batch, DeviceInfo.name(this@LocationTrackingService))
+                    LocationTrackingRepository.push(batch, DeviceInfo.name(this@LocationTrackingService), this@LocationTrackingService)
                     // Hanya titik yang benar-benar terkirim yang dibuang; fix baru yang masuk
                     // selama upload berjalan tidak ikut hilang.
                     repeat(batch.size.coerceAtMost(pending.size)) { pending.removeFirst() }

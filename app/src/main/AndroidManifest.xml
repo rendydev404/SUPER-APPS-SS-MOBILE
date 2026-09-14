@@ -6,6 +6,7 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <!-- Pelacakan lokasi kerja (SOP): dijalankan sebagai foreground service dengan
          notifikasi persisten, hanya setelah user menyetujui consent screen di app. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -18,13 +19,24 @@
     <!-- Alarm jaring pengaman yang membangunkan service bila dibunuh OEM. Alarm persis
          dipakai HANYA bila sistem mengizinkan; kalau tidak, kode jatuh ke alarm biasa. -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <!-- Distribusi mandiri (bukan Play Store), jadi app perlu bisa
+         minta izin sendiri untuk pasang APK update yang di-download dari dalam
+         aplikasi. Lihat AppUpdateManager. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Android 12+: izinkan PackageInstaller melakukan self-update tanpa
+         konfirmasi user ketika semua syarat platform terpenuhi. -->
+    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
+    <!-- Izin full screen intent untuk meluncurkan kembali UI saat update selesai -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <!-- Izin overlay jaring pengaman untuk membuka activity dari background pasca-update -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
-    <!-- Android 11+ menyembunyikan paket lain: tanpa deklarasi ini
-         getLaunchIntentForPackage("com.sukashawarma.pos") selalu null dan kartu POS
-         di beranda mengira aplikasi POS belum terpasang padahal ada. -->
     <queries>
         <package android:name="com.sukashawarma.pos" />
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="application/vnd.android.package-archive" />
+        </intent>
     </queries>
 
     <application
@@ -39,6 +51,7 @@
         <activity
             android:name=".presentation.MainActivity"
             android:exported="true"
+            android:launchMode="singleTop"
             android:screenOrientation="portrait"
             android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.SukaSuperapp">
@@ -111,6 +124,20 @@
             <intent-filter>
                 <action android:name="com.sukashawarma.superapp.BALAS_CHAT" />
                 <action android:name="com.sukashawarma.superapp.TANDAI_DIBACA_CHAT" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Receiver status instalasi update via PackageInstaller -->
+        <receiver
+            android:name="com.sukashawarma.superapp.core.update.UpdateInstallResultReceiver"
+            android:exported="false" />
+
+        <!-- Receiver auto-launch setelah APK baru selesai dipasang (ACTION_MY_PACKAGE_REPLACED) -->
+        <receiver
+            android:name="com.sukashawarma.superapp.core.update.AppUpdateRelaunchReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
     </application>

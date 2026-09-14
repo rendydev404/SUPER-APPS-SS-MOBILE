@@ -50,7 +50,7 @@ class LocationRepository(context: Context) {
                 isMock = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) location.isMock else location.isFromMockProvider,
                 timestampMs = location.time,
             )
-        } catch (e: SecurityException) {
+        } catch (e: Exception) {
             return null
         }
     }

@@ -215,6 +215,7 @@ object AppSession {
         _staff.value = null
         _mitraProfile.value = null
         _mitraLoadFailed.value = false
+        onSignOut?.invoke()
     }
 
     /** Sebelumnya SEMUA exception (DNS gagal, timeout, TLS, JSON tak terduga dari server, dst)

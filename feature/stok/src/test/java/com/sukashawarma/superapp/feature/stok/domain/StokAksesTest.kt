@@ -109,4 +109,32 @@ class StokAksesTest {
         }
         assertFalse(StokAkses.melihatAnalisisSelisih(null))
     }
+
+    /**
+     * Menu Plafon & Belanja Outlet:
+     * Cermin web (app/actions/budget.ts: requireBudgetViewer).
+     * Leader, SPV, Area Manager, Regional Manager, dan tim pusat (Admin, Kitchen, Owner, Finance, dkk)
+     * memiliki akses memantau limit belanja dan riwayat belanja outlet.
+     * Crew outlet biasa tidak memiliki akses ini.
+     */
+    @Test
+    fun `leader pengawas dan pusat dapat melihat plafon dan belanja`() {
+        listOf(
+            Role.LEADER,
+            Role.SPV,
+            Role.AREA_MANAGER,
+            Role.REGIONAL_MANAGER,
+            Role.KITCHEN,
+            Role.ADMIN,
+            Role.ADMIN_FINANCE,
+            Role.OWNER,
+            Role.PURCHASING,
+            Role.DEVELOPER,
+        ).forEach { role ->
+            assertTrue("$role harus bisa melihat Plafon & Belanja", StokAkses.melihatPlafonBelanja(role))
+        }
+
+        assertFalse("CREW tidak boleh melihat Plafon & Belanja", StokAkses.melihatPlafonBelanja(Role.CREW))
+        assertFalse("Null role tidak boleh melihat Plafon & Belanja", StokAkses.melihatPlafonBelanja(null))
+    }
 }

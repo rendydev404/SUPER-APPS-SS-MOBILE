@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -33,10 +34,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.border
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.FormatColorReset
 import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.CircularProgressIndicator
@@ -60,15 +63,19 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material.icons.Icons
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.sukashawarma.superapp.core.ui.AvatarStorage
 import com.sukashawarma.superapp.core.ui.AvatarStaf
 import com.sukashawarma.superapp.feature.chat.data.AnggotaGrup
+import com.sukashawarma.superapp.feature.chat.data.ChatWallpapers
 import com.sukashawarma.superapp.feature.chat.data.PengaturanGrup
 import com.sukashawarma.superapp.feature.chat.data.labelRole
 
@@ -97,7 +104,8 @@ fun InfoGrupSheet(
     memuatAnggota: Boolean,
     userId: String,
     onKlikAnggota: (AnggotaGrup) -> Unit,
-    onSimpan: (nama: String, deskripsi: String, hanyaAdmin: Boolean, fotoJpeg: ByteArray?, hapusFoto: Boolean) -> Unit,
+    onSimpan: (nama: String, deskripsi: String, hanyaAdmin: Boolean, fotoJpeg: ByteArray?, hapusFoto: Boolean, wallpaper: String) -> Unit,
+    onGantiWallpaper: (String) -> Unit = {},
     onTutup: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -109,6 +117,8 @@ fun InfoGrupSheet(
     var fotoBaru by remember { mutableStateOf<ByteArray?>(null) }
     var pratinjauBaru by remember { mutableStateOf<ImageBitmap?>(null) }
     var hapusFoto by remember { mutableStateOf(false) }
+    var wallpaper by remember { mutableStateOf(awal.wallpaper) }
+    var sheetPilihWallpaper by remember { mutableStateOf(false) }
     // Tertutup saat dibuka: daftar anggota se-perusahaan jauh lebih panjang
     // daripada seluruh isi lembar ini digabung, dan menggulirinya untuk mencapai
     // tombol Simpan bukan yang dicari orang saat membuka info grup.
@@ -227,6 +237,83 @@ fun InfoGrupSheet(
             }
 
             Spacer(Modifier.height(18.dp))
+            LabelBagian("Wallpaper Chat")
+            Kartu {
+                val wallpaperItem = remember(wallpaper) { ChatWallpapers.cari(wallpaper) }
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .then(if (bolehSunting) Modifier.clickable { sheetPilihWallpaper = true } else Modifier)
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        Modifier
+                            .size(42.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color.White)
+                            .border(1.dp, PemisahInfo, RoundedCornerShape(8.dp)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        val resId = wallpaperItem.drawableRes
+                        if (resId != null) {
+                            Image(
+                                painter = painterResource(id = resId),
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        } else {
+                            Icon(
+                                Icons.Filled.FormatColorReset,
+                                contentDescription = null,
+                                tint = Color(0xFF8E8E93),
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            wallpaperItem.nama,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color.Black,
+                        )
+                        Text(
+                            if (bolehSunting) wallpaperItem.deskripsi else "Hanya pengelola yang dapat mengubah wallpaper",
+                            fontSize = 12.sp,
+                            color = AbuInfo,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    if (bolehSunting) {
+                        Text(
+                            "Ganti",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = BiruIosInfo,
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Icon(
+                            Icons.Filled.ChevronRight,
+                            contentDescription = null,
+                            tint = Color(0xFFC7C7CC),
+                            modifier = Modifier.size(18.dp),
+                        )
+                    } else {
+                        Icon(
+                            Icons.Filled.Lock,
+                            contentDescription = "Hanya pengelola",
+                            tint = AbuInfo,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(18.dp))
             LabelBagian("Anggota")
             Kartu {
                 KepalaAccordionAnggota(
@@ -298,8 +385,8 @@ fun InfoGrupSheet(
             Kartu {
                 BarisInfo(
                     ikon = Icons.Filled.Groups,
-                    judul = "Pesan sementara 24 jam",
-                    isi = "Setiap pesan dan foto terhapus otomatis setelah 24 jam.",
+                    judul = "Pesan sementara (Reset 03:00 AM)",
+                    isi = "Setiap pesan dan foto terhapus otomatis setiap pukul 03:00 AM WIB.",
                 )
                 awal.diubahOleh?.let {
                     Pemisah()
@@ -322,7 +409,7 @@ fun InfoGrupSheet(
                             if (menyimpan || !berubah) BiruIosInfo.copy(alpha = 0.4f) else BiruIosInfo
                         )
                         .clickable(enabled = !menyimpan && berubah) {
-                            onSimpan(nama, deskripsi, hanyaAdmin, fotoBaru, hapusFoto)
+                            onSimpan(nama, deskripsi, hanyaAdmin, fotoBaru, hapusFoto, wallpaper)
                         }
                         .padding(vertical = 14.dp),
                     contentAlignment = Alignment.Center,
@@ -334,6 +421,17 @@ fun InfoGrupSheet(
                 }
             }
         }
+    }
+
+    if (sheetPilihWallpaper) {
+        PilihWallpaperSheet(
+            wallpaperAwal = wallpaper,
+            onTerapkan = { baru ->
+                wallpaper = baru
+                onGantiWallpaper(baru)
+            },
+            onTutup = { sheetPilihWallpaper = false },
+        )
     }
 }
 
@@ -486,9 +584,10 @@ private fun BarisAnggota(anggota: AnggotaGrup, akuSendiri: Boolean, onKlik: () -
             .padding(horizontal = 14.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        val namaTampil = anggota.namaTampil
         AvatarStaf(
             path = anggota.avatar,
-            nama = anggota.nama,
+            nama = namaTampil,
             modifier = Modifier.size(38.dp),
             ukuranHuruf = 15.sp,
         )
@@ -496,7 +595,7 @@ private fun BarisAnggota(anggota: AnggotaGrup, akuSendiri: Boolean, onKlik: () -
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    anggota.nama,
+                    namaTampil,
                     fontSize = 15.sp,
                     color = Color.Black,
                     maxLines = 1,

@@ -71,13 +71,12 @@ object LocationTracking {
 
     fun stop(context: Context) {
         LocationTrackingPrefs.setEnabled(context, false)
+        LocationTrackingPrefs.clearSession(context)
         cancelWatchdog(context)
-        val intent = Intent(context, LocationTrackingService::class.java)
-            .setAction(LocationTrackingService.ACTION_STOP)
         try {
-            ContextCompat.startForegroundService(context, intent)
-        } catch (e: Exception) {
             context.stopService(Intent(context, LocationTrackingService::class.java))
+        } catch (e: Exception) {
+            Log.w(TAG, "Gagal menghentikan service pelacakan", e)
         }
     }
 

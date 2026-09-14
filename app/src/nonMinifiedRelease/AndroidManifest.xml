@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Penanda `profileable` HANYA untuk varian pengukuran.
+
+  Tanpa ini, alat pembangkit Baseline Profile tidak boleh membaca statistik frame
+  aplikasi non-debug, dan gagal dengan "Unable to confirm activity launch
+  completion". Sengaja ditaruh di source set varian ini, bukan di manifest utama:
+  APK `release` yang dibagikan ke karyawan tidak boleh membuka dirinya untuk
+  diprofil siapa pun yang punya akses adb ke perangkat.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <application>
+        <profileable
+            android:shell="true"
+            tools:targetApi="29" />
+    </application>
+</manifest>

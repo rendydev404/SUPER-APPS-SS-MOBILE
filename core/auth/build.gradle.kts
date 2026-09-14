@@ -38,6 +38,7 @@ dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    api("androidx.biometric:biometric:1.1.0")
     implementation(project(":core:network"))
     implementation("androidx.core:core-ktx:1.12.0")
 }

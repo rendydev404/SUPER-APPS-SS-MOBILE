@@ -128,6 +128,16 @@ class HomeViewModel : ViewModel() {
         }
     }
 
+    /** Hentikan seluruh pekerjaan Chat Tim setelah masa tayangnya selesai. */
+    fun berhentiPantauChat() {
+        pemantauChat?.cancel()
+        pemantauChat = null
+        val kini = _state.value
+        if (kini.chatBelumDibaca != 0 || kini.chatAdaSebutan) {
+            _state.value = kini.copy(chatBelumDibaca = 0, chatAdaSebutan = false)
+        }
+    }
+
     fun hitungChat(context: Context) {
         val userId = AppSession.staff.value?.id ?: return
         val app = context.applicationContext

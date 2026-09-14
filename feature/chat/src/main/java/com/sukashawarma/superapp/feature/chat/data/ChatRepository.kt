@@ -4,6 +4,7 @@ import com.google.gson.JsonObject
 import com.sukashawarma.superapp.core.storage.StorageUtil
 import com.sukashawarma.superapp.data.remote.Postgrest
 import com.sukashawarma.superapp.data.remote.SupabaseClient
+import com.sukashawarma.superapp.feature.chat.domain.batasResetPesanMs
 import java.time.Instant
 import java.util.UUID
 
@@ -20,23 +21,20 @@ object ChatRepository {
     val ROLE_PENGELOLA = setOf("developer", "admin", "admin_hr")
 
     /** Batas atas satu pengambilan. Grup seramai apa pun jarang menembus ini
-     *  dalam 24 jam; kalau sampai, yang terpotong adalah pesan TERLAMA. */
+     *  dalam satu siklus harian; kalau sampai, yang terpotong adalah pesan TERLAMA. */
     private const val MAKS_PESAN = 500
 
     /**
-     * Seluruh pesan 24 jam terakhir, urut naik (terlama dulu).
-     *
-     * Filter 24 jam dikirim eksplisit walau RLS sudah menegakkannya — supaya
-     * pemotongan `limit` menghitung dari jendela yang benar, dan supaya query
-     * tetap benar seandainya policy-nya kelak berubah.
+     * Seluruh pesan dalam siklus aktif (sejak 03:00 AM WIB terakhir), urut naik (terlama dulu).
      */
     suspend fun ambilPesan(): List<PesanChat> {
-        val batas = Instant.now().minusSeconds(24L * 60 * 60).toString()
+        val cutoffMs = batasResetPesanMs(System.currentTimeMillis())
+        val batas = Instant.ofEpochMilli(cutoffMs).toString()
         val rows = Postgrest.select(
             TABLE,
             listOf(
                 "select" to "*",
-                "created_at" to "gt.$batas",
+                "created_at" to "gte.$batas",
                 "order" to "created_at.desc",
                 "limit" to MAKS_PESAN.toString(),
             ),
@@ -155,6 +153,7 @@ object ChatRepository {
         hanyaAdmin: Boolean,
         olehNama: String,
         fotoGrup: String? = null,
+        wallpaper: String? = null,
     ) {
         val patch = JsonObject().apply {
             addProperty("nama_grup", nama.trim().ifBlank { "Chat Tim" })
@@ -165,10 +164,34 @@ object ChatRepository {
             // null = jangan sentuh foto yang sudah ada; string kosong = hapus.
             // Tanpa pembedaan ini, menyimpan nama grup akan ikut menghapus fotonya.
             fotoGrup?.let { addProperty("foto_grup", it.ifBlank { null }) }
+            wallpaper?.let { addProperty("wallpaper", it.trim().ifBlank { "default" }) }
         }
-        val hasil = Postgrest.update(TABLE_PENGATURAN, listOf("id" to "eq.1"), patch)
+        val hasil = try {
+            Postgrest.update(TABLE_PENGATURAN, listOf("id" to "eq.1"), patch)
+        } catch (e: Exception) {
+            // Jika kolom 'wallpaper' belum ada di remote table Supabase, lakukan fallback tanpa kolom wallpaper
+            if (wallpaper != null && e.message?.contains("wallpaper", ignoreCase = true) == true) {
+                patch.remove("wallpaper")
+                Postgrest.update(TABLE_PENGATURAN, listOf("id" to "eq.1"), patch)
+            } else {
+                throw e
+            }
+        }
         // PostgREST membalas 200 dengan array kosong ketika RLS menyaring habis
         // barisnya. Tanpa pemeriksaan ini, penolakan izin terlihat seperti sukses.
+        if (hasil.size() == 0) {
+            throw IllegalStateException("Perubahan ditolak: akun Anda tidak berhak mengubah pengaturan grup.")
+        }
+    }
+
+    /** Simpan perubahan wallpaper secara mandiri dan instan oleh pengelola. */
+    suspend fun simpanWallpaper(wallpaper: String, olehNama: String) {
+        val patch = JsonObject().apply {
+            addProperty("wallpaper", wallpaper.trim().ifBlank { "default" })
+            addProperty("diubah_oleh", olehNama)
+            addProperty("diubah_pada", java.time.Instant.now().toString())
+        }
+        val hasil = Postgrest.update(TABLE_PENGATURAN, listOf("id" to "eq.1"), patch)
         if (hasil.size() == 0) {
             throw IllegalStateException("Perubahan ditolak: akun Anda tidak berhak mengubah pengaturan grup.")
         }

@@ -20,23 +20,53 @@ object AttendanceGates {
 
     private val UNFINISHED_ORDER_STATUSES = setOf("pending", "preparing", "ready")
 
-    suspend fun decideAction(staffId: String): NextAction {
-        val rows = Postgrest.select(
-            "attendance",
-            listOf(
-                "outlet_staff_id" to "eq.$staffId",
-                "ts_server" to "gte.${JakartaTime.todayStartIso()}",
-                "ts_server" to "lte.${JakartaTime.todayEndIso()}",
-                "select" to "type,status",
-                "order" to "ts_server.desc"
+    suspend fun decideAction(
+        staffId: String,
+        pendingDao: com.sukashawarma.superapp.data.local.dao.PendingAttendanceDao? = null
+    ): NextAction {
+        return try {
+            // Cek riwayat absensi staf dalam 18 jam terakhir untuk mendukung shift malam yang melewati tengah malam.
+            val cutoffIso = java.time.Instant.now().minus(18, java.time.temporal.ChronoUnit.HOURS).toString()
+            val recentRows = Postgrest.select(
+                "attendance",
+                listOf(
+                    "outlet_staff_id" to "eq.$staffId",
+                    "ts_server" to "gte.$cutoffIso",
+                    "select" to "type,status,ts_server",
+                    "order" to "ts_server.desc",
+                    "limit" to "5",
+                )
             )
-        )
-        val hasIn = rows.any { it.asJsonObject.optString("type") == "in" }
-        val hasOut = rows.any { it.asJsonObject.optString("type") == "out" }
-        return when {
-            !hasIn -> NextAction.IN
-            !hasOut -> NextAction.OUT
-            else -> NextAction.DONE
+            val latest = recentRows.firstOrNull()?.asJsonObject
+            val latestType = latest?.optString("type")
+
+            // Jika absen terakhir dalam 18 jam adalah 'in', maka aksi berikutnya adalah 'out' (absen pulang).
+            if (latestType == "in") {
+                return NextAction.OUT
+            }
+
+            val todayStart = JakartaTime.todayStartIso()
+            val todayEnd = JakartaTime.todayEndIso()
+            val todayRows = recentRows.filter {
+                val ts = it.asJsonObject.optString("ts_server") ?: ""
+                ts >= todayStart && ts <= todayEnd
+            }
+            val hasInToday = todayRows.any { it.asJsonObject.optString("type") == "in" }
+            val hasOutToday = todayRows.any { it.asJsonObject.optString("type") == "out" }
+
+            when {
+                hasInToday && hasOutToday -> NextAction.DONE
+                !hasInToday -> NextAction.IN
+                else -> NextAction.OUT
+            }
+        } catch (_: Exception) {
+            // Fallback offline: periksa antrean lokal Room
+            val pendingLatest = pendingDao?.getLatestForStaff(staffId)
+            when (pendingLatest?.type) {
+                "in" -> NextAction.OUT
+                "out" -> NextAction.DONE
+                else -> NextAction.IN
+            }
         }
     }
 

@@ -3,6 +3,7 @@ package com.sukashawarma.superapp.feature.chat
 import android.content.Context
 import com.sukashawarma.superapp.data.remote.Postgrest
 import com.sukashawarma.superapp.feature.chat.data.ChatRepository
+import com.sukashawarma.superapp.feature.chat.domain.batasResetPesanMs
 import java.time.Instant
 
 /**
@@ -52,7 +53,7 @@ object ChatBacaan {
     }
 
     /**
-     * Jumlah pesan orang lain yang datang setelah penanda baca.
+     * Jumlah pesan orang lain yang datang setelah penanda baca dan masih dalam siklus aktif.
      *
      * Hanya kolom `id` yang diminta dan dibatasi [MAKS_HITUNG] baris: yang
      * dibutuhkan cuma cacahnya, dan Beranda memanggil ini setiap kali ada pesan
@@ -61,7 +62,9 @@ object ChatBacaan {
      */
     suspend fun hitungBelumDibaca(context: Context, userId: String): Int {
         if (userId.isBlank()) return 0
-        val batas = Instant.ofEpochMilli(terakhirDibaca(context)).toString()
+        val cutoffMs = batasResetPesanMs(System.currentTimeMillis())
+        val batasMs = maxOf(terakhirDibaca(context), cutoffMs)
+        val batas = Instant.ofEpochMilli(batasMs).toString()
         return Postgrest.select(
             ChatRepository.TABLE,
             listOf(
@@ -74,7 +77,7 @@ object ChatBacaan {
     }
 
     /**
-     * Adakah pesan belum dibaca yang menyebut orang ini.
+     * Adakah pesan belum dibaca yang menyebut orang ini dalam siklus aktif.
      *
      * Penyaringannya dikerjakan DATABASE lewat operator `cs` (jsonb contains),
      * bukan dengan menarik pesannya lalu memeriksa satu per satu di aplikasi.
@@ -86,7 +89,9 @@ object ChatBacaan {
      */
     suspend fun adaSebutan(context: Context, userId: String): Boolean {
         if (userId.isBlank()) return false
-        val batas = Instant.ofEpochMilli(terakhirDibaca(context)).toString()
+        val cutoffMs = batasResetPesanMs(System.currentTimeMillis())
+        val batasMs = maxOf(terakhirDibaca(context), cutoffMs)
+        val batas = Instant.ofEpochMilli(batasMs).toString()
         return Postgrest.select(
             ChatRepository.TABLE,
             listOf(

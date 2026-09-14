@@ -11,8 +11,22 @@ import java.util.Locale
  * Logika murni layar chat — tanpa Android, supaya bisa diuji JVM.
  */
 
-/** Umur maksimal pesan yang boleh tampil. Cermin policy `chat_messages_select_24h`. */
-const val UMUR_PESAN_MS: Long = 24L * 60 * 60 * 1000
+/** Zona waktu resmi operasional (WIB). */
+val ZONA_WIB: ZoneId = ZoneId.of("Asia/Jakarta")
+
+/**
+ * Menghitung waktu cutoff reset pesan: pukul 03:00 AM WIB hari ini
+ * (atau kemarin pukul 03:00 AM WIB bila jam sekarang masih sebelum 03:00 AM WIB).
+ */
+fun batasResetPesanMs(nowMs: Long, zona: ZoneId = ZONA_WIB): Long {
+    val zdt = Instant.ofEpochMilli(nowMs).atZone(zona)
+    val cutoff = if (zdt.hour < 3) {
+        zdt.toLocalDate().minusDays(1).atTime(3, 0).atZone(zona)
+    } else {
+        zdt.toLocalDate().atTime(3, 0).atZone(zona)
+    }
+    return cutoff.toInstant().toEpochMilli()
+}
 
 /** Dua pesan beruntun dari orang yang sama digabung satu grup bila jaraknya <= ini. */
 const val JARAK_GRUP_MS: Long = 5L * 60 * 1000
@@ -51,8 +65,8 @@ fun labelTanggal(hari: LocalDate, hariIni: LocalDate): String = when (hari) {
 }
 
 /**
- * Susun daftar item layar dari pesan mentah: buang yang kedaluwarsa, urutkan,
- * sisipkan pemisah tanggal, dan tandai posisi tiap bubble dalam grupnya.
+ * Susun daftar item layar dari pesan mentah: buang yang kedaluwarsa (sebelum 03:00 AM),
+ * urutkan, sisipkan pemisah tanggal, dan tandai posisi tiap bubble dalam grupnya.
  *
  * Pengelompokan mengikuti WhatsApp: pengirim sama + hari sama + jarak antar
  * pesan <= 5 menit = satu grup; identitas (nama+avatar) hanya di bubble pertama.
@@ -61,10 +75,11 @@ fun susunItemChat(
     pesan: List<PesanChat>,
     userId: String,
     nowMs: Long,
-    zona: ZoneId = ZoneId.systemDefault(),
+    zona: ZoneId = ZONA_WIB,
 ): List<ItemChat> {
+    val batasMs = batasResetPesanMs(nowMs, zona)
     val hidup = pesan
-        .filter { nowMs - it.createdAtMs < UMUR_PESAN_MS }
+        .filter { it.createdAtMs >= batasMs }
         .sortedBy { it.createdAtMs }
     if (hidup.isEmpty()) return emptyList()
 

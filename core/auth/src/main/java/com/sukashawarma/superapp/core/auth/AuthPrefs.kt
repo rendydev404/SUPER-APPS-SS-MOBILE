@@ -92,12 +92,27 @@ object AuthPrefs {
         return isBiometricEnabledFor(userId)
     }
 
+    private const val KEY_BIOMETRIC_GUIDELINE_DISMISSED_PREFIX = "biometric_guideline_dismissed_"
+
+    fun isBiometricGuidelineDismissed(userId: String?): Boolean {
+        if (!::prefs.isInitialized || userId.isNullOrBlank()) return false
+        return prefs.getBoolean(KEY_BIOMETRIC_GUIDELINE_DISMISSED_PREFIX + userId, false)
+    }
+
+    fun setBiometricGuidelineDismissed(userId: String?, dismissed: Boolean = true) {
+        if (!::prefs.isInitialized || userId.isNullOrBlank()) return
+        prefs.edit()
+            .putBoolean(KEY_BIOMETRIC_GUIDELINE_DISMISSED_PREFIX + userId, dismissed)
+            .apply()
+    }
+
     fun enableBiometric(userId: String, refreshToken: String) {
         if (!::prefs.isInitialized) return
         prefs.edit()
             .putBoolean(KEY_BIOMETRIC_ENABLED, true)
             .putString(KEY_BIOMETRIC_USER_ID, userId)
             .putString(KEY_REFRESH_TOKEN, refreshToken)
+            .putBoolean(KEY_BIOMETRIC_GUIDELINE_DISMISSED_PREFIX + userId, true)
             .apply()
     }
 

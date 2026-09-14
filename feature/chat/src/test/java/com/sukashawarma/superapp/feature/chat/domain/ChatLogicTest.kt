@@ -27,20 +27,36 @@ class ChatLogicTest {
         createdAtMs = atMs,
     )
 
-    // -- susunItemChat: filter 24 jam ---------------------------------------
+    // -- susunItemChat: filter cutoff 03:00 AM --------------------------------
 
     @Test
-    fun `pesan lebih tua dari 24 jam dibuang, yang lebih muda dipertahankan`() {
-        val now = 1_000_000_000_000L
+    fun `batasResetPesanMs menghitung pukul 03 00 AM WIB dengan tepat`() {
+        // 14 Sep 2026 09:00:00 WIB
+        val siang = java.time.ZonedDateTime.of(2026, 9, 14, 9, 0, 0, 0, zona).toInstant().toEpochMilli()
+        val cutoffSiang = batasResetPesanMs(siang, zona)
+        val ekspektasiSiang = java.time.ZonedDateTime.of(2026, 9, 14, 3, 0, 0, 0, zona).toInstant().toEpochMilli()
+        assertEquals(ekspektasiSiang, cutoffSiang)
+
+        // 14 Sep 2026 02:30:00 WIB (sebelum jam 3 pagi, cutoff adalah kemarin jam 3 pagi)
+        val subuh = java.time.ZonedDateTime.of(2026, 9, 14, 2, 30, 0, 0, zona).toInstant().toEpochMilli()
+        val cutoffSubuh = batasResetPesanMs(subuh, zona)
+        val ekspektasiSubuh = java.time.ZonedDateTime.of(2026, 9, 13, 3, 0, 0, 0, zona).toInstant().toEpochMilli()
+        assertEquals(ekspektasiSubuh, cutoffSubuh)
+    }
+
+    @Test
+    fun `pesan sebelum batas 03 00 AM WIB dibuang, yang setelah batas dipertahankan`() {
+        val now = java.time.ZonedDateTime.of(2026, 9, 14, 10, 0, 0, 0, zona).toInstant().toEpochMilli()
+        val cutoff = java.time.ZonedDateTime.of(2026, 9, 14, 3, 0, 0, 0, zona).toInstant().toEpochMilli()
         val items = susunItemChat(
             listOf(
-                pesan("tua", "a", now - UMUR_PESAN_MS - 1),
-                pesan("muda", "a", now - UMUR_PESAN_MS + 60_000),
+                pesan("kemarin_malam", "a", cutoff - 1_000L),
+                pesan("pagi_ini", "a", cutoff + 60_000L),
             ),
             userId = "x", nowMs = now, zona = zona,
         )
         val bubbles = items.filterIsInstance<ItemChat.Bubble>()
-        assertEquals(listOf("muda"), bubbles.map { it.pesan.id })
+        assertEquals(listOf("pagi_ini"), bubbles.map { it.pesan.id })
     }
 
     // -- susunItemChat: pengelompokan ---------------------------------------

@@ -6,6 +6,8 @@ import com.sukashawarma.superapp.data.remote.optDouble
 import com.sukashawarma.superapp.data.remote.optJsonObject
 import com.sukashawarma.superapp.data.remote.optString
 import com.sukashawarma.superapp.domain.session.AppSession
+import com.sukashawarma.superapp.feature.stok.data.model.Permintaan
+import com.sukashawarma.superapp.feature.stok.data.model.StatusPermintaan
 import com.sukashawarma.superapp.feature.stok.domain.BarisNilai
 import com.sukashawarma.superapp.feature.stok.domain.StatusNilai
 import com.sukashawarma.superapp.feature.stok.domain.UnitMeta
@@ -260,5 +262,14 @@ object BudgetOutletRepository {
                 hasConfig = status?.hasConfig ?: false,
             )
         }.sortedBy { it.outletName }
+    }
+
+    /**
+     * Riwayat belanja permintaan bahan baku yang disetujui (memotong plafon) —
+     * cermin `getOutletSpendingHistory` di `app/actions/budget.ts` web.
+     */
+    suspend fun riwayatBelanja(outletId: String): List<Permintaan> {
+        return PermintaanRepository.daftarOutlet(outletId)
+            .filter { it.status == StatusPermintaan.DISETUJUI }
     }
 }

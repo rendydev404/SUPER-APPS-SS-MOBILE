@@ -78,6 +78,7 @@ class KasbonViewModel : ViewModel() {
     }
 
     fun submit(amount: Double, installmentMonths: Int, reason: String) {
+        if (_state.value.submitting) return
         val staffId = AppSession.staff.value?.id
         if (staffId == null) {
             _state.value = _state.value.copy(submitError = "Sesi tidak valid.")

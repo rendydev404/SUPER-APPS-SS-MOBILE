@@ -13,6 +13,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import java.util.concurrent.ConcurrentHashMap
+
 data class ChecklistItemUi(val id: String, val name: String, val isRequired: Boolean, val ticked: Boolean)
 data class ChecklistCategoryUi(val id: String, val name: String, val items: List<ChecklistItemUi>)
 
@@ -36,6 +40,8 @@ class ChecklistViewModel : ViewModel() {
     val state: StateFlow<ChecklistUiState> = _state
 
     private var recordId: String? = null
+    private val recordMutex = Mutex()
+    private val pendingToggles = ConcurrentHashMap<String, Boolean>()
 
     init { load() }
 
@@ -77,9 +83,15 @@ class ChecklistViewModel : ViewModel() {
                         "select" to "id",
                     )
                 )
-                recordId = record?.optString("id")
-                val ticked = recordId?.let { rid ->
-                    Postgrest.select("daily_checklist_ticks", listOf("record_id" to "eq.$rid", "select" to "item_id"))
+                val rid = record?.optString("id")
+                recordMutex.withLock {
+                    if (recordId == null && rid != null) {
+                        recordId = rid
+                    }
+                }
+                val activeRecordId = recordId ?: rid
+                val ticked = activeRecordId?.let { r ->
+                    Postgrest.select("daily_checklist_ticks", listOf("record_id" to "eq.$r", "select" to "item_id"))
                         .map { it.asJsonObject.optString("item_id") }
                         .toSet()
                 } ?: emptySet()
@@ -89,11 +101,12 @@ class ChecklistViewModel : ViewModel() {
                     val items = cat.optJsonArray("checklist_items")?.map { itemEl ->
                         val item = itemEl.asJsonObject
                         val id = item.optString("id") ?: ""
+                        val isTicked = pendingToggles[id] ?: (id in ticked)
                         ChecklistItemUi(
                             id = id,
                             name = item.optString("task_name") ?: "-",
                             isRequired = item.optBoolean("is_required"),
-                            ticked = id in ticked,
+                            ticked = isTicked,
                         )
                     } ?: emptyList()
                     ChecklistCategoryUi(id = cat.optString("id") ?: "", name = cat.optString("name") ?: "-", items = items)
@@ -109,6 +122,7 @@ class ChecklistViewModel : ViewModel() {
         val outletId = AppSession.staff.value?.outletId ?: return
         val staffId = AppSession.staff.value?.id ?: return
 
+        pendingToggles[itemId] = checked
         _state.value = _state.value.copy(
             categories = _state.value.categories.map { cat ->
                 cat.copy(items = cat.items.map { if (it.id == itemId) it.copy(ticked = checked) else it })
@@ -133,29 +147,38 @@ class ChecklistViewModel : ViewModel() {
                 }
             } catch (e: Exception) {
                 _state.value = _state.value.copy(error = "Gagal menyimpan centang: ${e.message}")
+            } finally {
+                pendingToggles.remove(itemId)
             }
         }
     }
 
-    private suspend fun ensureRecord(outletId: String): String {
+    private suspend fun ensureRecord(outletId: String): String = recordMutex.withLock {
         recordId?.let { return it }
+        val todayStr = JakartaTime.todayDateStr()
         val existing = Postgrest.selectOne(
             "daily_checklist_records",
-            listOf("outlet_id" to "eq.$outletId", "date" to "eq.${JakartaTime.todayDateStr()}", "select" to "id")
+            listOf("outlet_id" to "eq.$outletId", "date" to "eq.$todayStr", "select" to "id")
         )
         if (existing != null) {
             val id = existing.optString("id")!!
             recordId = id
             return id
         }
-        val created = Postgrest.insert(
+        val created = Postgrest.upsert(
             "daily_checklist_records",
             JsonObject().apply {
                 addProperty("outlet_id", outletId)
-                addProperty("date", JakartaTime.todayDateStr())
-            }
+                addProperty("date", todayStr)
+            },
+            onConflict = "outlet_id,date",
         )
-        val id = created[0].asJsonObject.optString("id")!!
+        val id = created.firstOrNull()?.asJsonObject?.optString("id")
+            ?: Postgrest.selectOne(
+                "daily_checklist_records",
+                listOf("outlet_id" to "eq.$outletId", "date" to "eq.$todayStr", "select" to "id")
+            )?.optString("id")
+            ?: error("Gagal memastikan record checklist harian")
         recordId = id
         return id
     }

@@ -1,8 +1,16 @@
 package com.sukashawarma.superapp.feature.chat.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.Box
@@ -21,10 +29,12 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,14 +44,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
 import coil.compose.AsyncImage
 import com.sukashawarma.superapp.core.ui.AvatarStorage
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 
 /**
  * Penampil foto layar penuh, dipakai bersama oleh foto profil dan foto di dalam
@@ -52,6 +67,10 @@ import com.sukashawarma.superapp.core.ui.AvatarStorage
  * terpisah, jadi lapisan biasa justru akan tertutup lembar itu sendiri; dan
  * sebagai dialog ia otomatis menutupi bilah sistem dengan benar dari mana pun
  * dibuka.
+ *
+ * Mendukung gesture geser ke bawah untuk menutup (swipe-down-to-dismiss) layaknya WhatsApp:
+ * latar belakang memudar halus saat ditarik, dan foto membal kembali dengan efek pegas jika
+ * tarikan dilepas sebelum ambang batas.
  *
  * [url] sudah berupa URL siap muat. Kedua bucket-nya privat, jadi pemuatnya
  * memakai `AvatarStorage.imageLoader` yang membawa token sesi — ImageLoader
@@ -71,6 +90,12 @@ fun PenampilFoto(
         onDismissRequest = onTutup,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
+        val view = LocalView.current
+        val dialogWindow = (view.parent as? DialogWindowProvider)?.window
+        SideEffect {
+            dialogWindow?.setDimAmount(0f)
+        }
+
         var skala by remember { mutableFloatStateOf(1f) }
         var geser by remember { mutableStateOf(Offset.Zero) }
         val transform = rememberTransformableState { ubahSkala, ubahGeser, _ ->
@@ -80,11 +105,60 @@ fun PenampilFoto(
             geser = if (skala <= 1f) Offset.Zero else geser + ubahGeser
         }
 
+        var dragOffsetY by remember { mutableFloatStateOf(0f) }
+        val coroutineScope = rememberCoroutineScope()
+        var animJob by remember { mutableStateOf<Job?>(null) }
+        val density = LocalDensity.current
+        val batasTutupPx = remember(density) { with(density) { 120.dp.toPx() } }
+
+        val draggableState = rememberDraggableState { delta ->
+            dragOffsetY = (dragOffsetY + delta).coerceAtLeast(0f)
+        }
+
+        // Opasitas latar belakang menggelap penuh saat di posisi awal,
+        // dan memudar secara mulus saat digeser ke bawah seperti WA
+        val alphaLatar = (1f - (dragOffsetY / 600f)).coerceIn(0f, 1f)
+        val alphaHeader = (1f - (dragOffsetY / 200f)).coerceIn(0f, 1f)
+
         Box(
             Modifier
                 .fillMaxSize()
-                .background(Color(0xFF0B0B0F))
-                .transformable(transform),
+                .background(Color(0xFF0B0B0F).copy(alpha = alphaLatar))
+                .transformable(transform)
+                .draggable(
+                    state = draggableState,
+                    orientation = Orientation.Vertical,
+                    enabled = skala <= 1.05f,
+                    onDragStarted = {
+                        animJob?.cancel()
+                    },
+                    onDragStopped = { kecepatan ->
+                        animJob?.cancel()
+                        animJob = coroutineScope.launch {
+                            val harusTutup = (dragOffsetY > batasTutupPx && kecepatan >= -200f) || kecepatan > 1000f
+                            if (harusTutup) {
+                                val targetY = dragOffsetY + with(density) { 500.dp.toPx() }
+                                Animatable(dragOffsetY).animateTo(
+                                    targetValue = targetY,
+                                    animationSpec = tween(durationMillis = 160, easing = FastOutSlowInEasing),
+                                ) {
+                                    dragOffsetY = value
+                                }
+                                onTutup()
+                            } else {
+                                Animatable(dragOffsetY).animateTo(
+                                    targetValue = 0f,
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioLowBouncy,
+                                        stiffness = Spring.StiffnessMediumLow,
+                                    ),
+                                ) {
+                                    dragOffsetY = value
+                                }
+                            }
+                        }
+                    },
+                ),
             contentAlignment = Alignment.Center,
         ) {
             AsyncImage(
@@ -96,10 +170,13 @@ fun PenampilFoto(
                     .fillMaxSize()
                     .padding(vertical = 76.dp)
                     .graphicsLayer {
-                        scaleX = skala
-                        scaleY = skala
-                        translationX = geser.x
-                        translationY = geser.y
+                        val dismissScale = if (skala <= 1.05f) {
+                            (1f - (dragOffsetY / 2500f)).coerceIn(0.85f, 1f)
+                        } else 1f
+                        scaleX = skala * dismissScale
+                        scaleY = skala * dismissScale
+                        translationX = if (skala <= 1.05f) 0f else geser.x
+                        translationY = if (skala <= 1.05f) dragOffsetY else geser.y
                     },
             )
 
@@ -108,6 +185,7 @@ fun PenampilFoto(
                     .align(Alignment.TopStart)
                     .statusBarsPadding()
                     .fillMaxWidth()
+                    .graphicsLayer { alpha = alphaHeader }
                     .padding(horizontal = 8.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {

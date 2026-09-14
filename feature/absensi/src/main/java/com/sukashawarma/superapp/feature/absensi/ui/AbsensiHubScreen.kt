@@ -61,6 +61,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sukashawarma.superapp.domain.model.ADMIN_OR_HR_ROLES
+import com.sukashawarma.superapp.domain.model.CHECKLIST_MANAGE_ROLES
 import com.sukashawarma.superapp.domain.model.ENROLL_ALLOWED_ROLES
 import com.sukashawarma.superapp.domain.model.SPV_TIER_ROLES
 import com.sukashawarma.superapp.domain.session.AppSession
@@ -69,14 +70,22 @@ import kotlinx.coroutines.launch
 private data class NavItem(val label: String, val icon: ImageVector, val route: String)
 
 /** Cermin `navItems` di apps/absensi/src/app/dashboard/layout.tsx — daftar menu
- *  tetap mengikuti role yang sama seperti halaman web. */
-private fun navItemsFor(roleAllowed: Boolean, isAdminOrHr: Boolean, canEnroll: Boolean): List<NavItem> {
+ *  tetap mengikuti role yang sama seperti halaman web.
+ *  Manajemen Checklist hanya untuk RM, Admin, dan Admin HR; Leader dan AM hanya Monitoring. */
+private fun navItemsFor(
+    roleAllowed: Boolean,
+    isAdminOrHr: Boolean,
+    canEnroll: Boolean,
+    canManageChecklist: Boolean,
+): List<NavItem> {
     if (roleAllowed) {
         return buildList {
             add(NavItem("Papan Kehadiran", Icons.Default.Dashboard, AbsensiRoutes.PAPAN))
             add(NavItem("Rekap & Riwayat", Icons.AutoMirrored.Filled.List, AbsensiRoutes.REKAP))
             add(NavItem("Monitor Checklist", Icons.Default.FactCheck, AbsensiRoutes.CHECKLIST_MONITOR))
-            add(NavItem("Manajemen Checklist", Icons.Default.Rule, AbsensiRoutes.CHECKLIST_MANAGE))
+            if (canManageChecklist) {
+                add(NavItem("Manajemen Checklist", Icons.Default.Rule, AbsensiRoutes.CHECKLIST_MANAGE))
+            }
             add(NavItem("Cuti", Icons.Default.CalendarMonth, AbsensiRoutes.CUTI))
             add(NavItem("Kasbon", Icons.Default.Payments, AbsensiRoutes.KASBON))
             if (canEnroll) add(NavItem("Enrollment Crew", Icons.Default.PersonAdd, AbsensiRoutes.ENROLL))
@@ -107,6 +116,7 @@ fun AbsensiHubScreen(
         roleAllowed = role in SPV_TIER_ROLES,
         isAdminOrHr = role in ADMIN_OR_HR_ROLES,
         canEnroll = role in ENROLL_ALLOWED_ROLES,
+        canManageChecklist = role in CHECKLIST_MANAGE_ROLES,
     )
 
     var sheetOpen by rememberSaveable { mutableStateOf(isSheetVisible) }

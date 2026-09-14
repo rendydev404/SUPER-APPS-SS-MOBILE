@@ -28,6 +28,7 @@ object SubmitAttendanceUseCase {
             val payloadObj = com.google.gson.JsonObject().apply {
                 addProperty("id", entity.id)
                 addProperty("outlet_id", entity.outletId)
+                addProperty("outlet_staff_id", entity.outletStaffId)
                 addProperty("type", entity.type)
                 addProperty("ts_client", entity.tsClientIso)
                 entity.gpsLat?.let { addProperty("gps_lat", it) }

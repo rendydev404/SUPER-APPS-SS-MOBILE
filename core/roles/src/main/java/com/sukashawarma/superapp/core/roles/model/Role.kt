@@ -41,3 +41,11 @@ val ENROLL_ALLOWED_ROLES = setOf(
     Role.SPV, Role.LEADER, Role.REGIONAL_MANAGER, Role.AREA_MANAGER,
     Role.ADMIN, Role.ADMIN_HR, Role.OWNER, Role.KITCHEN
 )
+
+/** Role yang boleh mengakses Manajemen Checklist (tambah/edit/hapus master item checklist):
+ *  HANYA Regional Manager (RM), Admin, dan Admin HR.
+ *  Leader dan Area Manager (AM) hanya boleh monitoring checklist. */
+val CHECKLIST_MANAGE_ROLES = setOf(
+    Role.ADMIN, Role.ADMIN_HR, Role.REGIONAL_MANAGER
+)
+

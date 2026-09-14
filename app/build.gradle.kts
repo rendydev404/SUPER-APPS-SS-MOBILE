@@ -1,6 +1,7 @@
 import java.util.Properties
 
 plugins {
+    id("androidx.baselineprofile")
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
 }
@@ -27,8 +28,8 @@ android {
         applicationId = "com.sukashawarma.superapp"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 12
+        versionName = "1.1.9"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
@@ -59,6 +60,18 @@ android {
             }
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+
+        // Varian bikinan plugin baseline profile (benchmarkRelease,
+        // nonMinifiedRelease) diturunkan dari release. Di mesin yang tidak
+        // memegang keystore rilis, turunan itu ikut tak bertanda tangan dan
+        // mustahil dipasang — padahal pembangkitan profil menuntut aplikasinya
+        // terpasang di perangkat. Untuk varian pengukuran, kunci debug sudah
+        // cukup; varian `release` sungguhan tidak tersentuh aturan ini.
+        all {
+            if (name != "release" && name.endsWith("Release") && signingConfig == null) {
+                signingConfig = signingConfigs.getByName("debug")
+            }
         }
     }
 
@@ -152,6 +165,10 @@ dependencies {
     implementation(project(":feature:leader"))
     implementation(project(":feature:profil"))
     implementation(project(":feature:chat"))
+    // Memasang Baseline Profile pada perangkat yang tidak menerimanya lewat
+    // Play Store (mis. APK yang dibagikan langsung ke karyawan).
+    implementation("androidx.profileinstaller:profileinstaller:1.3.1")
+    baselineProfile(project(":baselineprofile"))
 }
 
 

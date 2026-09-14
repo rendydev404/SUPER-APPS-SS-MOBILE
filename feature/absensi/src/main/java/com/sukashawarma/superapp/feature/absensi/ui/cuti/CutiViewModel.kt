@@ -83,6 +83,7 @@ class CutiViewModel : ViewModel() {
     }
 
     fun submit(leaveType: String, startDate: LocalDate, endDate: LocalDate, reason: String) {
+        if (_state.value.submitting) return
         val staffId = AppSession.staff.value?.id
         if (staffId == null) {
             _state.value = _state.value.copy(submitError = "Sesi tidak valid.")

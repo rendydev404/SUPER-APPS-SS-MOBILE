@@ -79,7 +79,9 @@ import com.sukashawarma.superapp.presentation.absensi.papan.PapanKehadiranScreen
 import com.sukashawarma.superapp.presentation.absensi.pengaturan.PengaturanScreen
 import com.sukashawarma.superapp.feature.profil.ui.ProfilScreen
 import com.sukashawarma.superapp.presentation.absensi.rekap.RekapScreen
+import com.sukashawarma.superapp.domain.model.CHECKLIST_MANAGE_ROLES
 import com.sukashawarma.superapp.domain.model.Role
+import com.sukashawarma.superapp.domain.model.SPV_TIER_ROLES
 import com.sukashawarma.superapp.domain.session.AppSession
 import com.sukashawarma.superapp.presentation.components.ComingSoon
 import com.sukashawarma.superapp.presentation.theme.SukaOnSurfaceVariant
@@ -150,8 +152,22 @@ fun AbsensiNavGraph(onExit: () -> Unit) {
         }
         composable(AbsensiRoutes.REKAP) { RekapScreen(onExit = { navController.popBackStack() }) }
         composable(AbsensiRoutes.CHECKLIST) { ChecklistScreen(onExit = { navController.popBackStack() }) }
-        composable(AbsensiRoutes.CHECKLIST_MONITOR) { ChecklistMonitorScreen(onExit = { navController.popBackStack() }) }
-        composable(AbsensiRoutes.CHECKLIST_MANAGE) { ChecklistManageScreen(onExit = { navController.popBackStack() }) }
+        composable(AbsensiRoutes.CHECKLIST_MONITOR) {
+            val staff by AppSession.staff.collectAsState()
+            if (staff?.role in SPV_TIER_ROLES) {
+                ChecklistMonitorScreen(onExit = { navController.popBackStack() })
+            } else {
+                LaunchedEffect(Unit) { navController.popBackStack() }
+            }
+        }
+        composable(AbsensiRoutes.CHECKLIST_MANAGE) {
+            val staff by AppSession.staff.collectAsState()
+            if (staff?.role in CHECKLIST_MANAGE_ROLES) {
+                ChecklistManageScreen(onExit = { navController.popBackStack() })
+            } else {
+                LaunchedEffect(Unit) { navController.popBackStack() }
+            }
+        }
         composable(AbsensiRoutes.CUTI) {
             CutiScreen(
                 onExit = { navController.popBackStack() },

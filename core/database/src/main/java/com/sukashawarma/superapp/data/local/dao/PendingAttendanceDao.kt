@@ -23,5 +23,8 @@ interface PendingAttendanceDao {
 
     @Query("SELECT COUNT(*) FROM pending_attendance")
     fun countFlow(): Flow<Int>
+
+    @Query("SELECT * FROM pending_attendance WHERE outletStaffId = :staffId ORDER BY createdAtMs DESC LIMIT 1")
+    suspend fun getLatestForStaff(staffId: String): PendingAttendanceEntity?
 }
 

@@ -16,7 +16,6 @@ sealed interface PesanProfil {
 
 data class ProfilUiState(
     val staff: StaffProfile? = null,
-    val namaTampilan: String = "",
     val usernameTampilan: String = "",
     val menyimpanIdentitas: Boolean = false,
     val mengurusFoto: Boolean = false,
@@ -27,13 +26,12 @@ data class ProfilUiState(
      *  supaya tidak ada request yang tidak mengubah apa pun. */
     val identitasBerubah: Boolean
         get() = staff != null && (
-            namaTampilan.trim() != (staff.displayName ?: "") ||
-                usernameTampilan.trim() != (staff.displayUsername ?: "")
-            )
+            usernameTampilan.trim() != (staff.displayUsername ?: "")
+        )
 }
 
 /**
- * Layar "Profil Saya": nama tampilan, username tampilan, foto, dan ganti password.
+ * Layar "Profil Saya": username tampilan, foto, dan ganti password.
  *
  * Yang TIDAK bisa diubah di sini, dan itu disengaja: nama kepegawaian (`name`),
  * username login, peran, dan outlet. Semuanya milik admin/HR lewat web — lihat
@@ -51,19 +49,11 @@ class ProfilViewModel : ViewModel() {
                     staff = staff,
                     // Isian hanya disetel ulang ketika BUKAN sedang diketik pengguna,
                     // yaitu saat isian masih mencerminkan nilai tersimpan sebelumnya.
-                    // Tanpa syarat ini, refreshStaff() yang datang di tengah pengetikan
-                    // akan menghapus ketikan yang belum sempat disimpan.
-                    namaTampilan = if (lama.identitasBerubah) lama.namaTampilan
-                    else staff?.displayName.orEmpty(),
                     usernameTampilan = if (lama.identitasBerubah) lama.usernameTampilan
                     else staff?.displayUsername.orEmpty(),
                 )
             }
         }
-    }
-
-    fun ubahNama(nilai: String) {
-        _state.value = _state.value.copy(namaTampilan = nilai.take(40), pesan = null)
     }
 
     fun ubahUsername(nilai: String) {
@@ -79,8 +69,7 @@ class ProfilViewModel : ViewModel() {
 
     /** Cermin aturan di dalam RPC. Diperiksa di sini juga supaya salah ketik
      *  ketahuan sebelum menghabiskan satu perjalanan ke server. */
-    private fun galatIdentitas(nama: String, username: String): String? = when {
-        nama.isNotEmpty() && nama.length < 2 -> "Nama tampilan minimal 2 karakter."
+    private fun galatUsername(username: String): String? = when {
         username.isNotEmpty() && !username.matches(Regex("^[a-z0-9._]{3,20}$")) ->
             "Username hanya boleh huruf, angka, titik, dan garis bawah, 3-20 karakter."
         else -> null
@@ -88,27 +77,26 @@ class ProfilViewModel : ViewModel() {
 
     fun simpanIdentitas() {
         val kini = _state.value
-        val nama = kini.namaTampilan.trim()
         val username = kini.usernameTampilan.trim()
-        galatIdentitas(nama, username)?.let {
+        galatUsername(username)?.let {
             _state.value = kini.copy(pesan = PesanProfil.Galat(it))
             return
         }
         _state.value = kini.copy(menyimpanIdentitas = true, pesan = null)
         viewModelScope.launch {
             try {
-                // Keduanya selalu dikirim (string kosong = kosongkan), karena layar
-                // ini memang menampilkan keduanya sekaligus: mengosongkan salah satu
-                // adalah perubahan yang disengaja, bukan "jangan diubah".
-                ProfilRepository.simpan(namaTampilan = nama, usernameTampilan = username)
+                // Ketika username disimpan, kita kirim username ke namaTampilan dan usernameTampilan.
+                // Supabase update_my_profile mengisi display_name dan display_username dengan username,
+                // sehingga di seluruh chat (chat_messages_fill_sender) dan profil nama yang tampil adalah username.
+                ProfilRepository.simpan(namaTampilan = username, usernameTampilan = username)
                 _state.value = _state.value.copy(
                     menyimpanIdentitas = false,
-                    pesan = PesanProfil.Sukses("Profil tersimpan."),
+                    pesan = PesanProfil.Sukses("Username tersimpan."),
                 )
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
                     menyimpanIdentitas = false,
-                    pesan = PesanProfil.Galat(e.message ?: "Gagal menyimpan profil."),
+                    pesan = PesanProfil.Galat(e.message ?: "Gagal menyimpan username."),
                 )
             }
         }

@@ -89,12 +89,22 @@ object StokAkses {
     )
 
     /**
-     * Laporan Penjualan dan Plafon & Belanja Outlet — cermin `canViewSales`.
-     * Web menempatkan keduanya di balik satu gerbang yang sama.
+     * Laporan Penjualan — cermin `canViewSales`.
      */
     private val PENJUALAN = setOf(
         Role.KITCHEN, Role.ADMIN, Role.OWNER, Role.ADMIN_FINANCE,
         Role.DEVELOPER, Role.PURCHASING,
+    )
+
+    /**
+     * Plafon & Belanja Outlet — cermin `requireBudgetViewer` di `app/actions/budget.ts`,
+     * `leaderMoreItems` di `BottomNav.tsx`, dan `SPVTabs.tsx` di web.
+     * Dapat diakses oleh pengawas outlet (Leader, SPV, Area Manager, Regional Manager)
+     * dan staf kantor pusat (Kitchen, Purchasing, Admin, Admin Finance, Owner, Developer).
+     */
+    private val PLAFON_BELANJA = setOf(
+        Role.KITCHEN, Role.PURCHASING, Role.ADMIN, Role.ADMIN_FINANCE, Role.OWNER,
+        Role.DEVELOPER, Role.LEADER, Role.SPV, Role.AREA_MANAGER, Role.REGIONAL_MANAGER,
     )
 
     /**
@@ -130,7 +140,7 @@ object StokAkses {
     fun melihatNilaiPersediaan(role: Role?): Boolean = role != null && role in NILAI_PERSEDIAAN
     fun melihatHppMenu(role: Role?): Boolean = role != null && role in HPP_MENU
     fun melihatLaporanPenjualan(role: Role?): Boolean = role != null && role in PENJUALAN
-    fun melihatPlafonBelanja(role: Role?): Boolean = role != null && role in PENJUALAN
+    fun melihatPlafonBelanja(role: Role?): Boolean = role != null && role in PLAFON_BELANJA
     fun melihatAnalisisSelisih(role: Role?): Boolean = role != null && role in ANALISIS_SELISIH
     fun melihatThreshold(role: Role?): Boolean = role != null && role in THRESHOLD
 }

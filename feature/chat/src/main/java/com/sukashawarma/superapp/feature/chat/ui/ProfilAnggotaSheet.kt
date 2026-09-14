@@ -78,7 +78,7 @@ fun ProfilAnggotaSheet(
     onTutup: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState()
-    val nama = anggota?.nama ?: namaCadangan
+    val nama = anggota?.username?.takeIf { it.isNotBlank() } ?: anggota?.nama ?: namaCadangan
     val avatar = anggota?.avatar ?: avatarCadangan
     var lihatFoto by remember { mutableStateOf(false) }
 
@@ -162,14 +162,14 @@ fun ProfilAnggotaSheet(
                         .clip(RoundedCornerShape(12.dp))
                         .background(Color.White),
                 ) {
+                    if (!anggota.username.isNullOrBlank()) {
+                        BarisProfil(Icons.Filled.Badge, "Nama Resmi", anggota.nama)
+                        PemisahBaris()
+                    }
                     BarisProfil(Icons.Filled.Badge, "Jabatan", labelRole(anggota.role))
                     anggota.outlet?.takeIf { it.isNotBlank() }?.let {
                         PemisahBaris()
                         BarisProfil(Icons.Filled.Storefront, "Outlet", it)
-                    }
-                    anggota.username?.takeIf { it.isNotBlank() }?.let {
-                        PemisahBaris()
-                        BarisProfil(Icons.Filled.AlternateEmail, "Username", "@$it")
                     }
                 }
             }

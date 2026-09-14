@@ -359,6 +359,7 @@ class ChatViewModel : ViewModel() {
         hanyaAdmin: Boolean,
         fotoBaru: ByteArray? = null,
         hapusFoto: Boolean = false,
+        wallpaper: String? = null,
         onSelesai: (String?) -> Unit,
     ) {
         viewModelScope.launch {
@@ -368,7 +369,12 @@ class ChatViewModel : ViewModel() {
                     hapusFoto -> ""
                     else -> null
                 }
-                ChatRepository.simpanPengaturan(nama, deskripsi, hanyaAdmin, namaSendiri, path)
+                wallpaper?.let { wp ->
+                    _state.value = _state.value.copy(
+                        pengaturan = _state.value.pengaturan.copy(wallpaper = wp)
+                    )
+                }
+                ChatRepository.simpanPengaturan(nama, deskripsi, hanyaAdmin, namaSendiri, path, wallpaper)
                 muatUlang()
                 onSelesai(null)
             } catch (e: kotlinx.coroutines.CancellationException) {
@@ -376,6 +382,27 @@ class ChatViewModel : ViewModel() {
             } catch (e: Exception) {
                 android.util.Log.e("ChatViewModel", "simpan pengaturan gagal", e)
                 onSelesai(e.message ?: "Gagal menyimpan pengaturan.")
+            }
+        }
+    }
+
+    /**
+     * Terapkan dan simpan wallpaper secara instan begitu tombol 'Terapkan' diketuk.
+     */
+    fun simpanWallpaper(idWallpaper: String, onSelesai: (String?) -> Unit = {}) {
+        viewModelScope.launch {
+            try {
+                _state.value = _state.value.copy(
+                    pengaturan = _state.value.pengaturan.copy(wallpaper = idWallpaper)
+                )
+                ChatRepository.simpanWallpaper(idWallpaper, namaSendiri)
+                muatUlang()
+                onSelesai(null)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.e("ChatViewModel", "simpan wallpaper gagal", e)
+                onSelesai(e.message ?: "Gagal menyimpan wallpaper.")
             }
         }
     }

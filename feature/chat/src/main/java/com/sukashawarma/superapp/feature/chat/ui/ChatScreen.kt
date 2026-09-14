@@ -14,7 +14,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.StartOffset
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
@@ -154,6 +157,7 @@ import com.sukashawarma.superapp.feature.chat.data.ChatRepository
 import com.sukashawarma.superapp.feature.chat.data.PesanChat
 import com.sukashawarma.superapp.feature.chat.data.ReaksiPesan
 import com.sukashawarma.superapp.feature.chat.data.Sebutan
+import com.sukashawarma.superapp.feature.chat.data.WallpaperLatarChat
 import com.sukashawarma.superapp.feature.chat.domain.ItemChat
 import com.sukashawarma.superapp.feature.chat.domain.cariKueriSebutan
 import com.sukashawarma.superapp.feature.chat.domain.rentangSebutan
@@ -191,6 +195,7 @@ private val Merah = Color(0xFFFF3B30)
 /** Aksen merek. Dipakai untuk hal yang menuntut perhatian: sorotan lompatan,
  *  mode sunting, dan tombol '@'. */
 private val Oranye = Color(0xFFEA580C)
+private val OranyeMenyala = Color(0xFFFF8A00)
 
 /** Warna nama pengirim di grup — satu warna tetap per orang, seperti WA. */
 /** Cermin batas di `chat_edit_pesan`. Di sini hanya menentukan apakah tombolnya
@@ -275,17 +280,16 @@ fun ChatScreen(
     var profilDibuka by remember { mutableStateOf<Triple<String, String, String?>?>(null) }
     // Pesan yang sedang disorot setelah melompat dari kartu kutipan.
     var sorotPesanId by remember { mutableStateOf<String?>(null) }
+    var sorotKunci by remember { mutableIntStateOf(0) }
     // Foto yang sedang dibuka layar penuh: URL siap muat + judulnya.
     var fotoDibuka by remember { mutableStateOf<Pair<String, String>?>(null) }
 
     // Sorotan padam sendiri. Membiarkannya menyala terus membuat pesan itu
     // tampak "terpilih" selamanya, padahal ia hanya sedang ditunjukkan.
-    LaunchedEffect(sorotPesanId) {
+    LaunchedEffect(sorotPesanId, sorotKunci) {
         if (sorotPesanId == null) return@LaunchedEffect
-        // Lebih lama dari denyutnya (220 + 1000 + 420 ms) supaya gelembungnya
-        // sempat memudar keluar; dibuang lebih cepat, sorotannya lenyap
-        // mendadak di tengah animasi.
-        kotlinx.coroutines.delay(1_900)
+        // Selaras dengan durasi animasi denyut + getar + memudar (~2.05s)
+        kotlinx.coroutines.delay(2_050)
         sorotPesanId = null
     }
     var menyimpanPengaturan by remember { mutableStateOf(false) }
@@ -468,13 +472,14 @@ fun ChatScreen(
             // Daftar nama lengkapnya ada di baris pengetik di dasar percakapan.
             subtitle = labelPengetikPendek(state.pengetik)
                 ?: if (state.pengaturan.hanyaAdmin) "Mode pengumuman aktif"
-                else "Pesan hilang otomatis setelah 24 jam",
+                else "Pesan terhapus otomatis setiap 03:00 AM",
             subtitleAktif = state.pengetik.isNotEmpty(),
             onBukaInfo = { galatPengaturan = null; sheetInfo = true; viewModel.muatAnggota() },
             onBack = onBack,
         )
 
         Box(Modifier.weight(1f).fillMaxWidth()) {
+            WallpaperLatarChat(state.pengaturan.wallpaper)
             when {
                 state.memuat -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = BiruIos, strokeWidth = 3.dp, modifier = Modifier.size(30.dp))
@@ -532,24 +537,29 @@ fun ChatScreen(
                     ) { i ->
                         when (val item = itemTampil[i]) {
                             is ItemChat.Pemisah -> PemisahTanggal(item.label)
-                            is ItemChat.Bubble -> BarisBubble(
-                                item = item,
-                                reaksi = state.reaksi[item.pesan.id].orEmpty(),
-                                userId = userId,
-                                onBalas = { viewModel.setBalas(it) },
-                                onTekanLama = { menuPesan = it },
-                                onKetukReaksi = { sheetReaksi = it },
-                                disorot = item.pesan.id == sorotPesanId,
-                                onKlikFoto = { pesan ->
-                                    ChatRepository.urlFoto(pesan.imagePath)?.let { url ->
-                                        fotoDibuka = url to pesan.senderName
-                                    }
-                                },
-                                onKlikPengirim = { pesan ->
-                                    profilDibuka = Triple(pesan.senderId, pesan.senderName, pesan.senderAvatar)
-                                    viewModel.muatAnggota()
-                                },
-                                onKlikSebutan = { orang ->
+                            is ItemChat.Bubble -> {
+                                val namaPengirim = state.anggota.firstOrNull { it.id == item.pesan.senderId }?.namaTampil
+                                    ?: item.pesan.senderName
+                                BarisBubble(
+                                    item = item,
+                                    namaPengirim = namaPengirim,
+                                    reaksi = state.reaksi[item.pesan.id].orEmpty(),
+                                    userId = userId,
+                                    onBalas = { viewModel.setBalas(it) },
+                                    onTekanLama = { menuPesan = it },
+                                    onKetukReaksi = { sheetReaksi = it },
+                                    disorot = item.pesan.id == sorotPesanId,
+                                    sorotKunci = if (item.pesan.id == sorotPesanId) sorotKunci else 0,
+                                    onKlikFoto = { pesan ->
+                                        ChatRepository.urlFoto(pesan.imagePath)?.let { url ->
+                                            fotoDibuka = url to namaPengirim
+                                        }
+                                    },
+                                    onKlikPengirim = { pesan ->
+                                        profilDibuka = Triple(pesan.senderId, namaPengirim, pesan.senderAvatar)
+                                        viewModel.muatAnggota()
+                                    },
+                                    onKlikSebutan = { orang ->
                                     // Wajahnya sengaja null: yang tersimpan di
                                     // pesan hanya id dan nama saat disebut.
                                     // Kartu profil menariknya sendiri dari
@@ -563,6 +573,7 @@ fun ChatScreen(
                                     if (idx >= 0) {
                                         scope.launch { listState.gulirHalusKe(idx) }
                                         sorotPesanId = idAsal
+                                        sorotKunci++
                                     } else {
                                         // Pesan asli bisa sudah dihapus atau lewat
                                         // 24 jam. Diam saja membuat ketukan terasa
@@ -577,6 +588,7 @@ fun ChatScreen(
                             )
                         }
                     }
+                }
                     if (itemTampil.isEmpty() && state.tertunda.isEmpty()) {
                         item { KeadaanKosong() }
                     }
@@ -601,7 +613,10 @@ fun ChatScreen(
                         sebutanSudahDilihat = true
                         val sasaran = itemTampil.getOrNull(indeksSebutanku)
                         scope.launch { listState.gulirHalusKe(indeksSebutanku) }
-                        if (sasaran is ItemChat.Bubble) sorotPesanId = sasaran.pesan.id
+                        if (sasaran is ItemChat.Bubble) {
+                            sorotPesanId = sasaran.pesan.id
+                            sorotKunci++
+                        }
                     }
                 }
                 Spacer(Modifier.height(10.dp))
@@ -638,7 +653,8 @@ fun ChatScreen(
         }
 
         state.balasTarget?.let { target ->
-            KartuBalasComposer(target) { viewModel.setBalas(null) }
+            val namaBalas = state.anggota.firstOrNull { it.id == target.senderId }?.namaTampil ?: target.senderName
+            KartuBalasComposer(target, namaBalas) { viewModel.setBalas(null) }
         }
 
         if (state.bolehKirim) {
@@ -727,7 +743,9 @@ fun ChatScreen(
     fotoPratinjau?.let { foto ->
         PratinjauKirimFoto(
             foto = foto,
-            namaBalasan = state.balasTarget?.senderName,
+            namaBalasan = state.balasTarget?.let { t ->
+                state.anggota.firstOrNull { it.id == t.senderId }?.namaTampil ?: t.senderName
+            },
             onKirim = { keterangan ->
                 viewModel.kirimFoto(foto.webp, keterangan)
                 fotoPratinjau = null
@@ -771,16 +789,23 @@ fun ChatScreen(
                 bubble = {
                     // Bubble yang sama persis, tanpa identitas berulang supaya
                     // fokusnya pada isi pesan yang sedang dipilih.
-                    Bubble(item = item.copy(tampilkanIdentitas = false), onLompatKe = {})
+                    val namaPengirim = state.anggota.firstOrNull { it.id == item.pesan.senderId }?.namaTampil
+                        ?: item.pesan.senderName
+                    Bubble(
+                        item = item.copy(tampilkanIdentitas = false),
+                        namaPengirim = namaPengirim,
+                        onLompatKe = {},
+                    )
                 },
             )
         }
     }
 
     konfirmasiHapus?.let { pesan ->
+        val namaHapus = state.anggota.firstOrNull { it.id == pesan.senderId }?.namaTampil ?: pesan.senderName
         AlertDialog(
             onDismissRequest = { konfirmasiHapus = null },
-            title = { Text(if (pesan.senderId == userId) "Hapus pesan?" else "Hapus pesan ${pesan.senderName}?") },
+            title = { Text(if (pesan.senderId == userId) "Hapus pesan?" else "Hapus pesan $namaHapus?") },
             text = {
                 Text(
                     if (pesan.senderId == userId) {
@@ -845,14 +870,23 @@ fun ChatScreen(
             memuatAnggota = state.memuatAnggota,
             userId = userId,
             onKlikAnggota = { profilDibuka = Triple(it.id, it.nama, it.avatar) },
-            onSimpan = { nama, deskripsi, hanyaAdmin, fotoJpeg, hapusFoto ->
+            onSimpan = { nama, deskripsi, hanyaAdmin, fotoJpeg, hapusFoto, wallpaper ->
                 menyimpanPengaturan = true
-                viewModel.simpanPengaturan(nama, deskripsi, hanyaAdmin, fotoJpeg, hapusFoto) { galat ->
+                viewModel.simpanPengaturan(nama, deskripsi, hanyaAdmin, fotoJpeg, hapusFoto, wallpaper) { galat ->
                     menyimpanPengaturan = false
                     galatPengaturan = galat
                     if (galat == null) {
                         sheetInfo = false
                         Toast.makeText(context, "Pengaturan grup tersimpan.", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            },
+            onGantiWallpaper = { idBaru ->
+                viewModel.simpanWallpaper(idBaru) { galat ->
+                    if (galat != null) {
+                        Toast.makeText(context, galat, Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, "Wallpaper chat berhasil diterapkan.", Toast.LENGTH_SHORT).show()
                     }
                 }
             },
@@ -975,28 +1009,80 @@ private fun PitaModePengumuman() {
     }
 }
 
+@Stable
+private class SorotAnimasiState(
+    val skala: Animatable<Float, *>,
+    val glow: Animatable<Float, *>,
+    val getarX: Animatable<Float, *>,
+)
+
 /**
- * Denyut sorotan: 0 -> 1 (muncul), ditahan, lalu 1 -> 0 (padam).
+ * Animasi sorotan interaktif saat melompat ke pesan yang dikutip (reply):
+ * 1. Membesar responsif (1.0f -> 1.065f -> 1.03f), bertahan beberapa detik, lalu kembali ke 1.0f normal.
+ * 2. Gerak getar taktil (micro-vibration jiggle ke kiri-kanan secara cepat + haptic feedback).
+ * 3. Menyala (glow & bloom aura hangat oranye merek di sekeliling dan dalam gelembung).
  *
- * Berdiri sebagai composable sendiri supaya state animasinya lahir dan mati
- * bersama sorotannya — bukan menumpang di setiap gelembung yang kebetulan
- * tersusun.
- *
- * SATU float untuk seluruh efek. Nilainya dipakai bersama oleh cincin, kilau
- * latar, dan pembesaran halus, sehingga ketiganya bergerak sebagai satu benda —
- * dan yang dibayar tetap satu animasi, pada satu gelembung, sekali lompatan.
- * Padamnya ikut dianimasikan; versi sebelumnya hanya memudar masuk lalu hilang
- * begitu saja, dan justru kepergian mendadak itulah yang terlihat patah.
+ * Seluruh nilai animasi dibaca murni di dalam `graphicsLayer` dan `drawWithContent`
+ * pada fase render GPU, sehingga 100% bebas dari recomposition dan bebas frame drop.
  */
 @Composable
-private fun denyutSorot(): Animatable<Float, *> {
-    val maju = remember { Animatable(0f) }
-    LaunchedEffect(Unit) {
-        maju.animateTo(1f, tween(220, easing = FastOutSlowInEasing))
-        kotlinx.coroutines.delay(1_000)
-        maju.animateTo(0f, tween(420, easing = FastOutSlowInEasing))
+private fun denyutSorot(kunci: Any): SorotAnimasiState {
+    val skala = remember(kunci) { Animatable(1f) }
+    val glow = remember(kunci) { Animatable(0f) }
+    val getarX = remember(kunci) { Animatable(0f) }
+    val haptic = LocalHapticFeedback.current
+
+    LaunchedEffect(kunci) {
+        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+
+        // 1. Membesar responsif (overshoot pop), bertahan beberapa detik, lalu kembali normal
+        launch {
+            skala.animateTo(
+                targetValue = 1.065f,
+                animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing),
+            )
+            skala.animateTo(
+                targetValue = 1.03f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMedium,
+                ),
+            )
+            kotlinx.coroutines.delay(1_200)
+            skala.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing),
+            )
+        }
+
+        // 2. Gerak getar taktil (micro-vibration jiggle) ke kiri-kanan secara cepat
+        launch {
+            val langkah = floatArrayOf(-6f, 6f, -4.5f, 4.5f, -2.5f, 2.5f, -1f, 1f, 0f)
+            for (offset in langkah) {
+                getarX.animateTo(
+                    targetValue = offset,
+                    animationSpec = tween(durationMillis = 30, easing = LinearEasing),
+                )
+            }
+        }
+
+        // 3. Efek Menyala (Glow & Bloom Aura)
+        launch {
+            glow.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = 160, easing = FastOutSlowInEasing),
+            )
+            kotlinx.coroutines.delay(1_200)
+            glow.animateTo(
+                targetValue = 0f,
+                animationSpec = tween(durationMillis = 380, easing = FastOutSlowInEasing),
+            )
+        }
     }
-    return maju
+
+    return remember(kunci) {
+        SorotAnimasiState(skala, glow, getarX)
+    }
 }
 
 /** Sisa jarak yang masih dianimasikan setelah lompatan instan. */
@@ -1207,6 +1293,7 @@ private fun HeaderChat(
 @Composable
 private fun BarisBubble(
     item: ItemChat.Bubble,
+    namaPengirim: String = item.pesan.senderName,
     reaksi: List<ReaksiPesan>,
     userId: String,
     onBalas: (PesanChat) -> Unit,
@@ -1217,6 +1304,7 @@ private fun BarisBubble(
     onKlikSebutan: (Sebutan) -> Unit,
     onKlikFoto: (PesanChat) -> Unit,
     disorot: Boolean,
+    sorotKunci: Any = Unit,
 ) {
     val p = item.pesan
     // Nisan tidak bisa dibalas, ditanggapi, disalin, atau disunting — tidak ada
@@ -1283,7 +1371,7 @@ private fun BarisBubble(
                     if (item.posisi == PosisiGrup.TUNGGAL || item.posisi == PosisiGrup.AKHIR) {
                         AvatarStaf(
                             path = p.senderAvatar,
-                            nama = p.senderName,
+                            nama = namaPengirim,
                             modifier = Modifier
                                 .size(30.dp)
                                 .clip(CircleShape)
@@ -1297,6 +1385,7 @@ private fun BarisBubble(
             Column(horizontalAlignment = if (item.milikSendiri) Alignment.End else Alignment.Start) {
                 Bubble(
                     item = item,
+                    namaPengirim = namaPengirim,
                     onLompatKe = onLompatKe,
                     onKlikFoto = { onKlikFoto(p) },
                     onKlikSebutan = onKlikSebutan,
@@ -1306,6 +1395,7 @@ private fun BarisBubble(
                     // diteruskan langsung ke bubble.
                     onTekanLama = { if (!terhapus) onTekanLama(p) },
                     disorot = disorot,
+                    sorotKunci = sorotKunci,
                     modifier = if (terhapus) Modifier else Modifier.combinedClickable(
                         onClick = {},
                         onLongClick = { onTekanLama(p) },
@@ -1365,11 +1455,13 @@ private fun KepingReaksi(
 @Composable
 private fun Bubble(
     item: ItemChat.Bubble,
+    namaPengirim: String = item.pesan.senderName,
     onLompatKe: (String) -> Unit,
     onKlikFoto: () -> Unit = {},
     onKlikSebutan: (Sebutan) -> Unit = {},
     onTekanLama: () -> Unit = {},
     disorot: Boolean = false,
+    sorotKunci: Any = Unit,
     modifier: Modifier = Modifier,
 ) {
     val p = item.pesan
@@ -1385,21 +1477,20 @@ private fun Bubble(
     // Versi sebelumnya memanggil animateColorAsState di SETIAP gelembung, jadi
     // setiap kali daftar melompat, belasan Animatable dan LaunchedEffect lahir
     // sekaligus hanya untuk menganimasikan warna transparan ke transparan.
-    val denyut = if (disorot) denyutSorot() else null
+    val denyut = if (disorot) denyutSorot(sorotKunci) else null
 
     Column(
         modifier
             .widthIn(max = 290.dp + EKOR)
-            // Denyutnya dibaca DI DALAM lambda gambar dan lapisan, bukan saat
-            // penyusunan. Compose karena itu hanya menggambar ulang satu
-            // gelembung tiap frame — tanpa menyusun ulang apa pun dan tanpa
-            // mengukur ulang daftarnya. Itulah yang membuat efek sekaya ini
-            // tetap gratis di HP lemah.
+            // Nilai animasi dibaca DI DALAM lambda graphicsLayer dan drawWithContent.
+            // Compose karena itu hanya menggambar ulang satu gelembung tiap frame
+            // pada tingkat GPU — tanpa recomposition dan tanpa relayout daftar.
             .then(
                 if (denyut == null) Modifier else Modifier.graphicsLayer {
-                    val skala = 1f + 0.04f * denyut.value
-                    scaleX = skala
-                    scaleY = skala
+                    val s = denyut.skala.value
+                    scaleX = s
+                    scaleY = s
+                    translationX = denyut.getarX.value
                 }
             )
             .clip(bentuk)
@@ -1407,18 +1498,29 @@ private fun Bubble(
             .then(
                 if (denyut == null) Modifier else Modifier.drawWithContent {
                     drawContent()
-                    val maju = denyut.value
+                    val maju = denyut.glow.value
                     if (maju <= 0f) return@drawWithContent
                     val garis = bentuk.createOutline(size, layoutDirection, this)
-                    // Kilau tipis di dalam, cincin tegas di tepi: yang pertama
-                    // membuat gelembungnya terasa menyala, yang kedua membuat
-                    // batasnya jelas di atas latar terang maupun gelap.
-                    drawOutline(garis, Oranye, alpha = 0.14f * maju)
+
+                    // 1. Aura cahaya memancar di sekeliling (outer bloom glow)
+                    drawOutline(
+                        garis,
+                        OranyeMenyala,
+                        alpha = 0.32f * maju,
+                        style = Stroke(width = 8.dp.toPx()),
+                    )
+                    // 2. Kilau hangat di dalam isi bubble
+                    drawOutline(
+                        garis,
+                        OranyeMenyala,
+                        alpha = 0.16f * maju,
+                    )
+                    // 3. Cincin tegas berkilau di batas luar
                     drawOutline(
                         garis,
                         Oranye,
                         alpha = maju,
-                        style = Stroke(width = 2.5.dp.toPx()),
+                        style = Stroke(width = 2.8.dp.toPx()),
                     )
                 }
             )
@@ -1433,7 +1535,7 @@ private fun Bubble(
     ) {
         if (item.tampilkanIdentitas) {
             Text(
-                p.senderName,
+                namaPengirim,
                 fontSize = 12.5.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = warnaNama(p.senderId),
@@ -1461,9 +1563,8 @@ private fun Bubble(
                     snippet = p.replyToSnippet.orEmpty(),
                     fotoPath = p.replyToImage,
                     diBubbleSendiri = item.milikSendiri,
-                    modifier = Modifier
-                        .padding(bottom = 4.dp)
-                        .clickable(enabled = p.replyToId != null) { p.replyToId?.let(onLompatKe) },
+                    onKlik = p.replyToId?.let { id -> { onLompatKe(id) } },
+                    modifier = Modifier.padding(bottom = 4.dp),
                 )
             }
 
@@ -1471,7 +1572,7 @@ private fun Bubble(
                 AsyncImage(
                     model = ChatRepository.urlFoto(p.imagePath),
                     imageLoader = AvatarStorage.imageLoader(LocalContext.current),
-                    contentDescription = "Foto dari ${p.senderName}",
+                    contentDescription = "Foto dari $namaPengirim",
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .padding(bottom = if (p.body.isNotBlank()) 4.dp else 0.dp)
@@ -1620,6 +1721,7 @@ private fun KutipanReply(
     fotoPath: String?,
     diBubbleSendiri: Boolean,
     modifier: Modifier = Modifier,
+    onKlik: (() -> Unit)? = null,
 ) {
     val latar = if (diBubbleSendiri) Color(0x2EFFFFFF) else Color(0x0F000000)
     val warnaBar = if (diBubbleSendiri) Color.White else BiruIos
@@ -1628,6 +1730,7 @@ private fun KutipanReply(
     Row(
         modifier
             .clip(RoundedCornerShape(8.dp))
+            .then(if (onKlik != null) Modifier.clickable(onClick = onKlik) else Modifier)
             .background(latar)
             .heightIn(min = 38.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -1799,7 +1902,7 @@ private fun PemisahTanggal(label: String) {
 private fun BannerSementara() {
     Box(Modifier.fillMaxWidth().padding(vertical = 12.dp), contentAlignment = Alignment.Center) {
         Text(
-            "🕒 Pesan di ruang ini otomatis terhapus setelah 24 jam",
+            "🕒 Pesan di ruang ini otomatis terhapus setiap pukul 03:00 AM WIB",
             fontSize = 12.sp,
             textAlign = TextAlign.Center,
             color = TeksBanner,
@@ -1997,7 +2100,7 @@ private fun KartuSuntingComposer(target: PesanChat, onTutup: () -> Unit) {
 }
 
 @Composable
-private fun KartuBalasComposer(target: PesanChat, onTutup: () -> Unit) {
+private fun KartuBalasComposer(target: PesanChat, namaBalasan: String = target.senderName, onTutup: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -2007,7 +2110,7 @@ private fun KartuBalasComposer(target: PesanChat, onTutup: () -> Unit) {
     ) {
         Box(Modifier.width(3.dp).height(36.dp).clip(RoundedCornerShape(2.dp)).background(BiruIos))
         Column(Modifier.weight(1f).padding(horizontal = 8.dp)) {
-            Text("Membalas ${target.senderName}", fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, color = BiruIos, maxLines = 1)
+            Text("Membalas $namaBalasan", fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, color = BiruIos, maxLines = 1)
             Text(
                 snippetPesan(target.body, target.imagePath),
                 fontSize = 12.5.sp, color = TeksSekunder, maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -2060,9 +2163,9 @@ private fun KomposerChat(
     Column(Modifier.fillMaxWidth().background(LatarBar)) {
         if (kueri != null && saran.isNotEmpty()) {
             PemilihSebutan(saran) { orang ->
-                val (baru, kursor) = sisipkanSebutan(nilai.text, kueri, orang.nama)
+                val (baru, kursor) = sisipkanSebutan(nilai.text, kueri, orang.namaTampil)
                 ketikan.nilai = TextFieldValue(baru, TextRange(kursor))
-                ketikan.kandidat = ketikan.kandidat + Sebutan(orang.id, orang.nama)
+                ketikan.kandidat = ketikan.kandidat + Sebutan(orang.id, orang.namaTampil)
             }
         }
         Box(Modifier.fillMaxWidth().height(0.5.dp).background(GarisTipis))
@@ -2174,21 +2277,21 @@ private fun PemilihSebutan(saran: List<AnggotaGrup>, onPilih: (AnggotaGrup) -> U
                 ) {
                     AvatarStaf(
                         path = orang.avatar,
-                        nama = orang.nama,
+                        nama = orang.namaTampil,
                         modifier = Modifier.size(32.dp).clip(CircleShape),
                         ukuranHuruf = 13.sp,
                     )
                     Spacer(Modifier.width(10.dp))
                     Column(Modifier.weight(1f)) {
                         Text(
-                            orang.nama,
+                            orang.namaTampil,
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Medium,
                             color = TeksUtama,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
-                        val bawah = orang.username?.let { "@" + it } ?: orang.outlet
+                        val bawah = if (!orang.username.isNullOrBlank()) orang.nama else orang.outlet
                         if (!bawah.isNullOrBlank()) {
                             Text(
                                 bawah,

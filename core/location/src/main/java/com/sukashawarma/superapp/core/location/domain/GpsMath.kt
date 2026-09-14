@@ -45,4 +45,23 @@ object GpsMath {
         if (hours <= 0) return 0.0
         return (haversineMeters(prev, curr) / 1000.0) / hours
     }
+
+    /**
+     * Format jarak agar mudah dibaca: ubah meter menjadi kilometer jika >= 1000 m.
+     * Contoh: 8502 m -> "8.5 km", 1000 m -> "1 km", 250 m -> "250 m".
+     */
+    fun formatDistance(meters: Double, withSpace: Boolean = true): String {
+        val sep = if (withSpace) " " else ""
+        return if (meters >= 1000.0) {
+            val km = meters / 1000.0
+            val text = String.format(java.util.Locale.US, "%.1f", km).removeSuffix(".0")
+            "$text${sep}km"
+        } else {
+            "${meters.toInt()}${sep}m"
+        }
+    }
+
+    /** Jarak dalam format ringkas tanpa spasi (misal: "8.5km", "250m"). */
+    fun formatDistanceShort(meters: Double): String = formatDistance(meters, withSpace = false)
 }
+

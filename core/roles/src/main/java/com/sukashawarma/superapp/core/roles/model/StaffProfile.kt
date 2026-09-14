@@ -23,7 +23,10 @@ data class StaffProfile(
 ) {
     val isActive: Boolean get() = status == "active"
 
-    /** Yang ditampilkan ke layar. Satu tempat supaya nama panggilan tidak muncul
-     *  di sebagian layar saja sementara sisanya masih memakai nama kepegawaian. */
-    val namaTampil: String get() = displayName?.takeIf { it.isNotBlank() } ?: name
+    /** Yang ditampilkan ke layar. Bila username (displayUsername) diisi,
+     *  username itulah yang tampil. Bila kosong, memakai nama kepegawaian resmi. */
+    val namaTampil: String
+        get() = displayUsername?.takeIf { it.isNotBlank() }
+            ?: displayName?.takeIf { it.isNotBlank() }
+            ?: name
 }

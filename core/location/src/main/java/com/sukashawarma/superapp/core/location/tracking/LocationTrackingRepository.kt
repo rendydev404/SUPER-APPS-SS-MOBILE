@@ -100,11 +100,17 @@ object LocationTrackingRepository {
      * TERBARU — menulis titik lama ke tabel live justru akan memundurkan posisi di dashboard
      * saat antrean offline baru menyusul.
      */
-    suspend fun push(points: List<TrackPoint>, deviceName: String) {
+    suspend fun push(points: List<TrackPoint>, deviceName: String, context: android.content.Context? = null) {
         if (points.isEmpty()) return
-        val staff = AppSession.staff.value ?: throw NoStaffSessionException()
-        val staffId = staff.id
-        val outletId = staff.outletId
+        val staff = AppSession.staff.value
+        val staffId = staff?.id ?: (context?.let { LocationTrackingPrefs.getStaffId(it) }) ?: throw NoStaffSessionException()
+        val outletId = staff?.outletId ?: (context?.let { LocationTrackingPrefs.getOutletId(it) })
+
+        // Pastikan token terpasang jika baru dihidupkan ulang oleh sistem
+        if (context != null && com.sukashawarma.superapp.data.remote.SessionTokenHolder.accessToken == null) {
+            com.sukashawarma.superapp.data.remote.SessionTokenHolder.accessToken = LocationTrackingPrefs.getAccessToken(context)
+            com.sukashawarma.superapp.data.remote.SessionTokenHolder.refreshToken = LocationTrackingPrefs.getRefreshToken(context)
+        }
 
         val trails = JsonArray().apply {
             points.forEach { add(trailJson(it, staffId, outletId)) }
