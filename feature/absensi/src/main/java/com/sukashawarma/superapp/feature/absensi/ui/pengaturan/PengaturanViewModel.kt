@@ -26,8 +26,13 @@ data class OutletSchedule(
     val toleransiMenit: Int,
     val radiusM: Int,
     val mode: String,
+    /** Crew wajib memilih Shift 1 (jamMasuk–jamKeluar) atau Shift 2 sebelum absen masuk. */
+    val pilihShiftAktif: Boolean = false,
+    val shift2JamMasuk: String? = null,
+    val shift2JamKeluar: String? = null,
 ) {
     val manual: Boolean get() = mode == "manual"
+    val duaShift: Boolean get() = pilihShiftAktif && shift2JamMasuk != null && shift2JamKeluar != null
 }
 
 data class PengaturanUiState(
@@ -200,6 +205,9 @@ class PengaturanViewModel : ViewModel() {
                             toleransiMenit = o.optInt("toleransi_menit") ?: 0,
                             radiusM = o.optInt("radius_m") ?: 0,
                             mode = o.optString("absen_window_mode") ?: "auto",
+                            pilihShiftAktif = o.get("pilih_shift_aktif")?.takeIf { !it.isJsonNull }?.asBoolean ?: false,
+                            shift2JamMasuk = o.optString("shift2_jam_masuk")?.take(5),
+                            shift2JamKeluar = o.optString("shift2_jam_keluar")?.take(5),
                         )
                     },
                 )
@@ -217,6 +225,9 @@ class PengaturanViewModel : ViewModel() {
         toleransiMenit: Int,
         radiusM: Int,
         mode: String,
+        pilihShiftAktif: Boolean,
+        shift2JamMasuk: String,
+        shift2JamKeluar: String,
         onSuccess: () -> Unit = {},
     ) {
         if (outletId.isBlank()) {
@@ -233,6 +244,21 @@ class PengaturanViewModel : ViewModel() {
         val safeJamMasuk = normalizedJamMasuk ?: return
         val safeJamKeluar = normalizedJamKeluar ?: return
 
+        // Validasi sama dengan server action web `saveOutletException`; RPC menegakkan ulang.
+        val safeShift2Masuk = normalizeTime(shift2JamMasuk)
+        val safeShift2Keluar = normalizeTime(shift2JamKeluar)
+        val shiftError = when {
+            !pilihShiftAktif -> null
+            safeShift2Masuk == null || safeShift2Keluar == null -> "Isi jam masuk dan jam pulang Shift 2"
+            safeShift2Masuk == safeJamMasuk && safeShift2Keluar == safeJamKeluar ->
+                "Shift 2 sama persis dengan Shift 1 — ubah jamnya atau matikan pilihan shift"
+            else -> null
+        }
+        if (shiftError != null) {
+            _state.value = _state.value.copy(jadwalError = shiftError, jadwalMessage = null)
+            return
+        }
+
         _state.value = _state.value.copy(savingJadwal = true, jadwalError = null, jadwalMessage = null)
         viewModelScope.launch {
             try {
@@ -245,6 +271,12 @@ class PengaturanViewModel : ViewModel() {
                         addProperty("p_toleransi_menit", toleransiMenit)
                         addProperty("p_radius_m", radiusM)
                         addProperty("p_absen_window_mode", mode)
+                        addProperty("p_pilih_shift_aktif", pilihShiftAktif)
+                        // Jam Shift 2 tetap dikirim walau toggle mati, agar tak perlu diketik ulang.
+                        if (safeShift2Masuk != null && safeShift2Keluar != null) {
+                            addProperty("p_shift2_jam_masuk", "$safeShift2Masuk:00")
+                            addProperty("p_shift2_jam_keluar", "$safeShift2Keluar:00")
+                        }
                     },
                 )
                 _state.value = _state.value.copy(
@@ -327,7 +359,7 @@ class PengaturanViewModel : ViewModel() {
                     "Akun ini tidak memiliki izin mengubah pengaturan absensi. Gunakan akun admin, HR, atau regional manager."
                 }
             error is Postgrest.PostgrestException && (error.code == 404 || "pgrst202" in detail) ->
-                "Fungsi jadwal khusus belum terpasang di server. Jalankan plan/jadwal-khusus-outlet.sql di Supabase."
+                "Fungsi jadwal khusus versi terbaru belum terpasang di server. Jalankan plan/absensi-pilih-shift-native.sql di Supabase."
             error is IOException ->
                 "Tidak dapat terhubung ke server. Periksa koneksi internet lalu coba lagi."
             // Layar ini khusus admin, jadi pesan mentah dari server lebih berguna
