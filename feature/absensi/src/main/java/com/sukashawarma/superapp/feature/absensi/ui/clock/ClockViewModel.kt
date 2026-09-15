@@ -587,7 +587,7 @@ class ClockViewModel(
         when {
             !wajibTutupOutlet -> null
             !AttendanceGates.isClosingChecklistDone(outletId) ->
-                "Checklist penutupan belum selesai. Selesaikan checklist tutup terlebih dahulu sebelum absen pulang."
+                "Checklist penutupan outlet belum selesai. Selesaikan checklist tutup outlet terlebih dahulu sebelum absen pulang."
             !AttendanceGates.isShiftClosed(outletId) ->
                 "Shift di POS Native masih terbuka. Tutup shift terlebih dahulu sebelum absen pulang."
             AttendanceGates.hasUnfinishedOrders(outletId) ->

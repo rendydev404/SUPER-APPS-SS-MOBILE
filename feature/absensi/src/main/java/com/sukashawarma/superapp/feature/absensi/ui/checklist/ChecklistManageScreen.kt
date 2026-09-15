@@ -740,7 +740,7 @@ private fun ChecklistFormDialog(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        // Card 1: Buka Toko (Opening)
+                        // Card 1: Buka Outlet (Opening)
                         val isBuka = phase == ChecklistPhase.BUKA
                         Surface(
                             onClick = { phase = ChecklistPhase.BUKA },
@@ -775,7 +775,7 @@ private fun ChecklistFormDialog(
                                     )
                                 }
                                 Text(
-                                    "Sebelum buka toko",
+                                    "Sebelum buka outlet",
                                     fontSize = 11.sp,
                                     color = StitchOnSurfaceVariant,
                                     textAlign = TextAlign.Center
@@ -783,7 +783,7 @@ private fun ChecklistFormDialog(
                             }
                         }
 
-                        // Card 2: Tutup Toko (Closing)
+                        // Card 2: Tutup Outlet (Closing)
                         val isTutup = phase == ChecklistPhase.TUTUP
                         Surface(
                             onClick = { phase = ChecklistPhase.TUTUP },
@@ -818,7 +818,7 @@ private fun ChecklistFormDialog(
                                     )
                                 }
                                 Text(
-                                    "Saat closing toko",
+                                    "Saat closing/tutup outlet",
                                     fontSize = 11.sp,
                                     color = StitchOnSurfaceVariant,
                                     textAlign = TextAlign.Center

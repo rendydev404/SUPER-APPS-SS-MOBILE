@@ -82,9 +82,9 @@ private fun navItemsFor(
         return buildList {
             add(NavItem("Papan Kehadiran", Icons.Default.Dashboard, AbsensiRoutes.PAPAN))
             add(NavItem("Rekap & Riwayat", Icons.AutoMirrored.Filled.List, AbsensiRoutes.REKAP))
-            add(NavItem("Monitor Checklist", Icons.Default.FactCheck, AbsensiRoutes.CHECKLIST_MONITOR))
+            add(NavItem("Monitor Tutup/Buka Outlet", Icons.Default.FactCheck, AbsensiRoutes.CHECKLIST_MONITOR))
             if (canManageChecklist) {
-                add(NavItem("Manajemen Checklist", Icons.Default.Rule, AbsensiRoutes.CHECKLIST_MANAGE))
+                add(NavItem("Kelola Tutup/Buka Outlet", Icons.Default.Rule, AbsensiRoutes.CHECKLIST_MANAGE))
             }
             add(NavItem("Cuti", Icons.Default.CalendarMonth, AbsensiRoutes.CUTI))
             add(NavItem("Kasbon", Icons.Default.Payments, AbsensiRoutes.KASBON))

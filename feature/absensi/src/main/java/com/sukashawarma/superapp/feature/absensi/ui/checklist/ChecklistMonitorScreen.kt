@@ -82,7 +82,7 @@ private val ShortDateFormatter: DateTimeFormatter =
     DateTimeFormatter.ofPattern("EEE, d MMM yyyy", Locale("id", "ID"))
 
 private val ChecklistPhase.monitorLabel: String
-    get() = if (this == ChecklistPhase.BUKA) "Buka Toko" else "Tutup Toko"
+    get() = if (this == ChecklistPhase.BUKA) "Buka Outlet" else "Tutup Outlet"
 
 private val ChecklistPhase.accent: Color
     get() = if (this == ChecklistPhase.BUKA) StitchSecondaryContainer else StitchPrimary

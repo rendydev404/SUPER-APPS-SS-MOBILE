@@ -86,7 +86,7 @@ fun ChecklistScreen(onExit: () -> Unit, viewModel: ChecklistViewModel = viewMode
                     )
                 }
                 state.categories.isEmpty() -> item(key = "empty") {
-                    MessageCard(message = "Belum ada tugas ${state.phase.label.lowercase()} toko hari ini.")
+                    MessageCard(message = "Belum ada tugas ${state.phase.label.lowercase()} outlet hari ini.")
                 }
                 else -> state.categories.forEach { category ->
                     item(key = "category-${category.id}") { CategoryHeader(category.name) }
@@ -142,7 +142,7 @@ private fun ChecklistTopBar(outletName: String, staffInitial: String) {
 private fun ChecklistHeader() {
     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
-            "Checklist Operasional",
+            "Tutup/Buka Outlet",
             color = SukaInk,
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
@@ -183,7 +183,7 @@ private fun ProgressCard(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                "Progress ${phase.label} Toko",
+                "Progress ${phase.label} Outlet",
                 color = SukaInk,
                 fontWeight = FontWeight.SemiBold,
                 style = MaterialTheme.typography.titleSmall,
@@ -215,7 +215,7 @@ private fun ProgressCard(
 
             ChecklistPhase.entries.forEachIndexed { index, option ->
                 PhaseButton(
-                    label = "${option.label} Toko",
+                    label = "${option.label} Outlet",
                     selected = phase == option,
                     onClick = { onPhaseSelected(option) },
                 )
