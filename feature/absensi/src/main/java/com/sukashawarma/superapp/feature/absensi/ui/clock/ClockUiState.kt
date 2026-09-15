@@ -4,6 +4,8 @@ import com.sukashawarma.superapp.domain.gps.LatLng
 import com.sukashawarma.superapp.domain.liveness.Challenge
 import com.sukashawarma.superapp.domain.model.ClockPhase
 import com.sukashawarma.superapp.domain.model.ClockResult
+import com.sukashawarma.superapp.domain.usecase.NextAction
+import com.sukashawarma.superapp.feature.absensi.shift.ShiftOption
 
 data class AttendanceHistoryItem(
     val type: String,
@@ -35,4 +37,20 @@ data class ClockUiState(
     val attendanceHistory: List<AttendanceHistoryItem> = emptyList(),
     val isAttendanceLoading: Boolean = true,
     val attendanceError: String? = null,
-)
+    /** Pilihan shift outlet aktif; null = outlet satu shift. */
+    val shiftOptions: List<ShiftOption>? = null,
+    /** Pilihan shift dan aksi berikutnya sudah termuat — modal tidak boleh berkedip sebelum ini. */
+    val shiftContextReady: Boolean = false,
+    val nextAction: NextAction? = null,
+    val selectedShiftKe: Int? = null,
+) {
+    val selectedShift: ShiftOption? get() = shiftOptions?.firstOrNull { it.ke == selectedShiftKe }
+
+    /** Cermin `perluPilihShift` di AttendanceKioskPanel.tsx (web). */
+    val perluPilihShift: Boolean
+        get() = shiftOptions != null &&
+            shiftContextReady &&
+            nextAction == NextAction.IN &&
+            phase != ClockPhase.LOCKED &&
+            selectedShiftKe == null
+}
