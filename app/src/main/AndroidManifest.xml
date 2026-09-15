@@ -28,7 +28,8 @@
     <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
     <!-- Izin full screen intent untuk meluncurkan kembali UI saat update selesai -->
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
-    <!-- Izin overlay jaring pengaman untuk membuka activity dari background pasca-update -->
+    <!-- Izin overlay: satu-satunya pengecualian Android 10+ yang membolehkan aplikasi
+         membuka dirinya sendiri dari latar belakang setelah update. Lihat AppUpdateRelauncher. -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <queries>
@@ -132,10 +133,11 @@
             android:name="com.sukashawarma.superapp.core.update.UpdateInstallResultReceiver"
             android:exported="false" />
 
-        <!-- Receiver auto-launch setelah APK baru selesai dipasang (ACTION_MY_PACKAGE_REPLACED) -->
+        <!-- Receiver auto-launch setelah APK baru selesai dipasang (ACTION_MY_PACKAGE_REPLACED).
+             exported="false": broadcast sistem tetap sampai, aplikasi lain tidak bisa memicunya. -->
         <receiver
             android:name="com.sukashawarma.superapp.core.update.AppUpdateRelaunchReceiver"
-            android:exported="true">
+            android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
