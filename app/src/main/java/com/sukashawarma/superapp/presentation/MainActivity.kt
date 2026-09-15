@@ -56,6 +56,14 @@ import com.sukashawarma.superapp.presentation.mitra.MitraNoProfileScreen
 import com.sukashawarma.superapp.presentation.theme.SukaSuperappTheme
 import androidx.compose.ui.platform.LocalContext
 import com.sukashawarma.superapp.core.update.AppUpdateManager
+import com.sukashawarma.superapp.core.update.AppUpdateRelauncher
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.sukashawarma.superapp.core.update.ui.AppUpdateIndicator
 import com.sukashawarma.superapp.core.update.ui.AppUpdateSuccessIndicator
 import com.sukashawarma.superapp.core.update.ui.DraggableUpdateOverlay
@@ -131,9 +139,13 @@ class MainActivity : FragmentActivity() {
 
     override fun onResume() {
         super.onResume()
-        val nm = getSystemService(android.content.Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
-        nm?.cancel(com.sukashawarma.superapp.core.update.AppUpdateRelaunchReceiver.NOTIFICATION_ID)
+        AppUpdateRelauncher.onAppVisible(this)
         com.sukashawarma.superapp.core.update.AppUpdateManager.resumeAfterInstallPermission(this)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        AppUpdateRelauncher.onAppHidden()
     }
 }
 
@@ -154,9 +166,61 @@ private fun RootNav() {
     val updateDownloadProgress by AppUpdateManager.downloadProgress.collectAsState()
     val recentlyInstalledVersion by AppUpdateManager.recentlyInstalledVersion.collectAsState()
 
+    // Izin "Tampil di atas aplikasi lain" yang membuat aplikasi terbuka sendiri
+    // setelah update terpasang. Ditawarkan sekali per versi; selama ditawarkan
+    // atau user sedang di layar pengaturan, pemasangan ditahan supaya aplikasi
+    // tidak keburu dimatikan installer sebelum izinnya sempat diaktifkan.
+    var izinBukaOtomatis by remember { mutableStateOf(IzinBukaOtomatis.TIDAK_PERLU) }
+    LaunchedEffect(updateManifest?.versionCode) {
+        val versi = updateManifest?.versionCode ?: return@LaunchedEffect
+        if (AppUpdateRelauncher.shouldOfferOverlayPermission(context, versi)) {
+            izinBukaOtomatis = IzinBukaOtomatis.DITAWARKAN
+        }
+    }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME && izinBukaOtomatis == IzinBukaOtomatis.DI_PENGATURAN) {
+                izinBukaOtomatis = IzinBukaOtomatis.TIDAK_PERLU
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    if (izinBukaOtomatis == IzinBukaOtomatis.DITAWARKAN) {
+        val versi = updateManifest?.versionCode ?: 0
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("Buka otomatis setelah update") },
+            text = {
+                Text(
+                    "Aktifkan izin \"Tampil di atas aplikasi lain\" untuk SUKA Superapp " +
+                        "agar aplikasi langsung terbuka lagi begitu update selesai dipasang."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    AppUpdateRelauncher.markOverlayOffered(context, versi)
+                    izinBukaOtomatis = IzinBukaOtomatis.DI_PENGATURAN
+                    val intent = AppUpdateRelauncher.overlayPermissionIntent(context)
+                    runCatching { context.startActivity(intent) }
+                        .onFailure { izinBukaOtomatis = IzinBukaOtomatis.TIDAK_PERLU }
+                }) { Text("Aktifkan") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    AppUpdateRelauncher.markOverlayOffered(context, versi)
+                    izinBukaOtomatis = IzinBukaOtomatis.TIDAK_PERLU
+                }) { Text("Nanti") }
+            },
+        )
+    }
+
     // Otomatis terapkan update begitu siap dipasang tanpa harus diklik user
-    LaunchedEffect(updateDownloadState) {
-        if (updateDownloadState == AppUpdateManager.DownloadState.READY_TO_INSTALL) {
+    LaunchedEffect(updateDownloadState, izinBukaOtomatis) {
+        if (updateDownloadState == AppUpdateManager.DownloadState.READY_TO_INSTALL &&
+            izinBukaOtomatis == IzinBukaOtomatis.TIDAK_PERLU
+        ) {
             kotlinx.coroutines.delay(1200)
             AppUpdateManager.installDownloadedApk(context)
         }
@@ -347,6 +411,8 @@ private fun RootNav() {
         }
     }
 }
+
+private enum class IzinBukaOtomatis { TIDAK_PERLU, DITAWARKAN, DI_PENGATURAN }
 
 /** Pemetaan tujuan ke string rute. Aturannya ada di resolveStartDestination, bukan di sini. */
 private fun routeFor(destination: StartDestination): String = when (destination) {
