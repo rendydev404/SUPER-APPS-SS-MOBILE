@@ -357,10 +357,15 @@ object AppUpdateManager {
                 _downloadProgress.value = 100
                 _downloadState.value = DownloadState.READY_TO_INSTALL
 
-                // Auto-apply update secara mandiri jika izin instalasi sudah siap
+                // Auto-apply update secara mandiri jika izin instalasi sudah siap. Selama izin
+                // buka-otomatis masih perlu ditawarkan, pemasangan diserahkan ke UI yang
+                // menunggu jawaban user — kalau tidak, installer mematikan aplikasi duluan.
                 scope.launch {
                     delay(1200)
-                    if (_downloadState.value == DownloadState.READY_TO_INSTALL && canRequestInstall(context)) {
+                    if (_downloadState.value == DownloadState.READY_TO_INSTALL &&
+                        canRequestInstall(context) &&
+                        !AppUpdateRelauncher.shouldOfferOverlayPermission(context, manifest.versionCode)
+                    ) {
                         installDownloadedApk(context)
                     }
                 }
