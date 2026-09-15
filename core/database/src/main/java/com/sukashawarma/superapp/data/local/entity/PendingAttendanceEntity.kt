@@ -25,5 +25,8 @@ data class PendingAttendanceEntity(
     val createdAtMs: Long,
     val attemptCount: Int = 0,
     val lastError: String? = null,
+    /** Nomor shift (1/2) yang dipilih crew di outlet dua shift. Hanya untuk absen masuk;
+     *  jam shift-nya ditentukan server dari config, bukan dari HP. */
+    val shiftKe: Int? = null,
 )
 
