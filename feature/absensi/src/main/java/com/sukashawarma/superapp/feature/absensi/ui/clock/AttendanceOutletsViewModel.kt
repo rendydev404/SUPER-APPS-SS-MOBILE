@@ -11,6 +11,8 @@ import com.sukashawarma.superapp.domain.gps.GpsMath
 import com.sukashawarma.superapp.domain.gps.LatLng
 import com.sukashawarma.superapp.domain.model.Role
 import com.sukashawarma.superapp.domain.session.AppSession
+import com.sukashawarma.superapp.feature.absensi.shift.KandidatOutlet
+import com.sukashawarma.superapp.feature.absensi.shift.pilihOutletTerdekat
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -20,6 +22,8 @@ data class AttendanceOutlet(
     val name: String,
     val lat: Double?,
     val lng: Double?,
+    /** `outlets.type` — outlet `test`/`marketplace` kalah saat jaraknya seri. */
+    val type: String? = null,
     /** Jarak perangkat ke outlet ini, diisi setelah GPS didapat. */
     val distanceM: Double? = null,
 ) {
@@ -148,13 +152,18 @@ class AttendanceOutletsViewModel(application: Application) : AndroidViewModel(ap
                 }
                 .sortedBy { it.distanceM ?: Double.MAX_VALUE }
 
-            val nearest = measured.firstOrNull { it.distanceM != null }
-            val autoPick = !manualSelection && nearest != null
+            // Bukan sekadar elemen pertama hasil sort: `outlet tes` menyalin koordinat BNR, jadi
+            // jarak seri dan pemenangnya harus outlet operasional (lihat pilihOutletTerdekat).
+            val nearestId = pilihOutletTerdekat(
+                measured.map { KandidatOutlet(it.id, it.type, it.coords) },
+                device,
+            )
+            val autoPick = !manualSelection && nearestId != null
 
             _state.value = _state.value.copy(
                 locating = false,
                 outlets = measured,
-                selectedId = if (autoPick) nearest!!.id else _state.value.selectedId,
+                selectedId = if (autoPick) nearestId else _state.value.selectedId,
                 autoDetected = autoPick,
             )
         }
@@ -180,7 +189,7 @@ class AttendanceOutletsViewModel(application: Application) : AndroidViewModel(ap
                 "staff_outlets",
                 listOf(
                     "staff_id" to "eq.$staffId",
-                    "select" to "outlet_id,outlets!staff_outlets_outlet_id_fkey(id,name,lat,lng)",
+                    "select" to "outlet_id,outlets!staff_outlets_outlet_id_fkey(id,name,lat,lng,type)",
                 ),
             )
         }.getOrNull()
@@ -198,7 +207,7 @@ class AttendanceOutletsViewModel(application: Application) : AndroidViewModel(ap
             if (ids.isNotEmpty()) {
                 Postgrest.select(
                     "outlets",
-                    listOf("id" to "in.(${ids.joinToString(",")})", "select" to "id,name,lat,lng"),
+                    listOf("id" to "in.(${ids.joinToString(",")})", "select" to "id,name,lat,lng,type"),
                 ).forEach { element ->
                     element.asJsonObject.toOutlet()?.let { list[it.id] = it }
                 }
@@ -208,7 +217,7 @@ class AttendanceOutletsViewModel(application: Application) : AndroidViewModel(ap
         // 2. Penempatan utama.
         if (primaryOutletId != null && primaryOutletId !in list) {
             runCatching {
-                Postgrest.selectOne("outlets", listOf("id" to "eq.$primaryOutletId", "select" to "id,name,lat,lng"))
+                Postgrest.selectOne("outlets", listOf("id" to "eq.$primaryOutletId", "select" to "id,name,lat,lng,type"))
             }.getOrNull()?.toOutlet()?.let { list[it.id] = it }
         }
 
@@ -216,7 +225,7 @@ class AttendanceOutletsViewModel(application: Application) : AndroidViewModel(ap
         if (role in ALL_OUTLET_ROLES && list.size <= 1) {
             Postgrest.select(
                 "outlets",
-                listOf("is_active" to "eq.true", "select" to "id,name,lat,lng", "order" to "name.asc"),
+                listOf("is_active" to "eq.true", "select" to "id,name,lat,lng,type", "order" to "name.asc"),
             ).forEach { element ->
                 element.asJsonObject.toOutlet()?.let { list.putIfAbsent(it.id, it) }
             }
@@ -232,6 +241,7 @@ class AttendanceOutletsViewModel(application: Application) : AndroidViewModel(ap
             name = optString("name") ?: "Outlet",
             lat = get("lat")?.takeIf { !it.isJsonNull }?.asDouble,
             lng = get("lng")?.takeIf { !it.isJsonNull }?.asDouble,
+            type = optString("type"),
         )
     }
 }
