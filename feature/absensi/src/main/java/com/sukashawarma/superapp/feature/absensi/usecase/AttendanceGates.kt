@@ -4,6 +4,9 @@ import com.sukashawarma.superapp.data.remote.Postgrest
 import com.sukashawarma.superapp.data.remote.optJsonArray
 import com.sukashawarma.superapp.data.remote.optString
 import com.sukashawarma.superapp.domain.util.JakartaTime
+import com.sukashawarma.superapp.feature.absensi.shift.ShiftConfig
+import com.sukashawarma.superapp.feature.absensi.shift.ShiftOption
+import com.sukashawarma.superapp.feature.absensi.shift.shiftOptions
 
 enum class NextAction { IN, OUT, DONE }
 
@@ -68,6 +71,44 @@ object AttendanceGates {
                 else -> NextAction.IN
             }
         }
+    }
+
+    /**
+     * Pilihan shift outlet, atau null bila outlet satu shift. Dibaca lewat RPC karena RLS
+     * `oac_read_own_outlet` hanya membuka config outlet utama, sementara leader dan kru
+     * multi-outlet bisa absen di outlet lain. Melempar exception bila gagal dimuat.
+     */
+    suspend fun loadShiftOptions(outletId: String): List<ShiftOption>? {
+        val body = com.google.gson.JsonObject().apply { addProperty("p_outlet_id", outletId) }
+        val cfg = Postgrest.rpc("attendance_shift_config", body).takeIf { it.isJsonObject }?.asJsonObject
+            ?: return null
+        return shiftOptions(
+            ShiftConfig(
+                jamMasuk = cfg.optString("jam_masuk"),
+                jamKeluar = cfg.optString("jam_keluar"),
+                pilihShiftAktif = cfg.get("pilih_shift_aktif")?.takeIf { !it.isJsonNull }?.asBoolean,
+                shift2JamMasuk = cfg.optString("shift2_jam_masuk"),
+                shift2JamKeluar = cfg.optString("shift2_jam_keluar"),
+            )
+        )
+    }
+
+    /** Jam pulang shift dari absen masuk TERBARU staff (bukan alpha, ≤ 20 jam) — sama dengan
+     *  jendela yang dipakai server untuk membaca jejak shift. Null = tanpa jejak shift. */
+    suspend fun latestInShiftJamKeluar(staffId: String): String? {
+        val cutoffIso = java.time.Instant.now().minus(20, java.time.temporal.ChronoUnit.HOURS).toString()
+        return Postgrest.selectOne(
+            "attendance",
+            listOf(
+                "outlet_staff_id" to "eq.$staffId",
+                "type" to "eq.in",
+                "status" to "neq.alpha",
+                "ts_server" to "gte.$cutoffIso",
+                "select" to "shift_jam_keluar",
+                "order" to "ts_server.desc",
+                "limit" to "1",
+            ),
+        )?.optString("shift_jam_keluar")
     }
 
     /** True bila semua item wajib checklist fase "tutup" sudah dicentang hari ini,
