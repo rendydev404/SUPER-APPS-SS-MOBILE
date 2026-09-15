@@ -36,6 +36,8 @@ object SubmitAttendanceUseCase {
                 entity.gpsAccuracy?.let { addProperty("gps_accuracy", it) }
                 entity.selfiePath?.let { addProperty("selfie_path", it) }
                 addProperty("is_manual_button", entity.isManualButton)
+                // Dikirim sebagai angka JSON: server menolak string "1" (cermin isShiftKe web).
+                entity.shiftKe?.let { addProperty("shift_ke", it) }
                 // Penanda audit agar seluruh rekap bisa membedakan presensi dari
                 // aplikasi Android tanpa mengubah alur/status absensi yang ada.
                 addProperty("source", "native")
