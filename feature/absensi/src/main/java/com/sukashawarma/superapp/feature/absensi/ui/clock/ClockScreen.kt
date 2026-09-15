@@ -187,7 +187,12 @@ fun ClockScreen(isActive: Boolean = true, onExit: () -> Unit) {
         }
     }
 
-    LaunchedEffect(Unit) {
+    // Modal izin kamera/lokasi ditahan sampai shift dipilih, supaya dua dialog tidak
+    // bertumpuk di atas modal pilih shift (§6.1 dokumen).
+    var izinSudahDiminta by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(state.shiftContextReady, state.perluPilihShift) {
+        if (izinSudahDiminta || !state.shiftContextReady || state.perluPilihShift) return@LaunchedEffect
+        izinSudahDiminta = true
         val permissionsToRequest = mutableListOf<String>()
         if (!hasCameraPermission) permissionsToRequest.add(Manifest.permission.CAMERA)
         if (!hasLocationPermission) {
@@ -268,6 +273,17 @@ fun ClockScreen(isActive: Boolean = true, onExit: () -> Unit) {
                     // Greeting
                     GreetingSection(staff?.name, selectedOutletName)
 
+                    val shiftTerpilih = state.selectedShift
+                    if (shiftTerpilih != null && state.nextAction == com.sukashawarma.superapp.domain.usecase.NextAction.IN) {
+                        KartuShiftTerpilih(
+                            opsi = shiftTerpilih,
+                            ubahEnabled = state.phase != ClockPhase.IDENTIFIED &&
+                                state.phase != ClockPhase.LIVENESS &&
+                                state.phase != ClockPhase.SUBMITTING,
+                            onUbah = viewModel::changeShift,
+                        )
+                    }
+
                     // Camera Action Area
                     ActionArea(
                         isActive = isActive,
@@ -295,6 +311,16 @@ fun ClockScreen(isActive: Boolean = true, onExit: () -> Unit) {
                 }
             }
         }
+    }
+
+    val opsiShift = state.shiftOptions
+    if (isActive && opsiShift != null && state.perluPilihShift) {
+        PilihShiftSheet(
+            staffName = staff?.name,
+            options = opsiShift,
+            onPick = viewModel::pickShift,
+            onExit = onExit,
+        )
     }
 }
 
