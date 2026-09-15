@@ -28,8 +28,8 @@ android {
         applicationId = "com.sukashawarma.superapp"
         minSdk = 26
         targetSdk = 34
-        versionCode = 17
-        versionName = "1.2.4"
+        versionCode = 18
+        versionName = "1.2.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
@@ -60,6 +60,10 @@ android {
             }
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            ndk {
+                abiFilters.clear()
+                abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a"))
+            }
         }
 
         // Varian bikinan plugin baseline profile (benchmarkRelease,

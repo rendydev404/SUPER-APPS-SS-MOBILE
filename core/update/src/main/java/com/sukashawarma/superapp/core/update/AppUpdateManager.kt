@@ -112,6 +112,8 @@ object AppUpdateManager {
             currentVersionName = packageInfo.versionName.orEmpty().ifBlank { "1.0.0" }
         }
 
+        cleanOldInstallers(appCtx)
+
         val prefs = appCtx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         if (prefs.getInt(KEY_ACKNOWLEDGED_VERSION, 0) == currentVersionCode) return
 
@@ -129,6 +131,39 @@ object AppUpdateManager {
         context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit().putInt(KEY_ACKNOWLEDGED_VERSION, currentVersionCode).apply()
         _recentlyInstalledVersion.value = null
+        cleanOldInstallers(context)
+    }
+
+    /**
+     * Membersihkan file installer APK (.apk) dan delta patch (.fbf/.partial) lama
+     * dari folder `updates/` di penyimpanan internal/eksternal aplikasi.
+     *
+     * File hanya dihapus jika target versinya <= versi aplikasi yang sedang aktif berjalan,
+     * sehingga memori HP kru tidak membengkak ratusan megabyte oleh file instalasi usang.
+     */
+    fun cleanOldInstallers(context: Context) {
+        try {
+            val updatesDir = File(context.getExternalFilesDir(null), "updates")
+            if (!updatesDir.exists() || !updatesDir.isDirectory) return
+            updatesDir.listFiles()?.forEach { file ->
+                val name = file.name
+                if (name.endsWith(".partial")) {
+                    file.delete()
+                    return@forEach
+                }
+                val isApkOrPatch = name.endsWith(".apk") || name.endsWith(".fbf")
+                if (isApkOrPatch) {
+                    val targetVersion = Regex("""(\d+)\.(apk|fbf)$""").find(name)?.groupValues?.get(1)?.toIntOrNull()
+                    if (targetVersion == null || targetVersion <= currentVersionCode) {
+                        if (file.delete()) {
+                            android.util.Log.i("AppUpdateManager", "Cleaned up old installer: $name")
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("AppUpdateManager", "Failed to clean old installers", e)
+        }
     }
 
     /** REST check idempoten ke baris key='superapp_update' di global_settings. */

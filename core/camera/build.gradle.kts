@@ -48,6 +48,12 @@ android {
                 ndk { abiFilters += debugAbi }
             }
         }
+        release {
+            ndk {
+                abiFilters.clear()
+                abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a"))
+            }
+        }
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.8"
