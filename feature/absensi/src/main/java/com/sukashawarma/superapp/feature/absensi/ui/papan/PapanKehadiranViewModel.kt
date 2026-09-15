@@ -93,7 +93,16 @@ private data class BoardConfig(
     val jamMasuk: String = "08:00",
     val jamKeluar: String = "16:00",
     val toleransiMenit: Int = 15,
-)
+    val pilihShiftAktif: Boolean = false,
+    val shift2JamMasuk: String? = null,
+) {
+    /** Outlet dua shift: yang belum absen baru dianggap alpha setelah shift TERAKHIR lewat
+     *  batas — crew siang tak boleh tercap alpha di pagi hari (cermin board.ts web). */
+    val jamMasukTerakhir: String
+        get() = shift2JamMasuk
+            ?.takeIf { pilihShiftAktif && it.take(5) > jamMasuk.take(5) }
+            ?: jamMasuk
+}
 
 data class PapanKehadiranUiState(
     val loading: Boolean = true,
@@ -300,7 +309,10 @@ class PapanKehadiranViewModel : ViewModel() {
         val outletCfg = runCatching {
             Postgrest.selectOne(
                 "outlet_attendance_config",
-                listOf("outlet_id" to "eq.$outletId", "select" to "jam_masuk,jam_keluar,toleransi_menit"),
+                listOf(
+                    "outlet_id" to "eq.$outletId",
+                    "select" to "jam_masuk,jam_keluar,toleransi_menit,pilih_shift_aktif,shift2_jam_masuk",
+                ),
             )
         }.getOrNull()
         if (outletCfg != null && !outletCfg.optString("jam_masuk").isNullOrBlank()) {
@@ -308,6 +320,8 @@ class PapanKehadiranViewModel : ViewModel() {
                 jamMasuk = outletCfg.optString("jam_masuk") ?: "08:00",
                 jamKeluar = outletCfg.optString("jam_keluar") ?: "16:00",
                 toleransiMenit = outletCfg.optInt("toleransi_menit") ?: 15,
+                pilihShiftAktif = outletCfg.get("pilih_shift_aktif")?.takeIf { !it.isJsonNull }?.asBoolean ?: false,
+                shift2JamMasuk = outletCfg.optString("shift2_jam_masuk"),
             )
         }
         val globalCfg = runCatching {
@@ -359,7 +373,7 @@ class PapanKehadiranViewModel : ViewModel() {
         today: LocalDate,
     ): List<StaffBoardRow> {
         val byStaff = records.groupBy { it.optString("outlet_staff_id") }
-        val deadline = today.atTime(parseTime(config.jamMasuk))
+        val deadline = today.atTime(parseTime(config.jamMasukTerakhir))
             .plusMinutes(config.toleransiMenit.toLong())
             .atZone(JakartaTime.ZONE)
         val isPastDeadline = JakartaTime.now().isAfter(deadline)
