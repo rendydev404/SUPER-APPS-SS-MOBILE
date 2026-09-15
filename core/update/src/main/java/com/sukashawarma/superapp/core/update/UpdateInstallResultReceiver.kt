@@ -3,17 +3,15 @@ package com.sukashawarma.superapp.core.update
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageInstaller
 
+/**
+ * Status sesi PackageInstaller. Membuka kembali aplikasi BUKAN tugas receiver ini —
+ * itu ditangani [AppUpdateRelaunchReceiver] lewat MY_PACKAGE_REPLACED, supaya tidak
+ * ada dua jalur yang sama-sama meluncurkan activity.
+ */
 class UpdateInstallResultReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
-        if (status == PackageInstaller.STATUS_SUCCESS) {
-            AppUpdateRelauncher.relaunchApp(context)
-            AppUpdateManager.onUpdateSuccessfullyApplied()
-        } else {
-            AppUpdateManager.handleInstallStatus(context.applicationContext, intent)
-        }
+        AppUpdateManager.handleInstallStatus(context.applicationContext, intent)
     }
 
     companion object {
