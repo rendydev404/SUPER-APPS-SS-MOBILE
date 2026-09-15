@@ -410,13 +410,16 @@ class EnrollViewModel(
                 )
                 _state.value.selectedOutletId?.let(::loadCrew)
                 loadSelf()
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                android.util.Log.e("EnrollViewModel", "Failed to save enrollment: ${e.message}", e)
                 if (candidateGeneration != generation) return@launch
+                val errMsg = e.message?.takeIf { it.isNotBlank() }
+                    ?: "Belum berhasil menyimpan enrollment. Periksa koneksi lalu coba lagi."
                 _state.value = _state.value.copy(
                     stage = EnrollStage.REVIEWING,
                     capturing = false,
                     captureOk = false,
-                    captureResult = "Belum berhasil menyimpan enrollment. Periksa koneksi lalu coba lagi.",
+                    captureResult = errMsg,
                 )
             }
         }
