@@ -1,7 +1,5 @@
 package com.sukashawarma.superapp.core.update
 
-import android.app.ActivityOptions
-import android.app.AlarmManager
 import android.app.DownloadManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
@@ -487,7 +485,7 @@ object AppUpdateManager {
                         callbackIntent,
                         PendingIntent.FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0)
                     )
-                    AppUpdateRelauncher.scheduleWatchdog(context)
+                    AppUpdateRelauncher.markPending(context)
                     session.commit(callback.intentSender)
                 }
 
@@ -562,6 +560,7 @@ object AppUpdateManager {
                 intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)?.let {
                     android.util.Log.e("AppUpdateManager", "Install failed: $it")
                 }
+                AppUpdateRelauncher.clearPending(context)
                 _downloadState.value = DownloadState.FAILED
             }
         }
@@ -574,23 +573,8 @@ object AppUpdateManager {
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        AppUpdateRelauncher.scheduleWatchdog(context)
+        AppUpdateRelauncher.markPending(context)
         context.startActivity(intent)
-    }
-
-    private fun relaunchUpdatedApp(context: Context) {
-        val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return
-        launchIntent.addFlags(
-            Intent.FLAG_ACTIVITY_NEW_TASK or
-            Intent.FLAG_ACTIVITY_CLEAR_TOP or
-            Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
-        )
-        try {
-            context.startActivity(launchIntent)
-            android.util.Log.i("AppUpdateManager", "relaunchUpdatedApp executed successfully")
-        } catch (e: Exception) {
-            android.util.Log.e("AppUpdateManager", "Direct relaunch failed", e)
-        }
     }
 
     fun reset() {
