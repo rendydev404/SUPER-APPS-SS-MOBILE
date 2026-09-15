@@ -25,6 +25,7 @@ import com.sukashawarma.superapp.domain.model.ClockPhase
 import com.sukashawarma.superapp.domain.model.ClockResult
 import com.sukashawarma.superapp.domain.usecase.AttendanceGates
 import com.sukashawarma.superapp.domain.usecase.NextAction
+import com.sukashawarma.superapp.feature.absensi.shift.isShiftPenutup
 import com.sukashawarma.superapp.feature.absensi.usecase.SubmitAttendanceUseCase
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -86,7 +87,49 @@ class ClockViewModel(
         observePending()
         observeOnline()
         refreshAttendance()
+        loadShiftContext()
     }
+
+    /**
+     * Pilihan shift outlet ini + aksi berikutnya akun yang login. ViewModel ini di-key oleh
+     * outletId, jadi ganti outlet otomatis membuat instance baru — pilihan shift outlet
+     * lama tidak terbawa (§6.1 dokumen).
+     */
+    private fun loadShiftContext() {
+        val staffId = lockToStaffId ?: return
+        viewModelScope.launch {
+            val options = runCatching { AttendanceGates.loadShiftOptions(outletId) }
+                // Gagal dimuat (offline / RPC belum terpasang) → pakai yang terakhir diketahui.
+                // Server tetap menolak dengan `shift_required` bila outlet ternyata dua shift.
+                .getOrElse { _state.value.shiftOptions }
+            val next = AttendanceGates.decideAction(staffId, db.pendingAttendanceDao())
+            _state.value = _state.value.copy(shiftOptions = options, nextAction = next, shiftContextReady = true)
+        }
+    }
+
+    private fun refreshNextAction() {
+        val staffId = lockToStaffId ?: return
+        viewModelScope.launch {
+            val next = AttendanceGates.decideAction(staffId, db.pendingAttendanceDao())
+            _state.value = _state.value.copy(nextAction = next)
+        }
+    }
+
+    fun pickShift(ke: Int) {
+        if (_state.value.shiftOptions?.any { it.ke == ke } != true) return
+        _state.value = _state.value.copy(selectedShiftKe = ke)
+    }
+
+    /** Tombol "Ubah" — nonaktif selama liveness/mengirim supaya shift tak berganti di tengah absen. */
+    fun changeShift() {
+        val phase = _state.value.phase
+        if (phase == ClockPhase.IDENTIFIED || phase == ClockPhase.LIVENESS || phase == ClockPhase.SUBMITTING) return
+        _state.value = _state.value.copy(selectedShiftKe = null)
+    }
+
+    /** Absen masuk di outlet dua shift wajib punya shift terpilih. */
+    private fun shiftBelumDipilih(action: NextAction): Boolean =
+        action == NextAction.IN && _state.value.shiftOptions != null && _state.value.selectedShiftKe == null
 
     private fun observePending() {
         viewModelScope.launch {
@@ -112,6 +155,7 @@ class ClockViewModel(
      * agar UI hanya merender state dan tidak mengelola akses backend secara langsung. */
     fun refreshAttendance() {
         val staffId = lockToStaffId ?: return
+        refreshNextAction()
         viewModelScope.launch {
             _state.value = _state.value.copy(isAttendanceLoading = true, attendanceError = null)
             try {
@@ -251,6 +295,8 @@ class ClockViewModel(
     fun onIdleFrame(frame: FrameFaceResult) {
         if (_state.value.phase != ClockPhase.IDLE) return
         if (busy.get()) return
+        // Jangan memindai wajah di balik modal pilih shift, atau sebelum konteks shift termuat.
+        if (lockToStaffId != null && (!_state.value.shiftContextReady || _state.value.perluPilihShift)) return
         val now = System.currentTimeMillis()
         if (_state.value.result?.ok == false && now - lastGuidanceAtMs < GUIDANCE_READ_MS) return
         if (frame.signal.faceCount != 1) return
@@ -296,8 +342,13 @@ class ClockViewModel(
             scheduleReset(2500)
             return
         }
+        if (shiftBelumDipilih(next)) {
+            _state.value = _state.value.copy(nextAction = next)
+            showCameraGuidance("Pilih shift dulu sebelum absen masuk.")
+            return
+        }
         if (next == NextAction.OUT && NetworkMonitor.isOnline.value) {
-            checkoutBlockMessage()?.let { message ->
+            checkoutBlockMessage(staffId)?.let { message ->
                 setResult(false, message, ClockPhase.RESULT)
                 scheduleReset(3500)
                 return
@@ -372,8 +423,13 @@ class ClockViewModel(
             scheduleReset(2500)
             return
         }
+        if (shiftBelumDipilih(next)) {
+            _state.value = _state.value.copy(nextAction = next)
+            showCameraGuidance("Pilih shift dulu sebelum absen masuk.")
+            return
+        }
         if (next == NextAction.OUT && NetworkMonitor.isOnline.value) {
-            checkoutBlockMessage()?.let { message ->
+            checkoutBlockMessage(staffId)?.let { message ->
                 setResult(false, message, ClockPhase.RESULT)
                 scheduleReset(3500)
                 return
@@ -407,7 +463,7 @@ class ClockViewModel(
         // Order baru dapat masuk setelah liveness selesai. Cek ulang sebelum
         // mengirim absen pulang agar gate tetap konsisten dengan kondisi POS terbaru.
         if (s.action == "out" && NetworkMonitor.isOnline.value) {
-            checkoutBlockMessage()?.let { message ->
+            checkoutBlockMessage(staffId)?.let { message ->
                 setResult(false, message, ClockPhase.RESULT)
                 scheduleReset(3500)
                 return
@@ -429,6 +485,8 @@ class ClockViewModel(
             tsClientIso = nowIso,
             selfiePath = null,
             createdAtMs = System.currentTimeMillis(),
+            // Hanya nomor shift yang dikirim; server memetakan ke jam di config outlet.
+            shiftKe = if (s.action == "in" && s.shiftOptions != null) s.selectedShiftKe else null,
         )
 
         if (!NetworkMonitor.isOnline.value) {
@@ -485,6 +543,11 @@ class ClockViewModel(
             setResult(true, if (s.action == "in") "Selamat bekerja! ($status)" else "Hati-hati di jalan! ($status)", ClockPhase.RESULT)
             scheduleReset(2500)
         } else {
+            if (res.reason == "shift_required") {
+                // Config outlet berubah jadi dua shift sejak layar dibuka → muat ulang & tanya.
+                _state.value = _state.value.copy(selectedShiftKe = null)
+                loadShiftContext()
+            }
             setResult(false, gagalText(res.reason), ClockPhase.RESULT)
             scheduleReset(1000)
         }
@@ -499,6 +562,7 @@ class ClockViewModel(
         "terlambat_alpha" -> "Lewat Batas Waktu (Alpha)"
         "too_early_in" -> "Belum waktunya absen masuk"
         "too_early_out" -> "Belum waktunya absen pulang"
+        "shift_required" -> "Pilih shift dulu sebelum absen masuk"
         "gps_accuracy_low" -> "Akurasi GPS terlalu rendah — aktifkan Lokasi Akurat"
         "shift_not_closed" -> "Shift di POS Native masih terbuka. Tutup shift terlebih dahulu sebelum absen pulang."
         "unfinished_orders" -> "Masih ada pesanan di POS Native yang belum selesai. Selesaikan atau batalkan pesanan terlebih dahulu sebelum absen pulang."
@@ -512,9 +576,16 @@ class ClockViewModel(
      * Urutan gate mengikuti aturan clock-out: checklist tutup, shift POS, lalu
      * order berjalan. Jika query gagal, blokir dengan pesan koneksi agar tidak
      * ada absen pulang yang lolos tanpa verifikasi status POS.
+     *
+     * Di outlet dua shift hanya crew shift PENUTUP (yang pulang paling akhir) yang wajib
+     * menunggu outlet ditutup — cermin `wajibTutupOutlet` di useClockKiosk.ts.
      */
-    private suspend fun checkoutBlockMessage(): String? = try {
+    private suspend fun checkoutBlockMessage(staffId: String): String? = try {
+        val options = _state.value.shiftOptions
+        val wajibTutupOutlet = options == null ||
+            isShiftPenutup(options, AttendanceGates.latestInShiftJamKeluar(staffId))
         when {
+            !wajibTutupOutlet -> null
             !AttendanceGates.isClosingChecklistDone(outletId) ->
                 "Checklist penutupan belum selesai. Selesaikan checklist tutup terlebih dahulu sebelum absen pulang."
             !AttendanceGates.isShiftClosed(outletId) ->
@@ -539,7 +610,8 @@ class ClockViewModel(
                 "fake_gps_detected",
                 "teleportation_detected",
                 "staff_not_found",
-                "staff_inactive"
+                "staff_inactive",
+                "shift_required",
             )
             for (item in pending) {
                 val localSelfie = item.selfiePath
