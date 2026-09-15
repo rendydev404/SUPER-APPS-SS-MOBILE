@@ -359,6 +359,9 @@ fun PengaturanScreen(onExit: () -> Unit, viewModel: PengaturanViewModel = viewMo
                     toleransiMenit = draft.toleransi.toIntOrNull() ?: 0,
                     radiusM = draft.radius.toIntOrNull() ?: 0,
                     mode = draft.mode,
+                    pilihShiftAktif = draft.pilihShiftAktif,
+                    shift2JamMasuk = draft.shift2JamMasuk,
+                    shift2JamKeluar = draft.shift2JamKeluar,
                     onSuccess = { jadwalDraft = null },
                 )
             },
@@ -370,14 +373,10 @@ fun PengaturanScreen(onExit: () -> Unit, viewModel: PengaturanViewModel = viewMo
         val draft = jadwalDraft ?: return@let
         WorkTimePickerDialog(
             title = target.title,
-            currentValue = if (target == JadwalTimeTarget.MASUK) draft.jamMasuk else draft.jamKeluar,
+            currentValue = draft.jam(target),
             onDismiss = { jadwalTimeTarget = null },
             onConfirm = { selectedTime ->
-                jadwalDraft = if (target == JadwalTimeTarget.MASUK) {
-                    draft.copy(jamMasuk = selectedTime)
-                } else {
-                    draft.copy(jamKeluar = selectedTime)
-                }
+                jadwalDraft = draft.denganJam(target, selectedTime)
                 jadwalTimeTarget = null
             },
         )
