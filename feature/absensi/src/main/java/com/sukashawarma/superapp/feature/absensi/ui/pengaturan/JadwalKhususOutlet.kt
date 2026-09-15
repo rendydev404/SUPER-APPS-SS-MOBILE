@@ -44,6 +44,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -82,7 +84,28 @@ internal data class JadwalDraft(
     val radius: String,
     val mode: String = "auto",
     val editing: Boolean = false,
-)
+    val pilihShiftAktif: Boolean = false,
+    val shift2JamMasuk: String = SHIFT2_DEFAULT_MASUK,
+    val shift2JamKeluar: String = SHIFT2_DEFAULT_KELUAR,
+) {
+    fun jam(target: JadwalTimeTarget): String = when (target) {
+        JadwalTimeTarget.MASUK -> jamMasuk
+        JadwalTimeTarget.KELUAR -> jamKeluar
+        JadwalTimeTarget.SHIFT2_MASUK -> shift2JamMasuk
+        JadwalTimeTarget.SHIFT2_KELUAR -> shift2JamKeluar
+    }
+
+    fun denganJam(target: JadwalTimeTarget, value: String): JadwalDraft = when (target) {
+        JadwalTimeTarget.MASUK -> copy(jamMasuk = value)
+        JadwalTimeTarget.KELUAR -> copy(jamKeluar = value)
+        JadwalTimeTarget.SHIFT2_MASUK -> copy(shift2JamMasuk = value)
+        JadwalTimeTarget.SHIFT2_KELUAR -> copy(shift2JamKeluar = value)
+    }
+}
+
+/** Nilai awal Shift 2 saat toggle pertama kali dinyalakan — sama dengan SHIFT2_DEFAULT web. */
+private const val SHIFT2_DEFAULT_MASUK = "13:00"
+private const val SHIFT2_DEFAULT_KELUAR = "22:00"
 
 internal fun OutletSchedule.toDraft() = JadwalDraft(
     outletId = outletId,
@@ -93,6 +116,9 @@ internal fun OutletSchedule.toDraft() = JadwalDraft(
     radius = radiusM.toString(),
     mode = mode,
     editing = true,
+    pilihShiftAktif = pilihShiftAktif,
+    shift2JamMasuk = shift2JamMasuk ?: SHIFT2_DEFAULT_MASUK,
+    shift2JamKeluar = shift2JamKeluar ?: SHIFT2_DEFAULT_KELUAR,
 )
 
 /* ------------------------------------------------------------------ Daftar */
@@ -232,14 +258,33 @@ private fun JadwalCard(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    Text(
-                        text = "Toleransi ${jadwal.toleransiMenit}m · Radius ${jadwal.radiusM}m",
-                        color = StitchSecondary,
-                        fontSize = 12.5.sp,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "Toleransi ${jadwal.toleransiMenit}m · Radius ${jadwal.radiusM}m",
+                            color = StitchSecondary,
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
+                        if (jadwal.pilihShiftAktif) {
+                            Spacer(Modifier.width(6.dp))
+                            Surface(
+                                color = StitchPrimary.copy(alpha = 0.12f),
+                                shape = RoundedCornerShape(6.dp),
+                                border = BorderStroke(1.dp, StitchPrimary.copy(alpha = 0.3f)),
+                            ) {
+                                Text(
+                                    text = "2 Shift",
+                                    color = StitchPrimary,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
+                                )
+                            }
+                        }
+                    }
                 }
                 IconButton(onClick = onEdit, enabled = enabled, modifier = Modifier.size(36.dp)) {
                     Icon(Icons.Default.Edit, contentDescription = "Ubah jadwal khusus", tint = StitchSecondary, modifier = Modifier.size(20.dp))
@@ -251,8 +296,19 @@ private fun JadwalCard(
 
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                JamChip("Masuk", jadwal.jamMasuk, Icons.Default.WbTwilight, Modifier.weight(1f))
-                JamChip("Keluar", jadwal.jamKeluar, Icons.Default.Nightlight, Modifier.weight(1f))
+                if (jadwal.pilihShiftAktif) {
+                    JamChip("Shift 1", "${jadwal.jamMasuk} – ${jadwal.jamKeluar}", Icons.Default.WbTwilight, Modifier.weight(1f), compact = true)
+                    JamChip(
+                        "Shift 2",
+                        "${jadwal.shift2JamMasuk ?: "-"} – ${jadwal.shift2JamKeluar ?: "-"}",
+                        Icons.Default.Nightlight,
+                        Modifier.weight(1f),
+                        compact = true,
+                    )
+                } else {
+                    JamChip("Masuk", jadwal.jamMasuk, Icons.Default.WbTwilight, Modifier.weight(1f))
+                    JamChip("Keluar", jadwal.jamKeluar, Icons.Default.Nightlight, Modifier.weight(1f))
+                }
             }
 
             Spacer(Modifier.height(10.dp))
@@ -284,7 +340,7 @@ private fun JadwalCard(
 }
 
 @Composable
-private fun JamChip(label: String, value: String, icon: ImageVector, modifier: Modifier = Modifier) {
+private fun JamChip(label: String, value: String, icon: ImageVector, modifier: Modifier = Modifier, compact: Boolean = false) {
     Surface(
         modifier = modifier,
         color = StitchSurfaceLow,
@@ -298,7 +354,14 @@ private fun JamChip(label: String, value: String, icon: ImageVector, modifier: M
             Spacer(Modifier.width(8.dp))
             Column {
                 Text(label, color = StitchSecondary, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold)
-                Text(value, color = StitchOnSurface, fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    value,
+                    color = StitchOnSurface,
+                    fontSize = if (compact) 14.sp else 18.sp,
+                    lineHeight = if (compact) 20.sp else 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                )
             }
         }
     }
@@ -369,21 +432,62 @@ internal fun JadwalKhususDialog(
                     )
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    JamPickerField(
-                        label = "Masuk",
-                        value = draft.jamMasuk,
-                        icon = Icons.Default.WbTwilight,
-                        onClick = { onPickTime(JadwalTimeTarget.MASUK) },
-                        modifier = Modifier.weight(1f),
-                    )
-                    JamPickerField(
-                        label = "Keluar",
-                        value = draft.jamKeluar,
-                        icon = Icons.Default.Nightlight,
-                        onClick = { onPickTime(JadwalTimeTarget.KELUAR) },
-                        modifier = Modifier.weight(1f),
-                    )
+                PilihShiftToggle(
+                    aktif = draft.pilihShiftAktif,
+                    enabled = !saving,
+                    onToggle = { onDraftChange(draft.copy(pilihShiftAktif = !draft.pilihShiftAktif)) },
+                )
+
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (draft.pilihShiftAktif) {
+                        Text("Shift 1", color = StitchOnSurface, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        JamPickerField(
+                            label = "Masuk",
+                            value = draft.jamMasuk,
+                            icon = Icons.Default.WbTwilight,
+                            onClick = { onPickTime(JadwalTimeTarget.MASUK) },
+                            modifier = Modifier.weight(1f),
+                        )
+                        JamPickerField(
+                            label = if (draft.pilihShiftAktif) "Pulang" else "Keluar",
+                            value = draft.jamKeluar,
+                            icon = Icons.Default.Nightlight,
+                            onClick = { onPickTime(JadwalTimeTarget.KELUAR) },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+
+                if (draft.pilihShiftAktif) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Shift 2", color = StitchOnSurface, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            JamPickerField(
+                                label = "Masuk",
+                                value = draft.shift2JamMasuk,
+                                icon = Icons.Default.WbTwilight,
+                                onClick = { onPickTime(JadwalTimeTarget.SHIFT2_MASUK) },
+                                modifier = Modifier.weight(1f),
+                            )
+                            JamPickerField(
+                                label = "Pulang",
+                                value = draft.shift2JamKeluar,
+                                icon = Icons.Default.Nightlight,
+                                onClick = { onPickTime(JadwalTimeTarget.SHIFT2_KELUAR) },
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        Text(
+                            text = "Crew akan melihat pilihan: ${draft.jamMasuk} – ${draft.jamKeluar} atau " +
+                                "${draft.shift2JamMasuk} – ${draft.shift2JamKeluar}",
+                            color = StitchTertiary,
+                            fontSize = 12.5.sp,
+                            lineHeight = 18.sp,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
                 }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -459,6 +563,44 @@ internal fun JadwalKhususDialog(
 internal enum class JadwalTimeTarget(val title: String) {
     MASUK("Pilih jam masuk outlet"),
     KELUAR("Pilih jam keluar outlet"),
+    SHIFT2_MASUK("Pilih jam masuk Shift 2"),
+    SHIFT2_KELUAR("Pilih jam pulang Shift 2"),
+}
+
+/** Toggle "Crew Pilih Shift Sebelum Absen" — hanya ada di jadwal khusus cabang, tidak di aturan pusat. */
+@Composable
+private fun PilihShiftToggle(aktif: Boolean, enabled: Boolean, onToggle: () -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        color = if (aktif) StitchPrimary.copy(alpha = 0.08f) else StitchSurfaceLow,
+        border = BorderStroke(if (aktif) 2.dp else 1.dp, if (aktif) StitchPrimary else StitchSurfaceVariant),
+    ) {
+        Row(
+            modifier = Modifier
+                .clickable(enabled = enabled, role = Role.Switch, onClick = onToggle)
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("Crew Pilih Shift Sebelum Absen", color = StitchOnSurface, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    "Untuk cabang dengan dua jam kerja. Crew wajib memilih shift sebelum absen masuk.",
+                    color = StitchTertiary,
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+            Spacer(Modifier.width(10.dp))
+            Switch(
+                checked = aktif,
+                onCheckedChange = null,
+                enabled = enabled,
+                colors = SwitchDefaults.colors(checkedTrackColor = StitchPrimary),
+            )
+        }
+    }
 }
 
 @Composable
