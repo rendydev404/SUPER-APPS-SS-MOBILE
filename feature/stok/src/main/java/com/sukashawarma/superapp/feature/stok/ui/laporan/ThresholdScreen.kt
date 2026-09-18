@@ -23,8 +23,9 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import com.sukashawarma.superapp.core.ui.SukaDropdownHeader
+import com.sukashawarma.superapp.core.ui.SukaDropdownMenu
+import com.sukashawarma.superapp.core.ui.SukaDropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -302,10 +303,12 @@ private fun PemilihOutletThreshold(state: ThresholdUiState, viewModel: Threshold
                 if (state.outlets.size > 1) Icon(Icons.Default.ArrowDropDown, null, tint = SLATE500)
             }
         }
-        DropdownMenu(terbuka, { terbuka = false }) {
+        SukaDropdownMenu(terbuka, { terbuka = false }) {
+            SukaDropdownHeader(title = "PILIH OUTLET", onClose = { terbuka = false })
             state.outlets.forEach { outlet ->
-                DropdownMenuItem(
-                    text = { Text(outlet.name, fontSize = 13.sp) },
+                SukaDropdownMenuItem(
+                    text = outlet.name,
+                    selected = (state.outletTerpilih?.id == outlet.id),
                     onClick = { terbuka = false; viewModel.pilihOutlet(outlet) },
                 )
             }
