@@ -2,8 +2,11 @@ package com.sukashawarma.superapp.feature.stok.ui.permintaan
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.sukashawarma.superapp.domain.model.Role
 import com.sukashawarma.superapp.domain.session.AppSession
+import com.sukashawarma.superapp.data.remote.HasilAksi
 import com.sukashawarma.superapp.feature.stok.data.PermintaanRepository
+import com.sukashawarma.superapp.feature.stok.data.ReturRepository
 import com.sukashawarma.superapp.feature.stok.data.StokRepository
 import com.sukashawarma.superapp.feature.stok.data.model.BahanBaku
 import com.sukashawarma.superapp.feature.stok.data.model.BudgetStatus
@@ -11,6 +14,7 @@ import com.sukashawarma.superapp.feature.stok.data.model.CrosscheckSaldo
 import com.sukashawarma.superapp.feature.stok.data.model.EstimasiKeranjang
 import com.sukashawarma.superapp.feature.stok.data.model.OutletRingkas
 import com.sukashawarma.superapp.feature.stok.data.model.Permintaan
+import com.sukashawarma.superapp.feature.stok.data.model.Retur
 import com.sukashawarma.superapp.feature.stok.data.model.SaranPermintaan
 import com.sukashawarma.superapp.feature.stok.data.model.StatusPermintaan
 import com.sukashawarma.superapp.feature.stok.data.model.TopUpRequest
@@ -27,11 +31,16 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.math.ceil
 
 /** Tab utama untuk role outlet — cermin `mainTab` ('buat' | 'riwayat') di web. */
-enum class TabPermintaan(val label: String) { BUAT("Buat Baru"), RIWAYAT("Riwayat") }
+enum class TabPermintaan(val label: String) {
+    BUAT("Buat Baru"),
+    RIWAYAT("Riwayat"),
+    ANTREAN("Antrean"),
+}
 
 /** Satu baris keranjang yang sudah diresolusikan ke master bahannya. */
 data class BarisKeranjang(val bahan: BahanBaku, val qty: Long)
@@ -44,10 +53,15 @@ data class PermintaanUiState(
     val outlets: List<OutletRingkas> = emptyList(),
     val outletTerpilih: OutletRingkas? = null,
     /**
-     * Role pengawas/dapur langsung masuk antrean persetujuan dan tidak membuat
-     * permintaan — cermin `isKitchen` di `permintaan/page.tsx`.
+     * Tab Antrean tersedia sebagai TAMBAHAN, bukan pengganti — cermin
+     * `canViewApprovalQueue` di `permintaan/page.tsx`.
+     *
+     * Sebelumnya flag ini menukar seluruh layar menjadi antrean, sehingga leader,
+     * SPV, dan regional manager kehilangan Buat Baru dan Riwayat. Di web mereka
+     * tetap punya keduanya: leader memegang outlet dan memang mengajukan permintaan
+     * sendiri, antrean hanya menambah satu tab di sebelahnya.
      */
-    val modeAntrean: Boolean = false,
+    val bolehAntrean: Boolean = false,
     val bolehApprove: Boolean = false,
     val katalogPenuh: Boolean = false,
     // ---- data bersama
@@ -95,6 +109,16 @@ data class PermintaanUiState(
     val stokGudang: Map<String, CrosscheckSaldo> = emptyMap(),
     /** bahanBakuId -> kebutuhan HPP dari target penjualan, bila ada. */
     val kebutuhanTarget: Map<String, Double> = emptyMap(),
+    /**
+     * Tiket retur outlet ini yang fisiknya sudah ditimbang di gudang tetapi
+     * penggantinya belum berangkat — cermin `usePendingReturForOutlet` di
+     * `ApprovalModal.tsx`. Terisi hanya selama layar persetujuan terbuka.
+     */
+    val returMenunggu: List<Retur> = emptyList(),
+    /** Tiket yang ikut diterbitkan SJ Penggantinya saat permintaan ini disetujui. */
+    val returDisertakan: Set<String> = emptySet(),
+    /** outletId -> jumlah tiket retur menunggu, untuk lencana di kartu antrean. */
+    val returPerOutlet: Map<String, Int> = emptyMap(),
 ) {
     val bahanMap: Map<String, BahanBaku> get() = katalog.associateBy { it.id }
 
@@ -205,9 +229,12 @@ class PermintaanViewModel : ViewModel() {
     fun muatAwal() {
         viewModelScope.launch {
             val role = AppSession.staff.value?.role
+            val bolehAntrean =
+                Approver.bolehReviewPermintaan(role) || Approver.bolehApprovePermintaan(role)
             _state.value = _state.value.copy(
                 memuat = true, error = null, tidakBerhak = false,
-                modeAntrean = Approver.bolehReviewPermintaan(role) || Approver.bolehApprovePermintaan(role),
+                bolehAntrean = bolehAntrean,
+                tab = if (role == Role.KITCHEN) TabPermintaan.ANTREAN else _state.value.tab,
                 bolehApprove = Approver.bolehApprovePermintaan(role),
                 katalogPenuh = KatalogPermintaan.katalogPenuh(role),
                 bolehApproveAm = Budget.bolehApproveAm(role),
@@ -245,8 +272,9 @@ class PermintaanViewModel : ViewModel() {
     }
 
     /**
-     * Muat semua data layar sekaligus. Katalog + harga dipakai kedua mode; saran dan
-     * riwayat hanya untuk mode outlet, antrean hanya untuk mode pengawas.
+     * Muat semua data layar sekaligus. Data outlet (saran + riwayat) selalu diambil
+     * karena setiap peran boleh membuat permintaan; antrean ditambahkan bagi peran
+     * yang memegang tab Antrean.
      */
     private suspend fun muatData() {
         val s = _state.value
@@ -254,19 +282,17 @@ class PermintaanViewModel : ViewModel() {
         _state.value = s.copy(memuat = true, error = null)
         try {
             val katalog = PermintaanRepository.bahanBaku()
-            if (s.modeAntrean) {
+            _state.value = _state.value.copy(
+                memuat = false, katalog = katalog,
+                saran = PermintaanRepository.saran(outlet.id),
+                daftarOutlet = PermintaanRepository.daftarOutlet(outlet.id),
+            )
+            muatBudgetOutlet(outlet.id)
+            if (s.bolehAntrean) {
                 val antrean = PermintaanRepository.menunggu(s.outlets.map { it.id })
-                _state.value = _state.value.copy(
-                    memuat = false, katalog = katalog, daftarReview = antrean,
-                )
+                _state.value = _state.value.copy(daftarReview = antrean)
+                muatLencanaRetur(antrean.map { it.outletId }.distinct())
                 muatBudgetAntrean(antrean, katalog.associateBy { it.id })
-            } else {
-                _state.value = _state.value.copy(
-                    memuat = false, katalog = katalog,
-                    saran = PermintaanRepository.saran(outlet.id),
-                    daftarOutlet = PermintaanRepository.daftarOutlet(outlet.id),
-                )
-                muatBudgetOutlet(outlet.id)
             }
         } catch (e: Exception) {
             _state.value = _state.value.copy(memuat = false, error = stokErrorMessage(e))
@@ -329,6 +355,27 @@ class PermintaanViewModel : ViewModel() {
                 .awaitAll()
         }.filterNotNull().toMap()
         _state.value = _state.value.copy(estimasiPerPermintaan = estimasi)
+    }
+
+    /**
+     * Berapa tiket retur yang menunggu pengganti di tiap outlet yang punya antrean.
+     *
+     * Hanya angka, bukan isinya: kartu antrean cuma menampilkan lencana "Ada N
+     * Pengganti Retur", dan daftar lengkapnya baru ditarik saat kartunya dibuka.
+     * Kegagalannya diabaikan — lencana yang hilang tidak boleh menahan antrean.
+     */
+    private suspend fun muatLencanaRetur(outletIds: List<String>) {
+        if (outletIds.isEmpty()) return
+        val hasil = coroutineScope {
+            outletIds.map { id ->
+                async {
+                    runCatching { ReturRepository.menungguPengganti(id) }.getOrNull()
+                        ?.takeIf { it.isNotEmpty() }
+                        ?.let { id to it.size }
+                }
+            }.awaitAll()
+        }.filterNotNull().toMap()
+        _state.value = _state.value.copy(returPerOutlet = hasil)
     }
 
     private var estimasiJob: Job? = null
@@ -516,18 +563,37 @@ class PermintaanViewModel : ViewModel() {
     }
 
     fun kirimPermintaan() {
+        var lanjut = false
+        _state.update { current ->
+            val outlet = current.outletTerpilih
+            val items = current.keranjangItems
+            if (outlet == null) {
+                current
+            } else if (items.isEmpty()) {
+                current.copy(konfirmasiTerbuka = false, pesan = "Tidak ada bahan baku yang perlu diminta.")
+            } else if (current.mengirim) {
+                current
+            } else {
+                lanjut = true
+                current.copy(mengirim = true, error = null, pesan = null)
+            }
+        }
+        if (!lanjut) return
+
         val s = _state.value
-        val outlet = s.outletTerpilih ?: return
-        val staffId = AppSession.staff.value?.id ?: return
-        val items = s.keranjangItems
-        if (items.isEmpty()) {
-            _state.value = s.copy(konfirmasiTerbuka = false, pesan = "Tidak ada bahan baku yang perlu diminta.")
+        val outlet = s.outletTerpilih ?: run {
+            _state.update { it.copy(mengirim = false) }
             return
         }
+        val staffId = AppSession.staff.value?.id ?: run {
+            _state.update { it.copy(mengirim = false, error = "Sesi tidak valid, silakan login ulang.") }
+            return
+        }
+        val items = s.keranjangItems
+
         viewModelScope.launch {
-            _state.value = _state.value.copy(mengirim = true, error = null, pesan = null)
             try {
-                PermintaanRepository.buat(
+                val hasil = PermintaanRepository.buat(
                     outletId = outlet.id,
                     dibuatOleh = staffId,
                     // qty_diminta tersimpan pada satuan besar; keranjang pada satuan pesan.
@@ -539,14 +605,23 @@ class PermintaanViewModel : ViewModel() {
                     },
                 )
                 estimasiJob?.cancel()
-                _state.value = _state.value.copy(
-                    mengirim = false, konfirmasiTerbuka = false, tinjauTerbuka = false,
-                    keranjang = emptyMap(), estimasi = EstimasiKeranjang(), tab = TabPermintaan.RIWAYAT,
-                    pesan = "Permintaan berhasil dikirim (${items.size} item bahan baku). Menunggu persetujuan.",
-                )
-                muatData()
+                _state.update {
+                    it.copy(
+                        mengirim = false, konfirmasiTerbuka = false, tinjauTerbuka = false,
+                        keranjang = emptyMap(), estimasi = EstimasiKeranjang(), tab = TabPermintaan.RIWAYAT,
+                        pesan = if (hasil == HasilAksi.MASUK_ANTREAN) {
+                            "Permintaan (${items.size} item) tersimpan di HP dan akan terkirim " +
+                                "otomatis begitu ada internet."
+                        } else {
+                            "Permintaan berhasil dikirim (${items.size} item bahan baku). Menunggu persetujuan."
+                        },
+                    )
+                }
+                // Riwayat hanya dimuat ulang kalau permintaannya benar-benar sampai server;
+                // saat offline pemuatan itu gagal dan menimpa pesan di atas dengan galat.
+                if (hasil == HasilAksi.TERKIRIM) muatData()
             } catch (e: Exception) {
-                _state.value = _state.value.copy(mengirim = false, error = stokErrorMessage(e))
+                _state.update { it.copy(mengirim = false, error = stokErrorMessage(e)) }
             }
         }
     }
@@ -585,6 +660,7 @@ class PermintaanViewModel : ViewModel() {
             approveUntuk = p, qtySetuju = awal, memuatCrosscheck = true,
             stokOutlet = emptyMap(), stokGudang = emptyMap(), kebutuhanTarget = emptyMap(),
             estimasiSetuju = EstimasiKeranjang(),
+            returMenunggu = emptyList(), returDisertakan = emptySet(),
         )
         jadwalkanEstimasiSetuju()
         viewModelScope.launch {
@@ -601,12 +677,19 @@ class PermintaanViewModel : ViewModel() {
                     p.targetJual.mapNotNull { t -> t.resepId?.let { it to t.qty } },
                 )
             }.getOrDefault(emptyMap())
+            // Semua tiket dicentang lebih dulu, sama seperti web: kalau barangnya
+            // sudah ditimbang dan rutenya toh berangkat, tidak ada alasan menunda
+            // penggantinya satu putaran pengiriman lagi.
+            val retur = runCatching { ReturRepository.menungguPengganti(p.outletId) }
+                .getOrDefault(emptyList())
             if (_state.value.approveUntuk?.id != p.id) return@launch
             _state.value = _state.value.copy(
                 memuatCrosscheck = false,
                 stokOutlet = cc[p.outletId].orEmpty(),
                 stokGudang = gudangId?.let { cc[it] }.orEmpty(),
                 kebutuhanTarget = kebutuhan,
+                returMenunggu = retur,
+                returDisertakan = retur.map { it.id }.toSet(),
             )
         }
     }
@@ -617,6 +700,7 @@ class PermintaanViewModel : ViewModel() {
             approveUntuk = null, qtySetuju = emptyMap(),
             stokOutlet = emptyMap(), stokGudang = emptyMap(), kebutuhanTarget = emptyMap(),
             estimasiSetuju = EstimasiKeranjang(),
+            returMenunggu = emptyList(), returDisertakan = emptySet(),
         )
     }
 
@@ -672,47 +756,123 @@ class PermintaanViewModel : ViewModel() {
         // RPC menolak bila semua item nol dan menyuruh memakai jalur tolak; dicegat di
         // sini supaya pengguna tidak menerima pesan error mentah dari database.
         if (items.none { it.qtyDisetujui > 0 }) {
-            _state.value = _state.value.copy(
-                pesan = "Tidak ada item dengan jumlah di atas nol. Gunakan tombol Tolak bila memang ditolak."
-            )
+            _state.update {
+                it.copy(
+                    pesan = "Tidak ada item dengan jumlah di atas nol. Gunakan tombol Tolak bila memang ditolak."
+                )
+            }
             return
         }
-        viewModelScope.launch {
-            _state.value = _state.value.copy(mengirim = true, error = null, pesan = null)
-            try {
-                PermintaanRepository.setujui(p.id, items)
-                estimasiSetujuJob?.cancel()
-                _state.value = _state.value.copy(
-                    mengirim = false, approveUntuk = null, qtySetuju = emptyMap(),
-                    estimasiSetuju = EstimasiKeranjang(),
-                    pesan = "Permintaan disetujui dan surat jalan dibuat.",
-                )
-                muatData()
-            } catch (e: Exception) {
-                _state.value = _state.value.copy(mengirim = false, error = stokErrorMessage(e))
+        var lanjut = false
+        _state.update { current ->
+            if (current.mengirim) {
+                current
+            } else {
+                lanjut = true
+                current.copy(mengirim = true, error = null, pesan = null)
             }
         }
+        if (!lanjut) return
+
+        viewModelScope.launch {
+            try {
+                PermintaanRepository.setujui(p.id, items)
+                val ikut = terbitkanPenggantiRetur(p)
+                estimasiSetujuJob?.cancel()
+                _state.update {
+                    it.copy(
+                        mengirim = false, approveUntuk = null, qtySetuju = emptyMap(),
+                        estimasiSetuju = EstimasiKeranjang(),
+                        returMenunggu = emptyList(), returDisertakan = emptySet(),
+                        pesan = if (ikut > 0) {
+                            "Permintaan disetujui, surat jalan dibuat, dan $ikut Surat Jalan Pengganti retur ikut diterbitkan."
+                        } else {
+                            "Permintaan disetujui dan surat jalan dibuat."
+                        },
+                    )
+                }
+                muatData()
+            } catch (e: Exception) {
+                _state.update { it.copy(mengirim = false, error = stokErrorMessage(e)) }
+                muatData()
+            }
+        }
+    }
+
+    /**
+     * Menerbitkan SJ Pengganti untuk tiket retur yang dicentang — cermin perulangan
+     * `verifikasiKitchenDanBuatSJ` setelah `approve` di `ApprovalModal.tsx`.
+     *
+     * Dijalankan SETELAH persetujuan berhasil dan kegagalannya tidak dilempar ulang.
+     * Yang sudah terjadi tidak bisa dibatalkan: `approve_permintaan_svc` sudah
+     * menerbitkan surat jalan dan memotong stok gudang. Melempar galat di sini akan
+     * membuat layar berkata "gagal" padahal permintaannya sudah disetujui, dan
+     * penyetuju akan menekan tombolnya sekali lagi. Tiket retur yang gagal ikut tetap
+     * berstatus `diterima_kitchen` dan bisa diterbitkan manual dari layar Retur.
+     *
+     * Qty memakai timbangan gudang bila ada, kalau tidak klaim outlet — sama seperti
+     * web, dan sama dengan bawaan RPC-nya sendiri.
+     */
+    private suspend fun terbitkanPenggantiRetur(p: Permintaan): Int {
+        val s = _state.value
+        val dipilih = s.returMenunggu.filter { it.id in s.returDisertakan }
+        if (dipilih.isEmpty()) return 0
+        val catatan = "Digabung bersama pengiriman reguler #${p.id.take(6).uppercase()}"
+        var berhasil = 0
+        dipilih.forEach { retur ->
+            val qty = retur.items.associate { it.id to (it.qtyDiterimaKitchen ?: it.qtyKlaim) }
+            runCatching {
+                ReturRepository.verifikasiKitchen(
+                    returId = retur.id,
+                    qtyPerItem = qty,
+                    catatan = catatan,
+                    terbitkanSjSekarang = true,
+                )
+            }.onSuccess { berhasil++ }
+        }
+        return berhasil
+    }
+
+    /** Centang/hapus centang satu tiket retur yang akan menumpang pengiriman ini. */
+    fun ubahReturDisertakan(returId: String, ikut: Boolean) {
+        val kini = _state.value.returDisertakan
+        _state.value = _state.value.copy(
+            returDisertakan = if (ikut) kini + returId else kini - returId,
+        )
     }
 
     fun tolak(alasan: String) {
         val p = _state.value.approveUntuk ?: return
         if (alasan.isBlank()) {
-            _state.value = _state.value.copy(pesan = "Alasan penolakan wajib diisi.")
+            _state.update { it.copy(pesan = "Alasan penolakan wajib diisi.") }
             return
         }
+        var lanjut = false
+        _state.update { current ->
+            if (current.mengirim) {
+                current
+            } else {
+                lanjut = true
+                current.copy(mengirim = true, error = null, pesan = null)
+            }
+        }
+        if (!lanjut) return
+
         viewModelScope.launch {
-            _state.value = _state.value.copy(mengirim = true, error = null, pesan = null)
             try {
                 PermintaanRepository.tolak(p.id, alasan.trim())
                 estimasiSetujuJob?.cancel()
-                _state.value = _state.value.copy(
-                    mengirim = false, approveUntuk = null, qtySetuju = emptyMap(),
-                    estimasiSetuju = EstimasiKeranjang(),
-                    pesan = "Permintaan ditolak.",
-                )
+                _state.update {
+                    it.copy(
+                        mengirim = false, approveUntuk = null, qtySetuju = emptyMap(),
+                        estimasiSetuju = EstimasiKeranjang(),
+                        pesan = "Permintaan ditolak.",
+                    )
+                }
                 muatData()
             } catch (e: Exception) {
-                _state.value = _state.value.copy(mengirim = false, error = stokErrorMessage(e))
+                _state.update { it.copy(mengirim = false, error = stokErrorMessage(e)) }
+                muatData()
             }
         }
     }
