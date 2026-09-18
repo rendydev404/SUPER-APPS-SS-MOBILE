@@ -19,11 +19,15 @@ import com.sukashawarma.superapp.feature.stok.domain.MasukanBerjenjang
 import com.sukashawarma.superapp.feature.stok.domain.OpnameHitung
 import com.sukashawarma.superapp.feature.stok.domain.bungkusCatatanOpname
 import com.sukashawarma.superapp.feature.stok.domain.formatTriUnitAdaptif
+import com.sukashawarma.superapp.feature.stok.domain.CalonPenurunan
+import com.sukashawarma.superapp.feature.stok.domain.GerbangNolOpname
+import com.sukashawarma.superapp.feature.stok.domain.Penurunan
 import com.sukashawarma.superapp.feature.stok.domain.Selisih
 import com.sukashawarma.superapp.feature.stok.domain.bolehTampilDiOutlet
 import com.sukashawarma.superapp.feature.stok.domain.stokErrorMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class OpnameUiState(
@@ -44,7 +48,14 @@ data class OpnameUiState(
     val terkunci: AlasanOpnameTerkunci? = null,
     val items: List<OpnameItemRow> = emptyList(),
     val cari: String = "",
+    /**
+     * Baris yang turun drastis dan menunggu konfirmasi ulang sebelum finalisasi.
+     * Tidak kosong berarti gerbangnya sedang terbuka; lihat [GerbangNolOpname].
+     */
+    val penurunan: List<Penurunan> = emptyList(),
 ) {
+    val gerbangPenurunanTerbuka: Boolean get() = penurunan.isNotEmpty()
+
     val itemTampil: List<OpnameItemRow>
         get() {
             val kata = cari.trim().lowercase()
@@ -222,6 +233,7 @@ class OpnameViewModel(app: Application) : AndroidViewModel(app) {
                             qtySystemSmallest = sistem,
                             saldoIsGram = row.saldoIsGram,
                             terukur = Selisih.ambangPersen(row.meta.satuan, row.meta.satuanKecil) > 0,
+                            faktorKonversi = row.faktorKonversi,
                             besar = masukan?.besar.orEmpty(),
                             tengah = masukan?.tengah.orEmpty(),
                             kecil = masukan?.kecil
@@ -309,29 +321,44 @@ class OpnameViewModel(app: Application) : AndroidViewModel(app) {
         }
 
     fun simpanDraft() {
-        val opnameId = _state.value.opnameId ?: return
+        var lanjut = false
+        _state.update { current ->
+            if (current.menyimpan) {
+                current
+            } else {
+                lanjut = true
+                current.copy(menyimpan = true, error = null, pesan = null)
+            }
+        }
+        if (!lanjut) return
+
+        val opnameId = _state.value.opnameId ?: run {
+            _state.update { it.copy(menyimpan = false) }
+            return
+        }
         val items = itemUntukDisimpan(opnameId)
         if (items.isEmpty()) {
-            _state.value = _state.value.copy(pesan = "Belum ada item yang diisi.")
+            _state.update { it.copy(menyimpan = false, pesan = "Belum ada item yang diisi.") }
             return
         }
         viewModelScope.launch {
-            _state.value = _state.value.copy(menyimpan = true, error = null, pesan = null)
             try {
                 OpnameRepository.simpanItem(items)
                 // Tandai baris yang sudah tersimpan supaya UI menampilkan
                 // indikator visual — baris yang polos belum pernah ke server.
                 val idTersimpan = items.map { it.bahanBakuId }.toSet()
-                _state.value = _state.value.copy(
-                    menyimpan = false,
-                    pesan = "Draft tersimpan (${items.size} item).",
-                    items = _state.value.items.map { row ->
-                        if (row.bahanBakuId in idTersimpan) row.copy(tersimpanDraft = true)
-                        else row
-                    },
-                )
+                _state.update {
+                    it.copy(
+                        menyimpan = false,
+                        pesan = "Draft tersimpan (${items.size} item).",
+                        items = it.items.map { row ->
+                            if (row.bahanBakuId in idTersimpan) row.copy(tersimpanDraft = true)
+                            else row
+                        },
+                    )
+                }
             } catch (e: Exception) {
-                _state.value = _state.value.copy(menyimpan = false, error = stokErrorMessage(e))
+                _state.update { it.copy(menyimpan = false, error = stokErrorMessage(e)) }
             }
         }
     }
@@ -346,36 +373,125 @@ class OpnameViewModel(app: Application) : AndroidViewModel(app) {
      * berbeda tergantung perangkat yang dipakai — dan itu lebih berbahaya daripada
      * meneruskan kesenjangan yang sudah ada.
      */
+    /**
+     * Gerbang terakhir sebelum finalisasi — cermin `lanjutkanKeFinalisasi()` web.
+     *
+     * Dipanggil layar sebagai ganti [finalisasi] langsung. Bila ada bahan yang
+     * hitungannya turun drastis, daftarnya dimunculkan lebih dulu; finalisasi baru
+     * berjalan setelah kru menegaskannya atau melewati baris yang salah ketik.
+     */
+    fun mintaFinalisasi() {
+        val turun = GerbangNolOpname.daftarPenurunan(
+            _state.value.items.filter { it.adaMasukan }.map { item ->
+                CalonPenurunan(
+                    bahanBakuId = item.bahanBakuId,
+                    nama = item.namaBahan,
+                    qtyFisik = fisik(item),
+                    qtySystem = item.qtySystemSmallest,
+                    faktorKonversi = item.faktorKonversi,
+                    ditandai = ditandai(item),
+                )
+            },
+        )
+        if (turun.isNotEmpty()) {
+            _state.value = _state.value.copy(penurunan = turun)
+            return
+        }
+        finalisasi()
+    }
+
+    /** Menutup gerbang tanpa memfinalisasi — kru kembali menyunting hitungannya. */
+    fun tutupGerbangPenurunan() {
+        _state.value = _state.value.copy(penurunan = emptyList())
+    }
+
+    /**
+     * Mengembalikan satu bahan ke status "belum dihitung": isiannya dihapus sehingga
+     * baris itu dilewati opname dan saldo sistemnya tidak diubah sama sekali.
+     *
+     * Inilah jalan keluar yang benar untuk kru yang mengetik "0" bermaksud "belum
+     * saya hitung". Peringatan saja tidak cukup — tanpa jalan keluar di tempat
+     * peringatannya muncul, orang akan menekan lanjut saja.
+     */
+    fun lewatiPenurunan(bahanBakuId: String) {
+        _state.value = _state.value.copy(
+            items = _state.value.items.map { row ->
+                if (row.bahanBakuId == bahanBakuId) {
+                    row.copy(besar = "", tengah = "", kecil = "")
+                } else {
+                    row
+                }
+            },
+            penurunan = _state.value.penurunan.filterNot { it.calon.bahanBakuId == bahanBakuId },
+        )
+    }
+
     fun finalisasi() {
-        val opnameId = _state.value.opnameId ?: return
+        var lanjut = false
+        _state.update { current ->
+            if (current.menyimpan) {
+                current
+            } else {
+                lanjut = true
+                current.copy(menyimpan = true, error = null, pesan = null, penurunan = emptyList())
+            }
+        }
+        if (!lanjut) return
+
+        val opnameId = _state.value.opnameId ?: run {
+            _state.update { it.copy(menyimpan = false) }
+            return
+        }
         val items = itemUntukDisimpan(opnameId)
         if (items.isEmpty()) {
-            _state.value = _state.value.copy(pesan = "Tidak ada item yang diinput.")
+            _state.update {
+                it.copy(
+                    menyimpan = false,
+                    penurunan = emptyList(),
+                    pesan = "Tidak ada item yang diinput.",
+                )
+            }
             return
         }
         viewModelScope.launch {
-            _state.value = _state.value.copy(menyimpan = true, error = null, pesan = null)
             try {
                 OpnameRepository.simpanItem(items)
                 OpnameRepository.finalisasi(opnameId)
                 val bertanda = items.count { it.flagged }
                 StokRepository.invalidate()
-                _state.value = _state.value.copy(
-                    menyimpan = false,
-                    formTerbuka = false,
-                    items = emptyList(),
-                    opnameId = null,
-                    pesan = if (bertanda > 0) {
-                        "Opname difinalisasi. $bertanda item di luar toleransi tercatat sebagai selisih."
-                    } else {
-                        "Opname berhasil difinalisasi."
-                    },
-                )
+                _state.update {
+                    it.copy(
+                        menyimpan = false,
+                        formTerbuka = false,
+                        items = emptyList(),
+                        opnameId = null,
+                        pesan = if (bertanda > 0) {
+                            "Opname difinalisasi. $bertanda item di luar toleransi tercatat sebagai selisih."
+                        } else {
+                            "Opname berhasil difinalisasi."
+                        },
+                    )
+                }
                 muatRiwayat()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                antrekanFinalisasiGagal(opnameId, e)
+                // Cek apakah sebenarnya sudah difinalisasi (oleh pengguna lain atau request sebelumnya)
+                if (OpnameRepository.sudahFinalized(opnameId)) {
+                    StokRepository.invalidate()
+                    _state.update {
+                        it.copy(
+                            menyimpan = false,
+                            formTerbuka = false,
+                            items = emptyList(),
+                            opnameId = null,
+                            pesan = "Opname sudah difinalisasi oleh pengguna lain.",
+                        )
+                    }
+                    muatRiwayat()
+                } else {
+                    antrekanFinalisasiGagal(opnameId, e)
+                }
             }
         }
     }
