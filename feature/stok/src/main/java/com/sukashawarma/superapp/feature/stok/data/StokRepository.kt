@@ -39,9 +39,9 @@ object StokRepository {
     private const val MONITORING_SELECT =
         "outlet_id,outlet_name,bahan_baku_id,item_name,current_qty," +
             "threshold,status,is_flagged,saldo_is_gram,last_opname_date,kategori,satuan," +
-            "bahan_baku(satuan,satuan_tengah,satuan_kecil,faktor_tengah,faktor_tampilan)"
+            "bahan_baku(satuan,satuan_tengah,satuan_kecil,faktor_tengah,faktor_tampilan,faktor_konversi)"
 
-    private val cache = HashMap<String, Pair<Long, Any>>()
+    private val cache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, Any>>()
 
     private suspend fun <T : Any> cached(key: String, load: suspend () -> T): T {
         val hit = cache[key]
@@ -185,6 +185,10 @@ object StokRepository {
             lastOpnameDate = optString("last_opname_date"),
             kategori = optString("kategori"),
             satuan = optString("satuan"),
+            // Kolom terpisah, bukan bagian UnitMeta: `faktor_konversi` punya arti
+            // sendiri (faktor resep/BOM) dan menyatukannya ke UnitMeta akan
+            // mengaburkan batas yang sengaja dijaga di UnitScale.
+            faktorKonversi = bb?.optDouble("faktor_konversi"),
             meta = UnitMeta(
                 satuan = bb?.optString("satuan") ?: optString("satuan"),
                 satuanTengah = bb?.optString("satuan_tengah"),
