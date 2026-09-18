@@ -55,6 +55,11 @@ import com.sukashawarma.superapp.presentation.theme.SukaOrange
 import com.sukashawarma.superapp.presentation.theme.SukaSurface
 import com.sukashawarma.superapp.presentation.theme.SukaSurfaceContainerHighest
 import com.sukashawarma.superapp.presentation.theme.SukaSurfaceContainerLowest
+import com.sukashawarma.superapp.core.ui.SukaDropdownHeader
+import com.sukashawarma.superapp.core.ui.SukaDropdownMenu
+import com.sukashawarma.superapp.core.ui.SukaDropdownMenuItem
+import com.sukashawarma.superapp.core.ui.RealtimeRefresh
+import com.sukashawarma.superapp.core.ui.RealtimeTables
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -107,6 +112,11 @@ fun EnrollScreen(onExit: () -> Unit) {
         return
     }
 
+    // Satu wajah yang baru didaftarkan di HP lain memindahkan orangnya dari
+    // "Belum Enroll" ke "Sudah Enroll". Tanpa ini, dua supervisor yang mendaftarkan
+    // crew bersamaan akan saling memanggil orang yang sudah selesai.
+    RealtimeRefresh(RealtimeTables.OUTLET_STAFF) { viewModel.segarkanCrew() }
+
     Scaffold(
         containerColor = SukaSurface,
         topBar = {
@@ -118,64 +128,71 @@ fun EnrollScreen(onExit: () -> Unit) {
             )
         }
     ) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize()) {
-            // Diri sendiri sudah punya kartunya sendiri di atas; dibiarkan ikut di daftar
-            // crew hanya akan menampilkan orang yang sama dua kali.
-            val others = state.crew.filterNot { it.id == state.self?.id }
-            val notEnrolled = others.filterNot { it.alreadyEnrolled }
-            val enrolled = others.filter { it.alreadyEnrolled }
-            var pendingExpanded by rememberSaveable { mutableStateOf(true) }
-            var enrolledExpanded by rememberSaveable { mutableStateOf(false) }
+        // Diri sendiri sudah punya kartunya sendiri di atas; dibiarkan ikut di daftar
+        // crew hanya akan menampilkan orang yang sama dua kali.
+        val others = state.crew.filterNot { it.id == state.self?.id }
+        val notEnrolled = others.filterNot { it.alreadyEnrolled }
+        val enrolled = others.filter { it.alreadyEnrolled }
+        var pendingExpanded by rememberSaveable { mutableStateOf(true) }
+        var enrolledExpanded by rememberSaveable { mutableStateOf(false) }
 
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 18.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                state.self?.let { me ->
-                    SelfEnrollmentCard(self = me, onSelect = { viewModel.selectStaff(me.id) })
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize()
+                // Dua akordeon yang terbuka bersamaan, apalagi di outlet berkru banyak,
+                // melampaui tinggi layar. Tanpa gulir, kartu terakhir hanya terpotong di
+                // tepi bawah dan crew di dalamnya tidak bisa dijangkau sama sekali.
+                // Gulir dipasang sebelum padding supaya jarak bawahnya ikut bergulir dan
+                // baris terakhir tidak mepet ke bilah navigasi.
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            state.self?.let { me ->
+                SelfEnrollmentCard(self = me, onSelect = { viewModel.selectStaff(me.id) })
+            }
+
+            OutletSelectionCard(
+                bisaPilihOutlet = state.canChooseOutlet,
+                outletName = AppSession.staff.value?.outletName,
+                outlets = state.outlets,
+                loading = state.loadingOutlets,
+                selectedId = state.selectedOutletId,
+                onSelect = viewModel::selectOutlet,
+            )
+
+            if (state.error != null) {
+                Text(state.error ?: "", color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
+            }
+
+            if (state.loadingCrew && state.selectedOutletId != null) {
+                Box(Modifier.fillMaxWidth().padding(vertical = 36.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = Color(0xFF9A560C), modifier = Modifier.size(28.dp), strokeWidth = 2.dp)
                 }
-
-                OutletSelectionCard(
-                    bisaPilihOutlet = state.canChooseOutlet,
-                    outletName = AppSession.staff.value?.outletName,
-                    outlets = state.outlets,
-                    loading = state.loadingOutlets,
-                    selectedId = state.selectedOutletId,
-                    onSelect = viewModel::selectOutlet,
+            } else if (state.selectedOutletId != null) {
+                CrewEnrollmentSection(
+                    title = "Belum Enroll",
+                    subtitle = "${notEnrolled.size} Crew Members",
+                    crew = notEnrolled,
+                    expanded = pendingExpanded,
+                    selectedId = state.selectedStaffId,
+                    accent = Color(0xFFD65B5B),
+                    onExpandedChange = { pendingExpanded = !pendingExpanded },
+                    onSelect = viewModel::selectStaff,
                 )
-
-                if (state.error != null) {
-                    Text(state.error ?: "", color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
-                }
-
-                if (state.loadingCrew && state.selectedOutletId != null) {
-                    Box(Modifier.fillMaxWidth().padding(vertical = 36.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = Color(0xFF9A560C), modifier = Modifier.size(28.dp), strokeWidth = 2.dp)
-                    }
-                } else if (state.selectedOutletId != null) {
-                    CrewEnrollmentSection(
-                        title = "Belum Enroll",
-                        subtitle = "${notEnrolled.size} Crew Members",
-                        crew = notEnrolled,
-                        expanded = pendingExpanded,
-                        selectedId = state.selectedStaffId,
-                        accent = Color(0xFFD65B5B),
-                        onExpandedChange = { pendingExpanded = !pendingExpanded },
-                        onSelect = viewModel::selectStaff,
-                    )
-                    CrewEnrollmentSection(
-                        title = "Sudah Enroll",
-                        subtitle = "${enrolled.size} Crew Members",
-                        crew = enrolled,
-                        expanded = enrolledExpanded,
-                        selectedId = state.selectedStaffId,
-                        accent = Color(0xFF6D9FA2),
-                        onExpandedChange = { enrolledExpanded = !enrolledExpanded },
-                        onSelect = viewModel::selectStaff,
-                    )
-                } else {
-                    Text("Pilih outlet untuk memuat crew.", color = Color(0xFF68757A), fontSize = 14.sp)
-                }
+                CrewEnrollmentSection(
+                    title = "Sudah Enroll",
+                    subtitle = "${enrolled.size} Crew Members",
+                    crew = enrolled,
+                    expanded = enrolledExpanded,
+                    selectedId = state.selectedStaffId,
+                    accent = Color(0xFF6D9FA2),
+                    onExpandedChange = { enrolledExpanded = !enrolledExpanded },
+                    onSelect = viewModel::selectStaff,
+                )
+            } else {
+                Text("Pilih outlet untuk memuat crew.", color = Color(0xFF68757A), fontSize = 14.sp)
             }
         }
     }
@@ -579,19 +596,23 @@ private fun OutletSelectionCard(
                             )
                         }
                     }
-                    DropdownMenu(
+                    SukaDropdownMenu(
                         expanded = expanded,
                         onDismissRequest = { expanded = false },
-                        modifier = Modifier.width(280.dp).heightIn(max = 430.dp),
+                        modifier = Modifier.width(300.dp).heightIn(max = 440.dp),
                     ) {
-                        Column(Modifier.padding(horizontal = 8.dp, vertical = 6.dp)) {
+                        SukaDropdownHeader(
+                            title = "PILIH OUTLET",
+                            onClose = { expanded = false },
+                        )
+                        Column(Modifier.padding(horizontal = 10.dp, vertical = 4.dp)) {
                             OutlinedTextField(
                                 value = searchQuery,
                                 onValueChange = { searchQuery = it },
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true,
                                 shape = RoundedCornerShape(12.dp),
-                                placeholder = { Text("Cari outlet", fontSize = 13.sp) },
+                                placeholder = { Text("Cari outlet...", fontSize = 13.sp) },
                                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                                 trailingIcon = {
                                     if (searchQuery.isNotEmpty()) {
@@ -601,10 +622,18 @@ private fun OutletSelectionCard(
                                     }
                                 },
                                 colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = Color(0xFF1D1D1F),
+                                    unfocusedTextColor = Color(0xFF1D1D1F),
                                     focusedBorderColor = SukaOrange,
-                                    unfocusedBorderColor = SukaSurfaceContainerHighest,
-                                    focusedContainerColor = SukaSurfaceContainerLowest,
-                                    unfocusedContainerColor = SukaSurfaceContainerLowest,
+                                    unfocusedBorderColor = Color(0xFFE5E5EA),
+                                    focusedContainerColor = Color(0xFFF2F2F7),
+                                    unfocusedContainerColor = Color(0xFFF2F2F7),
+                                    focusedPlaceholderColor = Color(0xFF8E8E93),
+                                    unfocusedPlaceholderColor = Color(0xFF8E8E93),
+                                    focusedLeadingIconColor = SukaOrange,
+                                    unfocusedLeadingIconColor = Color(0xFF8E8E93),
+                                    focusedTrailingIconColor = Color(0xFF8E8E93),
+                                    unfocusedTrailingIconColor = Color(0xFF8E8E93),
                                 ),
                             )
                             Spacer(Modifier.height(6.dp))
@@ -617,16 +646,19 @@ private fun OutletSelectionCard(
                                 if (filteredOutlets.isEmpty()) {
                                     Text(
                                         "Outlet tidak ditemukan",
-                                        color = SukaOnSurfaceVariant,
+                                        color = Color(0xFF8E8E93),
                                         fontSize = 13.sp,
                                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 18.dp),
                                     )
                                 } else filteredOutlets.forEach { outlet ->
-                                    DropdownMenuItem(
-                                        text = { Text(outlet.name, fontSize = 14.sp, fontWeight = FontWeight.SemiBold) },
-                                        leadingIcon = { Icon(Icons.Default.Storefront, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                                        onClick = { onSelect(outlet.id); expanded = false },
-                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                                    SukaDropdownMenuItem(
+                                        title = outlet.name,
+                                        selected = outlet.id == selected?.id,
+                                        leadingIcon = Icons.Default.Storefront,
+                                        onClick = {
+                                            onSelect(outlet.id)
+                                            expanded = false
+                                        },
                                     )
                                 }
                             }
