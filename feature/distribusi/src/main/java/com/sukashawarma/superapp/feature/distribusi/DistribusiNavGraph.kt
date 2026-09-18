@@ -1,18 +1,19 @@
 package com.sukashawarma.superapp.feature.distribusi
 
-import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.sukashawarma.superapp.core.ui.keluarMaju
+import com.sukashawarma.superapp.core.ui.keluarMundur
+import com.sukashawarma.superapp.core.ui.masukMaju
+import com.sukashawarma.superapp.core.ui.masukMundur
+import com.sukashawarma.superapp.core.ui.navigateSekali
+import com.sukashawarma.superapp.core.ui.popAman
 import com.sukashawarma.superapp.feature.distribusi.ui.dashboard.DashboardScreen
 import com.sukashawarma.superapp.feature.distribusi.ui.detail.DetailSuratJalanScreen
 import com.sukashawarma.superapp.feature.distribusi.ui.inbox.InboxScreen
@@ -32,16 +33,13 @@ fun DistribusiNavGraph(onExit: () -> Unit) {
         navController = navController,
         startDestination = DistribusiRoutes.DASHBOARD,
         enterTransition = {
-            // Kamera tidak ikut cross-fade dengan halaman sebelumnya. CameraX
+            // Kamera tidak ikut beranimasi dengan halaman sebelumnya. CameraX
             // adalah AndroidView yang berat dan overlap selama animasi menjadi
             // sumber frame drop pada perangkat dengan resource terbatas.
             if (targetState.destination.route == DistribusiRoutes.SCAN) {
                 EnterTransition.None
             } else {
-                slideIntoContainer(
-                    AnimatedContentTransitionScope.SlideDirection.Start,
-                    tween(180, easing = FastOutSlowInEasing),
-                ) + fadeIn(tween(180))
+                masukMaju()
             }
         },
         exitTransition = {
@@ -50,30 +48,21 @@ fun DistribusiNavGraph(onExit: () -> Unit) {
             ) {
                 ExitTransition.None
             } else {
-                slideOutOfContainer(
-                    AnimatedContentTransitionScope.SlideDirection.Start,
-                    tween(180, easing = FastOutSlowInEasing),
-                ) + fadeOut(tween(180))
+                keluarMaju()
             }
         },
         popEnterTransition = {
             if (targetState.destination.route == DistribusiRoutes.SCAN) {
                 EnterTransition.None
             } else {
-                slideIntoContainer(
-                    AnimatedContentTransitionScope.SlideDirection.End,
-                    tween(180, easing = FastOutSlowInEasing),
-                ) + fadeIn(tween(180))
+                masukMundur()
             }
         },
         popExitTransition = {
             if (initialState.destination.route == DistribusiRoutes.SCAN) {
                 ExitTransition.None
             } else {
-                slideOutOfContainer(
-                    AnimatedContentTransitionScope.SlideDirection.End,
-                    tween(180, easing = FastOutSlowInEasing),
-                ) + fadeOut(tween(180))
+                keluarMundur()
             }
         },
     ) {
@@ -88,7 +77,7 @@ fun DistribusiNavGraph(onExit: () -> Unit) {
 
         composable(DistribusiRoutes.INBOX) {
             InboxScreen(
-                onKeluar = { navController.popBackStack() },
+                onKeluar = onExit,
                 onBukaScan = { navController.navigateSekali(DistribusiRoutes.SCAN) },
                 onBukaDetail = { id -> navController.navigateSekali(DistribusiRoutes.detail(id)) },
                 // Nav bawah berpindah antar-tab, bukan menumpuk layar: kembali
@@ -100,7 +89,10 @@ fun DistribusiNavGraph(onExit: () -> Unit) {
 
         composable(DistribusiRoutes.SCAN) {
             ScanQrScreen(
-                onKeluar = { navController.popBackStack() },
+                // Pengecualian: pemindai dan dua layar di bawah adalah lanjutan satu
+                // alur atas satu surat jalan. "Kembali" di sini berarti membatalkan
+                // langkahnya, bukan pulang ke Beranda.
+                onKeluar = { navController.popAman() },
                 onTerbuka = { id ->
                     // Pemindai dikeluarkan dari tumpukan: menekan Kembali dari
                     // layar verifikasi harus mendarat di inbox, bukan menyalakan
@@ -119,7 +111,7 @@ fun DistribusiNavGraph(onExit: () -> Unit) {
         ) { entry ->
             VerifikasiScreen(
                 suratJalanId = entry.arguments?.getString("suratJalanId").orEmpty(),
-                onKeluar = { navController.popBackStack() },
+                onKeluar = { navController.popAman() },
                 onSelesai = {
                     navController.navigate(DistribusiRoutes.RIWAYAT) {
                         launchSingleTop = true
@@ -131,7 +123,7 @@ fun DistribusiNavGraph(onExit: () -> Unit) {
 
         composable(DistribusiRoutes.RIWAYAT) {
             RiwayatScreen(
-                onKeluar = { navController.popBackStack() },
+                onKeluar = onExit,
                 onBukaDetail = { id -> navController.navigateSekali(DistribusiRoutes.detail(id)) },
                 onBukaDashboard = { navController.popBackStack(DistribusiRoutes.DASHBOARD, false) },
                 onBukaScan = { navController.navigateSekali(DistribusiRoutes.SCAN) },
@@ -144,14 +136,8 @@ fun DistribusiNavGraph(onExit: () -> Unit) {
         ) { entry ->
             DetailSuratJalanScreen(
                 suratJalanId = entry.arguments?.getString("suratJalanId").orEmpty(),
-                onKeluar = { navController.popBackStack() },
+                onKeluar = { navController.popAman() },
             )
         }
     }
-}
-
-/** Mencegah tap berulang menumpuk destination saat animasi belum selesai. */
-private fun androidx.navigation.NavHostController.navigateSekali(route: String) {
-    if (currentDestination?.route == route) return
-    navigate(route) { launchSingleTop = true }
 }
