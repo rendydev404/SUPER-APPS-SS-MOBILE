@@ -20,6 +20,8 @@ import com.sukashawarma.superapp.feature.stok.domain.UnitMeta
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlin.math.abs
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Stock opname — cermin `hooks/useOpname.ts` dan `app/actions/opname.ts` di web.
@@ -153,6 +155,8 @@ object OpnameRepository {
             ),
         )?.toHeader()
 
+    private val draftMutex = Mutex()
+
     /**
      * Ambil draft hari ini bila ada, atau buat baru.
      *
@@ -164,7 +168,7 @@ object OpnameRepository {
         tipe: String,
         createdBy: String,
         catatan: String? = null,
-    ): OpnameHeader {
+    ): OpnameHeader = draftMutex.withLock {
         val tanggal = tanggalEfektif(outletId)
 
         // Draft berjalan dicari LEBIH DULU dan tanpa memandang tipe. Urutan ini yang
@@ -197,7 +201,7 @@ object OpnameRepository {
             maksimalHariIni = OpnameTanggal.maksimalOpname(outletId, tanggal),
         )
 
-        return when (keputusan) {
+        when (keputusan) {
             is KeputusanDraftOpname.Lanjutkan -> berjalan!!
             is KeputusanDraftOpname.Tampilkan -> sudahAda!!
             is KeputusanDraftOpname.BuatBaru ->
@@ -212,6 +216,10 @@ object OpnameRepository {
         catatan: String?,
         tanggal: String,
     ): OpnameHeader {
+        // Cek kembali siapa tahu user/perangkat lain baru saja membuat draft di detik yang sama
+        val berjalanBaru = draftBerjalan(outletId, tanggal)
+        if (berjalanBaru != null) return berjalanBaru
+
         val body = JsonObject().apply {
             addProperty("outlet_id", outletId)
             addProperty("tipe", tipe)
@@ -221,9 +229,17 @@ object OpnameRepository {
             if (catatan.isNullOrBlank()) add("notes", com.google.gson.JsonNull.INSTANCE)
             else addProperty("notes", catatan)
         }
-        val hasil = Postgrest.insert("opname", body)
-        val row = hasil.firstOrNull()?.asJsonObject ?: error("Gagal membuat draft opname")
-        return row.toHeader() ?: error("Draft opname tidak terbaca")
+        val hasil = runCatching { Postgrest.insert("opname", body) }
+        val row = hasil.getOrNull()?.firstOrNull()?.asJsonObject
+        if (row != null) {
+            return row.toHeader() ?: error("Draft opname tidak terbaca")
+        }
+
+        // Jika insert gagal (misal tabrakan constraint konkuren), coba ambil draft yang dibuat pihak lain
+        val fallback = draftBerjalan(outletId, tanggal)
+        if (fallback != null) return fallback
+
+        throw hasil.exceptionOrNull() ?: IllegalStateException("Gagal membuat draft opname")
     }
 
     // -------------------------------------------------------------- penulisan
