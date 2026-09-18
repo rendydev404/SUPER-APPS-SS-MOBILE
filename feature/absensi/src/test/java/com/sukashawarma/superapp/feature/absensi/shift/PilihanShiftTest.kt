@@ -10,6 +10,7 @@ class PilihanShiftTest {
 
     private val cfgBnr = ShiftConfig("08:00:00", "17:00:00", true, "13:00:00", "22:00:00")
     private val opsiBnr = shiftOptions(cfgBnr)
+    private val opsiDriver = shiftOptions(cfgBnr, "driver")
     private val opsiLewatMalam = listOf(ShiftOption(1, "10:00", "22:00"), ShiftOption(2, "18:00", "02:00"))
 
     @Test
@@ -21,9 +22,22 @@ class PilihanShiftTest {
     }
 
     @Test
+    fun `role driver mendapatkan 3 pilihan shift termasuk 09-00 - 18-00`() {
+        assertEquals(
+            listOf(
+                ShiftOption(1, "08:00", "17:00"),
+                ShiftOption(2, "13:00", "22:00"),
+                ShiftOption(3, "09:00", "18:00"),
+            ),
+            opsiDriver,
+        )
+    }
+
+    @Test
     fun `toggle mati atau config kosong berarti outlet satu shift`() {
         assertNull(shiftOptions(null))
         assertNull(shiftOptions(cfgBnr.copy(pilihShiftAktif = false)))
+        assertNull(shiftOptions(cfgBnr.copy(pilihShiftAktif = false), "driver"))
         assertNull(shiftOptions(cfgBnr.copy(pilihShiftAktif = null)))
     }
 
@@ -36,6 +50,7 @@ class PilihanShiftTest {
     @Test
     fun `sebutan shift mengikuti jam masuk`() {
         assertEquals("Shift Pagi", namaShift("08:00"))
+        assertEquals("Shift Pagi", namaShift("09:00"))
         assertEquals("Shift Pagi", namaShift("10:59"))
         assertEquals("Shift Siang", namaShift("11:00"))
         assertEquals("Shift Siang", namaShift("14:30"))
@@ -43,17 +58,26 @@ class PilihanShiftTest {
     }
 
     @Test
-    fun `hanya angka satu atau dua yang sah`() {
+    fun `hanya angka 1, 2, atau 3 yang sah`() {
         assertTrue(isShiftKe(1))
         assertTrue(isShiftKe(2))
-        assertFalse(isShiftKe(3))
+        assertTrue(isShiftKe(3))
+        assertFalse(isShiftKe(4))
         assertFalse(isShiftKe(null))
+    }
+
+    @Test
+    fun `shift 3 driver (18-00) bukan penutup`() {
+        assertFalse(isShiftPenutup(opsiDriver, "18:00"))
+        assertFalse(isShiftPenutup(opsiDriver, "18:00:00"))
     }
 
     @Test
     fun `F1 shift yang pulang paling akhir adalah penutup`() {
         assertTrue(isShiftPenutup(opsiBnr, "22:00"))
         assertTrue(isShiftPenutup(opsiBnr, "22:00:00"))
+        assertTrue(isShiftPenutup(opsiDriver, "22:00"))
+        assertTrue(isShiftPenutup(opsiDriver, "22:00:00"))
     }
 
     @Test
