@@ -9,8 +9,10 @@ import com.sukashawarma.superapp.data.remote.optInt
 import com.sukashawarma.superapp.data.remote.optJsonArray
 import com.sukashawarma.superapp.data.remote.optJsonObject
 import com.sukashawarma.superapp.data.remote.optString
+import com.sukashawarma.superapp.feature.stok.data.model.LedgerAuditDetail
 import com.sukashawarma.superapp.feature.stok.data.model.LedgerDetailRow
 import com.sukashawarma.superapp.feature.stok.data.model.LedgerTransaksi
+import com.sukashawarma.superapp.feature.stok.data.model.OrderItemRow
 import com.sukashawarma.superapp.feature.stok.domain.UnitMeta
 
 /**
@@ -53,7 +55,7 @@ object LedgerRepository {
             ringkas
         }
 
-        return perkaya(gabungan)
+        return perkaya(outletId, gabungan)
     }
 
     private suspend fun wastePending(outletId: String): List<LedgerTransaksi> = try {
@@ -97,7 +99,7 @@ object LedgerRepository {
      * Outlet tujuan perlu dicari terpisah karena `ledger_stok.outlet_id` pada baris
      * `transfer_keluar` berisi outlet GUDANG (pengirim), bukan outlet peminta.
      */
-    private suspend fun perkaya(baris: List<LedgerTransaksi>): List<LedgerTransaksi> {
+    private suspend fun perkaya(outletId: String, baris: List<LedgerTransaksi>): List<LedgerTransaksi> {
         val orderIds = baris.mapNotNull { it.refOrderId }.distinct()
         val opnameIds = baris.mapNotNull { it.refOpnameId }.distinct()
         val shipmentIds = baris.mapNotNull { it.refShipmentId }.distinct()
@@ -148,8 +150,57 @@ object LedgerRepository {
             }.toMap()
         }.getOrDefault(emptyMap())
 
+        // Bahan untuk kejadian berbahan tunggal. Dicari di sini, bukan lewat embed pada
+        // view ringkas: `ledger_transaksi_ringkas` hanya menyimpan id bahannya.
+        val bahanIds = baris
+            .mapNotNull { if (it.gabungan) null else it.singleBahanBakuId }
+            .distinct()
+        val bahan = if (bahanIds.isEmpty()) emptyMap() else runCatching {
+            Postgrest.select(
+                "bahan_baku",
+                listOf(
+                    "select" to "id,nama,satuan,satuan_tengah,satuan_kecil," +
+                        "faktor_tengah,faktor_tampilan",
+                    "id" to "in.(${bahanIds.joinToString(",")})",
+                ),
+            ).mapNotNull { el ->
+                val o = el.asJsonObject
+                val id = o.optString("id") ?: return@mapNotNull null
+                id to Pair(
+                    o.optString("nama"),
+                    UnitMeta(
+                        satuan = o.optString("satuan"),
+                        satuanTengah = o.optString("satuan_tengah"),
+                        satuanKecil = o.optString("satuan_kecil"),
+                        faktorTengah = o.optDouble("faktor_tengah"),
+                        faktorTampilan = o.optDouble("faktor_tampilan"),
+                    ),
+                )
+            }.toMap()
+        }.getOrDefault(emptyMap())
+
+        // Skala baris saldo, tanpa ini qty-nya tidak bisa dibaca sebagai gram atau kilo.
+        val gram = if (bahanIds.isEmpty()) emptyMap() else runCatching {
+            Postgrest.select(
+                "stok_balance",
+                listOf(
+                    "select" to "bahan_baku_id,saldo_is_gram",
+                    "outlet_id" to "eq.$outletId",
+                    "bahan_baku_id" to "in.(${bahanIds.joinToString(",")})",
+                ),
+            ).mapNotNull { el ->
+                val o = el.asJsonObject
+                val id = o.optString("bahan_baku_id") ?: return@mapNotNull null
+                id to o.optBoolean("saldo_is_gram")
+            }.toMap()
+        }.getOrDefault(emptyMap())
+
         return baris.map { t ->
+            val bb = if (t.gabungan) null else t.singleBahanBakuId?.let { bahan[it] }
             t.copy(
+                singleNamaBahan = bb?.first,
+                singleMeta = bb?.second,
+                singleSaldoIsGram = t.singleBahanBakuId?.let { gram[it] } ?: false,
                 orderNumber = t.refOrderId?.let { orders[it]?.first },
                 orderItemsNames = t.refOrderId?.let { orders[it]?.second },
                 opnameTanggal = t.refOpnameId?.let { opnames[it]?.first },
@@ -284,4 +335,207 @@ object LedgerRepository {
         val catatan: String? = null,
         val signedOverride: Double? = null,
     )
+
+    /**
+     * Detail pesanan dari tabel `order_items` untuk kejadian berjenis Order / Penjualan.
+     * Menampilkan nama menu dan porsi yang dipesan pelanggan (cermin useOrderDetails di web).
+     */
+    suspend fun orderItems(orderId: String): List<OrderItemRow> = runCatching {
+        Postgrest.select(
+            "order_items",
+            listOf(
+                "select" to "id,menu_item_name,quantity",
+                "order_id" to "eq.$orderId",
+                "order" to "created_at.asc",
+            ),
+        ).mapNotNull { el ->
+            val o = el.asJsonObject
+            val id = o.optString("id") ?: return@mapNotNull null
+            val name = o.optString("menu_item_name") ?: return@mapNotNull null
+            val qty = o.optInt("quantity") ?: 1
+            OrderItemRow(id, name, qty)
+        }
+    }.getOrDefault(emptyList())
+
+    /**
+     * Audit log detail untuk satu baris ledger tunggal (cermin /stok/ledger/[id] di web).
+     */
+    suspend fun auditDetail(outletId: String, ledgerId: String): LedgerAuditDetail? = runCatching {
+        val rows = Postgrest.select(
+            "ledger_stok",
+            listOf(
+                "select" to "id,tipe,qty,catatan,saldo_sebelum,saldo_sesudah,created_at," +
+                    "created_by,ref_waste_id,ref_shipment_id,ref_opname_id,bahan_baku_id," +
+                    "bahan_baku(nama,satuan,satuan_tengah,satuan_kecil,faktor_tengah,faktor_tampilan)",
+                "id" to "eq.$ledgerId",
+                "limit" to "1",
+            ),
+        )
+        if (rows.isEmpty()) return null
+        val o = rows.first().asJsonObject
+        val id = o.optString("id") ?: return null
+        val bahanId = o.optString("bahan_baku_id") ?: return null
+        val bb = o.optJsonObject("bahan_baku")
+        val refWasteId = o.optString("ref_waste_id")
+        val createdBy = o.optString("created_by")
+
+        // Cari status saldo_is_gram dari stok_balance
+        val gram = runCatching {
+            Postgrest.select(
+                "stok_balance",
+                listOf(
+                    "select" to "saldo_is_gram",
+                    "outlet_id" to "eq.$outletId",
+                    "bahan_baku_id" to "eq.$bahanId",
+                    "limit" to "1",
+                ),
+            ).firstOrNull()?.asJsonObject?.optBoolean("saldo_is_gram") ?: false
+        }.getOrDefault(false)
+
+        var wastePhotoUrl: String? = null
+        var wasteReporterName: String? = null
+        var wasteApproverName: String? = null
+        var wasteCreatedAt: String? = null
+        var wasteUpdatedAt: String? = null
+
+        if (!refWasteId.isNullOrBlank()) {
+            val wasteData = runCatching {
+                Postgrest.select(
+                    "stok_waste_reports",
+                    listOf(
+                        "select" to "photo_url,created_at,updated_at,reported_by,approved_by",
+                        "id" to "eq.$refWasteId",
+                        "limit" to "1",
+                    ),
+                ).firstOrNull()?.asJsonObject
+            }.getOrNull()
+
+            if (wasteData != null) {
+                wastePhotoUrl = wasteData.optString("photo_url")
+                wasteCreatedAt = wasteData.optString("created_at")
+                wasteUpdatedAt = wasteData.optString("updated_at")
+                val reportedById = wasteData.optString("reported_by")
+                val approvedById = wasteData.optString("approved_by")
+
+                val staffIds = listOfNotNull(reportedById, approvedById).distinct()
+                val staffMap = if (staffIds.isEmpty()) emptyMap() else runCatching {
+                    Postgrest.select(
+                        "outlet_staff",
+                        listOf(
+                            "select" to "id,name",
+                            "id" to "in.(${staffIds.joinToString(",")})",
+                        ),
+                    ).mapNotNull { s ->
+                        val so = s.asJsonObject
+                        val sId = so.optString("id") ?: return@mapNotNull null
+                        sId to (so.optString("name") ?: "Staf")
+                    }.toMap()
+                }.getOrDefault(emptyMap())
+
+                wasteReporterName = reportedById?.let { staffMap[it] }
+                wasteApproverName = approvedById?.let { staffMap[it] }
+            }
+        }
+
+        val creatorName = if (!createdBy.isNullOrBlank()) {
+            runCatching {
+                Postgrest.select(
+                    "outlet_staff",
+                    listOf(
+                        "select" to "name",
+                        "id" to "eq.$createdBy",
+                        "limit" to "1",
+                    ),
+                ).firstOrNull()?.asJsonObject?.optString("name")
+            }.getOrNull() ?: "Sistem"
+        } else {
+            "Sistem"
+        }
+
+        LedgerAuditDetail(
+            id = id,
+            tipe = o.optString("tipe") ?: "adjustment",
+            qty = o.optDouble("qty") ?: 0.0,
+            catatan = o.optString("catatan"),
+            saldoSebelum = o.optDouble("saldo_sebelum"),
+            saldoSesudah = o.optDouble("saldo_sesudah"),
+            createdAt = o.optString("created_at"),
+            bahanBakuId = bahanId,
+            namaBahan = bb?.optString("nama"),
+            meta = UnitMeta(
+                satuan = bb?.optString("satuan"),
+                satuanTengah = bb?.optString("satuan_tengah"),
+                satuanKecil = bb?.optString("satuan_kecil"),
+                faktorTengah = bb?.optDouble("faktor_tengah"),
+                faktorTampilan = bb?.optDouble("faktor_tampilan"),
+            ),
+            saldoIsGram = gram,
+            genericCreatorName = creatorName,
+            wastePhotoUrl = wastePhotoUrl,
+            wasteReporterName = wasteReporterName,
+            wasteApproverName = wasteApproverName,
+            wasteCreatedAt = wasteCreatedAt,
+            wasteUpdatedAt = wasteUpdatedAt,
+            refShipmentId = o.optString("ref_shipment_id"),
+            refOpnameId = o.optString("ref_opname_id"),
+        )
+    }.getOrNull()
+
+    fun cleanItemNames(text: String?): String? {
+        if (text.isNullOrBlank()) return null
+        return text.split(',')
+            .map { it.replace(Regex("""\|ID\|[^|]+"""), "").replace(Regex("""\|NOTE\|[^|]+"""), "").trim() }
+            .filter { it.isNotBlank() }
+            .joinToString(", ")
+            .ifBlank { null }
+    }
+
+    fun cleanCatatan(text: String?): String? {
+        if (text.isNullOrBlank()) return null
+        return text
+            .replace(Regex("""\|ID\|[^|)]+"""), "")
+            .replace(Regex("""\|NOTE\|[^|)]+"""), "")
+            .replace(Regex("""\s+\)"""), ")")
+            .trim()
+            .ifBlank { null }
+    }
+
+    data class TransaksiLabel(val title: String, val subtitle: String?)
+
+    fun transaksiLabel(t: LedgerTransaksi): TransaksiLabel {
+        if (t.refOrderId != null) {
+            val title = if (t.orderNumber != null) "Order #${t.orderNumber}" else "Order Selesai"
+            val sub = cleanItemNames(t.orderItemsNames) ?: if (t.orderNumber != null) "Order #${t.orderNumber}" else null
+            return TransaksiLabel(title, sub)
+        }
+        if (t.refOpnameId != null) {
+            val tgl = t.opnameTanggal?.take(10)
+            val sub = if (tgl != null) "${t.opnameTipe.orEmpty()} — $tgl" else null
+            return TransaksiLabel("Opname", sub)
+        }
+        if (t.refShipmentId != null) {
+            val shortId = t.refShipmentId.substringBefore('-').uppercase(java.util.Locale.ROOT)
+            val isKirim = (t.singleQty ?: 0.0) < 0
+            val dest = if (isKirim && !t.shipmentDestOutletName.isNullOrBlank()) " ke ${t.shipmentDestOutletName}" else ""
+            val title = if (isKirim) "Kirim SJ$dest" else "Terima Kiriman"
+            return TransaksiLabel(title, "Surat Jalan #$shortId")
+        }
+        if (t.refTransferId != null) {
+            return TransaksiLabel("Transfer Stok", null)
+        }
+        val title = when (t.singleTipe) {
+            "terima_kiriman" -> "Terima Kiriman"
+            "pemakaian" -> "Pemakaian"
+            "waste" -> "Waste"
+            "adjustment" -> "Penyesuaian"
+            "opname_selisih" -> "Selisih Opname"
+            "transfer_keluar" -> "Transfer Keluar"
+            "transfer_masuk" -> "Transfer Masuk"
+            "pembelian_supplier" -> "Terima Langsung Vendor"
+            "waste_pending" -> "Waste (Menunggu Verifikasi)"
+            null -> "Manual"
+            else -> t.singleTipe.replace('_', ' ').replaceFirstChar { if (it.isLowerCase()) it.titlecase(java.util.Locale.ROOT) else it.toString() }
+        }
+        return TransaksiLabel(title, null)
+    }
 }
