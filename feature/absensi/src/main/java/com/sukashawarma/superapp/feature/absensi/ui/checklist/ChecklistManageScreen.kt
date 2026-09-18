@@ -39,6 +39,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.sukashawarma.superapp.core.ui.RealtimeRefresh
+import com.sukashawarma.superapp.core.ui.RealtimeTables
 
 // Stitch Suka Culinary Design Tokens
 private val StitchPrimary = Color(0xFF450700)
@@ -71,6 +73,10 @@ fun ChecklistManageScreen(
     viewModel: ChecklistManageViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+
+    // Master checklist disunting dari beberapa perangkat sekaligus; tanpa ini
+    // dua penyunting saling menimpa tanpa pernah melihat daftar yang sama.
+    RealtimeRefresh(RealtimeTables.CHECKLIST_ITEMS) { viewModel.load() }
     var selectedTab by remember { mutableStateOf(ChecklistTabFilter.ALL) }
 
     // Dialog state
