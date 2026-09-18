@@ -18,6 +18,7 @@ enum class Role(val value: String) {
     AREA_MANAGER("area_manager"),
     PURCHASING("purchasing"),
     DEVELOPER("developer"),
+    DRIVER("driver"),
     KORLAP("korlap"); // ada di DB & dipakai staff_outlets, belum resmi di union web (S7)
 
     companion object {
