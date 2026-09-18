@@ -143,6 +143,46 @@ object UnitScale {
         }
         return bagian.joinToString(" ")
     }
+
+    /**
+     * Satu pergerakan `ledger_stok.qty` beserta satuannya, mis. "+50 Gram" atau "-3 Kg".
+     *
+     * `qty` TIDAK selalu berada di satuan terkecil. Penulisnya — baik fungsi database
+     * `to_ledger_scale` (migrasi `20300105000017_scale_aware_ledger_writers`) maupun
+     * jalur klien di layar Entri Manual — mencatatnya pada SKALA BARIS SALDO: satuan
+     * terkecil bila `saldo_is_gram`, satuan besar bila tidak. Pembacaan harus jadi
+     * cermin penulisan, jadi aturan yang sama dipakai terbalik di sini.
+     *
+     * Memperlakukan qty seolah selalu satuan terkecil membuat [formatBerjenjang]
+     * memecah angka yang skalanya salah dan menghasilkan omong kosong seperti
+     * "50" menjadi "4 Kg 2 Gram".
+     */
+    fun formatQtyLedger(qty: Double, meta: UnitMeta?, saldoIsGram: Boolean): String {
+        val nilai = kotlin.math.abs(qty)
+        val teks = if (saldoIsGram) {
+            // Sudah di satuan terkecil — boleh dipecah berjenjang.
+            meta?.let { formatBerjenjang(nilai, it) }
+                ?: "${formatAngkaStok(nilai)} ${meta?.satuanKecil.orEmpty()}".trim()
+        } else {
+            // Sudah di satuan besar; tidak ada jenjang di atasnya untuk dipecah.
+            "${formatAngkaStok(nilai)} ${meta?.satuan.orEmpty()}".trim()
+        }
+        return (if (qty >= 0) "+" else "-") + teks
+    }
+
+    /**
+     * Format saldo akhir / running balance untuk ledger (tanpa tanda tambah bila positif).
+     */
+    fun formatSaldoLedger(saldo: Double, meta: UnitMeta?, saldoIsGram: Boolean): String {
+        val nilai = kotlin.math.abs(saldo)
+        val teks = if (saldoIsGram) {
+            meta?.let { formatBerjenjang(nilai, it) }
+                ?: "${formatAngkaStok(nilai)} ${meta?.satuanKecil.orEmpty()}".trim()
+        } else {
+            "${formatAngkaStok(nilai)} ${meta?.satuan.orEmpty()}".trim()
+        }
+        return (if (saldo < 0) "-" else "") + teks
+    }
 }
 
 /** Angka bulat tanpa ekor desimal palsu; desimal disimpan maksimal dua digit. */
