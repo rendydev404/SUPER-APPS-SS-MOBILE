@@ -41,10 +41,28 @@ object StokAkses {
     fun melihatDashboard(role: Role?): Boolean = !pusat(role)
 
     /**
-     * Penerimaan PO supplier. Web menampilkannya sebagai tab utama untuk role pusat
-     * dan sebagai menu "Terima PO Supplier" untuk pengawas outlet.
+     * Peran yang berwenang memverifikasi penerimaan fisik PO di Gudang Pusat —
+     * cermin fungsi database `can_verify_po_receipt()` dan trigger `trg_po_status_transition_guard`.
      */
-    fun melihatPenerimaanPo(role: Role?): Boolean = pusat(role) || pengawas(role)
+    private val VERIFIKASI_PO = setOf(
+        Role.KITCHEN, Role.ADMIN, Role.OWNER, Role.DEVELOPER,
+    )
+
+    fun bisaVerifikasiPo(role: Role?): Boolean = role != null && role in VERIFIKASI_PO
+
+    /**
+     * Penerimaan PO supplier — cermin `canReceivePO` di `AppSidebar.tsx` web.
+     * Khusus untuk peran pusat (kitchen, purchasing, admin, admin_finance, owner, developer).
+     * Pengawas outlet cabang (leader, area manager, regional manager) tidak menerima PO gudang pusat.
+     */
+    fun melihatPenerimaanPo(role: Role?): Boolean = pusat(role)
+
+    /**
+     * Terima dari vendor (drop-ship ke outlet) — cermin `canCatatTerimaVendor` di web
+     * (`approver.ts` & `AppSidebar.tsx`).
+     * Dibuka untuk seluruh staf yang memiliki penugasan outlet (outletId != null).
+     */
+    fun bisaTerimaVendor(outletId: String?): Boolean = !outletId.isNullOrBlank()
 
     /** Inbound/Outbound gudang pusat — web membatasinya ke `kitchen` saja. */
     fun melihatInboundOutbound(role: Role?): Boolean = role == Role.KITCHEN
