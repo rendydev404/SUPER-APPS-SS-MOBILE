@@ -214,6 +214,18 @@ class EnrollViewModel(
         loadCrew(outletId)
     }
 
+    /**
+     * Muat ulang daftar crew tanpa menyentuh apa pun yang sedang dikerjakan.
+     *
+     * Ditahan selagi ada crew terpilih: saat itu kameranya terbuka, dan menarik
+     * daftar baru di tengah pemindaian wajah hanya akan menggoyang layar orang
+     * yang sedang berdiri di depannya.
+     */
+    fun segarkanCrew() {
+        if (_state.value.selectedStaffId != null) return
+        _state.value.selectedOutletId?.let(::loadCrew)
+    }
+
     private fun loadCrew(outletId: String) {
         viewModelScope.launch {
             try {
