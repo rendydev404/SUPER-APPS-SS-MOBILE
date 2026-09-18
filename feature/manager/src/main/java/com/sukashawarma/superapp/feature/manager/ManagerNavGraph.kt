@@ -24,6 +24,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.sukashawarma.superapp.core.ui.RealtimeRefresh
+import com.sukashawarma.superapp.core.ui.keluarMaju
+import com.sukashawarma.superapp.core.ui.keluarMundur
+import com.sukashawarma.superapp.core.ui.masukMaju
+import com.sukashawarma.superapp.core.ui.masukMundur
 import com.sukashawarma.superapp.core.ui.RealtimeTables
 import com.sukashawarma.superapp.domain.session.AppSession
 import com.sukashawarma.superapp.feature.manager.domain.ManagerAkses
@@ -127,6 +131,10 @@ fun ManagerNavGraph(onExit: () -> Unit, tujuanAwal: TujuanManager? = null) {
         NavHost(
             navController = navController,
             startDestination = TujuanManager.OVERVIEW.rute,
+            enterTransition = { masukMaju() },
+            exitTransition = { keluarMaju() },
+            popEnterTransition = { masukMundur() },
+            popExitTransition = { keluarMundur() },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(bottom = padding.calculateBottomPadding()),
@@ -138,36 +146,36 @@ fun ManagerNavGraph(onExit: () -> Unit, tujuanAwal: TujuanManager? = null) {
                 )
             }
             composable(TujuanManager.LAPORAN.rute) {
-                LaporanScreen(onExit = { pindah(TujuanManager.OVERVIEW) })
+                LaporanScreen(onExit = onExit)
             }
             composable(TujuanManager.PERSETUJUAN.rute) {
-                PersetujuanScreen(onExit = { pindah(TujuanManager.OVERVIEW) })
+                PersetujuanScreen(onExit = onExit)
             }
             composable(TujuanManager.PETTY_CASH.rute) {
-                PettyCashScreen(onExit = { pindah(TujuanManager.OVERVIEW) })
+                PettyCashScreen(onExit = onExit)
             }
             composable(TujuanManager.WASTE.rute) {
-                WasteScreen(onExit = { pindah(TujuanManager.OVERVIEW) })
+                WasteScreen(onExit = onExit)
             }
             composable(TujuanManager.TIM.rute) {
-                MonitoringScreen(onExit = { pindah(TujuanManager.OVERVIEW) })
+                MonitoringScreen(onExit = onExit)
             }
             composable(TujuanManager.SIDAK.rute) {
-                SidakScreen(onExit = { pindah(TujuanManager.OVERVIEW) })
+                SidakScreen(onExit = onExit)
             }
             composable(TujuanManager.INVENTORI.rute) {
                 // Cermin `isReportViewer` web: area manager mengisi form, regional
                 // manager membuka laporannya. Bukan dua menu — satu tujuan yang
                 // wajahnya ditentukan peran, persis seperti `/dashboard` di sana.
                 if (mengisiInventaris(staff?.role)) {
-                    InventarisScreen(onExit = { pindah(TujuanManager.OVERVIEW) })
+                    InventarisScreen(onExit = onExit)
                 } else {
-                    LaporanInventarisScreen(onExit = { pindah(TujuanManager.OVERVIEW) })
+                    LaporanInventarisScreen(onExit = onExit)
                 }
             }
             if (bolehResep) {
                 composable(TujuanManager.RESEP.rute) {
-                    HppScreen(onExit = { pindah(TujuanManager.OVERVIEW) })
+                    HppScreen(onExit = onExit)
                 }
             }
         }
