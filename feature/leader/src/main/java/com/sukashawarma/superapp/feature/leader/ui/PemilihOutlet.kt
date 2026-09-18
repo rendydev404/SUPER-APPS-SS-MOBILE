@@ -12,8 +12,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Storefront
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import com.sukashawarma.superapp.core.ui.SukaDropdownHeader
+import com.sukashawarma.superapp.core.ui.SukaDropdownMenu
+import com.sukashawarma.superapp.core.ui.SukaDropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -77,17 +78,12 @@ fun PemilihOutlet(
             Icon(Icons.Default.ArrowDropDown, null, tint = SukaOrange)
         }
         Box {
-            DropdownMenu(expanded = terbuka, onDismissRequest = { terbuka = false }) {
+            SukaDropdownMenu(expanded = terbuka, onDismissRequest = { terbuka = false }) {
+                SukaDropdownHeader(title = "PILIH OUTLET", onClose = { terbuka = false })
                 daftar.forEach { outlet ->
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                outlet.nama,
-                                fontSize = 13.sp,
-                                fontWeight = if (outlet.id == terpilih) FontWeight.Black else FontWeight.Medium,
-                                color = if (outlet.id == terpilih) SukaOrange else SukaBrown,
-                            )
-                        },
+                    SukaDropdownMenuItem(
+                        text = outlet.nama,
+                        selected = (outlet.id == terpilih),
                         onClick = {
                             terbuka = false
                             onPilih(outlet.id)
