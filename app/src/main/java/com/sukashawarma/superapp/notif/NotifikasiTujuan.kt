@@ -36,5 +36,7 @@ object NotifikasiTujuan {
     /** Rute yang dikenali. Payload di luar daftar ini diabaikan, bukan dipercaya. */
     const val MANAGER_PERSETUJUAN = "manager_persetujuan"
     const val MANAGER_WASTE = "manager_waste"
+    const val MANAGER_PETTY_CASH = "manager_petty_cash"
+    const val LEADER_PETTY_CASH = "leader_petty_cash"
     const val CHAT = "chat"
 }
