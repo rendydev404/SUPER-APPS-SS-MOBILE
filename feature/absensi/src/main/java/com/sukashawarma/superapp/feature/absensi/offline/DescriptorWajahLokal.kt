@@ -11,6 +11,8 @@ import com.sukashawarma.superapp.data.remote.Postgrest
 import com.sukashawarma.superapp.data.remote.optString
 import com.sukashawarma.superapp.domain.face.KandidatWajah
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -40,6 +42,8 @@ object DescriptorWajahLokal {
     private const val PANJANG_IV = 12
     private const val PANJANG_TAG_BIT = 128
 
+    private val kunciSinkron = Mutex()
+
     /** Disegarkan paling sering sekali sehari; enrollment baru tidak sesering itu. */
     const val UMUR_SEGAR_MS = 24L * 60 * 60 * 1000
 
@@ -51,43 +55,60 @@ object DescriptorWajahLokal {
      * Mengembalikan jumlah descriptor yang tersimpan, atau -1 bila dilewati.
      */
     suspend fun sinkronkan(context: Context, outletId: String, paksa: Boolean = false): Int =
-        withContext(Dispatchers.IO) {
-            val dao = AppDatabase.get(context).faceDescriptorDao()
-            if (!paksa) {
-                val terakhir = dao.disegarkanTerakhir(outletId) ?: 0L
-                if (System.currentTimeMillis() - terakhir < UMUR_SEGAR_MS) return@withContext -1
+        // Pemeriksaan umur di bawah adalah check-then-act: dua pemanggilan yang berbarengan
+        // (layar dibuka persis saat jaringan kembali) sama-sama lolos dan sama-sama menarik
+        // seluruh descriptor outlet. Kuncinya membuat yang kedua melihat hasil yang pertama.
+        kunciSinkron.withLock {
+            withContext(Dispatchers.IO) {
+                sinkronkanTanpaKunci(context, outletId, paksa)
             }
-
-            val body = JsonObject().apply { addProperty("p_outlet_id", outletId) }
-            val baris = Postgrest.rpc("sync_face_descriptors", body).asJsonArray
-
-            val sekarang = System.currentTimeMillis()
-            val entitas = baris.mapNotNull { elemen ->
-                val obj = elemen.asJsonObject
-                val staffId = obj.optString("staff_id") ?: return@mapNotNull null
-                val descriptor = obj.get("descriptor")
-                    ?.takeIf { it.isJsonArray }
-                    ?.asJsonArray
-                    ?.map { it.asFloat }
-                    ?.toFloatArray()
-                    ?: return@mapNotNull null
-                if (descriptor.isEmpty()) return@mapNotNull null
-
-                FaceDescriptorEntity(
-                    staffId = staffId,
-                    outletId = outletId,
-                    nama = obj.optString("name").orEmpty(),
-                    descriptor = enkripsi(keFloatBytes(descriptor)),
-                    updatedAtMs = sekarang,
-                )
-            }
-
-            // Hapus lalu simpan, bukan upsert: upsert menyisakan staf yang sudah tidak ada
-            // di jawaban server.
-            dao.hapusOutlet(outletId)
-            dao.simpanSemua(entitas)
-            entitas.size
         }
+
+    private suspend fun sinkronkanTanpaKunci(context: Context, outletId: String, paksa: Boolean): Int {
+        val dao = AppDatabase.get(context).faceDescriptorDao()
+        if (!paksa) {
+            val terakhir = dao.disegarkanTerakhir(outletId) ?: 0L
+            if (System.currentTimeMillis() - terakhir < UMUR_SEGAR_MS) return -1
+        }
+
+        val body = JsonObject().apply { addProperty("p_outlet_id", outletId) }
+        val baris = Postgrest.rpc("sync_face_descriptors", body).asJsonArray
+
+        val sekarang = System.currentTimeMillis()
+        val entitas = baris.mapNotNull { elemen ->
+            val obj = elemen.asJsonObject
+            val staffId = obj.optString("staff_id") ?: return@mapNotNull null
+            val descriptor = obj.get("descriptor")
+                ?.takeIf { it.isJsonArray }
+                ?.asJsonArray
+                ?.map { it.asFloat }
+                ?.toFloatArray()
+                ?: return@mapNotNull null
+            if (descriptor.isEmpty()) return@mapNotNull null
+
+            FaceDescriptorEntity(
+                staffId = staffId,
+                outletId = outletId,
+                nama = obj.optString("name").orEmpty(),
+                descriptor = enkripsi(keFloatBytes(descriptor)),
+                updatedAtMs = sekarang,
+            )
+        }
+
+        // Jawaban kosong TIDAK menghapus salinan yang ada. Outlet yang semua stafnya
+        // belum enroll memang kosong, tapi RPC yang berubah/gagal separuh juga bisa
+        // mengembalikan kosong — dan itu berarti membuang satu-satunya cara outlet ini
+        // absen saat internet mati.
+        if (entitas.isEmpty()) {
+            Log.w(TAG, "sinkron outlet '$outletId' kosong, salinan lama dipertahankan")
+            return 0
+        }
+
+        // Satu transaksi: kamera terus memindai wajah dari coroutine lain selagi ini
+        // berjalan, dan tabel outlet tidak boleh sempat terlihat kosong.
+        dao.gantiOutlet(outletId, entitas)
+        return entitas.size
+    }
 
     /**
      * Kandidat untuk pencocokan offline. Baris yang gagal didekripsi dilewati, bukan
