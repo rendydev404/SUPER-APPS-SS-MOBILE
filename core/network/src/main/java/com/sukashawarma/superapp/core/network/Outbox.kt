@@ -154,7 +154,7 @@ object Outbox {
             } catch (e: TolakPermanen) {
                 menyerah(item, e.message)
             } catch (e: Throwable) {
-                if (!adalahGalatJaringan(e)) {
+                if (!bolehDicobaLagi(e)) {
                     menyerah(item, e.message)
                     continue
                 }
@@ -170,6 +170,22 @@ object Outbox {
             }
         }
     }
+
+    /**
+     * Lebih longgar daripada [adalahGalatJaringan], dan bedanya disengaja.
+     *
+     * 401 di sini hampir tidak pernah berarti "aksi ini tidak sah". Sesi yang dibuka dari
+     * snapshot offline belum punya access token yang hidup, dan OkHttp sudah mencoba
+     * menyegarkannya sekali sebelum 401 sampai ke sini — jadi yang tersisa adalah sesi yang
+     * perlu dipulihkan, bukan aksi yang perlu dibuang. Memperlakukannya sebagai kegagalan
+     * permanen berarti seluruh antrean hangus persis pada detik jaringan kembali, sebelum
+     * sesi sempat pulih.
+     *
+     * 403 TIDAK ikut: itu jawaban RLS bahwa orang ini memang tidak berhak, dan mengulanginya
+     * seribu kali tidak mengubah apa pun.
+     */
+    internal fun bolehDicobaLagi(e: Throwable): Boolean =
+        adalahGalatJaringan(e) || (e as? Postgrest.PostgrestException)?.code == 401
 
     /**
      * Lampiran diunggah lebih dulu karena payload menyebut path-nya.
