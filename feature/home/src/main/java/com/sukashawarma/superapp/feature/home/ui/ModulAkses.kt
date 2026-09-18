@@ -90,3 +90,24 @@ internal val MANAGER_ROLES = setOf(
 internal val LEADER_ROLES = setOf(
     Role.LEADER,
 )
+
+/**
+ * Modul yang memang tidak bisa dipakai tanpa server, beserta alasannya dalam kalimat yang
+ * bisa ditindaklanjuti.
+ *
+ * Kuncinya adalah id tile di [DaftarAplikasiCard]. Modul yang TIDAK ada di sini dianggap
+ * bisa jalan offline — absensi, stok, dan distribusi — jadi menambah modul baru ke daftar
+ * aplikasi tanpa menyentuh peta ini berarti modul itu diam-diam dijanjikan bisa offline.
+ *
+ * Alasannya sengaja menyebut sebabnya, bukan "butuh koneksi": orang yang tahu persetujuan
+ * bisa bentrok dengan approver lain akan menunggu, sedangkan orang yang cuma dibilang
+ * "tidak ada internet" akan mencoba lagi berkali-kali.
+ */
+internal val ALASAN_PERLU_INTERNET: Map<String, String> = mapOf(
+    "chat" to "Chat butuh koneksi internet. Pesan tidak bisa dikirim maupun diterima saat offline.",
+    "pos" to "Kasir POS butuh koneksi internet untuk membuka sesi dan mencatat penjualan.",
+    "manager" to "Persetujuan butuh koneksi agar tidak bentrok dengan approver lain, " +
+        "dan laporannya dihitung server dari data lintas outlet.",
+    "leader" to "Petty cash dan laporan penjualan dihitung server dari data lintas outlet, " +
+        "jadi butuh koneksi internet.",
+)
