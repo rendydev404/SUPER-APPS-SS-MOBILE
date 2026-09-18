@@ -40,6 +40,13 @@ dependencies {
     // hilt-android — kebetulan yang pecah begitu Hilt dilepas.
     api("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     implementation("androidx.core:core-ktx:1.12.0")
+    // Cache baca dan antrean tulis offline bersandar pada Room. Arahnya sengaja
+    // core:network -> core:database dan tidak sebaliknya; core:storage sudah bergantung
+    // pada modul ini, jadi unggahan lampiran dipasang lewat hook Outbox.unggahLampiran
+    // dari layer app alih-alih dipanggil langsung (kalau langsung, dependensinya melingkar).
+    implementation(project(":core:database"))
+
+    testImplementation("junit:junit:4.13.2")
 }
 
 
