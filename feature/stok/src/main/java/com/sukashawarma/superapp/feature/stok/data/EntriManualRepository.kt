@@ -1,11 +1,5 @@
 package com.sukashawarma.superapp.feature.stok.data
 
-import com.google.gson.JsonArray
-import com.google.gson.JsonObject
-import com.sukashawarma.superapp.core.storage.StorageUtil
-import com.sukashawarma.superapp.data.remote.Postgrest
-import com.sukashawarma.superapp.data.remote.SupabaseClient
-import java.util.UUID
 
 /**
  * Entri manual ledger dan pelaporan waste — cermin `ManualEntryForm.tsx` dan
@@ -24,9 +18,6 @@ import java.util.UUID
  */
 object EntriManualRepository {
 
-    /** Bucket ini publik (lihat migrasi pembuatannya), jadi URL-nya bisa disimpan apa adanya. */
-    private const val BUCKET_WASTE = "waste_evidence"
-
     /** Alasan waste — daftar yang sama persis dengan dropdown di `WasteModal.tsx`. */
     val ALASAN_WASTE = listOf(
         "Basi / Expired",
@@ -36,51 +27,8 @@ object EntriManualRepository {
         "Lainnya",
     )
 
-    /**
-     * Mengunggah foto bukti dan mengembalikan URL publiknya.
-     *
-     * Kolom `photo_url` menyimpan URL penuh, bukan path — itu yang dibaca layar
-     * persetujuan waste, dan mengisinya dengan path akan membuat fotonya gagal
-     * tampil di web maupun native.
-     */
-    suspend fun unggahBuktiWaste(outletId: String, bahanBakuId: String, jpeg: ByteArray): String {
-        val path = "$outletId/$bahanBakuId/${System.currentTimeMillis()}-${UUID.randomUUID()}.jpg"
-        StorageUtil.uploadJpeg(BUCKET_WASTE, path, jpeg)
-        return "${SupabaseClient.BASE_URL}storage/v1/object/public/$BUCKET_WASTE/$path"
-    }
-
-    /**
-     * Melaporkan waste. Statusnya selalu `PENDING`; yang memotong stok adalah
-     * trigger saat laporan disetujui, bukan pemanggilan ini.
-     *
-     * [qtyBesar] WAJIB sudah dalam satuan besar bahan. Trigger persetujuan menulis
-     * `-NEW.qty` ke ledger apa adanya, jadi mengirim angka dalam gram untuk bahan
-     * ber-satuan kilogram akan memotong stok ribuan kali lipat.
-     */
-    suspend fun laporWaste(
-        outletId: String,
-        bahanBakuId: String,
-        qtyBesar: Double,
-        alasan: String,
-        photoUrl: String,
-        dilaporkanOleh: String,
-    ) {
-        Postgrest.insert(
-            "stok_waste_reports",
-            JsonArray().apply {
-                add(
-                    JsonObject().apply {
-                        addProperty("outlet_id", outletId)
-                        addProperty("bahan_baku_id", bahanBakuId)
-                        addProperty("qty", qtyBesar)
-                        addProperty("reason", alasan)
-                        addProperty("photo_url", photoUrl)
-                        addProperty("status", "PENDING")
-                        addProperty("reported_by", dilaporkanOleh)
-                    }
-                )
-            },
-            returning = false,
-        )
-    }
+    // Pengunggahan foto dan penulisan `stok_waste_reports` pindah ke
+    // `feature/stok/offline/AksiStokOffline.kt` (WasteOffline). Keduanya kini memakai jalur
+    // yang sama dengan antrean offline, sehingga laporan waste tetap bisa dibuat saat
+    // internet mati — dan tidak ada dua salinan logika penulisan yang bisa menyimpang.
 }
