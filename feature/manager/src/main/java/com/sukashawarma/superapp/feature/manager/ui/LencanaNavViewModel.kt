@@ -9,6 +9,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /** Angka lencana pada nav bawah dan lembar menu. */
@@ -37,9 +38,17 @@ class LencanaNavViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 coroutineScope {
-                    val persetujuan = async { PersetujuanRepository.muat().void.size }
+                    // Lencana menghitung seluruh antrean layar Persetujuan, bukan hanya
+                    // Void: tab Bypass POS ada di layar yang sama dan antreannya sama
+                    // mendesaknya.
+                    val persetujuan = async {
+                        val data = PersetujuanRepository.muat()
+                        data.void.size + data.bypass.size
+                    }
                     val waste = async { WasteRepository.jumlahMenunggu(null) }
-                    _lencana.value = LencanaNav(persetujuan.await(), waste.await())
+                    val jumlahPersetujuan = persetujuan.await()
+                    val jumlahWaste = waste.await()
+                    _lencana.update { LencanaNav(jumlahPersetujuan, jumlahWaste) }
                 }
             } catch (e: CancellationException) {
                 throw e
