@@ -15,6 +15,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 object StorageUtil {
     private val jpegMedia = "image/jpeg".toMediaType()
     private val webpMedia = "image/webp".toMediaType()
+    private val m4aMedia = "audio/mp4".toMediaType()
 
     /** Upload JPEG ke `bucket/path` (upsert). Kembalikan `bucket/path` yang sama —
      *  itu format yang dipakai kolom `ref_photo_url`/`ref_photo_url_mobile` di
@@ -35,6 +36,16 @@ object StorageUtil {
      */
     suspend fun uploadWebp(bucket: String, path: String, bytes: ByteArray, upsert: Boolean = false): String =
         upload(bucket, path, bytes, webpMedia, upsert)
+
+    /**
+     * Upload rekaman suara M4A (AAC dalam wadah MP4) — dipakai voice note chat.
+     *
+     * Sama seperti [uploadWebp], menimpa sengaja tidak diizinkan: nama berkasnya
+     * UUID baru tiap rekaman, jadi tidak ada yang perlu ditimpa, dan rekaman
+     * yang sudah terkirim tidak bisa diganti isinya di belakang layar.
+     */
+    suspend fun uploadM4a(bucket: String, path: String, bytes: ByteArray): String =
+        upload(bucket, path, bytes, m4aMedia, upsert = false)
 
     private suspend fun upload(
         bucket: String,
