@@ -3,7 +3,10 @@ package com.sukashawarma.superapp.presentation.absensi.cuti
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.gson.JsonObject
+import com.sukashawarma.superapp.data.remote.HasilAksi
 import com.sukashawarma.superapp.data.remote.Postgrest
+import com.sukashawarma.superapp.data.remote.kirimAtauAntre
+import com.sukashawarma.superapp.feature.absensi.offline.CutiOffline
 import com.sukashawarma.superapp.data.remote.optInt
 import com.sukashawarma.superapp.data.remote.optString
 import com.sukashawarma.superapp.domain.session.AppSession
@@ -28,6 +31,8 @@ data class CutiUiState(
     val error: String? = null,
     val submitting: Boolean = false,
     val submitError: String? = null,
+    /** Terisi saat pengajuan hanya tersimpan di perangkat, bukan sampai ke server. */
+    val pesanAntrean: String? = null,
     val rows: List<CutiRequestRow> = emptyList(),
 )
 
@@ -97,24 +102,30 @@ class CutiViewModel : ViewModel() {
         _state.value = _state.value.copy(submitting = true, submitError = null)
         viewModelScope.launch {
             try {
-                Postgrest.insert(
-                    "leave_requests",
-                    JsonObject().apply {
-                        addProperty("staff_id", staffId)
-                        addProperty("leave_type", leaveType)
-                        addProperty("start_date", startDate.toString())
-                        addProperty("end_date", endDate.toString())
-                        addProperty("days", days)
-                        addProperty("reason", reason)
-                        addProperty("status", "pending")
-                    }
+                val hasil = kirimAtauAntre(
+                    jenis = CutiOffline.JENIS,
+                    payload = CutiOffline.payload(
+                        staffId, leaveType, startDate.toString(), endDate.toString(), days, reason,
+                    ),
+                    kirim = CutiOffline::kirim,
+                    dibuatOleh = staffId,
                 )
-                _state.value = _state.value.copy(submitting = false)
-                load()
+                _state.value = _state.value.copy(
+                    submitting = false,
+                    pesanAntrean = "Pengajuan tersimpan di HP dan akan terkirim otomatis begitu ada internet."
+                        .takeIf { hasil == HasilAksi.MASUK_ANTREAN },
+                )
+                // Riwayat dimuat ulang hanya kalau benar-benar sampai server; saat offline
+                // pemuatan itu akan gagal dan menimpa pesan di atas dengan pesan galat.
+                if (hasil == HasilAksi.TERKIRIM) load()
             } catch (e: Exception) {
                 _state.value = _state.value.copy(submitting = false, submitError = "Gagal mengajukan cuti: ${e.message}")
             }
         }
+    }
+
+    fun clearPesanAntrean() {
+        _state.value = _state.value.copy(pesanAntrean = null)
     }
 
     fun clearSubmitError() {
