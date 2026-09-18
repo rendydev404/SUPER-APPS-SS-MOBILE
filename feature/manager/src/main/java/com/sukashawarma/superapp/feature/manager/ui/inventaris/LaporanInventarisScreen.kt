@@ -72,6 +72,8 @@ import com.sukashawarma.superapp.presentation.theme.SukaBrown
 import com.sukashawarma.superapp.presentation.theme.SukaCream
 import com.sukashawarma.superapp.presentation.theme.SukaGray400
 import com.sukashawarma.superapp.presentation.theme.SukaOrange
+import com.sukashawarma.superapp.core.ui.RealtimeRefresh
+import com.sukashawarma.superapp.core.ui.RealtimeTables
 
 /**
  * Laporan Inventaris — cermin `dashboard/reports` web.
@@ -87,6 +89,10 @@ fun LaporanInventarisScreen(
     viewModel: LaporanInventarisViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+
+    // Menunggu `plan/inventaris-realtime-publication.sql` dijalankan di Supabase;
+    // sebelum itu langganan ini hidup tapi tidak pernah menerima event.
+    RealtimeRefresh(RealtimeTables.INVENTARIS_SUBMISSIONS) { viewModel.muatUlang(silent = true) }
     val snackbar = remember { SnackbarHostState() }
 
     LaunchedEffect(state.galat) {
@@ -129,7 +135,7 @@ fun LaporanInventarisScreen(
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             when {
-                state.memuat -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                state.memuat && state.outlets.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = SukaOrange)
                 }
                 state.outletDibuka == null -> DaftarLaporanOutlet(state, viewModel)
