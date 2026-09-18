@@ -35,8 +35,9 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import com.sukashawarma.superapp.core.ui.SukaDropdownHeader
+import com.sukashawarma.superapp.core.ui.SukaDropdownMenu
+import com.sukashawarma.superapp.core.ui.SukaDropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -117,7 +118,7 @@ fun PettyCashScreen(
     val state by viewModel.state.collectAsState()
     val snackbar = remember { SnackbarHostState() }
 
-    RealtimeRefresh(RealtimeTables.PETTY_CASH_TOPUPS) { viewModel.muatUlang() }
+    RealtimeRefresh(RealtimeTables.PETTY_CASH_TOPUPS) { viewModel.muatUlang(silent = true) }
 
     LaunchedEffect(state.kabar, state.galat) {
         val pesan = state.kabar ?: state.galat
@@ -139,7 +140,7 @@ fun PettyCashScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = viewModel::muatUlang) {
+                    IconButton(onClick = { viewModel.muatUlang(silent = true) }) {
                         Icon(Icons.Default.Refresh, "Muat ulang", tint = SukaBrown)
                     }
                 },
@@ -183,9 +184,6 @@ private fun PanelKepala(state: PettyCashUiState, viewModel: PettyCashViewModel) 
                     fontWeight = FontWeight.Medium,
                     lineHeight = 16.sp,
                 )
-            }
-            if (state.memuat) {
-                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = SukaOrange)
             }
         }
         Spacer(Modifier.height(14.dp))
@@ -239,10 +237,12 @@ private fun <T> PilihanTurun(
                 Icon(Icons.Default.ArrowDropDown, null, tint = SukaBrown)
             }
         }
-        DropdownMenu(expanded = terbuka, onDismissRequest = { terbuka = false }) {
-            pilihan.forEach { (nilaiPilihan, label) ->
-                DropdownMenuItem(
-                    text = { Text(label, fontSize = 12.sp, fontWeight = FontWeight.Bold) },
+        SukaDropdownMenu(expanded = terbuka, onDismissRequest = { terbuka = false }) {
+            SukaDropdownHeader(title = "PILIH OPSI", onClose = { terbuka = false })
+            pilihan.forEach { (nilaiPilihan, textLabel) ->
+                SukaDropdownMenuItem(
+                    text = textLabel,
+                    selected = (textLabel == nilai),
                     onClick = { terbuka = false; onPilih(nilaiPilihan) },
                 )
             }
@@ -411,9 +411,7 @@ private fun PanelKosongPettyCash(state: PettyCashUiState) {
             // memancarkan composable meninggalkan pembukuan grup kompilator tidak
             // seimbang, dan begitu keadaannya berbalik, tabel slot dibaca dengan
             // indeks negatif -> ArrayIndexOutOfBoundsException di SlotTableKt.key.
-            if (state.memuat) {
-                CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp, color = SukaOrange)
-                Spacer(Modifier.height(12.dp))
+            if (state.memuat && state.semua.isEmpty()) {
                 Text("Memuat pengajuan...", color = SukaGray400, fontSize = 12.sp, fontWeight = FontWeight.Medium)
             } else if (state.tab == TabPettyCash.REVIEW) {
                 Box(
