@@ -75,7 +75,15 @@ object AppUpdateManager {
     private var pendingDelta: AppUpdateDelta? = null
     private var forceFullForVersion: Int? = null
     private var receiverRegistered = false
-    @Volatile private var processingDownloadedPayload = false
+    /**
+     * Gerbang atomik pemrosesan berkas yang sudah selesai diunduh.
+     *
+     * `BroadcastReceiver` DownloadManager dan polling kemajuan bisa sama-sama
+     * menyimpulkan "unduhan selesai" pada saat yang nyaris bersamaan; tanpa
+     * compare-and-set, keduanya menambal APK yang sama secara bersamaan dan
+     * berkas hasilnya rusak.
+     */
+    private val processingDownloadedPayload = java.util.concurrent.atomic.AtomicBoolean(false)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     @Volatile private var appContext: Context? = null
     private val gson = Gson()
@@ -220,7 +228,7 @@ object AppUpdateManager {
             pendingUserAction = null
             pendingDelta = null
             forceFullForVersion = null
-            processingDownloadedPayload = false
+            processingDownloadedPayload.set(false)
             pendingManifest = manifest
             _downloadProgress.value = 0
             _downloadPayloadSizeBytes.value = null
@@ -235,7 +243,7 @@ object AppUpdateManager {
     }
 
     fun startDownload(context: Context, manifest: AppUpdateManifest) {
-        if (_downloadState.value == DownloadState.DOWNLOADING || processingDownloadedPayload) return
+        if (_downloadState.value == DownloadState.DOWNLOADING || processingDownloadedPayload.get()) return
         pendingManifest = manifest
 
         val updatesDir = File(context.getExternalFilesDir(null), "updates").apply { mkdirs() }
@@ -346,13 +354,15 @@ object AppUpdateManager {
     }
 
     private fun markDownloadReady(context: Context) {
-        if (processingDownloadedPayload ||
+        if (processingDownloadedPayload.get() ||
             _downloadState.value == DownloadState.READY_TO_INSTALL ||
             _downloadState.value == DownloadState.INSTALLING ||
             _downloadState.value == DownloadState.AWAITING_USER_ACTION
         ) return
         val manifest = pendingManifest ?: return
-        processingDownloadedPayload = true
+        // Gerbang sebenarnya: hanya satu pemanggil yang berhasil menaikkan tanda ini,
+        // sisanya berhenti di sini walau lolos pemeriksaan di atas.
+        if (!processingDownloadedPayload.compareAndSet(false, true)) return
         scope.launch {
             var shouldFallbackToFull = false
             try {
@@ -418,7 +428,7 @@ object AppUpdateManager {
                 }
                 if (!shouldFallbackToFull) _downloadState.value = DownloadState.FAILED
             } finally {
-                processingDownloadedPayload = false
+                processingDownloadedPayload.set(false)
             }
 
             if (shouldFallbackToFull) {
