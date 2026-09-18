@@ -36,8 +36,9 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import com.sukashawarma.superapp.core.ui.SukaDropdownHeader
+import com.sukashawarma.superapp.core.ui.SukaDropdownMenu
+import com.sukashawarma.superapp.core.ui.SukaDropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -87,6 +88,8 @@ import com.sukashawarma.superapp.presentation.theme.SukaBrown
 import com.sukashawarma.superapp.presentation.theme.SukaCream
 import com.sukashawarma.superapp.presentation.theme.SukaGray400
 import com.sukashawarma.superapp.presentation.theme.SukaOrange
+import com.sukashawarma.superapp.core.ui.RealtimeRefresh
+import com.sukashawarma.superapp.core.ui.RealtimeTables
 
 private val AMBER_LATAR = Color(0xFFFEF3C7)
 private val AMBER_GARIS = Color(0xFFFCD34D)
@@ -110,6 +113,13 @@ fun SidakScreen(
     viewModel: SidakViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+
+    // Menunggu `plan/inventaris-realtime-publication.sql` dijalankan di Supabase;
+    // sebelum itu langganan ini hidup tapi tidak pernah menerima event.
+    RealtimeRefresh(
+        RealtimeTables.INVENTARIS_SUBMISSIONS,
+        RealtimeTables.INVENTARIS_MASTER_ITEMS,
+    ) { viewModel.muatUlang(silent = true) }
     val snackbar = remember { SnackbarHostState() }
 
     LaunchedEffect(state.kabar, state.galat) {
@@ -184,9 +194,6 @@ private fun PanelOutlet(state: SidakUiState, viewModel: SidakViewModel) {
                     lineHeight = 16.sp,
                 )
             }
-            if (state.memuat) {
-                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = SukaOrange)
-            }
         }
 
         Spacer(Modifier.height(14.dp))
@@ -226,24 +233,14 @@ private fun PanelOutlet(state: SidakUiState, viewModel: SidakViewModel) {
                     Icon(Icons.Default.ArrowDropDown, null, tint = SukaBrown)
                 }
             }
-            DropdownMenu(expanded = menuOutlet, onDismissRequest = { menuOutlet = false }) {
+            SukaDropdownMenu(expanded = menuOutlet, onDismissRequest = { menuOutlet = false }) {
+                SukaDropdownHeader(title = "PILIH OUTLET SIDAK", onClose = { menuOutlet = false })
                 state.outletTerlihat.forEach { outlet ->
                     val keadaan = state.keadaan(outlet.id)
-                    DropdownMenuItem(
-                        text = {
-                            Column {
-                                Text(outlet.nama, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                Text(
-                                    keadaan.label,
-                                    fontSize = 10.sp,
-                                    color = when (keadaan) {
-                                        KeadaanSidak.SUDAH_DISIDAK -> HijauTeks
-                                        KeadaanSidak.MENUNGGU_SIDAK -> AMBER_TEKS
-                                        KeadaanSidak.BELUM_ADA_LAPORAN -> SukaGray400
-                                    },
-                                )
-                            }
-                        },
+                    SukaDropdownMenuItem(
+                        text = outlet.nama,
+                        subtitle = keadaan.label,
+                        selected = (state.outletTerpilih == outlet.id),
                         onClick = { viewModel.pilihOutlet(outlet.id); menuOutlet = false },
                     )
                 }
