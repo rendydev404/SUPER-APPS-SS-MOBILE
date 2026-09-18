@@ -55,6 +55,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.platform.LocalContext
+import com.sukashawarma.superapp.data.remote.NetworkMonitor
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -68,6 +69,8 @@ import com.sukashawarma.superapp.core.auth.findActivity
 import com.sukashawarma.superapp.core.ui.AvatarStaf
 import com.sukashawarma.superapp.data.local.AuthPrefs
 import com.sukashawarma.superapp.presentation.theme.*
+import com.sukashawarma.superapp.core.ui.RealtimeRefresh
+import com.sukashawarma.superapp.core.ui.RealtimeTables
 
 // Canonical Apple iOS Color Palette
 private val IosSystemBg = Color(0xFFF2F2F7) // iOS System Grouped Background
@@ -215,6 +218,19 @@ fun HomeScreen(
     LaunchedEffect(Unit) {
         viewModel.pesanPos.collect { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }
     }
+
+    // Lencana di kartu modul adalah hal pertama yang dilihat setiap kali aplikasi
+    // dibuka, dan sebelumnya hanya dihitung sekali saat sesi berubah — angkanya
+    // basi begitu rekan kerja mengirim surat jalan atau melaporkan waste.
+    // Tabelnya persis yang dibaca `muatSorotan()`; `monitoring_view_crew`
+    // bersumber dari `stok_balance`.
+    RealtimeRefresh(
+        RealtimeTables.ATTENDANCE,
+        RealtimeTables.STOK_BALANCE,
+        RealtimeTables.SURAT_JALAN,
+        RealtimeTables.WASTE_REPORTS,
+        RealtimeTables.PETTY_CASH_TOPUPS,
+    ) { viewModel.segarkanSorotan() }
 
     val pemilikDaurHidup = LocalLifecycleOwner.current
     DisposableEffect(pemilikDaurHidup, userId) {
@@ -600,6 +616,7 @@ private fun formatRoleTitle(role: com.sukashawarma.superapp.domain.model.Role?, 
         com.sukashawarma.superapp.domain.model.Role.MITRA -> "MITRA"
         com.sukashawarma.superapp.domain.model.Role.PURCHASING -> "PURCHASING"
         com.sukashawarma.superapp.domain.model.Role.DEVELOPER -> "DEVELOPER"
+        com.sukashawarma.superapp.domain.model.Role.DRIVER -> "DRIVER"
         else -> roleRaw?.uppercase()?.takeIf { it.isNotBlank() } ?: "STAFF"
     }
 }
@@ -1107,19 +1124,39 @@ private fun DaftarAplikasiCard(
         }
     }
 
-    // Pada varian release, modul operasional selain Absensi dikunci (disable + ikon gembok)
+    // Pada varian release, modul operasional selain Absensi dan Chat dikunci (disable + ikon gembok).
+    // Chat di daftar aplikasi tetap terbuka (bisa diklik), namun ruang percakapannya (room) yang terkunci di dalam.
     val isRelease = !com.sukashawarma.superapp.feature.home.BuildConfig.DEBUG
-    val displayedApps = apps.map { app ->
-        if (isRelease && app.id != "absensi") {
+    val appsSetelahRelease = apps.map { app ->
+        if (isRelease && app.id != "absensi" && app.id != "chat") {
             app.copy(
                 isLocked = true,
                 statusText = "Terkunci",
                 statusTextColor = Color(0xFF64748B),
                 statusBgColor = Color(0xFFF1F5F9),
-                onClick = {}
+                onClick = ({})
             )
         } else {
             app
+        }
+    }
+
+    // Saat offline, modul yang memang tidak bisa jalan tanpa server diberi label — TIDAK
+    // dikunci. Tile yang mati tidak memberi tahu apa pun; tile yang bisa ditekan dan
+    // menjawab alasannya membuat orang berhenti mencoba dan tahu harus menunggu apa.
+    val online by NetworkMonitor.isOnline.collectAsState()
+    val konteks = LocalContext.current
+    val displayedApps = appsSetelahRelease.map { app ->
+        val alasan = if (online) null else ALASAN_PERLU_INTERNET[app.id]
+        if (alasan == null || app.isLocked) {
+            app
+        } else {
+            app.copy(
+                statusText = "Perlu internet",
+                statusTextColor = Color(0xFF92400E),
+                statusBgColor = Color(0xFFFEF3C7),
+                onClick = { Toast.makeText(konteks, alasan, Toast.LENGTH_LONG).show() },
+            )
         }
     }
 
