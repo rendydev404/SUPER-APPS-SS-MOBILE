@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,6 +62,9 @@ import com.sukashawarma.superapp.domain.model.ClockPhase
 import com.sukashawarma.superapp.domain.model.Role
 import com.sukashawarma.superapp.domain.gps.GpsMath
 import com.sukashawarma.superapp.domain.session.AppSession
+import com.sukashawarma.superapp.core.ui.SukaDropdownHeader
+import com.sukashawarma.superapp.core.ui.SukaDropdownMenu
+import com.sukashawarma.superapp.core.ui.SukaDropdownMenuItem
 import com.sukashawarma.superapp.presentation.components.FaceCameraPreview
 import com.sukashawarma.superapp.presentation.theme.*
 import java.time.Instant
@@ -71,13 +75,25 @@ import java.util.Locale
 import com.sukashawarma.superapp.feature.absensi.R
 import com.sukashawarma.superapp.presentation.absensi.enroll.captureJpeg
 import androidx.compose.ui.res.painterResource
-import androidx.compose.material.icons.filled.NotificationsNone
+import com.sukashawarma.superapp.core.ui.AvatarStaf
 import com.sukashawarma.superapp.core.ui.RealtimeRefresh
 import com.sukashawarma.superapp.core.ui.RealtimeTables
 
+/**
+ * Panel absen.
+ *
+ * [onAbsenMasukSelesai] dipanggil sekali tiap absen MASUK yang berhasil, supaya
+ * pemanggil bisa mengantar kru ke langkah berikutnya. Default kosong: layar ini juga
+ * dipakai sebagai rute yang berdiri sendiri, dan di sana tidak ada checklist untuk
+ * dituju.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ClockScreen(isActive: Boolean = true, onExit: () -> Unit) {
+fun ClockScreen(
+    isActive: Boolean = true,
+    onExit: () -> Unit,
+    onAbsenMasukSelesai: () -> Unit = {},
+) {
     val context = LocalContext.current
     val staff by AppSession.staff.collectAsState()
 
@@ -160,10 +176,22 @@ fun ClockScreen(isActive: Boolean = true, onExit: () -> Unit) {
             application = context.applicationContext as android.app.Application,
             outletId = outletId,
             lockToStaffId = staff?.id,
+            staffRole = staff?.role?.value ?: staff?.roleRaw,
         )
     )
     val state by viewModel.state.collectAsState()
     RealtimeRefresh(RealtimeTables.ATTENDANCE) { viewModel.refreshAttendance() }
+
+    // Jeda sebelum berpindah: pesan "Selamat bekerja!" dan ripple perayaannya (900 ms)
+    // dibiarkan tuntas lebih dulu. Berpindah seketika membuat kru tidak sempat melihat
+    // absennya benar-benar tercatat.
+    val antarKeCeklis by rememberUpdatedState(onAbsenMasukSelesai)
+    LaunchedEffect(viewModel) {
+        viewModel.absenMasukBerhasil.collect {
+            delay(1300)
+            antarKeCeklis()
+        }
+    }
     var hasCameraPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
@@ -244,7 +272,12 @@ fun ClockScreen(isActive: Boolean = true, onExit: () -> Unit) {
         ) {
             // Top App Bar — di LUAR area scroll (bukan child dari Column yang di-scroll)
             // supaya selalu ikut/menempel di atas, bukan ikut ter-scroll menghilang.
-            TopBar(staffName = staff?.name, onBackClick = onExit, scrollProgress = scrollProgress)
+            TopBar(
+                staffName = staff?.namaTampil,
+                avatarPath = staff?.avatarUrl,
+                onBackClick = onExit,
+                scrollProgress = scrollProgress,
+            )
 
             Column(
                 modifier = Modifier
@@ -430,7 +463,7 @@ private fun AttendanceOutletSelector(
                 }
             }
 
-            DropdownMenu(
+            SukaDropdownMenu(
                 expanded = expanded,
                 onDismissRequest = { onExpandedChange(false) },
                 modifier = Modifier
@@ -474,58 +507,20 @@ private fun AttendanceOutletSelector(
                         } else filteredOutlets.forEach { outlet ->
                             val isSelected = outlet.id == state.selectedId
                             val outletDistance = outlet.distanceM
-                            DropdownMenuItem(
-                                text = {
-                                    Column {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                        ) {
-                                            Text(
-                                                outlet.name,
-                                                fontSize = 14.sp,
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
-                                                color = if (isSelected) SukaOrange else SukaOnSurface,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                                modifier = Modifier.weight(1f, fill = false),
-                                            )
-                                            if (outlet.id == nearestId) {
-                                                Surface(
-                                                    shape = RoundedCornerShape(6.dp),
-                                                    color = SukaOrange.copy(alpha = 0.14f),
-                                                ) {
-                                                    Text(
-                                                        "Terdekat",
-                                                        fontSize = 9.5.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = SukaOrange,
-                                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
-                                                    )
-                                                }
-                                            }
-                                        }
-                                        Text(
-                                            text = if (outletDistance != null) {
-                                                formatDistanceShort(outletDistance) + " dari Anda"
-                                            } else {
-                                                "Jarak belum terukur"
-                                            },
-                                            fontSize = 11.sp,
-                                            color = SukaOnSurfaceVariant,
-                                        )
-                                    }
+                            SukaDropdownMenuItem(
+                                text = outlet.name,
+                                subtitle = if (outletDistance != null) {
+                                    formatDistanceShort(outletDistance) + " dari Anda"
+                                } else {
+                                    "Jarak belum terukur"
                                 },
-                                leadingIcon = {
-                                    Icon(
-                                        Icons.Default.Storefront,
-                                        contentDescription = null,
-                                        tint = if (isSelected) SukaOrange else SukaOnSurfaceVariant,
-                                        modifier = Modifier.size(20.dp),
-                                    )
+                                badgeText = if (outlet.id == nearestId) "Terdekat" else null,
+                                selected = isSelected,
+                                leadingIcon = Icons.Default.Storefront,
+                                onClick = {
+                                    onSelect(outlet.id)
+                                    onExpandedChange(false)
                                 },
-                                onClick = { onSelect(outlet.id); onExpandedChange(false) },
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
                             )
                         }
                     }
@@ -1034,7 +1029,12 @@ private fun ClockModernOverlay(
  */
 
 @Composable
-private fun TopBar(staffName: String?, onBackClick: () -> Unit, scrollProgress: Float = 0f) {
+private fun TopBar(
+    staffName: String?,
+    avatarPath: String?,
+    onBackClick: () -> Unit,
+    scrollProgress: Float = 0f,
+) {
     // Micro-animasi "collapsing header": begitu user scroll ke bawah, header memepet rata
     // (radius bawah hilang), memunculkan shadow tipis, dan sedikit memampat (avatar & padding
     // mengecil) — bukan on/off tiba-tiba, tapi interpolasi halus mengikuti scrollProgress.
@@ -1077,35 +1077,24 @@ private fun TopBar(staffName: String?, onBackClick: () -> Unit, scrollProgress: 
                 )
             }
             Spacer(modifier = Modifier.width(4.dp))
-            Box(
-                modifier = Modifier
-                    .size(avatarSize)
-                    .clip(CircleShape)
-                    .background(Color(0xFFFFF4EC)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("SC", color = Color(0xFFE86F21), fontWeight = FontWeight.Bold)
-            }
+            // Foto profil yang diatur staff sendiri di halaman Profil; tanpa foto,
+            // AvatarStaf menampilkan huruf awal nama.
+            AvatarStaf(
+                path = avatarPath,
+                nama = staffName,
+                modifier = Modifier.size(avatarSize),
+                warnaLatar = Color(0xFFFFF4EC),
+                warnaHuruf = Color(0xFFE86F21),
+            )
             Spacer(modifier = Modifier.width(12.dp))
             Column {
-                Text("Suka Culinary", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color(0xFF11142D))
+                Text("SUKA Kerja", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color(0xFF11142D))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(Color(0xFF10B981)))
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("Online", fontSize = 12.sp, color = Color(0xFF10B981))
                 }
             }
-        }
-
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .border(1.dp, Color(0xFFEEEEEE), CircleShape)
-                .clickable { },
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(Icons.Default.NotificationsNone, contentDescription = "Notifications", tint = Color(0xFF11142D))
         }
     }
 }
