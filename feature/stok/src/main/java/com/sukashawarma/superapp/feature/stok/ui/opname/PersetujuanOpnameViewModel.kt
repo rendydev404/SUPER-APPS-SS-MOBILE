@@ -11,6 +11,7 @@ import com.sukashawarma.superapp.feature.stok.domain.stokErrorMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class PersetujuanOpnameUiState(
@@ -82,24 +83,36 @@ class PersetujuanOpnameViewModel : ViewModel() {
 
     fun setujui(opname: OpnameHeader) {
         val pengguna = AppSession.staff.value?.id ?: return
-        if (_state.value.sedangDiproses != null) return
+        var lanjut = false
+        _state.update { current ->
+            if (current.sedangDiproses != null) {
+                current
+            } else {
+                lanjut = true
+                current.copy(sedangDiproses = opname.id, error = null, pesan = null)
+            }
+        }
+        if (!lanjut) return
+
         viewModelScope.launch {
-            _state.value = _state.value.copy(sedangDiproses = opname.id, error = null, pesan = null)
             try {
                 OpnameRepository.setujui(opname.id, pengguna)
                 StokRepository.invalidate()
-                _state.value = _state.value.copy(
-                    sedangDiproses = null,
-                    // Barisnya dibuang lokal supaya antrean langsung terlihat berkurang,
-                    // tidak menunggu putaran muat ulang.
-                    antrean = _state.value.antrean.filterNot { it.id == opname.id },
-                    pesan = "Opname ${opname.outletName.orEmpty()} disetujui dan difinalisasi.",
-                )
+                _state.update {
+                    it.copy(
+                        sedangDiproses = null,
+                        // Barisnya dibuang lokal supaya antrean langsung terlihat berkurang,
+                        // tidak menunggu putaran muat ulang.
+                        antrean = it.antrean.filterNot { item -> item.id == opname.id },
+                        pesan = "Opname ${opname.outletName.orEmpty()} disetujui dan difinalisasi.",
+                    )
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 android.util.Log.e("PersetujuanOpnameVM", "setujui() gagal", e)
-                _state.value = _state.value.copy(sedangDiproses = null, error = stokErrorMessage(e))
+                _state.update { it.copy(sedangDiproses = null, error = stokErrorMessage(e)) }
+                muatUlang()
             }
         }
     }
@@ -108,27 +121,39 @@ class PersetujuanOpnameViewModel : ViewModel() {
         val pengguna = AppSession.staff.value?.id ?: return
         val alasan = _state.value.alasanTolak.trim()
         if (alasan.isEmpty()) {
-            _state.value = _state.value.copy(error = "Alasan penolakan wajib diisi.")
+            _state.update { it.copy(error = "Alasan penolakan wajib diisi.") }
             return
         }
-        if (_state.value.sedangDiproses != null) return
+        var lanjut = false
+        _state.update { current ->
+            if (current.sedangDiproses != null) {
+                current
+            } else {
+                lanjut = true
+                current.copy(sedangDiproses = opname.id, error = null, pesan = null)
+            }
+        }
+        if (!lanjut) return
+
         viewModelScope.launch {
-            _state.value = _state.value.copy(sedangDiproses = opname.id, error = null, pesan = null)
             try {
                 OpnameRepository.tolak(opname.id, pengguna, alasan)
                 StokRepository.invalidate()
-                _state.value = _state.value.copy(
-                    sedangDiproses = null,
-                    menolak = null,
-                    alasanTolak = "",
-                    antrean = _state.value.antrean.filterNot { it.id == opname.id },
-                    pesan = "Opname ditolak. Kru perlu menghitung ulang.",
-                )
+                _state.update {
+                    it.copy(
+                        sedangDiproses = null,
+                        menolak = null,
+                        alasanTolak = "",
+                        antrean = it.antrean.filterNot { item -> item.id == opname.id },
+                        pesan = "Opname ditolak. Kru perlu menghitung ulang.",
+                    )
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 android.util.Log.e("PersetujuanOpnameVM", "tolak() gagal", e)
-                _state.value = _state.value.copy(sedangDiproses = null, error = stokErrorMessage(e))
+                _state.update { it.copy(sedangDiproses = null, error = stokErrorMessage(e)) }
+                muatUlang()
             }
         }
     }
