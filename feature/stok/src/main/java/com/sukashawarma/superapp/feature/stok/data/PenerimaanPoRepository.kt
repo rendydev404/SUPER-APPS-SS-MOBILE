@@ -3,10 +3,20 @@ package com.sukashawarma.superapp.feature.stok.data
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.sukashawarma.superapp.data.remote.Postgrest
+import com.sukashawarma.superapp.data.remote.optBoolean
 import com.sukashawarma.superapp.data.remote.optDouble
 import com.sukashawarma.superapp.data.remote.optJsonObject
 import com.sukashawarma.superapp.data.remote.optString
+import com.sukashawarma.superapp.feature.stok.domain.DistribusiUnit
+import com.sukashawarma.superapp.feature.stok.domain.UnitMeta
 import java.time.LocalDate
+
+/**
+ * Outlet Gudang Pusat. UUID mati, sama seperti `GUDANG_PUSAT_ID` di
+ * `apps/stok/src/lib/stok/penyesuaianVendor.ts` — penerimaan PO supplier selalu
+ * mendarat di sini, jadi stok pembandingnya juga dibaca dari sini.
+ */
+private const val GUDANG_PUSAT_ID = "d23e11b3-23f1-4f9a-b428-cc73e1aa9b90"
 
 /** Satu PO yang barangnya sedang dalam perjalanan dari supplier. */
 data class PoInbound(
@@ -119,6 +129,52 @@ object PenerimaanPoRepository {
         val kondisi: String,
         val catatan: String?,
     )
+
+    /**
+     * Stok berjalan Gudang Pusat untuk bahan-bahan ini, pada SATUAN BESAR.
+     *
+     * Bahan yang tidak punya baris saldo sengaja TIDAK dimasukkan ke peta, bukan
+     * diisi nol: "belum diketahui" dan "benar-benar kosong" punya arti berbeda bagi
+     * [com.sukashawarma.superapp.feature.stok.domain.GerbangTerimaPo], dan menebaknya
+     * sebagai nol akan memunculkan peringatan lompatan palsu pada setiap bahan baru.
+     *
+     * Kegagalannya dikembalikan sebagai peta kosong: ini pelengkap peringatan, dan
+     * menggagalkan seluruh layar penerimaan hanya karena angka pembanding tak terbaca
+     * jauh lebih merugikan daripada kehilangan satu peringatan.
+     */
+    suspend fun stokGudang(bahanIds: List<String>): Map<String, Double> {
+        if (bahanIds.isEmpty()) return emptyMap()
+        return runCatching {
+            Postgrest.select(
+                "stok_balance",
+                listOf(
+                    "select" to "bahan_baku_id,saldo,saldo_is_gram," +
+                        "bahan_baku(satuan,satuan_tengah,satuan_kecil,faktor_tengah,faktor_tampilan)",
+                    "outlet_id" to "eq.$GUDANG_PUSAT_ID",
+                    "bahan_baku_id" to "in.(${bahanIds.joinToString(",")})",
+                ),
+            ).mapNotNull { el ->
+                val o = el.asJsonObject
+                val id = o.optString("bahan_baku_id") ?: return@mapNotNull null
+                val bb = o.optJsonObject("bahan_baku")
+                val meta = UnitMeta(
+                    satuan = bb?.optString("satuan"),
+                    satuanTengah = bb?.optString("satuan_tengah"),
+                    satuanKecil = bb?.optString("satuan_kecil"),
+                    faktorTengah = bb?.optDouble("faktor_tengah"),
+                    faktorTampilan = bb?.optDouble("faktor_tampilan"),
+                )
+                id to DistribusiUnit.saldoKeBesar(
+                    saldo = o.optDouble("saldo") ?: 0.0,
+                    saldoIsGram = o.optBoolean("saldo_is_gram"),
+                    meta = meta,
+                )
+            }.toMap()
+        }.getOrElse {
+            android.util.Log.w("PenerimaanPoRepository", "stokGudang() gagal", it)
+            emptyMap()
+        }
+    }
 
     suspend fun verifikasi(poId: String, items: List<Verifikasi>) {
         val payload = JsonArray()
