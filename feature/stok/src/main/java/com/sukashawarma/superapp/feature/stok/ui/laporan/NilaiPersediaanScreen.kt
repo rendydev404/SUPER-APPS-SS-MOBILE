@@ -124,7 +124,7 @@ fun NilaiPersediaanScreen(
             onKembali = onBack,
             aksi = {
                 IconButton(onClick = viewModel::muatUlang) {
-                    Icon(Icons.Default.Refresh, "Muat ulang", tint = Color.White)
+                    Icon(Icons.Default.Refresh, "Muat ulang", tint = Color(0xFF1E293B))
                 }
             },
         )
