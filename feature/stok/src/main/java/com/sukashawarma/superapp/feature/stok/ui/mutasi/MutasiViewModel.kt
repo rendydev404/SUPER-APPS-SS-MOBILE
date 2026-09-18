@@ -13,6 +13,7 @@ import com.sukashawarma.superapp.feature.stok.domain.formatAngkaStok
 import com.sukashawarma.superapp.feature.stok.domain.stokErrorMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
@@ -238,19 +239,35 @@ class MutasiViewModel : ViewModel() {
     }
 
     fun ajukan() {
-        val asal = _state.value.outletTerpilih?.takeUnless { it.adalahSemuaOutlet } ?: return
-        // Semua syaratnya — termasuk outlet tujuan wajib berbeda dari asal, yang juga
-        // dijaga database — terkumpul di halanganAjukan supaya layar bisa menampilkan
-        // alasan yang sama persis di bawah tombol sebelum ditekan.
-        val halangan = _state.value.halanganAjukan
-        if (halangan != null) {
-            _state.value = _state.value.copy(pesan = halangan)
+        var lanjut = false
+        _state.update { current ->
+            val asal = current.outletTerpilih?.takeUnless { it.adalahSemuaOutlet }
+            val halangan = current.halanganAjukan
+            if (asal == null) {
+                current
+            } else if (halangan != null) {
+                current.copy(pesan = halangan)
+            } else if (current.memproses) {
+                current
+            } else {
+                lanjut = true
+                current.copy(memproses = true, error = null, pesan = null)
+            }
+        }
+        if (!lanjut) return
+
+        val s = _state.value
+        val asal = s.outletTerpilih?.takeUnless { it.adalahSemuaOutlet } ?: run {
+            _state.update { it.copy(memproses = false) }
             return
         }
-        val tujuan = _state.value.tujuanTerpilih!!
-        val items = _state.value.itemDiajukan
+        val tujuan = s.tujuanTerpilih ?: run {
+            _state.update { it.copy(memproses = false) }
+            return
+        }
+        val items = s.itemDiajukan
+
         viewModelScope.launch {
-            _state.value = _state.value.copy(memproses = true, error = null, pesan = null)
             try {
                 MutasiRepository.ajukan(
                     outletAsalId = asal.id,
@@ -258,14 +275,16 @@ class MutasiViewModel : ViewModel() {
                     catatan = _state.value.catatan,
                     items = items.map { (b, q) -> MutasiRepository.ItemAjuan(b.bahanBakuId, q) },
                 )
-                _state.value = _state.value.copy(
-                    memproses = false, formTerbuka = false, bahan = emptyList(),
-                    jumlah = emptyMap(), catatan = "",
-                    pesan = "Mutasi diajukan ke ${tujuan.name}.",
-                )
+                _state.update {
+                    it.copy(
+                        memproses = false, formTerbuka = false, bahan = emptyList(),
+                        jumlah = emptyMap(), catatan = "",
+                        pesan = "Mutasi diajukan ke ${tujuan.name}.",
+                    )
+                }
                 muatDaftar()
             } catch (e: Exception) {
-                _state.value = _state.value.copy(memproses = false, error = stokErrorMessage(e))
+                _state.update { it.copy(memproses = false, error = stokErrorMessage(e)) }
             }
         }
     }
@@ -343,18 +362,40 @@ class MutasiViewModel : ViewModel() {
     }
 
     private fun jalankan(pesanSukses: String, aksi: suspend () -> Unit) {
+        var lanjut = false
+        _state.update { current ->
+            if (current.memproses) {
+                current
+            } else {
+                lanjut = true
+                current.copy(memproses = true, error = null, pesan = null)
+            }
+        }
+        if (!lanjut) return
+
         viewModelScope.launch {
-            _state.value = _state.value.copy(memproses = true, error = null, pesan = null)
             try {
                 aksi()
                 StokRepository.invalidate()
-                _state.value = _state.value.copy(
-                    memproses = false, detailUntuk = null, qtyTindakan = emptyMap(),
-                    kurir = "", pesan = pesanSukses,
-                )
+                _state.update {
+                    it.copy(
+                        memproses = false, detailUntuk = null, qtyTindakan = emptyMap(),
+                        kurir = "", pesan = pesanSukses,
+                    )
+                }
                 muatDaftar()
             } catch (e: Exception) {
-                _state.value = _state.value.copy(memproses = false, error = stokErrorMessage(e))
+                // Jika aksi gagal (misal sudah diproses user lain), tutup detail dan refresh daftar agar data sinkron
+                _state.update {
+                    it.copy(
+                        memproses = false,
+                        detailUntuk = null,
+                        qtyTindakan = emptyMap(),
+                        kurir = "",
+                        error = stokErrorMessage(e),
+                    )
+                }
+                muatDaftar()
             }
         }
     }
