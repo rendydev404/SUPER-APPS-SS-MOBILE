@@ -11,9 +11,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -33,9 +35,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -172,19 +178,7 @@ private fun TombolNav(
                 )
             }
             if (lencana > 0) {
-                Surface(
-                    shape = CircleShape,
-                    color = Color(0xFFDC2626),
-                    border = BorderStroke(2.dp, Color.White),
-                ) {
-                    Text(
-                        if (lencana > 9) "9+" else lencana.toString(),
-                        Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
-                        color = Color.White,
-                        fontSize = 8.sp,
-                        fontWeight = FontWeight.Black,
-                    )
-                }
+                LencanaNav(lencana, Modifier.offset(x = 6.dp, y = (-3).dp))
             }
         }
         Spacer(Modifier.height(2.dp))
@@ -199,6 +193,47 @@ private fun TombolNav(
         )
     }
 }
+
+/**
+ * Lencana jumlah antrean di pojok ikon bilah bawah.
+ *
+ * Tingginya dikunci 18dp dan lebarnya minimal sama, jadi satu digit selalu
+ * bulat sempurna dan "9+" melebar jadi kapsul — bukan oval tegak seperti saat
+ * ukurannya ditentukan padding teks. Padding font bawaan Android dimatikan dan
+ * baris teks dipusatkan; tanpa itu angka duduk terlalu tinggi di dalam lingkaran.
+ * Cincin putih memisahkannya dari lingkaran jingga tombol aktif.
+ */
+@Composable
+private fun LencanaNav(jumlah: Int, modifier: Modifier = Modifier) {
+    Box(
+        modifier
+            .height(18.dp)
+            .widthIn(min = 18.dp)
+            .shadow(3.dp, CircleShape, clip = false)
+            .background(Color.White, CircleShape)
+            .padding(1.5.dp)
+            .background(MerahLencana, CircleShape)
+            .padding(horizontal = 4.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            if (jumlah > 9) "9+" else jumlah.toString(),
+            color = Color.White,
+            style = TextStyle(
+                fontSize = 10.sp,
+                lineHeight = 10.sp,
+                fontWeight = FontWeight.ExtraBold,
+                platformStyle = PlatformTextStyle(includeFontPadding = false),
+                lineHeightStyle = LineHeightStyle(
+                    alignment = LineHeightStyle.Alignment.Center,
+                    trim = LineHeightStyle.Trim.Both,
+                ),
+            ),
+        )
+    }
+}
+
+private val MerahLencana = Color(0xFFE53935)
 
 /**
  * Isi lembar menu bawah — seluruh tujuan, dikelompokkan seperti sidebar web.
