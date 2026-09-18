@@ -24,6 +24,14 @@ android {
         buildConfig = true
         compose = false
     }
+    testOptions {
+        unitTests {
+            // android.util.Log tidak ada di JVM. Tanpa ini, satu baris Log.i di jalur yang
+            // sedang diuji membuat tesnya gagal karena alasan yang sama sekali bukan
+            // perilakunya.
+            isReturnDefaultValues = true
+        }
+    }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.8"
     }
