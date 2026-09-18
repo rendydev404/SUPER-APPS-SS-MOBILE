@@ -126,11 +126,15 @@ class MonitoringViewModel : ViewModel() {
         _state.value = _state.value.copy(outletTerpilih = outletId)
     }
 
-    fun muatUlang() {
+    fun muatUlang(silent: Boolean = false) {
+        val sudahAdaData = _state.value.data != null
+        val senyap = silent || sudahAdaData
         pemuatan?.cancel()
         pemuatan = viewModelScope.launch {
             val rentang = _state.value.rentang
-            _state.value = _state.value.copy(memuat = true, galat = null)
+            if (!senyap) {
+                _state.value = _state.value.copy(memuat = true, galat = null)
+            }
             try {
                 val data = MonitoringRepository.muat(rentang)
                 _state.value = _state.value.copy(memuat = false, galat = null, data = data)
@@ -138,7 +142,13 @@ class MonitoringViewModel : ViewModel() {
                 throw e
             } catch (e: Exception) {
                 android.util.Log.e("MonitoringViewModel", "muatUlang() gagal", e)
-                _state.value = _state.value.copy(memuat = false, galat = pesanGalat(e))
+                if (!senyap) {
+                    _state.value = _state.value.copy(memuat = false, galat = pesanGalat(e))
+                }
+            } finally {
+                if (_state.value.memuat) {
+                    _state.value = _state.value.copy(memuat = false)
+                }
             }
         }
     }
