@@ -75,6 +75,8 @@ import com.sukashawarma.superapp.presentation.theme.SukaBrown
 import com.sukashawarma.superapp.presentation.theme.SukaCream
 import com.sukashawarma.superapp.presentation.theme.SukaGray400
 import com.sukashawarma.superapp.presentation.theme.SukaOrange
+import com.sukashawarma.superapp.core.ui.RealtimeRefresh
+import com.sukashawarma.superapp.core.ui.RealtimeTables
 
 private val AMBER_LATAR = Color(0xFFFEF3C7)
 private val AMBER_GARIS = Color(0xFFFCD34D)
@@ -100,6 +102,9 @@ fun HppScreen(
     viewModel: HppViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+
+    // Sama dengan HPP Menu di modul Stok: resep dinilai ulang tiap harga bahan berubah.
+    RealtimeRefresh(RealtimeTables.BAHAN_BAKU_HARGA, RealtimeTables.BAHAN_BAKU) { viewModel.muatUlang(silent = true) }
 
     Scaffold(
         containerColor = SukaCream,
@@ -158,9 +163,6 @@ private fun PanelKepala(state: HppUiState, viewModel: HppViewModel) {
                     fontWeight = FontWeight.Medium,
                     lineHeight = 16.sp,
                 )
-            }
-            if (state.memuat) {
-                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = SukaOrange)
             }
         }
 
