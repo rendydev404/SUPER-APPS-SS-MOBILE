@@ -44,23 +44,38 @@ class AbsenReminderTest {
             set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
         }.timeInMillis / 86_400_000L
 
-    @Test fun `perangkat menyala sesudah 12 10 menayangkan susulan`() {
-        assertTrue(AbsenReminder.perluSusulan(waktu(5, 14, 30), terakhirTayang = -1))
+    @Test fun `tepat pukul 12 10 boleh tayang`() {
+        assertTrue(AbsenReminder.bolehTayang(waktu(5, 12, 10), terakhirTayang = -1))
     }
 
-    @Test fun `menyala sebelum 12 10 tidak menayangkan apa-apa`() {
-        assertFalse(AbsenReminder.perluSusulan(waktu(5, 9, 0), terakhirTayang = -1))
+    /** Alarm yang tertunda doze beberapa menit, atau HP yang baru menyala
+     *  sesaat setelah jadwal, masih diingatkan. */
+    @Test fun `terlambat beberapa menit masih boleh tayang`() {
+        assertTrue(AbsenReminder.bolehTayang(waktu(5, 12, 24, 59), terakhirTayang = -1))
+    }
+
+    /** Regresi: pengingat pernah muncul pukul 16:07 saat aplikasi dibuka/diperbarui. */
+    @Test fun `sore hari tidak menayangkan pengingat`() {
+        assertFalse(AbsenReminder.bolehTayang(waktu(5, 16, 7), terakhirTayang = -1))
+    }
+
+    @Test fun `lewat jendela tayang tidak menayangkan apa-apa`() {
+        assertFalse(AbsenReminder.bolehTayang(waktu(5, 12, 25), terakhirTayang = -1))
+    }
+
+    @Test fun `sebelum 12 10 tidak menayangkan apa-apa`() {
+        assertFalse(AbsenReminder.bolehTayang(waktu(5, 9, 0), terakhirTayang = -1))
     }
 
     @Test fun `yang sudah tayang hari ini tidak diulang`() {
-        val sekarang = waktu(5, 14, 30)
-        assertFalse(AbsenReminder.perluSusulan(sekarang, terakhirTayang = hariEpoch(sekarang)))
+        val sekarang = waktu(5, 12, 12)
+        assertFalse(AbsenReminder.bolehTayang(sekarang, terakhirTayang = hariEpoch(sekarang)))
     }
 
-    /** Tayangan kemarin tidak boleh menahan susulan hari ini. */
-    @Test fun `catatan kemarin tidak menahan susulan hari ini`() {
-        val sekarang = waktu(5, 14, 30)
-        assertTrue(AbsenReminder.perluSusulan(sekarang, terakhirTayang = hariEpoch(sekarang) - 1))
+    /** Tayangan kemarin tidak boleh menahan tayangan hari ini. */
+    @Test fun `catatan kemarin tidak menahan tayangan hari ini`() {
+        val sekarang = waktu(5, 12, 12)
+        assertTrue(AbsenReminder.bolehTayang(sekarang, terakhirTayang = hariEpoch(sekarang) - 1))
     }
 
     @Test fun `jadwal berikutnya selalu di masa depan`() {
