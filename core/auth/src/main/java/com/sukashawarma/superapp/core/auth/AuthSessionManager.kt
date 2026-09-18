@@ -15,20 +15,44 @@ object AuthSessionManager {
      * oleh jalur refresh API biasa; hanya login biometrik yang memasukkannya ke
      * [SessionTokenHolder] setelah BiometricPrompt berhasil.
      */
-    suspend fun ensureAuthenticated(): Boolean {
-        if (isUsable(SessionTokenHolder.accessToken)) return true
-        return refresh()
+    suspend fun ensureAuthenticated(): Boolean = ensureAuthenticatedRinci() == HasilSesi.BERHASIL
+
+    /**
+     * Sama dengan [ensureAuthenticated], tetapi membedakan dua kegagalan yang selama ini
+     * terlihat identik.
+     *
+     * Bedanya menentukan nasib pengguna: token yang benar-benar ditolak server berarti
+     * harus login ulang dengan password, sedangkan tidak ada jaringan berarti tokennya
+     * mungkin masih sah dan sesi boleh dibuka dari snapshot lokal. Sebelum ini keduanya
+     * sama-sama berakhir di pesan "Sesi biometrik perlu diperbarui" — menyuruh crew di
+     * lokasi tanpa sinyal melakukan hal yang justru mustahil dilakukan tanpa sinyal.
+     */
+    suspend fun ensureAuthenticatedRinci(): HasilSesi {
+        if (isUsable(SessionTokenHolder.accessToken)) return HasilSesi.BERHASIL
+        return refreshRinci()
     }
 
-    suspend fun refresh(): Boolean = mutex.withLock {
-        if (isUsable(SessionTokenHolder.accessToken)) return@withLock true
+    enum class HasilSesi {
+        BERHASIL,
+
+        /** Server menjawab dan menolak: token dicabut, akun dinonaktifkan, dsb. */
+        DITOLAK,
+
+        /** Server tidak terjangkau. Belum tentu tokennya tidak sah. */
+        TIDAK_ADA_JARINGAN,
+    }
+
+    suspend fun refresh(): Boolean = refreshRinci() == HasilSesi.BERHASIL
+
+    suspend fun refreshRinci(): HasilSesi = mutex.withLock {
+        if (isUsable(SessionTokenHolder.accessToken)) return@withLock HasilSesi.BERHASIL
 
         // Hanya token sesi aktif di memory yang boleh dipakai di sini. Refresh
         // token terenkripsi di disk dimasukkan oleh login biometrik setelah
         // autentikasi perangkat berhasil. Ini mencegah service/background
         // request membuka sesi kembali setelah user logout.
         val refreshToken = SessionTokenHolder.refreshToken
-            ?: return@withLock false
+            ?: return@withLock HasilSesi.DITOLAK
 
         try {
             val res = authApi.refreshSession(payload = RefreshTokenPayload(refreshToken))
@@ -42,13 +66,17 @@ object AuthSessionManager {
                     AuthPrefs.getBiometricUserId(),
                     body.refresh_token,
                 )
-                true
+                HasilSesi.BERHASIL
+            } else if (res.code() >= 500) {
+                // Server sedang bermasalah, bukan tokennya. Memaksa login ulang di sini
+                // berarti seluruh outlet terkunci setiap kali Supabase batuk.
+                HasilSesi.TIDAK_ADA_JARINGAN
             } else {
-                false
+                HasilSesi.DITOLAK
             }
         } catch (e: Exception) {
             e.printStackTrace()
-            false
+            if (adalahGalatJaringan(e)) HasilSesi.TIDAK_ADA_JARINGAN else HasilSesi.DITOLAK
         }
     }
 
