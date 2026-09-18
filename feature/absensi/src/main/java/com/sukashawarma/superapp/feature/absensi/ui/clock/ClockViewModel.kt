@@ -9,8 +9,14 @@ import com.sukashawarma.superapp.data.local.AppDatabase
 import com.sukashawarma.superapp.data.local.entity.PendingAttendanceEntity
 import com.sukashawarma.superapp.data.location.LocationRepository
 import com.sukashawarma.superapp.data.remote.AbsensiWebApi
+import com.sukashawarma.superapp.data.remote.CacheOffline
 import com.sukashawarma.superapp.data.remote.NetworkMonitor
+import com.sukashawarma.superapp.data.remote.adalahGalatJaringan
+import com.sukashawarma.superapp.domain.face.FaceMatcherLokal
+import com.sukashawarma.superapp.domain.face.HasilCocok
+import com.sukashawarma.superapp.feature.absensi.offline.DescriptorWajahLokal
 import com.sukashawarma.superapp.data.remote.Postgrest
+import com.sukashawarma.superapp.data.remote.optDouble
 import com.sukashawarma.superapp.data.remote.optInt
 import com.sukashawarma.superapp.data.remote.optString
 import com.sukashawarma.superapp.core.storage.StorageUtil
@@ -29,7 +35,9 @@ import com.sukashawarma.superapp.feature.absensi.shift.isShiftPenutup
 import com.sukashawarma.superapp.feature.absensi.usecase.SubmitAttendanceUseCase
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -49,6 +57,7 @@ class ClockViewModel(
     application: Application,
     private val outletId: String,
     private val lockToStaffId: String?,
+    private val staffRole: String? = null,
     private val faceEmbeddingExtractor: FaceEmbeddingExtractor = UnavailableFaceEmbeddingExtractor(),
 ) : AndroidViewModel(application) {
 
@@ -98,7 +107,7 @@ class ClockViewModel(
     private fun loadShiftContext() {
         val staffId = lockToStaffId ?: return
         viewModelScope.launch {
-            val options = runCatching { AttendanceGates.loadShiftOptions(outletId) }
+            val options = runCatching { AttendanceGates.loadShiftOptions(outletId, staffRole) }
                 // Gagal dimuat (offline / RPC belum terpasang) → pakai yang terakhir diketahui.
                 // Server tetap menolak dengan `shift_required` bila outlet ternyata dua shift.
                 .getOrElse { _state.value.shiftOptions }
@@ -146,6 +155,7 @@ class ClockViewModel(
                 if (online) {
                     flushQueue()
                     refreshAttendance()
+                    sinkronkanDescriptorWajah()
                 }
             }
         }
@@ -191,7 +201,12 @@ class ClockViewModel(
         _state.value = _state.value.copy(phase = ClockPhase.LOCATING, result = null)
         viewModelScope.launch {
             val outlet = try {
-                Postgrest.selectOne("outlets", listOf("id" to "eq.$outletId", "select" to "lat,lng,is_active"))
+                // Lewat cache: koordinat outlet praktis tidak pernah berubah, dan tanpa ini
+                // layar absensi mentok di "Gagal memuat koordinat outlet" begitu sinyal mati —
+                // seluruh mode offline absensi tidak akan pernah terjangkau.
+                CacheOffline.bacaObjek("outlet:$outletId", scope = outletId) {
+                    Postgrest.selectOne("outlets", listOf("id" to "eq.$outletId", "select" to "lat,lng,is_active"))
+                }.data
             } catch (e: Exception) {
                 setResult(false, "Gagal memuat koordinat outlet", ClockPhase.LOCATION_INVALID)
                 return@launch
@@ -220,10 +235,12 @@ class ClockViewModel(
 
     private suspend fun loadGeofenceRadius(): Double {
         val outletConfig = runCatching {
-            Postgrest.selectOne(
-                "outlet_attendance_config",
-                listOf("outlet_id" to "eq.$outletId", "select" to "radius_m"),
-            )
+            CacheOffline.bacaObjek("attendance_config:$outletId", scope = outletId) {
+                Postgrest.selectOne(
+                    "outlet_attendance_config",
+                    listOf("outlet_id" to "eq.$outletId", "select" to "radius_m"),
+                )
+            }.data
         }.getOrNull()
         val outletRadius = outletConfig?.optInt("radius_m")?.toDouble()?.takeIf { it > 0 }
         if (outletRadius != null) return outletRadius
@@ -231,10 +248,12 @@ class ClockViewModel(
         // Fallback untuk outlet baru yang belum memiliki row exception. Pengaturan
         // pusat disimpan di global_settings dan berlaku ke seluruh outlet.
         val globalConfig = runCatching {
-            Postgrest.selectOne(
-                "global_settings",
-                listOf("key" to "eq.global_attendance_config", "select" to "value"),
-            )
+            CacheOffline.bacaObjek("global_attendance_config") {
+                Postgrest.selectOne(
+                    "global_settings",
+                    listOf("key" to "eq.global_attendance_config", "select" to "value"),
+                )
+            }.data
         }.getOrNull()?.get("value")?.takeIf { it.isJsonObject }?.asJsonObject
         return globalConfig?.optInt("radius_m")?.toDouble()?.takeIf { it > 0 }
             ?: GpsMath.GEOFENCE_RADIUS_M
@@ -311,27 +330,72 @@ class ClockViewModel(
                     return@launch
                 }
 
-                // Pencocokan 1:1 (device personal, lockToStaffId) atau 1:N (kiosk outlet) — server-side
-                // RPC (SECURITY DEFINER) bandingkan cosine similarity vs face_descriptor_mobile,
-                // TIDAK PERNAH kirim descriptor staff lain balik ke client (privasi biometrik).
-                val body = com.google.gson.JsonObject().apply {
-                    add("embedding", com.google.gson.JsonArray().apply { descriptor.forEach { add(it) } })
-                    addProperty("p_outlet_id", outletId)
-                    if (lockToStaffId != null) addProperty("p_lock_to_staff_id", lockToStaffId)
-                    else add("p_lock_to_staff_id", com.google.gson.JsonNull.INSTANCE)
-                }
-                val res = Postgrest.rpc("match_face_mobile", body).asJsonObject
-                val ok = res.get("ok")?.takeIf { !it.isJsonNull }?.asBoolean ?: false
-                if (!ok) {
+                val cocok = if (NetworkMonitor.isOnline.value) cocokkanDiServer(descriptor) else cocokkanDiPerangkat(descriptor)
+                if (cocok == null) {
                     showCameraGuidance("Wajah tidak dikenali. Pastikan Anda sudah terdaftar dan coba posisikan wajah lebih jelas di tengah kamera.")
                     return@launch
                 }
-
-                val staffId = res.optString("staff_id") ?: return@launch
-                proceedAfterIdentified(staffId, res.optString("name") ?: "")
+                proceedAfterIdentified(cocok.staffId, cocok.nama)
             } finally {
                 busy.set(false)
             }
+        }
+    }
+
+    /**
+     * Pencocokan 1:1 (device personal, lockToStaffId) atau 1:N (kiosk outlet) — server-side
+     * RPC (SECURITY DEFINER) bandingkan cosine similarity vs face_descriptor_mobile,
+     * TIDAK PERNAH kirim descriptor staff lain balik ke client (privasi biometrik).
+     *
+     * Ini tetap jalur utama. Selama ada sinyal, tidak ada pencocokan yang terjadi di HP.
+     */
+    private suspend fun cocokkanDiServer(descriptor: FloatArray): HasilCocok? {
+        val body = com.google.gson.JsonObject().apply {
+            add("embedding", com.google.gson.JsonArray().apply { descriptor.forEach { add(it) } })
+            addProperty("p_outlet_id", outletId)
+            if (lockToStaffId != null) addProperty("p_lock_to_staff_id", lockToStaffId)
+            else add("p_lock_to_staff_id", com.google.gson.JsonNull.INSTANCE)
+        }
+        val res = try {
+            Postgrest.rpc("match_face_mobile", body).asJsonObject
+        } catch (e: Exception) {
+            // Sinyal putus persis saat pencocokan. NetworkMonitor bisa saja belum sempat
+            // berubah, jadi jatuhkan ke perangkat alih-alih menolak wajah yang sah.
+            if (!adalahGalatJaringan(e)) throw e
+            return cocokkanDiPerangkat(descriptor)
+        }
+        val ok = res.get("ok")?.takeIf { !it.isJsonNull }?.asBoolean ?: false
+        if (!ok) return null
+        val staffId = res.optString("staff_id") ?: return null
+        return HasilCocok(staffId, res.optString("name") ?: "", res.optDouble("similarity") ?: 0.0)
+    }
+
+    /**
+     * Jalur darurat: cocokkan dengan descriptor outlet yang tersalin di perangkat.
+     *
+     * Ambang dan rumusnya sama persis dengan RPC server (lihat [FaceMatcherLokal]), jadi
+     * orang yang dikenali saat offline juga akan dikenali saat online.
+     */
+    private suspend fun cocokkanDiPerangkat(descriptor: FloatArray): HasilCocok? {
+        val kandidat = DescriptorWajahLokal.kandidat(getApplication(), outletId)
+        if (kandidat.isEmpty()) {
+            showCameraGuidance(
+                "Data wajah belum tersalin ke HP ini. Sambungkan ke internet sekali, " +
+                    "atau pakai tombol absen manual."
+            )
+            return null
+        }
+        return FaceMatcherLokal.cocokkan(descriptor, kandidat, lockToStaffId)
+    }
+
+    /**
+     * Menyalin descriptor wajah outlet ke perangkat selagi masih ada sinyal, supaya siap
+     * dipakai saat tidak ada. Dilewati sendiri kalau salinannya masih segar (24 jam).
+     */
+    private fun sinkronkanDescriptorWajah() {
+        viewModelScope.launch {
+            runCatching { DescriptorWajahLokal.sinkronkan(getApplication(), outletId) }
+                .onFailure { android.util.Log.e("ClockViewModel", "sinkron descriptor gagal", it) }
         }
     }
 
@@ -502,8 +566,7 @@ class ClockViewModel(
                 }
             }
             db.pendingAttendanceDao().insert(entity.copy(selfiePath = localPath))
-            setResult(true, if (s.action == "in") "Selamat bekerja! (Offline)" else "Hati-hati di jalan! (Offline)", ClockPhase.RESULT)
-            scheduleReset(2500)
+            selesaiBerhasil(s.action, if (s.action == "in") "Selamat bekerja! (Offline)" else "Hati-hati di jalan! (Offline)")
             return
         }
 
@@ -531,8 +594,7 @@ class ClockViewModel(
                 }
             }
             db.pendingAttendanceDao().insert(entity.copy(selfiePath = localPath))
-            setResult(true, if (s.action == "in") "Selamat bekerja! (Tersimpan offline)" else "Hati-hati di jalan! (Tersimpan offline)", ClockPhase.RESULT)
-            scheduleReset(2500)
+            selesaiBerhasil(s.action, if (s.action == "in") "Selamat bekerja! (Tersimpan offline)" else "Hati-hati di jalan! (Tersimpan offline)")
             return
         }
 
@@ -540,8 +602,7 @@ class ClockViewModel(
             refreshAttendance()
             // Status was returned in reason when OK in UseCase
             val status = res.reason
-            setResult(true, if (s.action == "in") "Selamat bekerja! ($status)" else "Hati-hati di jalan! ($status)", ClockPhase.RESULT)
-            scheduleReset(2500)
+            selesaiBerhasil(s.action, if (s.action == "in") "Selamat bekerja! ($status)" else "Hati-hati di jalan! ($status)")
         } else {
             if (res.reason == "shift_required") {
                 // Config outlet berubah jadi dua shift sejak layar dibuka → muat ulang & tanya.
@@ -634,7 +695,9 @@ class ClockViewModel(
                         }
                     }
 
-                    val res = SubmitAttendanceUseCase(currentItem)
+                    // Kiriman dari antrean: jam absennya adalah tsClientIso yang tersimpan
+                    // saat kejadian, bukan saat ini.
+                    val res = SubmitAttendanceUseCase(currentItem, dariAntrean = true)
                     if (res.ok) {
                         db.pendingAttendanceDao().delete(item.id)
                         if (localSelfie != null) {
@@ -684,6 +747,25 @@ class ClockViewModel(
 
     private fun setResult(ok: Boolean, message: String, phase: ClockPhase) {
         _state.value = _state.value.copy(result = ClockResult(ok, message), phase = phase)
+    }
+
+    /**
+     * Satu absen masuk yang berhasil dicatat — termasuk yang mendarat di antrean offline,
+     * karena bagi kru yang bersangkutan absennya memang sudah selesai.
+     *
+     * Dibuat sebagai peristiwa sekali-pakai, bukan bendera di [ClockUiState]: tujuannya
+     * mengantar kru ke checklist tepat sekali, sedangkan state ikut terbaca ulang tiap
+     * recomposition dan pemulihan proses — antaran itu akan terulang di saat yang salah.
+     */
+    private val _absenMasukBerhasil = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val absenMasukBerhasil: SharedFlow<Unit> = _absenMasukBerhasil
+
+    /** Menutup satu siklus absen yang berhasil: pesannya, hitung mundur reset, dan
+     *  — khusus absen masuk — peristiwa yang mengantar kru ke checklist. */
+    private fun selesaiBerhasil(aksi: String, pesan: String) {
+        setResult(true, pesan, ClockPhase.RESULT)
+        scheduleReset(2500)
+        if (aksi == "in") _absenMasukBerhasil.tryEmit(Unit)
     }
 
     /** Camera feedback stays non-blocking and clears itself after [GUIDANCE_READ_MS] — cukup
@@ -744,11 +826,12 @@ class ClockViewModelFactory(
     private val application: Application,
     private val outletId: String,
     private val lockToStaffId: String?,
+    private val staffRole: String? = null,
 ) : androidx.lifecycle.ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T =
         ClockViewModel(
-            application, outletId, lockToStaffId,
+            application, outletId, lockToStaffId, staffRole,
             faceEmbeddingExtractor = com.sukashawarma.superapp.domain.face.NcnnArcFaceEmbeddingExtractor(application),
         ) as T
 }
