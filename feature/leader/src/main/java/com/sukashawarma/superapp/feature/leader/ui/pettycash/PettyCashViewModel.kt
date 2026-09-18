@@ -121,10 +121,16 @@ class PettyCashViewModel : ViewModel() {
         }
     }
 
-    fun muatUlang() {
+    fun muatUlang(silent: Boolean = false) {
+        val sudahAdaData = _state.value.semua.isNotEmpty()
+        val senyap = silent || sudahAdaData
+        if (senyap && pemuatan?.isActive == true) return
+
         pemuatan?.cancel()
         pemuatan = viewModelScope.launch {
-            _state.value = _state.value.copy(memuat = true)
+            if (!senyap) {
+                _state.value = _state.value.copy(memuat = true)
+            }
             try {
                 // Tanpa penyaring outlet: RLS `petty_cash_topups` sudah membatasi
                 // barisnya ke cabang terakses, dan leader memang perlu melihat
@@ -135,10 +141,16 @@ class PettyCashViewModel : ViewModel() {
                 throw e
             } catch (e: Exception) {
                 android.util.Log.e("LeaderPettyCashViewModel", "muatUlang() gagal", e)
-                _state.value = _state.value.copy(
-                    memuat = false,
-                    galat = pesanGalatMuat(e, "daftar pengajuan"),
-                )
+                if (!senyap) {
+                    _state.value = _state.value.copy(
+                        memuat = false,
+                        galat = pesanGalatMuat(e, "daftar pengajuan"),
+                    )
+                }
+            } finally {
+                if (_state.value.memuat) {
+                    _state.value = _state.value.copy(memuat = false)
+                }
             }
         }
     }
@@ -151,21 +163,18 @@ class PettyCashViewModel : ViewModel() {
             _state.value = _state.value.copy(galat = pesan)
             return
         }
-        if (_state.value.mengirim) return
 
         viewModelScope.launch {
-            _state.value = _state.value.copy(mengirim = true)
+            _state.value = _state.value.copy(mengirim = true, galat = null)
             try {
                 PengajuanRepository.ajukan(form)
                 _state.value = _state.value.copy(
                     mengirim = false,
                     formTerbuka = false,
-                    // Nominal dan keperluan dikosongkan, rekening TIDAK: itu milik
-                    // cabang dan akan sama pada pengajuan berikutnya.
-                    form = form.copy(nominal = "", keperluan = ""),
-                    kabar = "Pengajuan top up terkirim ke Area Manager.",
+                    form = FormTopup(),
+                    kabar = "Pengajuan petty cash berhasil dikirim dan menunggu persetujuan AM.",
                 )
-                muatUlang()
+                muatUlang(silent = true)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -196,7 +205,7 @@ class PettyCashViewModel : ViewModel() {
                 _state.value = _state.value.copy(
                     kabar = "Dana diserahkan ke crew. Saldo petty cash outlet bertambah.",
                 )
-                muatUlang()
+                muatUlang(silent = true)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
