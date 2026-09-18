@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -82,10 +83,12 @@ fun MenuPesanPopup(
     emojiTerpilih: String?,
     bolehHapus: Boolean,
     bolehSunting: Boolean,
+    bolehInfo: Boolean = false,
     adaTeks: Boolean,
     onEmoji: (String) -> Unit,
     onSemuaEmoji: () -> Unit,
     onBalas: () -> Unit,
+    onInfo: () -> Unit = {},
     onSunting: () -> Unit,
     onSalin: () -> Unit,
     onHapus: () -> Unit,
@@ -149,7 +152,9 @@ fun MenuPesanPopup(
                         adaTeks = adaTeks,
                         bolehHapus = bolehHapus,
                         bolehSunting = bolehSunting,
+                        bolehInfo = bolehInfo,
                         onBalas = onBalas,
+                        onInfo = onInfo,
                         onSunting = onSunting,
                         onSalin = onSalin,
                         onHapus = onHapus,
@@ -210,7 +215,9 @@ private fun KartuAksi(
     adaTeks: Boolean,
     bolehHapus: Boolean,
     bolehSunting: Boolean,
+    bolehInfo: Boolean,
     onBalas: () -> Unit,
+    onInfo: () -> Unit,
     onSunting: () -> Unit,
     onSalin: () -> Unit,
     onHapus: () -> Unit,
@@ -222,6 +229,10 @@ private fun KartuAksi(
             .background(PutihKartu),
     ) {
         BarisAksi("Balas", Icons.AutoMirrored.Filled.Reply, TeksAksi, onBalas)
+        if (bolehInfo) {
+            Pemisah()
+            BarisAksi("Info", Icons.Outlined.Info, TeksAksi, onInfo)
+        }
         if (bolehSunting) {
             Pemisah()
             BarisAksi("Edit", Icons.Filled.Edit, TeksAksi, onSunting)
