@@ -8,10 +8,12 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.sukashawarma.superapp.R
 import com.sukashawarma.superapp.core.storage.StorageUtil
+import com.sukashawarma.superapp.data.local.AppDatabase
 import com.sukashawarma.superapp.data.local.entity.OutboxEntity
 import com.sukashawarma.superapp.data.remote.CacheOffline
 import com.sukashawarma.superapp.data.remote.NetworkMonitor
 import com.sukashawarma.superapp.data.remote.Outbox
+import com.sukashawarma.superapp.domain.session.AppSession
 import com.sukashawarma.superapp.notif.SuperappMessagingService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.drop
@@ -58,7 +60,28 @@ object ModeOffline {
             NetworkMonitor.isOnline
                 .drop(1)
                 .filter { it }
-                .collect { Outbox.flush() }
+                .collect {
+                    // Urutannya penting: antrean dikirim memakai token sesi, dan sesi yang
+                    // sedang berjalan dari snapshot belum punya token yang sah. Memulihkan
+                    // sesi lebih dulu membuat seluruh antrean tidak langsung kena 401.
+                    AppSession.pulihkanSesiSaatOnline()
+                    Outbox.flush()
+                }
+        }
+    }
+
+    /**
+     * Dipanggil saat logout. Cache dan descriptor wajah adalah data perusahaan yang kebetulan
+     * menumpang di perangkat, jadi ikut pergi bersama sesinya.
+     *
+     * [Outbox] SENGAJA tidak ikut dibersihkan: isinya kerja yang sudah dilakukan orang dan
+     * belum ada di mana pun selain perangkat ini. Menghapusnya saat logout berarti menghapus
+     * absen atau catatan waste seseorang hanya karena ia keluar dari akun.
+     */
+    fun bersihkanDataOffline(app: Context, lingkup: CoroutineScope) {
+        lingkup.launch {
+            CacheOffline.bersihkanSemua()
+            AppDatabase.get(app).faceDescriptorDao().hapusSemua()
         }
     }
 
