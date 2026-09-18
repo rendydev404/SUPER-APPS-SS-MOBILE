@@ -53,7 +53,14 @@ object Outbox {
     }
 
     @Volatile private var db: AppDatabase? = null
-    private val penangan = mutableMapOf<String, Penangan>()
+
+    /**
+     * ConcurrentHashMap, bukan mutableMapOf: pendaftaran terjadi di thread utama saat
+     * Application start, sedangkan pembacaan terjadi di coroutine flush. Dengan HashMap
+     * biasa, satu pendaftaran yang datang belakangan (mis. modul yang mendaftar sendiri
+     * saat layarnya pertama dibuka) bisa berbarengan dengan iterasi flush.
+     */
+    private val penangan = java.util.concurrent.ConcurrentHashMap<String, Penangan>()
     private val kunciFlush = Mutex()
 
     /**
@@ -66,6 +73,18 @@ object Outbox {
     /** Dipanggil saat sebuah aksi menyerah. Layer `app` memakainya untuk memunculkan notifikasi. */
     @Volatile
     var onGagalPermanen: ((OutboxEntity) -> Unit)? = null
+
+    /**
+     * Dipanggil setiap kali ada aksi baru masuk antrean. Layer `app` memakainya untuk
+     * menjadwalkan [OutboxWorker].
+     *
+     * Tanpa ini ada lubang yang tidak kentara: aksi yang diantrekan SESUDAH satu putaran
+     * flush selesai tidak punya pemicu apa pun sampai jaringan berpindah keadaan lagi.
+     * Di perangkat yang sejak awal online (mis. kiriman gagal sekali lalu diulang manual),
+     * "lagi" itu bisa berarti besok.
+     */
+    @Volatile
+    var onAntreBaru: (() -> Unit)? = null
 
     fun init(context: Context) {
         db = AppDatabase.get(context)
@@ -80,9 +99,10 @@ object Outbox {
      * ini — maka kegagalan di sini harus dilempar, bukan ditelan: lebih baik crew tahu
      * catatannya tidak tersimpan daripada mengira sudah.
      */
-    suspend fun antre(item: OutboxEntity) = withContext(Dispatchers.IO) {
+    suspend fun antre(item: OutboxEntity) {
         val dao = db?.outboxDao() ?: error("Outbox belum di-init")
-        dao.insert(item)
+        withContext(Dispatchers.IO) { dao.insert(item) }
+        onAntreBaru?.invoke()
     }
 
     fun jumlahMenunggu(): Flow<Int> =
@@ -141,11 +161,12 @@ object Outbox {
                 withContext(Dispatchers.IO) { dao.markFailedAttempt(item.id, e.message) }
                 if (item.attemptCount + 1 >= OutboxEntity.BATAS_PERCOBAAN) {
                     menyerah(item, e.message)
-                } else {
-                    // Sinyal putus lagi di tengah antrean — sisanya percuma dicoba sekarang.
-                    Log.i(TAG, "flush berhenti di '${item.jenis}': ${e.message}")
-                    return@withLock
                 }
+                // Sinyal putus di tengah antrean — sisanya percuma dicoba sekarang, dan
+                // memaksakannya justru menghabiskan jatah percobaan setiap aksi yang tersisa
+                // untuk kegagalan yang penyebabnya satu dan sama.
+                Log.i(TAG, "flush berhenti di '${item.jenis}': ${e.message}")
+                return@withLock
             }
         }
     }
