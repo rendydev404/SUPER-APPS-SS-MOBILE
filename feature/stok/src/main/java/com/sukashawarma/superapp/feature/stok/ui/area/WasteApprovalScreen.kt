@@ -51,7 +51,7 @@ fun WasteApprovalScreen(onBack: () -> Unit, vm: WasteApprovalViewModel = viewMod
     var photoPreview by remember { mutableStateOf<WasteReview?>(null) }
     Column(Modifier.fillMaxSize().background(Slate50)) {
         HeaderStok("Persetujuan Waste", "Kelola dan tinjau laporan waste dari outlet", onBack) {
-            IconButton(onClick = vm::refresh, enabled = !state.loading && !state.busy) { Icon(Icons.Default.Refresh, "Perbarui data", tint = Color.White) }
+            IconButton(onClick = vm::refresh, enabled = !state.loading && !state.busy) { Icon(Icons.Default.Refresh, "Perbarui data", tint = Color(0xFF1E293B)) }
         }
         state.message?.let { PitaPesan(it, false, vm::clearMessage) }
         state.error?.let { PitaPesan(it, true, vm::clearMessage) }
