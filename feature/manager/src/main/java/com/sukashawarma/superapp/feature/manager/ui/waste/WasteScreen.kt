@@ -42,8 +42,9 @@ import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DateRangePicker
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import com.sukashawarma.superapp.core.ui.SukaDropdownHeader
+import com.sukashawarma.superapp.core.ui.SukaDropdownMenu
+import com.sukashawarma.superapp.core.ui.SukaDropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -131,7 +132,7 @@ fun WasteScreen(
     val state by viewModel.state.collectAsState()
     val snackbar = remember { SnackbarHostState() }
 
-    RealtimeRefresh(RealtimeTables.WASTE_REPORTS) { viewModel.muatUlang() }
+    RealtimeRefresh(RealtimeTables.WASTE_REPORTS) { viewModel.muatUlang(silent = true) }
 
     LaunchedEffect(state.kabar, state.galat) {
         val pesan = state.kabar ?: state.galat
@@ -214,9 +215,6 @@ private fun PanelKepala(state: WasteUiState, viewModel: WasteViewModel) {
                     fontWeight = FontWeight.Bold,
                 )
             }
-            if (state.memuat) {
-                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = SukaOrange)
-            }
         }
         Spacer(Modifier.height(10.dp))
         Surface(
@@ -267,20 +265,17 @@ private fun PanelKepala(state: WasteUiState, viewModel: WasteViewModel) {
                     Icon(Icons.Default.ArrowDropDown, null, tint = SukaBrown)
                 }
             }
-            DropdownMenu(expanded = menuOutlet, onDismissRequest = { menuOutlet = false }) {
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            if (seluruhOutlet) "Semua outlet aktif" else "Semua outlet binaan saya",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    },
+            SukaDropdownMenu(expanded = menuOutlet, onDismissRequest = { menuOutlet = false }) {
+                SukaDropdownHeader(title = "PILIH OUTLET", onClose = { menuOutlet = false })
+                SukaDropdownMenuItem(
+                    text = if (seluruhOutlet) "Semua outlet aktif" else "Semua outlet binaan saya",
+                    selected = (state.outletTerpilih == null),
                     onClick = { viewModel.pilihOutlet(null); menuOutlet = false },
                 )
                 state.daftarOutlet.forEach { outlet ->
-                    DropdownMenuItem(
-                        text = { Text(outlet.nama, fontSize = 12.sp, fontWeight = FontWeight.Bold) },
+                    SukaDropdownMenuItem(
+                        text = outlet.nama,
+                        selected = (state.outletTerpilih == outlet.id),
                         onClick = { viewModel.pilihOutlet(outlet.id); menuOutlet = false },
                     )
                 }
@@ -953,10 +948,12 @@ private fun PanelPenyaringRiwayat(state: WasteUiState, viewModel: WasteViewModel
                     Icon(Icons.Default.ArrowDropDown, null, tint = SukaBrown)
                 }
             }
-            DropdownMenu(expanded = menuStatus, onDismissRequest = { menuStatus = false }) {
+            SukaDropdownMenu(expanded = menuStatus, onDismissRequest = { menuStatus = false }) {
+                SukaDropdownHeader(title = "STATUS WASTE", onClose = { menuStatus = false })
                 listOf(null, StatusWaste.DISETUJUI, StatusWaste.DITOLAK).forEach { status ->
-                    DropdownMenuItem(
-                        text = { Text(labelStatus(status), fontSize = 12.sp, fontWeight = FontWeight.Bold) },
+                    SukaDropdownMenuItem(
+                        text = labelStatus(status),
+                        selected = (state.filterStatus == status),
                         onClick = { viewModel.pilihStatus(status); menuStatus = false },
                     )
                 }
