@@ -155,6 +155,19 @@ class HomeViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Muat ulang angka absensi & sorotan modul untuk sesi yang sedang aktif.
+     *
+     * Dipanggil dari langganan realtime Beranda. Sengaja membaca [AppSession]
+     * langsung, bukan menerima staff sebagai argumen: pemanggilnya adalah layar,
+     * yang tidak punya urusan tahu siapa pemilik sesi.
+     */
+    fun segarkanSorotan() {
+        val staff = AppSession.staff.value
+        loadTodayAttendance(staff?.id)
+        muatSorotan(staff)
+    }
+
     private fun muatSorotan(staff: StaffProfile?) {
         val role = staff?.role
         val outletId = staff?.outletId
