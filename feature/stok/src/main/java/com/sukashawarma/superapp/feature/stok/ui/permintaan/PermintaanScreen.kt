@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -249,20 +250,30 @@ private fun LayarUtama(state: PermintaanUiState, viewModel: PermintaanViewModel)
             state.memuat && state.outlets.isEmpty() -> MemuatPenuh()
             state.error != null && state.katalog.isEmpty() && state.daftarReview.isEmpty() ->
                 KeadaanGagal(state.error, viewModel::muatAwal)
-            state.modeAntrean -> AntreanPersetujuan(state, viewModel)
             else -> {
                 if (state.outlets.size > 1) {
                     PemilihOutlet(state.outlets, state.outletTerpilih, viewModel::pilihOutlet)
+                }
+                // Antrean hanya tab tambahan: Buat Baru dan Riwayat tetap ada untuk
+                // semua peran, termasuk leader/SPV yang memegang outletnya sendiri.
+                val tabs = TabPermintaan.entries.filter {
+                    it != TabPermintaan.ANTREAN || state.bolehAntrean
                 }
                 Row(
                     Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    TabPermintaan.entries.forEach { t ->
+                    tabs.forEach { t ->
+                        val jumlah = if (t == TabPermintaan.ANTREAN) state.daftarReview.size else 0
                         FilterChip(
                             selected = state.tab == t,
                             onClick = { viewModel.pilihTab(t) },
-                            label = { Text(t.label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold) },
+                            label = {
+                                Text(
+                                    if (jumlah > 0) "${t.label} ($jumlah)" else t.label,
+                                    fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                                )
+                            },
                             shape = RoundedCornerShape(50),
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = Color(0xFFFFEDD5),
@@ -274,6 +285,7 @@ private fun LayarUtama(state: PermintaanUiState, viewModel: PermintaanViewModel)
                 when (state.tab) {
                     TabPermintaan.BUAT -> KontenKatalog(state, viewModel)
                     TabPermintaan.RIWAYAT -> KontenRiwayat(state, viewModel)
+                    TabPermintaan.ANTREAN -> AntreanPersetujuan(state, viewModel)
                 }
             }
         }
@@ -365,7 +377,7 @@ private fun KontenKatalog(state: PermintaanUiState, viewModel: PermintaanViewMod
                     ChipKategori(
                         label = "Semua (${state.katalogBoleh.count { it.id !in pending }})",
                         aktif = state.kategoriTerpilih == "all",
-                        warnaAktif = Color(0xFF3E2A20),
+                        warnaAktif = Color(0xFF0F172A),
                     ) { viewModel.pilihKategori("all") }
                     if (saranBoleh.isNotEmpty()) {
                         ChipKategori(
@@ -378,7 +390,7 @@ private fun KontenKatalog(state: PermintaanUiState, viewModel: PermintaanViewMod
                         ChipKategori(
                             label = kat,
                             aktif = state.kategoriTerpilih == kat,
-                            warnaAktif = Color(0xFF3E2A20),
+                            warnaAktif = Color(0xFF0F172A),
                         ) { viewModel.pilihKategori(kat) }
                     }
                 }
@@ -660,13 +672,13 @@ private fun StepperQty(
 
 @Composable
 private fun BarKeranjang(jumlahItem: Int, estimasi: Double, onBuka: () -> Unit) {
-    Surface(color = Color(0xFF3E2A20), shadowElevation = 10.dp) {
+    Surface(color = Color(0xFF0F172A), shadowElevation = 8.dp) {
         Row(
             Modifier
                 .fillMaxWidth()
                 .clickable(onClick = onBuka)
                 .navigationBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 13.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
@@ -679,7 +691,7 @@ private fun BarKeranjang(jumlahItem: Int, estimasi: Double, onBuka: () -> Unit) 
             Column(Modifier.weight(1f)) {
                 Text(
                     "$jumlahItem BAHAN DI KERANJANG",
-                    color = Color(0xFFFFEDD5), fontSize = 9.sp,
+                    color = Color(0xFF94A3B8), fontSize = 9.sp,
                     fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
                 )
                 Text(
@@ -687,7 +699,7 @@ private fun BarKeranjang(jumlahItem: Int, estimasi: Double, onBuka: () -> Unit) 
                     color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold,
                 )
             }
-            Surface(shape = RoundedCornerShape(11.dp), color = Color.White.copy(alpha = 0.15f)) {
+            Surface(shape = RoundedCornerShape(11.dp), color = Oranye) {
                 Text(
                     "Tinjau →",
                     Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
@@ -879,7 +891,7 @@ private fun KontenRiwayat(state: PermintaanUiState, viewModel: PermintaanViewMod
                 ChipKategori(
                     label = "Semua (${state.daftarOutlet.size})",
                     aktif = state.filterStatus == null,
-                    warnaAktif = Color(0xFF3E2A20),
+                    warnaAktif = Color(0xFF0F172A),
                 ) { viewModel.pilihFilterStatus(null) }
                 StatusPermintaan.entries.forEach { st ->
                     val jumlah = state.daftarOutlet.count { it.status == st }
@@ -1042,8 +1054,74 @@ private fun AntreanPersetujuan(state: PermintaanUiState, viewModel: PermintaanVi
                     bahanMap = state.bahanMap,
                     budget = state.budgetPerOutlet[p.outletId],
                     estimasi = state.estimasiPerPermintaan[p.id] ?: 0.0,
+                    returMenunggu = state.returPerOutlet[p.outletId] ?: 0,
                     onBuka = { viewModel.bukaApprove(p) },
                 )
+            }
+        }
+    }
+}
+
+/**
+ * Penggantian retur yang bisa menumpang pengiriman ini — cermin banner ungu di
+ * `ApprovalModal.tsx`.
+ *
+ * Yang dicentang akan diterbitkan Surat Jalan Penggantinya (Rp 0) bersamaan dengan
+ * persetujuan permintaan, sehingga satu rute kurir mengantar dua dokumen sekaligus.
+ */
+@Composable
+private fun PanelPenggantiRetur(state: PermintaanUiState, viewModel: PermintaanViewModel) {
+    Surface(
+        Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        color = Color(0xFFF5F3FF),
+        border = BorderStroke(1.dp, Color(0xFFDDD6FE)),
+    ) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                "Ada ${state.returMenunggu.size} Penggantian Retur untuk Outlet Ini",
+                color = Color(0xFF6B21A8), fontSize = 12.sp, fontWeight = FontWeight.Black,
+            )
+            Text(
+                "Fisik retur sudah ditimbang di Kitchen. Centang untuk otomatis menerbitkan " +
+                    "Surat Jalan Pengganti (Rp 0) bersamaan dengan pengiriman ini.",
+                color = Color(0xFF6B21A8).copy(alpha = 0.85f), fontSize = 10.sp, lineHeight = 14.sp,
+            )
+            state.returMenunggu.forEach { retur ->
+                val ikut = retur.id in state.returDisertakan
+                Surface(
+                    onClick = { viewModel.ubahReturDisertakan(retur.id, !ikut) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color.White,
+                    border = BorderStroke(
+                        if (ikut) 2.dp else 1.dp,
+                        if (ikut) Color(0xFF7C3AED) else Color(0xFFE9D5FF),
+                    ),
+                ) {
+                    Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = ikut,
+                            onCheckedChange = { viewModel.ubahReturDisertakan(retur.id, it) },
+                        )
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                retur.nomorRetur,
+                                color = Color(0xFF6B21A8), fontSize = 11.sp, fontWeight = FontWeight.Black,
+                            )
+                            Text(
+                                retur.items.joinToString(", ") { item ->
+                                    val qty = item.qtyDiterimaKitchen ?: item.qtyKlaim
+                                    "${item.namaBahan ?: "Bahan"}: ${formatAngkaStok(qty)} ${formatSatuan(item.satuan)}".trim()
+                                },
+                                color = SukaOnSurface, fontSize = 11.sp, lineHeight = 15.sp,
+                            )
+                            retur.catatanKitchen?.takeIf { it.isNotBlank() }?.let {
+                                Text("\"$it\"", color = SukaOnSurfaceVariant, fontSize = 10.sp)
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -1055,6 +1133,7 @@ private fun KartuAntrean(
     bahanMap: Map<String, BahanBaku>,
     budget: BudgetStatus?,
     estimasi: Double,
+    returMenunggu: Int,
     onBuka: () -> Unit,
 ) {
     Surface(
@@ -1107,6 +1186,23 @@ private fun KartuAntrean(
                         "Potensi Omzet: ${formatRp(p.omzetTarget)}",
                         Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
                         color = Hijau, fontSize = 9.sp, fontWeight = FontWeight.Black,
+                    )
+                }
+            }
+            // Penyetuju perlu tahu SEBELUM membuka kartu bahwa outlet ini punya
+            // penggantian retur yang bisa menumpang — itu yang menentukan apakah
+            // permintaan ini layak disetujui sekarang atau menunggu digabung.
+            if (returMenunggu > 0) {
+                Spacer(Modifier.height(5.dp))
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = Color(0xFFF5F3FF),
+                    border = BorderStroke(1.dp, Color(0xFFDDD6FE)),
+                ) {
+                    Text(
+                        "Ada $returMenunggu Pengganti Retur",
+                        Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                        color = Color(0xFF6B21A8), fontSize = 9.sp, fontWeight = FontWeight.Black,
                     )
                 }
             }
@@ -1174,7 +1270,7 @@ private fun LayarPersetujuan(
                         Column(Modifier.padding(12.dp)) {
                             Text(
                                 "TARGET PENJUALAN",
-                                color = Color(0xFF701604), fontSize = 10.sp,
+                                color = Color(0xFF0F172A), fontSize = 10.sp,
                                 fontWeight = FontWeight.Black, letterSpacing = 0.5.sp,
                             )
                             Spacer(Modifier.height(5.dp))
@@ -1196,6 +1292,10 @@ private fun LayarPersetujuan(
                         }
                     }
                 }
+            }
+
+            if (state.returMenunggu.isNotEmpty()) {
+                item(key = "retur-menunggu") { PanelPenggantiRetur(state, viewModel) }
             }
 
             items(p.items, key = { it.bahanBakuId }) { item ->
@@ -1225,7 +1325,7 @@ private fun LayarPersetujuan(
                         }
                         Text(
                             "Diminta: ${qtyTersimpanTeks(item.qtyDiminta, bahan, item.satuan)}",
-                            color = Color(0xFF701604), fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                            color = Color(0xFFEA580C), fontSize = 11.sp, fontWeight = FontWeight.Bold,
                         )
                         val ccOutlet = state.stokOutlet[item.bahanBakuId]
                         val ccGudang = state.stokGudang[item.bahanBakuId]
@@ -1298,7 +1398,7 @@ private fun LayarPersetujuan(
                             }
                             Text(
                                 formatRp(totalNilai),
-                                color = Color(0xFF701604), fontSize = 13.sp, fontWeight = FontWeight.Black,
+                                color = Color(0xFF0F172A), fontSize = 13.sp, fontWeight = FontWeight.Black,
                             )
                         }
                     }
