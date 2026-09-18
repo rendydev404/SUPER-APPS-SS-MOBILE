@@ -66,6 +66,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import com.sukashawarma.superapp.core.ui.RealtimeRefresh
+import com.sukashawarma.superapp.core.ui.RealtimeTables
 
 private val ORANGE = Color(0xFFEA580C)
 private val ORANGE_SOFT = Color(0xFFFFF7ED)
@@ -173,6 +175,12 @@ fun PlafonBelanjaScreen(
 ) {
     val state by viewModel.state.collectAsState()
 
+    // Angka terpakai & sisa dihitung dari permintaan bahan pada periode berjalan
+    // (lihat `get_outlet_budget_status_scoped`), jadi setiap permintaan baru
+    // menggesernya. Perubahan plafon dan topup belum bisa diikuti — tabelnya
+    // belum masuk publication realtime.
+    RealtimeRefresh(RealtimeTables.PERMINTAAN) { viewModel.muatUlang() }
+
     Column(Modifier.fillMaxSize().background(Color(0xFFF8FAFC))) {
         HeaderStok(
             judul = "Plafon & Belanja Outlet",
@@ -184,7 +192,7 @@ fun PlafonBelanjaScreen(
             onKembali = onBack,
             aksi = {
                 IconButton(onClick = viewModel::muatUlang) {
-                    Icon(Icons.Default.Refresh, "Muat ulang", tint = Color.White)
+                    Icon(Icons.Default.Refresh, "Muat ulang", tint = Color(0xFF1E293B))
                 }
             },
         )
