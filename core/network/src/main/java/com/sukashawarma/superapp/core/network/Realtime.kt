@@ -70,6 +70,17 @@ object Realtime {
     private val lock = Any()
     private val wanted = mutableMapOf<String, Int>()
     private val joined = mutableSetOf<String>()
+    /**
+     * Server menolak dengan 429 (batas laju sambungan Realtime Supabase).
+     *
+     * Ditandai supaya percobaan berikutnya menunggu lama, bukan ikut menambah
+     * ketukan pada pintu yang sedang menghitung ketukan. Tanpa ini, socket yang
+     * ditolak akan dicoba lagi sedetik kemudian — dan penolakannya jadi awet
+     * sendiri: realtime mati total, termasuk sinyal typing.
+     */
+    @Volatile
+    private var kenaBatasLaju = false
+
     private var live: WebSocket? = null
     private var generation = 0
     private var pump: Job? = null
@@ -170,7 +181,16 @@ object Realtime {
                 val opened = runConnection()
                 if (synchronized(lock) { wanted.isEmpty() }) break
                 backoff = if (opened) 0 else backoff + 1
-                delay(minOf(30_000L, 1_000L * (backoff + 1)))
+                // Naik berlipat, bukan linier, dan diberi sedikit acak supaya
+                // beberapa perangkat yang putus bersamaan tidak kembali
+                // mengetuk pada detik yang sama.
+                val dasar = if (kenaBatasLaju) {
+                    kenaBatasLaju = false
+                    60_000L
+                } else {
+                    minOf(60_000L, 1_000L shl minOf(backoff, 6))
+                }
+                delay(dasar + (0..1_500).random())
             }
         }
     }
@@ -199,9 +219,19 @@ object Realtime {
                 override fun onMessage(webSocket: WebSocket, text: String) {
                     val data = try { JsonParser.parseString(text).asJsonObject } catch (_: Exception) { return }
                     when (data.get("event")?.asString) {
-                        "postgres_changes" -> events.tryEmit(
-                            data.getAsJsonObject("payload")?.getAsJsonObject("data")?.get("table")?.asString ?: ANY
-                        )
+                        "postgres_changes" -> {
+                            val topic = data.get("topic")?.asString
+                            val tableFromTopic = when {
+                                topic == null -> null
+                                topic.startsWith("realtime:native-bc-") -> null
+                                topic.startsWith("realtime:native-") -> topic.removePrefix("realtime:native-")
+                                else -> null
+                            }
+                            val tableFromPayload = data.getAsJsonObject("payload")?.getAsJsonObject("data")?.get("table")?.asString
+                                ?: data.getAsJsonObject("payload")?.get("table")?.asString
+                            val table = tableFromTopic ?: tableFromPayload ?: ANY
+                            events.tryEmit(table)
+                        }
                         "broadcast" -> {
                             // topic "realtime:native-bc-<nama>" -> kunci "bc:<nama>"
                             val nama = data.get("topic")?.asString?.removePrefix("realtime:native-bc-")
@@ -210,11 +240,56 @@ object Realtime {
                                 broadcastEvents.tryEmit(BC_PREFIX + nama to payload)
                             }
                         }
-                        "phx_error", "phx_close" -> close(mine, webSocket)
+                        "phx_error", "phx_close" -> {
+                            // Kunci internal dipulihkan dari topic dengan aturan
+                            // yang SAMA seperti cabang "broadcast" di atas:
+                            // "realtime:native-bc-<nama>" -> "bc:<nama>".
+                            //
+                            // Sebelumnya awalannya disusun ulang dengan menempel
+                            // BC_PREFIX ke nama yang sudah membawa "bc-", jadi
+                            // kuncinya menjadi "bc:bc-<nama>" — tidak pernah cocok
+                            // dengan apa pun. Akibatnya channel broadcast tidak
+                            // pernah di-join ulang setelah error, sementara
+                            // namanya tetap tertinggal di `joined`; `sendBroadcast`
+                            // lalu merasa channel-nya hidup dan membuang sinyal
+                            // typing ke channel yang sudah mati, tanpa satu pun
+                            // gejala di layar.
+                            val topic = data.get("topic")?.asString
+                            val kunci = when {
+                                topic == null -> null
+                                topic.startsWith("realtime:native-bc-") ->
+                                    BC_PREFIX + topic.removePrefix("realtime:native-bc-")
+                                topic.startsWith("realtime:native-") ->
+                                    topic.removePrefix("realtime:native-")
+                                else -> null
+                            }
+                            when {
+                                // Hanya kegagalan pada socket itu sendiri yang
+                                // menjatuhkan sambungan.
+                                topic == null || topic == "phoenix" -> close(mine, webSocket)
+
+                                kunci != null -> synchronized(lock) {
+                                    // Dilepas lebih dulu, apa pun hasilnya: channel
+                                    // yang ditutup server tidak boleh dianggap hidup.
+                                    joined.remove(kunci)
+                                    if (kunci in wanted) join(kunci, webSocket)
+                                }
+
+                                // Topik asing — misalnya balasan atas frame
+                                // `access_token` yang dikirim ke "realtime:any",
+                                // yang memang tidak pernah di-join. Menutup socket
+                                // karenanya akan memutus seluruh realtime setiap
+                                // satu denyut jantung.
+                                else -> Unit
+                            }
+                        }
                     }
                 }
 
-                override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) = close(mine, webSocket)
+                override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                    if (response?.code == 429) kenaBatasLaju = true
+                    close(mine, webSocket)
+                }
                 override fun onClosed(webSocket: WebSocket, code: Int, reason: String) = close(mine, webSocket)
             },
         )
@@ -223,10 +298,12 @@ object Realtime {
                 delay(HEARTBEAT_MS)
                 val current = synchronized(lock) { if (generation != mine) null else live } ?: break
                 current.send(frame("heartbeat", JsonObject(), "phoenix"))
-                // Token berumur pendek; channel yang tidak diperbarui ditolak diam-diam
-                // oleh server begitu token kedaluwarsa.
-                synchronized(lock) { joined.toList() }.forEach { table ->
-                    current.send(frame("access_token", tokenPayload(), topic(table)))
+                val token = SessionTokenHolder.accessToken
+                if (!token.isNullOrBlank()) {
+                    current.send(frame("access_token", tokenPayload(), "realtime:any"))
+                    synchronized(lock) { joined.toList() }.forEach { table ->
+                        current.send(frame("access_token", tokenPayload(), topic(table)))
+                    }
                 }
             }
         } finally {
@@ -259,7 +336,10 @@ object Realtime {
         }
         val payload = JsonObject().apply {
             add("config", JsonParser.parseString(config))
-            addProperty("access_token", SessionTokenHolder.accessToken)
+            val token = SessionTokenHolder.accessToken
+            if (!token.isNullOrBlank()) {
+                addProperty("access_token", token)
+            }
         }
         socket.send(frame("phx_join", payload, topic(table)))
     }
@@ -277,7 +357,12 @@ object Realtime {
         if (table.startsWith(BC_PREFIX)) "realtime:native-bc-${table.removePrefix(BC_PREFIX)}"
         else "realtime:native-$table"
 
-    private fun tokenPayload() = JsonObject().apply { addProperty("access_token", SessionTokenHolder.accessToken) }
+    private fun tokenPayload() = JsonObject().apply {
+        val token = SessionTokenHolder.accessToken
+        if (!token.isNullOrBlank()) {
+            addProperty("access_token", token)
+        }
+    }
 
     private fun frame(event: String, payload: JsonObject, topic: String) = JsonObject().apply {
         addProperty("topic", topic)
