@@ -22,6 +22,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /** Foto yang sedang dibuka besar. */
@@ -85,6 +86,14 @@ class SidakViewModel : ViewModel() {
 
     private var pemuatan: Job? = null
 
+    /**
+     * Menandai isian yang belum dikirim ke server. Selama ini menyala, pemuatan
+     * ulang senyap (mis. dari event realtime) tidak boleh menimpa keputusan dan
+     * catatan yang sedang diketik manager.
+     */
+    @Volatile
+    private var adaSuntinganBelumDisimpan = false
+
     init {
         muatUlang()
     }
@@ -95,27 +104,39 @@ class SidakViewModel : ViewModel() {
         // belum tentu ada di outlet ini, dan daftar kosong terbaca seperti galat.
         // Keputusan juga disemai ulang dari hasil outlet BARU — membawa keputusan
         // outlet sebelumnya adalah cara tercepat menyidak cabang yang salah.
-        _state.value = _state.value.copy(
-            outletTerpilih = outletId,
-            section = null,
-            keputusan = emptyMap(),
-            catatan = "",
-        ).let { it.copy(keputusan = keputusanAwal(it.hasil), catatan = it.hasil?.catatan.orEmpty()) }
+        adaSuntinganBelumDisimpan = false
+        _state.update {
+            val pindah = it.copy(
+                outletTerpilih = outletId,
+                section = null,
+                keputusan = emptyMap(),
+                catatan = "",
+            )
+            pindah.copy(
+                keputusan = keputusanAwal(pindah.hasil),
+                catatan = pindah.hasil?.catatan.orEmpty(),
+            )
+        }
     }
 
     fun pilihKeputusan(itemId: String, keputusan: KeputusanSidak) {
-        val sekarang = _state.value.keputusan
-        // Menekan tombol yang sudah aktif membatalkannya, seperti `setCheck` di web.
-        val berikutnya = if (sekarang[itemId] == keputusan) sekarang - itemId else sekarang + (itemId to keputusan)
-        _state.value = _state.value.copy(keputusan = berikutnya)
+        adaSuntinganBelumDisimpan = true
+        _state.update {
+            val sekarang = it.keputusan
+            // Menekan tombol yang sudah aktif membatalkannya, seperti `setCheck` di web.
+            val berikutnya =
+                if (sekarang[itemId] == keputusan) sekarang - itemId else sekarang + (itemId to keputusan)
+            it.copy(keputusan = berikutnya)
+        }
     }
 
     fun ubahCatatan(teks: String) {
-        _state.value = _state.value.copy(catatan = teks)
+        adaSuntinganBelumDisimpan = true
+        _state.update { it.copy(catatan = teks) }
     }
 
     fun tutupKabar() {
-        _state.value = _state.value.copy(kabar = null, galat = null)
+        _state.update { it.copy(kabar = null, galat = null) }
     }
 
     fun simpan() {
@@ -123,24 +144,32 @@ class SidakViewModel : ViewModel() {
         val laporan = awal.laporan ?: return
         val halangan = awal.halangan
         if (halangan != null || !awal.bolehMenyimpan) {
-            _state.value = awal.copy(
-                galat = halangan ?: "Peran Anda tidak berwenang menyimpan hasil sidak.",
-            )
+            _state.update {
+                it.copy(galat = halangan ?: "Peran Anda tidak berwenang menyimpan hasil sidak.")
+            }
             return
         }
-        if (awal.menyimpan) return
+        // Kunci dipasang sebelum coroutine dimulai supaya ketukan ganda yang cepat
+        // tidak sempat mengirim dua kali hasil sidak yang sama.
+        var lolos = false
+        _state.update {
+            lolos = !it.menyimpan
+            if (lolos) it.copy(menyimpan = true, galat = null) else it
+        }
+        if (!lolos) return
 
         viewModelScope.launch {
-            _state.value = _state.value.copy(menyimpan = true, galat = null)
             try {
                 SidakRepository.simpanSidak(laporan.id, awal.catatan, awal.keputusan)
-                _state.value = _state.value.copy(menyimpan = false, kabar = "Hasil sidak tersimpan.")
+                adaSuntinganBelumDisimpan = false
+                _state.update { it.copy(menyimpan = false, kabar = "Hasil sidak tersimpan.") }
                 muatUlang()
             } catch (e: CancellationException) {
+                _state.update { it.copy(menyimpan = false) }
                 throw e
             } catch (e: Exception) {
                 android.util.Log.e("SidakViewModel", "simpan() gagal", e)
-                _state.value = _state.value.copy(menyimpan = false, galat = pesanSimpanGagal(e))
+                _state.update { it.copy(menyimpan = false, galat = pesanSimpanGagal(e)) }
             }
         }
     }
@@ -170,63 +199,75 @@ class SidakViewModel : ViewModel() {
     }
 
     fun ubahPencarian(teks: String) {
-        _state.value = _state.value.copy(pencarian = teks)
+        _state.update { it.copy(pencarian = teks) }
     }
 
     fun pilihSection(section: String?) {
-        _state.value = _state.value.copy(section = section)
+        _state.update { it.copy(section = section) }
     }
 
     fun bukaFoto(item: ItemSidak) {
         val namaOutlet = _state.value.namaOutlet(_state.value.outletTerpilih)
         if (item.fotoPath.isBlank()) {
-            _state.value = _state.value.copy(
-                foto = FotoSidak(null, item.nama, namaOutlet, memuat = false),
-            )
+            _state.update { it.copy(foto = FotoSidak(null, item.nama, namaOutlet, memuat = false)) }
             return
         }
-        _state.value = _state.value.copy(
-            foto = FotoSidak(null, item.nama, namaOutlet, memuat = true),
-        )
+        _state.update { it.copy(foto = FotoSidak(null, item.nama, namaOutlet, memuat = true)) }
         viewModelScope.launch {
             val url = SidakRepository.urlFoto(item.fotoPath)
             // Pengguna bisa saja sudah menutup dialog sementara tanda tangan diminta;
             // jangan menghidupkannya kembali.
-            if (_state.value.foto?.namaItem != item.nama) return@launch
-            _state.value = _state.value.copy(
-                foto = FotoSidak(url, item.nama, namaOutlet, memuat = false),
-            )
+            _state.update {
+                if (it.foto?.namaItem != item.nama) it
+                else it.copy(foto = FotoSidak(url, item.nama, namaOutlet, memuat = false))
+            }
         }
     }
 
     fun tutupFoto() {
-        _state.value = _state.value.copy(foto = null)
+        _state.update { it.copy(foto = null) }
     }
 
-    fun muatUlang() {
+    fun muatUlang(silent: Boolean = false) {
+        val sudahAdaData = _state.value.data != null
+        val senyap = silent || sudahAdaData
         pemuatan?.cancel()
         pemuatan = viewModelScope.launch {
-            _state.value = _state.value.copy(memuat = true, galat = null)
+            if (!senyap) {
+                _state.update { it.copy(memuat = true, galat = null) }
+            }
             try {
                 val data = SidakRepository.muat()
-                val setelahMuat = _state.value.copy(
-                    memuat = false,
-                    galat = null,
-                    data = data,
-                    role = AppSession.staff.value?.role,
-                    // Outlet pertama dipilih otomatis supaya layar tidak terbuka kosong,
-                    // tapi pilihan pengguna yang sudah ada tidak ditimpa.
-                    outletTerpilih = _state.value.outletTerpilih ?: data.outlets.firstOrNull()?.id,
-                )
-                _state.value = setelahMuat.copy(
-                    keputusan = keputusanAwal(setelahMuat.hasil),
-                    catatan = setelahMuat.hasil?.catatan.orEmpty(),
-                )
+                _state.update { lama ->
+                    val setelahMuat = lama.copy(
+                        memuat = false,
+                        galat = null,
+                        data = data,
+                        role = AppSession.staff.value?.role,
+                        // Outlet pertama dipilih otomatis supaya layar tidak terbuka kosong,
+                        // tapi pilihan pengguna yang sudah ada tidak ditimpa.
+                        outletTerpilih = lama.outletTerpilih ?: data.outlets.firstOrNull()?.id,
+                    )
+                    // Isian yang belum disimpan dipertahankan: menimpanya dengan data
+                    // server akan menghapus penilaian yang sedang dikerjakan manager.
+                    if (adaSuntinganBelumDisimpan) {
+                        setelahMuat
+                    } else {
+                        setelahMuat.copy(
+                            keputusan = keputusanAwal(setelahMuat.hasil),
+                            catatan = setelahMuat.hasil?.catatan.orEmpty(),
+                        )
+                    }
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 android.util.Log.e("SidakViewModel", "muatUlang() gagal", e)
-                _state.value = _state.value.copy(memuat = false, galat = pesanGalat(e))
+                if (!senyap) {
+                    _state.update { it.copy(memuat = false, galat = pesanGalat(e)) }
+                }
+            } finally {
+                _state.update { if (it.memuat) it.copy(memuat = false) else it }
             }
         }
     }
