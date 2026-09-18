@@ -24,21 +24,37 @@ data class ShiftConfig(
     val pilihShiftAktif: Boolean?,
     val shift2JamMasuk: String?,
     val shift2JamKeluar: String?,
+    val shift3JamMasuk: String? = null,
+    val shift3JamKeluar: String? = null,
 )
 
 private fun hhmm(t: String) = t.take(5)
 
-/** Daftar shift yang wajib dipilih crew, atau null bila outlet hanya satu shift. */
-fun shiftOptions(cfg: ShiftConfig?): List<ShiftOption>? {
+/**
+ * Daftar shift yang wajib dipilih crew/staf, atau null bila outlet hanya satu shift.
+ * Bila role == "driver", otomatis diberikan 3 pilihan shift (termasuk 09:00–18:00).
+ */
+fun shiftOptions(cfg: ShiftConfig?, role: String? = null): List<ShiftOption>? {
     if (cfg?.pilihShiftAktif != true) return null
     val masuk1 = cfg.jamMasuk?.takeIf { it.isNotBlank() } ?: return null
     val keluar1 = cfg.jamKeluar?.takeIf { it.isNotBlank() } ?: return null
     val masuk2 = cfg.shift2JamMasuk?.takeIf { it.isNotBlank() } ?: return null
     val keluar2 = cfg.shift2JamKeluar?.takeIf { it.isNotBlank() } ?: return null
-    return listOf(
+
+    val options = mutableListOf(
         ShiftOption(1, hhmm(masuk1), hhmm(keluar1)),
         ShiftOption(2, hhmm(masuk2), hhmm(keluar2)),
     )
+
+    if (role == "driver") {
+        val s3Masuk = cfg.shift3JamMasuk?.takeIf { it.isNotBlank() }?.let { hhmm(it) } ?: "09:00"
+        val s3Keluar = cfg.shift3JamKeluar?.takeIf { it.isNotBlank() }?.let { hhmm(it) } ?: "18:00"
+        options.add(ShiftOption(3, s3Masuk, s3Keluar))
+    } else if (!cfg.shift3JamMasuk.isNullOrBlank() && !cfg.shift3JamKeluar.isNullOrBlank()) {
+        options.add(ShiftOption(3, hhmm(cfg.shift3JamMasuk), hhmm(cfg.shift3JamKeluar)))
+    }
+
+    return options
 }
 
 /** Sebutan shift dari jam masuknya: Pagi (<11), Siang (<15), selain itu Malam. */
@@ -51,7 +67,7 @@ fun namaShift(jamMasuk: String): String {
     }
 }
 
-fun isShiftKe(v: Int?): Boolean = v == 1 || v == 2
+fun isShiftKe(v: Int?): Boolean = v == 1 || v == 2 || v == 3
 
 private fun menit(t: String): Int = (t.take(2).toIntOrNull() ?: 0) * 60 + (t.substring(3, 5).toIntOrNull() ?: 0)
 
