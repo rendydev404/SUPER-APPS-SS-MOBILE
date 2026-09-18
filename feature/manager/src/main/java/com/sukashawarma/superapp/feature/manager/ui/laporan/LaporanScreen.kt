@@ -40,8 +40,9 @@ import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DateRangePicker
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import com.sukashawarma.superapp.core.ui.SukaDropdownHeader
+import com.sukashawarma.superapp.core.ui.SukaDropdownMenu
+import com.sukashawarma.superapp.core.ui.SukaDropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -128,7 +129,7 @@ fun LaporanScreen(
 ) {
     val state by viewModel.state.collectAsState()
 
-    RealtimeRefresh(RealtimeTables.ORDERS, RealtimeTables.ORDER_ITEMS) { viewModel.muatUlang() }
+    RealtimeRefresh(RealtimeTables.ORDERS, RealtimeTables.ORDER_ITEMS) { viewModel.segarkanDariRealtime() }
 
     Scaffold(
         containerColor = SukaCream,
@@ -141,7 +142,7 @@ fun LaporanScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = viewModel::muatUlang) {
+                    IconButton(onClick = viewModel::muatPaksa) {
                         Icon(Icons.Default.Refresh, "Muat ulang", tint = SukaBrown)
                     }
                 },
@@ -156,7 +157,7 @@ fun LaporanScreen(
         ) {
             item { PanelPenyaring(state, viewModel) }
             if (state.galat != null) {
-                item { PanelGalat(state.galat!!, viewModel::muatUlang) }
+                item { PanelGalat(state.galat!!, viewModel::muatPaksa) }
             }
             kartuKpi(state.analitik)
             item { PanelStatusTransaksi(state.analitik) }
@@ -191,9 +192,6 @@ private fun PanelPenyaring(state: LaporanUiState, viewModel: LaporanViewModel) {
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium,
                 )
-            }
-            if (state.memuat) {
-                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = SukaOrange)
             }
         }
 
@@ -257,7 +255,7 @@ private fun <T> PilihanTurun(
         Surface(
             shape = RoundedCornerShape(12.dp),
             color = Color.White,
-            border = BorderStroke(1.dp, SukaBrown.copy(alpha = 0.15f)),
+            border = BorderStroke(1.dp, if (terbuka) SukaOrange else SukaBrown.copy(alpha = 0.15f)),
             modifier = Modifier.fillMaxWidth().clickable { terbuka = true },
         ) {
             Row(
@@ -275,13 +273,15 @@ private fun <T> PilihanTurun(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Icon(Icons.Default.ArrowDropDown, null, tint = SukaBrown)
+                Icon(Icons.Default.ArrowDropDown, null, tint = if (terbuka) SukaOrange else SukaBrown)
             }
         }
-        DropdownMenu(expanded = terbuka, onDismissRequest = { terbuka = false }) {
+        SukaDropdownMenu(expanded = terbuka, onDismissRequest = { terbuka = false }) {
+            SukaDropdownHeader(title = "PILIH OPSI", onClose = { terbuka = false })
             pilihan.forEach { (nilaiPilihan, label) ->
-                DropdownMenuItem(
-                    text = { Text(label, fontSize = 12.sp, fontWeight = FontWeight.Bold) },
+                SukaDropdownMenuItem(
+                    text = label,
+                    selected = (label == nilai),
                     onClick = { terbuka = false; onPilih(nilaiPilihan) },
                 )
             }
