@@ -67,6 +67,13 @@ import com.sukashawarma.superapp.presentation.theme.SukaOrange
 import com.sukashawarma.superapp.presentation.theme.SukaPrimaryContainer
 import com.sukashawarma.superapp.presentation.theme.SukaSurface
 import com.sukashawarma.superapp.presentation.theme.SukaSurfaceContainerHigh
+import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.heightIn
+import com.sukashawarma.superapp.feature.stok.domain.GerbangTerimaPo
+import com.sukashawarma.superapp.feature.stok.domain.PeringatanTerima
+import androidx.compose.material3.OutlinedButton
 
 private val ORANGE = SukaOrange
 private val SLATE400 = SukaGray400
@@ -92,6 +99,15 @@ fun PenerimaanPoScreen(
 ) {
     val state by viewModel.state.collectAsState()
 
+    if (state.konfirmasi.isNotEmpty()) {
+        DialogKonfirmasiTerima(
+            konfirmasi = state.konfirmasi,
+            mengirim = state.mengirim,
+            onLanjut = viewModel::kirim,
+            onBatal = viewModel::tutupKonfirmasi,
+        )
+    }
+
     RealtimeRefresh(RealtimeTables.PURCHASE_ORDER) { viewModel.muatUlang() }
     BackHandler(enabled = state.poDibuka != null) { viewModel.tutupPo() }
 
@@ -104,7 +120,7 @@ fun PenerimaanPoScreen(
             aksi = {
                 if (state.poDibuka == null) {
                     IconButton(onClick = viewModel::muatUlang) {
-                        Icon(Icons.Default.Refresh, "Muat ulang", tint = Color.White)
+                        Icon(Icons.Default.Refresh, "Muat ulang", tint = Color(0xFF1E293B))
                     }
                 }
             },
@@ -406,7 +422,7 @@ private fun FormVerifikasi(state: PenerimaanPoUiState, viewModel: PenerimaanPoVi
                         Spacer(Modifier.height(8.dp))
                     }
                     Button(
-                        onClick = viewModel::kirim,
+                        onClick = viewModel::mintaKirim,
                         enabled = halangan == null && !state.mengirim,
                         modifier = Modifier.fillMaxWidth().height(48.dp),
                         shape = RoundedCornerShape(13.dp),
@@ -501,6 +517,38 @@ private fun KartuItemPo(
                 fontWeight = FontWeight.Medium,
             )
 
+            // Akibat ke stok gudang ditampilkan SELALU, bukan cuma saat curiga.
+            // Formulir ini dulu tidak pernah menunjukkan akibat apa pun, dan itulah
+            // yang membuat salah input 16 September 2026 lolos tanpa terasa.
+            val stokSekarang = state.stokBesar(baris.bahanBakuId)
+            val stokNanti = state.stokSetelah(baris)
+            if (stokSekarang != null && stokNanti != null) {
+                Text(
+                    "Stok gudang ${angka(stokSekarang)} → ${angka(stokNanti)} ${baris.satuan}",
+                    color = SLATE500,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+
+            val peringatan = state.peringatan(baris)
+            peringatan.forEach { p ->
+                Spacer(Modifier.height(6.dp))
+                Surface(
+                    shape = RoundedCornerShape(9.dp),
+                    color = Color(0xFFFFFBEB),
+                    border = BorderStroke(1.dp, Color(0xFFFDE68A)),
+                ) {
+                    Text(
+                        GerbangTerimaPo.pesan(p, baris.satuan),
+                        modifier = Modifier.padding(9.dp),
+                        color = Color(0xFF92400E),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
+            }
+
             Spacer(Modifier.height(11.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
                 OutlinedTextField(
@@ -574,3 +622,87 @@ private fun kolomWarna() = OutlinedTextFieldDefaults.colors(
 
 private fun angka(nilai: Double): String =
     if (nilai % 1.0 == 0.0) nilai.toLong().toString() else nilai.toString()
+
+/**
+ * Konfirmasi terakhir sebelum penerimaan disimpan.
+ *
+ * Bukan penolakan: vendor memang kadang mengirim lebih, dan gudang memang kadang
+ * kosong melompong sebelum restock. Yang dituntut hanya satu kali baca ulang,
+ * karena `verifikasi_terima_po` memakai GREATEST(0, qty_baru - qty_lama) sehingga
+ * kelebihan input tidak bisa diperbaiki lewat formulir ini.
+ */
+@Composable
+private fun DialogKonfirmasiTerima(
+    konfirmasi: List<Pair<ItemPo, List<PeringatanTerima>>>,
+    mengirim: Boolean,
+    onLanjut: () -> Unit,
+    onBatal: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = { if (!mengirim) onBatal() },
+        title = {
+            Text(
+                "Periksa ${konfirmasi.size} baris ini dulu",
+                fontWeight = FontWeight.Black,
+                fontSize = 16.sp,
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.heightIn(max = 380.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(
+                    "Jumlah yang salah di sini tidak bisa dikurangi lagi lewat aplikasi — " +
+                        "perbaikannya harus lewat database.",
+                    color = SLATE500,
+                    fontSize = 12.sp,
+                )
+                konfirmasi.forEach { (baris, peringatan) ->
+                    Surface(
+                        shape = RoundedCornerShape(11.dp),
+                        color = Color(0xFFFFFBEB),
+                        border = BorderStroke(1.dp, Color(0xFFFDE68A)),
+                    ) {
+                        Column(Modifier.padding(11.dp)) {
+                            Text(
+                                baris.nama,
+                                color = SLATE900,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            peringatan.forEach { p ->
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    GerbangTerimaPo.pesan(p, baris.satuan),
+                                    color = Color(0xFF92400E),
+                                    fontSize = 11.5.sp,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onLanjut,
+                enabled = !mengirim,
+                shape = RoundedCornerShape(11.dp),
+            ) {
+                Text(
+                    if (mengirim) "Mengirim…" else "Benar, simpan",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+        },
+        dismissButton = {
+            OutlinedButton(
+                onClick = onBatal,
+                enabled = !mengirim,
+                shape = RoundedCornerShape(11.dp),
+            ) { Text("Periksa lagi", fontSize = 13.sp, fontWeight = FontWeight.Bold) }
+        },
+    )
+}
