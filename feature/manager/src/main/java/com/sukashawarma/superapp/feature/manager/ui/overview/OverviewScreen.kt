@@ -37,11 +37,12 @@ import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DateRangePicker
 import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DateRangePicker
 import androidx.compose.material3.ExperimentalMaterial3Api
+import com.sukashawarma.superapp.core.ui.SukaDropdownHeader
+import com.sukashawarma.superapp.core.ui.SukaDropdownMenu
+import com.sukashawarma.superapp.core.ui.SukaDropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -131,7 +132,7 @@ fun OverviewScreen(
         RealtimeTables.ATTENDANCE,
         RealtimeTables.OUTLETS,
         RealtimeTables.WASTE_REPORTS,
-    ) { viewModel.muatUlang() }
+    ) { viewModel.segarkanDariRealtime() }
 
     Scaffold(
         containerColor = SukaCream,
@@ -165,11 +166,11 @@ fun OverviewScreen(
                 item { PanelGalat(state.galat!!, viewModel::muatUlang) }
             }
 
+            item { KartuBonus(state.ringkasan) }
             item { KartuOmzet(state.ringkasan) }
             item { KartuTransaksi(state.ringkasan) }
             item { KartuPorsi(state.ringkasan) }
             item { KartuWaste(state.ringkasan, onBukaWaste) }
-            item { KartuBonus(state.ringkasan) }
 
             if (ManagerAkses.melihatPerformaZona(state.role)) {
                 item { PanelPerformaZona(state.ringkasan) }
@@ -201,9 +202,6 @@ private fun PanelPeriode(state: OverviewUiState, viewModel: OverviewViewModel) {
             Spacer(Modifier.width(8.dp))
             ChipJingga("USER: ${labelRole(state.role?.value)}")
             Spacer(Modifier.weight(1f))
-            if (state.memuat) {
-                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = SukaOrange)
-            }
         }
         Spacer(Modifier.height(6.dp))
         Text(
@@ -579,20 +577,17 @@ private fun PanelPerformaZona(r: RingkasanArea) {
                     Icon(Icons.Default.ArrowDropDown, null, tint = SukaBrown)
                 }
             }
-            DropdownMenu(expanded = menuTerbuka, onDismissRequest = { menuTerbuka = false }) {
-                DropdownMenuItem(
-                    text = { Text("Semua Zona (${r.zona.size} Area)", fontSize = 12.sp, fontWeight = FontWeight.Bold) },
+            SukaDropdownMenu(expanded = menuTerbuka, onDismissRequest = { menuTerbuka = false }) {
+                SukaDropdownHeader(title = "PILIH ZONA", onClose = { menuTerbuka = false })
+                SukaDropdownMenuItem(
+                    text = "Semua Zona (${r.zona.size} Area)",
+                    selected = (zonaTerpilih == null),
                     onClick = { zonaTerpilih = null; pencarian = ""; menuTerbuka = false },
                 )
                 r.zona.forEach { zona ->
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                "Zona ${zona.zona} (${zona.outlets.size} Outlet)",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                            )
-                        },
+                    SukaDropdownMenuItem(
+                        text = "Zona ${zona.zona} (${zona.outlets.size} Outlet)",
+                        selected = (zonaTerpilih == zona.zona),
                         onClick = { zonaTerpilih = zona.zona; pencarian = ""; menuTerbuka = false },
                     )
                 }
