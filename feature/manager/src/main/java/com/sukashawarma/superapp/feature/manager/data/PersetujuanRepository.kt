@@ -7,9 +7,14 @@ import com.sukashawarma.superapp.data.remote.optInt
 import com.sukashawarma.superapp.data.remote.optJsonArray
 import com.sukashawarma.superapp.data.remote.optJsonObject
 import com.sukashawarma.superapp.data.remote.optString
+import com.sukashawarma.superapp.feature.manager.data.model.OutletRingkas
 import com.sukashawarma.superapp.feature.manager.domain.ItemPesananVoid
 import com.sukashawarma.superapp.feature.manager.domain.PengajuanBypass
 import com.sukashawarma.superapp.feature.manager.domain.PengajuanVoid
+import com.sukashawarma.superapp.feature.manager.domain.PesananSelesaiItem
+import com.sukashawarma.superapp.feature.manager.domain.RentangTanggal
+import com.sukashawarma.superapp.feature.manager.domain.akhirIso
+import com.sukashawarma.superapp.feature.manager.domain.awalIso
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 
@@ -185,12 +190,110 @@ object PersetujuanRepository {
     }
 
     /**
+     * Outlet yang boleh diakses pengguna saat ini untuk filter pesanan selesai.
+     */
+    suspend fun outlets(): List<OutletRingkas> {
+        val filter = CakupanOutletRepository.filterOutlet(CakupanOutletRepository.cakupan())
+            ?: return emptyList()
+        return Postgrest.select(
+            "outlets",
+            listOf("select" to "id,name,is_active", "is_active" to "eq.true", "order" to "name") + filter,
+        ).mapNotNull { baris ->
+            val obj = baris.asJsonObject
+            val id = obj.optString("id") ?: return@mapNotNull null
+            OutletRingkas(id, obj.optString("name").orEmpty(), true)
+        }
+    }
+
+    /**
+     * Mencari pesanan berstatus selesai pada satu outlet dan rentang waktu tertentu.
+     * Dapat disaring lebih lanjut berdasarkan nomor order atau nama pelanggan.
+     */
+    suspend fun cariPesananSelesai(
+        outletId: String,
+        kueri: String,
+        rentang: RentangTanggal,
+    ): List<PesananSelesaiItem> {
+        val trimmed = kueri.trim()
+        val params = mutableListOf(
+            "select" to "id,order_number,customer_name,total_amount,created_at,outlet_id,outlets(name),order_items(menu_item_name,quantity,subtotal)",
+            "outlet_id" to "eq.$outletId",
+            "status" to "eq.completed",
+            "created_at" to "gte.${rentang.awalIso()}",
+            "created_at" to "lte.${rentang.akhirIso()}",
+            "order" to "created_at.desc",
+            "limit" to "50",
+        )
+        if (trimmed.isNotEmpty()) {
+            if (trimmed.all { it.isDigit() }) {
+                params.add("order_number" to "eq.$trimmed")
+            } else {
+                params.add("customer_name" to "ilike.*$trimmed*")
+            }
+        }
+        return Postgrest.select("orders", params).mapNotNull { elemen ->
+            val obj = elemen.asJsonObject
+            val id = obj.optString("id") ?: return@mapNotNull null
+            val nomorOrder = obj.optDouble("order_number")?.toLong()?.toString() ?: "-"
+            val customerName = obj.optString("customer_name")?.takeIf { it.isNotBlank() } ?: "Tanpa nama"
+            val total = obj.optDouble("total_amount")?.toLong() ?: 0L
+            val createdAt = obj.optString("created_at").orEmpty()
+            val outletNama = obj.optJsonObject("outlets")?.optString("name") ?: "Outlet"
+            val items = obj.optJsonArray("order_items")?.map { itemElem ->
+                val itemObj = itemElem.asJsonObject
+                ItemPesananVoid(
+                    nama = itemObj.optString("menu_item_name") ?: "Item",
+                    qty = itemObj.optInt("quantity") ?: 0,
+                    subtotal = itemObj.optDouble("subtotal")?.toLong() ?: 0L,
+                )
+            }.orEmpty()
+            PesananSelesaiItem(
+                id = id,
+                outletId = outletId,
+                outletNama = outletNama,
+                nomorOrder = nomorOrder,
+                namaPelanggan = customerName,
+                total = total,
+                dibuatPada = createdAt,
+                items = items,
+            )
+        }
+    }
+
+    /**
+     * Membatalkan paksa pesanan berstatus selesai.
+     * Memanggil RPC `force_cancel_order` di Supabase.
+     */
+    suspend fun batalPaksaPesanan(orderId: String, outletId: String, alasan: String): String? {
+        val note = alasan.trim()
+        if (note.isEmpty()) {
+            return "Catatan pembatalan wajib diisi."
+        }
+        try {
+            Postgrest.rpc(
+                "force_cancel_order",
+                JsonObject().apply {
+                    addProperty("p_order_id", orderId)
+                    addProperty("p_outlet_id", outletId)
+                    addProperty("p_reason", note)
+                },
+            )
+            return null
+        } catch (e: Postgrest.PostgrestException) {
+            val body = e.message.orEmpty()
+            android.util.Log.e("PersetujuanRepository", "force_cancel_order ditolak ${e.code}: $body")
+            if (e.code == 404 || body.contains("PGRST202")) {
+                return "Fitur ini belum aktif: fungsi force_cancel_order belum ada di database."
+            }
+            return pesanDariGalatServer(body)
+        }
+    }
+
+    /**
      * Mengambil pesan `RAISE EXCEPTION` dari balasan PostgREST.
      *
-     * Seluruh penolakan di `process_void_request` sudah ditulis dalam kalimat yang
-     * layak dibaca pengguna ("Pengajuan sudah diproses sebelumnya."), jadi yang
-     * terbaik adalah meneruskannya apa adanya ketimbang menggantinya dengan pesan
-     * generik yang menyembunyikan alasannya.
+     * Seluruh penolakan di `process_void_request` dan `force_cancel_order` sudah ditulis dalam
+     * kalimat yang layak dibaca pengguna, jadi diteruskan apa adanya.
      */
     private fun pesanDariGalatServer(body: String): String {
         val pesan = runCatching {
