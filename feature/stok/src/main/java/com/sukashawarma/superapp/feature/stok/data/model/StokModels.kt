@@ -32,6 +32,11 @@ data class MonitoringRow(
     val lastOpnameDate: String?,
     val kategori: String?,
     val satuan: String?,
+    /**
+     * `bahan_baku.faktor_konversi` — satuan terkecil per satu satuan yang berarti.
+     * Dipakai gerbang nol opname; lihat [com.sukashawarma.superapp.feature.stok.domain.GerbangNolOpname].
+     */
+    val faktorKonversi: Double? = null,
     val meta: UnitMeta,
 ) {
     /** Saldo pada satuan terkecil; null bila faktor konversi tidak dapat dipercaya. */
