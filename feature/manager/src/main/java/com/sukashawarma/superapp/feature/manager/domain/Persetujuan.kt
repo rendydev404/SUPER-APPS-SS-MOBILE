@@ -36,7 +36,22 @@ data class PengajuanBypass(
 enum class TabPersetujuan(val label: String) {
     VOID("Void Transaksi"),
     BYPASS("Bypass POS"),
+    BATAL_PAKSA("Pesanan Selesai"),
 }
+
+/**
+ * Ringkasan pesanan berstatus 'completed' untuk keperluan pembatalan paksa oleh manager.
+ */
+data class PesananSelesaiItem(
+    val id: String,
+    val outletId: String,
+    val outletNama: String,
+    val nomorOrder: String,
+    val namaPelanggan: String,
+    val total: Long,
+    val dibuatPada: String,
+    val items: List<ItemPesananVoid> = emptyList(),
+)
 
 /** Menyaring pengajuan pada rentang tanggal terpilih. */
 fun <T> saringPeriode(
