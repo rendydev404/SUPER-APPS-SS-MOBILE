@@ -51,8 +51,25 @@ class StokErrorTest {
             stokErrorMessage(galat(403, """{"code":"42501"}""")),
         )
         assertEquals(
+            "Anda tidak punya akses ke data outlet ini.",
+            stokErrorMessage(galat(403, """{"code":"42501","message":"new row violates row-level security policy for table outlet_stok"}""")),
+        )
+        assertEquals(
             "Data yang diminta tidak ditemukan di server.",
             stokErrorMessage(galat(404, """{"code":"PGRST116"}""")),
+        )
+    }
+
+    @Test
+    fun `pesan khusus penolakan wewenang dari database ditampilkan apa adanya`() {
+        assertEquals(
+            "Hanya kitchen/admin/owner yang dapat menandai PO diterima",
+            stokErrorMessage(
+                galat(
+                    403,
+                    """{"code":"42501","message":"Hanya kitchen/admin/owner yang dapat menandai PO diterima"}""",
+                ),
+            ),
         )
     }
 }
