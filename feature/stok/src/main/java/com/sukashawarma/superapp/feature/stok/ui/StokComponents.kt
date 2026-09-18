@@ -41,9 +41,11 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.IconButton
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
@@ -132,11 +134,11 @@ fun KeadaanGagal(pesan: String, onCobaLagi: () -> Unit, modifier: Modifier = Mod
             Icon(Icons.Default.CloudOff, null, tint = Color(0xFFDC2626), modifier = Modifier.size(27.dp))
         }
         Spacer(Modifier.height(14.dp))
-        Text("Gagal memuat", color = SukaOnSurface, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
+        Text("Gagal memuat", color = Color(0xFF0F172A), fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
         Spacer(Modifier.height(5.dp))
         Text(
             pesan,
-            color = SukaOnSurfaceVariant,
+            color = Color(0xFF64748B),
             fontSize = 12.sp,
             lineHeight = 17.sp,
             textAlign = TextAlign.Center,
@@ -166,11 +168,11 @@ private fun KeadaanPesan(icon: ImageVector, judul: String, pesan: String, modifi
             Icon(icon, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(27.dp))
         }
         Spacer(Modifier.height(14.dp))
-        Text(judul, color = SukaOnSurface, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
+        Text(judul, color = Color(0xFF0F172A), fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
         Spacer(Modifier.height(5.dp))
         Text(
             pesan,
-            color = SukaOnSurfaceVariant,
+            color = Color(0xFF64748B),
             fontSize = 12.sp,
             lineHeight = 17.sp,
             textAlign = TextAlign.Center,
@@ -186,8 +188,8 @@ fun MemuatPenuh(modifier: Modifier = Modifier) {
 }
 
 /**
- * Header oranye yang dipakai seluruh layar modul Stok, supaya tiap tab tidak
- * membangun bilah atasnya sendiri-sendiri dan ikut berubah kalau temanya berubah.
+ * Header clean minimalist yang dipakai seluruh layar modul Stok, bergaya Apple HIG
+ * dengan latar putih, tipografi slate kontras tinggi, dan batas halus.
  */
 @Composable
 fun HeaderStok(
@@ -196,37 +198,53 @@ fun HeaderStok(
     onKembali: (() -> Unit)? = null,
     aksi: @Composable RowScope.() -> Unit = {},
 ) {
-    Box(
-        Modifier.fillMaxWidth().background(
-            Brush.verticalGradient(
-                listOf(Color(0xFFEA580C), Color(0xFFF97316))
-            )
-        )
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = Color.White,
+        border = BorderStroke(1.dp, Color(0xFFF1F5F9)),
     ) {
         Row(
             Modifier
                 .statusBarsPadding()
-                .padding(start = if (onKembali != null) 8.dp else 16.dp, end = 8.dp, top = 6.dp, bottom = 14.dp),
+                .padding(
+                    start = if (onKembali != null) 4.dp else 16.dp,
+                    end = 12.dp,
+                    top = 8.dp,
+                    bottom = 12.dp
+                ),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (onKembali != null) {
                 IconButton(onClick = onKembali) {
-                    Icon(Icons.Default.ArrowBack, "Kembali", tint = Color.White)
+                    Icon(Icons.Default.ArrowBack, "Kembali", tint = Color(0xFF0F172A))
                 }
             }
             Column(Modifier.weight(1f)) {
-                Text(judul, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold)
+                Text(
+                    judul,
+                    color = Color(0xFF0F172A),
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = (-0.3).sp,
+                )
                 if (subjudul != null) {
-                    Text(subjudul, color = Color(0xFFFFEDD5), fontSize = 11.sp)
+                    Text(
+                        subjudul,
+                        color = Color(0xFF64748B),
+                        fontSize = 11.5.sp,
+                        lineHeight = 15.sp,
+                    )
                 }
             }
-            aksi()
+            CompositionLocalProvider(LocalContentColor provides Color(0xFF1E293B)) {
+                aksi()
+            }
         }
     }
 }
 
 /**
- * Baris pemilih outlet, hanya berguna bila pengguna memegang lebih dari satu outlet.
+ * Baris pemilih outlet berbentuk capsule pill clean minimalist.
  * Dipakai bersama oleh Ledger, Opname, Permintaan, dan Mutasi.
  */
 @Composable
@@ -236,23 +254,36 @@ fun PemilihOutlet(
     onPilih: (OutletRingkas) -> Unit,
 ) {
     var terbuka by remember { mutableStateOf(false) }
-    Box(Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp)) {
+    Box(Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 4.dp)) {
         Surface(
             onClick = { terbuka = true },
-            shape = RoundedCornerShape(14.dp),
+            shape = RoundedCornerShape(20.dp),
             color = Color.White,
-            border = BorderStroke(1.dp, Color(0xFFE7ECF2)),
+            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+            shadowElevation = 0.5.dp,
         ) {
-            Row(Modifier.padding(horizontal = 14.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .background(Color(0xFFEA580C), CircleShape)
+                )
+                Spacer(Modifier.width(8.dp))
                 Text(
                     terpilih?.name ?: "Pilih outlet",
-                    color = SukaOnSurface,
-                    fontSize = 13.sp,
+                    color = Color(0xFF0F172A),
+                    fontSize = 12.5.sp,
                     fontWeight = FontWeight.Bold,
                 )
+                Spacer(Modifier.width(4.dp))
                 Icon(
-                    Icons.Default.ArrowDropDown, null,
-                    tint = Color(0xFF94A3B8), modifier = Modifier.size(18.dp),
+                    Icons.Default.ArrowDropDown,
+                    contentDescription = "Ganti outlet",
+                    tint = Color(0xFF64748B),
+                    modifier = Modifier.size(18.dp),
                 )
             }
         }
