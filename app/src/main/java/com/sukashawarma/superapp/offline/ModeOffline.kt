@@ -14,6 +14,10 @@ import com.sukashawarma.superapp.data.remote.CacheOffline
 import com.sukashawarma.superapp.data.remote.NetworkMonitor
 import com.sukashawarma.superapp.data.remote.Outbox
 import com.sukashawarma.superapp.domain.session.AppSession
+import com.sukashawarma.superapp.feature.absensi.offline.CutiOffline
+import com.sukashawarma.superapp.feature.absensi.offline.KasbonOffline
+import com.sukashawarma.superapp.feature.stok.offline.PermintaanOffline
+import com.sukashawarma.superapp.feature.stok.offline.WasteOffline
 import com.sukashawarma.superapp.notif.SuperappMessagingService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.drop
@@ -42,8 +46,32 @@ object ModeOffline {
         Outbox.unggahLampiran = { bucket, path, bytes -> StorageUtil.uploadJpeg(bucket, path, bytes) }
 
         Outbox.onGagalPermanen = { item -> beritahuGagal(app, item) }
+        Outbox.onAntreBaru = { OutboxWorker.jadwalkan(app) }
+
+        daftarkanPenangan()
 
         picuSinkronSaatOnline(app, lingkup)
+    }
+
+    /**
+     * Daftar tunggal semua aksi yang boleh menunggu di perangkat.
+     *
+     * Didaftarkan di sini, sekali, saat Application start — bukan saat layarnya dibuka.
+     * [OutboxWorker] bisa berjalan tanpa ada satu layar pun yang pernah tampil, dan aksi yang
+     * penangannya belum terdaftar akan dilewati terus sampai ada yang kebetulan membuka layar
+     * yang tepat.
+     *
+     * Satu berkas yang memuat semuanya juga membuat pertanyaan "apa saja yang bisa offline"
+     * punya satu jawaban yang bisa dibaca, bukan tersebar di enam modul.
+     */
+    private fun daftarkanPenangan() {
+        // `item.id` ADALAH kunci idempotensinya: id baris antrean dibuat sekali saat aksinya
+        // terjadi dan tidak pernah berubah, jadi berapa kali pun kiriman ini diulang, server
+        // menerima kunci yang sama dan mengenali kiriman kedua sebagai yang itu-itu juga.
+        Outbox.daftarkan(KasbonOffline.JENIS) { item, payload, url -> KasbonOffline.kirim(item.id, payload, url) }
+        Outbox.daftarkan(CutiOffline.JENIS) { item, payload, url -> CutiOffline.kirim(item.id, payload, url) }
+        Outbox.daftarkan(WasteOffline.JENIS) { item, payload, url -> WasteOffline.kirim(item.id, payload, url) }
+        Outbox.daftarkan(PermintaanOffline.JENIS) { item, payload, url -> PermintaanOffline.kirim(item.id, payload, url) }
     }
 
     /**
