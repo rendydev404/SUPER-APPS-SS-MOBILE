@@ -6,6 +6,8 @@ import com.sukashawarma.superapp.feature.stok.data.StokRepository
 import com.sukashawarma.superapp.feature.stok.data.model.LedgerEntry
 import com.sukashawarma.superapp.feature.stok.data.model.MonitoringRow
 import com.sukashawarma.superapp.feature.stok.domain.stokErrorMessage
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -24,11 +26,13 @@ class DetailBahanViewModel : ViewModel() {
 
     private var outletId: String? = null
     private var bahanId: String? = null
+    private var muatJob: Job? = null
 
     fun muat(outletId: String, bahanId: String) {
         this.outletId = outletId
         this.bahanId = bahanId
-        viewModelScope.launch {
+        muatJob?.cancel()
+        muatJob = viewModelScope.launch {
             _state.value = DetailUiState(memuat = true)
             try {
                 // Baris monitoring diambil lintas outlet lalu disaring, karena hasilnya
@@ -37,6 +41,8 @@ class DetailBahanViewModel : ViewModel() {
                     .firstOrNull { it.outletId == outletId }
                 val mutasi = StokRepository.ledger(outletId, bahanId)
                 _state.value = DetailUiState(memuat = false, baris = baris, mutasi = mutasi)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _state.value = DetailUiState(memuat = false, error = stokErrorMessage(e))
             }
