@@ -3,13 +3,10 @@
 package com.sukashawarma.superapp.presentation.absensi
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
@@ -68,6 +65,11 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.sukashawarma.superapp.core.ui.keluarMaju
+import com.sukashawarma.superapp.core.ui.keluarMundur
+import com.sukashawarma.superapp.core.ui.masukMaju
+import com.sukashawarma.superapp.core.ui.masukMundur
+import com.sukashawarma.superapp.core.ui.navigateSekali
 import com.sukashawarma.superapp.presentation.absensi.checklist.ChecklistManageScreen
 import com.sukashawarma.superapp.presentation.absensi.checklist.ChecklistMonitorScreen
 import com.sukashawarma.superapp.presentation.absensi.checklist.ChecklistScreen
@@ -86,6 +88,7 @@ import com.sukashawarma.superapp.domain.session.AppSession
 import com.sukashawarma.superapp.presentation.components.ComingSoon
 import com.sukashawarma.superapp.presentation.theme.SukaOnSurfaceVariant
 import com.sukashawarma.superapp.presentation.theme.SukaOrange
+import com.sukashawarma.superapp.presentation.theme.SukaSurface
 import com.sukashawarma.superapp.presentation.theme.SukaSurfaceContainerHighest
 import com.sukashawarma.superapp.presentation.theme.SukaSurfaceContainerLowest
 import kotlinx.coroutines.launch
@@ -104,73 +107,53 @@ fun AbsensiNavGraph(onExit: () -> Unit) {
     NavHost(
         navController = navController,
         startDestination = AbsensiRoutes.MAIN,
-        enterTransition = {
-            slideIntoContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.Start,
-                animationSpec = tween(300, easing = FastOutSlowInEasing)
-            ) + fadeIn(animationSpec = tween(300))
-        },
-        exitTransition = {
-            slideOutOfContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.Start,
-                animationSpec = tween(300, easing = FastOutSlowInEasing)
-            ) + fadeOut(animationSpec = tween(300))
-        },
-        popEnterTransition = {
-            slideIntoContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.End,
-                animationSpec = tween(300, easing = FastOutSlowInEasing)
-            ) + fadeIn(animationSpec = tween(300))
-        },
-        popExitTransition = {
-            slideOutOfContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.End,
-                animationSpec = tween(300, easing = FastOutSlowInEasing)
-            ) + fadeOut(animationSpec = tween(300))
-        }
+        enterTransition = { masukMaju() },
+        exitTransition = { keluarMaju() },
+        popEnterTransition = { masukMundur() },
+        popExitTransition = { keluarMundur() },
     ) {
         composable(AbsensiRoutes.MAIN) {
             AbsensiMainPagerScreen(
-                onNavigateToSubRoute = { route -> navController.navigate(route) },
+                onNavigateToSubRoute = { route -> navController.navigateSekali(route) },
                 onExit = onExit,
                 pendingTab = pendingTab,
                 onPendingTabConsumed = { pendingTab = null },
             )
         }
         composable(AbsensiRoutes.HUB) {
-            AbsensiHubScreen(onNavigate = { navController.navigate(it) }, onExit = onExit)
+            AbsensiHubScreen(onNavigate = { navController.navigateSekali(it) }, onExit = onExit)
         }
-        composable(AbsensiRoutes.CLOCK) { ClockScreen(isActive = true, onExit = { navController.popBackStack() }) }
+        composable(AbsensiRoutes.CLOCK) { ClockScreen(isActive = true, onExit = onExit) }
         composable(AbsensiRoutes.PAPAN) {
             PapanKehadiranScreen(
-                onExit = { navController.popBackStack() },
+                onExit = onExit,
                 onNavigateTab = { index ->
                     pendingTab = index
                     navController.popBackStack(AbsensiRoutes.MAIN, inclusive = false)
                 },
             )
         }
-        composable(AbsensiRoutes.REKAP) { RekapScreen(onExit = { navController.popBackStack() }) }
-        composable(AbsensiRoutes.CHECKLIST) { ChecklistScreen(onExit = { navController.popBackStack() }) }
+        composable(AbsensiRoutes.REKAP) { RekapScreen(onExit = onExit) }
+        composable(AbsensiRoutes.CHECKLIST) { ChecklistScreen(onExit = onExit) }
         composable(AbsensiRoutes.CHECKLIST_MONITOR) {
             val staff by AppSession.staff.collectAsState()
             if (staff?.role in SPV_TIER_ROLES) {
-                ChecklistMonitorScreen(onExit = { navController.popBackStack() })
+                ChecklistMonitorScreen(onExit = onExit)
             } else {
-                LaunchedEffect(Unit) { navController.popBackStack() }
+                LaunchedEffect(Unit) { navController.popBackStack() } // gerbang peran: pop mentah, entri belum RESUMED
             }
         }
         composable(AbsensiRoutes.CHECKLIST_MANAGE) {
             val staff by AppSession.staff.collectAsState()
             if (staff?.role in CHECKLIST_MANAGE_ROLES) {
-                ChecklistManageScreen(onExit = { navController.popBackStack() })
+                ChecklistManageScreen(onExit = onExit)
             } else {
-                LaunchedEffect(Unit) { navController.popBackStack() }
+                LaunchedEffect(Unit) { navController.popBackStack() } // gerbang peran: pop mentah, entri belum RESUMED
             }
         }
         composable(AbsensiRoutes.CUTI) {
             CutiScreen(
-                onExit = { navController.popBackStack() },
+                onExit = onExit,
                 onNavigateTab = { index ->
                     pendingTab = index
                     navController.popBackStack(AbsensiRoutes.MAIN, inclusive = false)
@@ -179,16 +162,16 @@ fun AbsensiNavGraph(onExit: () -> Unit) {
         }
         composable(AbsensiRoutes.KASBON) {
             KasbonScreen(
-                onExit = { navController.popBackStack() },
+                onExit = onExit,
                 onNavigateTab = { index ->
                     pendingTab = index
                     navController.popBackStack(AbsensiRoutes.MAIN, inclusive = false)
                 },
             )
         }
-        composable(AbsensiRoutes.ENROLL) { EnrollScreen(onExit = { navController.popBackStack() }) }
-        composable(AbsensiRoutes.PENGATURAN) { PengaturanScreen(onExit = { navController.popBackStack() }) }
-        composable(AbsensiRoutes.PROFIL) { ProfilScreen(onExit = { navController.popBackStack() }) }
+        composable(AbsensiRoutes.ENROLL) { EnrollScreen(onExit = onExit) }
+        composable(AbsensiRoutes.PENGATURAN) { PengaturanScreen(onExit = onExit) }
+        composable(AbsensiRoutes.PROFIL) { ProfilScreen(onExit = onExit) }
         composable(AbsensiRoutes.MANAJEMEN_KRU) { ComingSoon("Manajemen Kru") }
     }
 }
@@ -492,6 +475,10 @@ fun AbsensiMainPagerScreen(
     }
 
     Scaffold(
+        // Area bottom bar (celah di atas bar tempat bubble melayang) dicat Scaffold.
+        // Warna bawaan tema adalah SukaCream, yang tampil sebagai pita coklat muda di
+        // antara halaman abu terang dan nav. Disamakan dengan latar halaman.
+        containerColor = SukaSurface,
         bottomBar = {
             AbsensiBottomNav(
                 selectedIndex = if (moreSheetVisible) 3 else pagerState.currentPage,
@@ -526,17 +513,22 @@ fun AbsensiMainPagerScreen(
                     0 -> ClockScreen(
                         isActive = !moreSheetVisible &&
                             (pagerState.currentPage == 0 || pagerState.targetPage == 0),
-                        onExit = onExit
+                        onExit = onExit,
+                        // Absen hadir berlanjut ke checklist: itu tugas berikutnya kru
+                        // begitu masuk, dan sebelumnya mereka harus mencarinya sendiri.
+                        // Dijaga `currentPage == 0` supaya kru yang sudah telanjur
+                        // menggeser ke tab lain tidak ditarik balik.
+                        onAbsenMasukSelesai = {
+                            if (pagerState.currentPage == 0) {
+                                coroutineScope.launch { pagerState.animateScrollToPage(1) }
+                            }
+                        },
                     )
-                    1 -> ChecklistScreen(onExit = {
-                        coroutineScope.launch { pagerState.animateScrollToPage(0) }
-                    })
+                    1 -> ChecklistScreen(onExit = onExit)
                     // Slot yang sama dengan tab index 2 di bottom nav — ikut berganti isi
                     // supaya label tab dan halaman yang muncul selalu cocok.
                     2 -> if (enrollTab) {
-                        EnrollScreen(onExit = {
-                            coroutineScope.launch { pagerState.animateScrollToPage(0) }
-                        })
+                        EnrollScreen(onExit = onExit)
                     } else {
                         // Sebagai tab, layar ini tidak punya halaman induk untuk
                         // dituju — tombol kembali di sana hanya akan membingungkan.
