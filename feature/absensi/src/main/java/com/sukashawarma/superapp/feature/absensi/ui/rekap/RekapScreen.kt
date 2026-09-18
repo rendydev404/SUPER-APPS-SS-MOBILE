@@ -57,6 +57,9 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import com.sukashawarma.superapp.core.ui.RealtimeRefresh
 import com.sukashawarma.superapp.core.ui.RealtimeTables
+import com.sukashawarma.superapp.core.ui.SukaDropdownHeader
+import com.sukashawarma.superapp.core.ui.SukaDropdownMenu
+import com.sukashawarma.superapp.core.ui.SukaDropdownMenuItem
 
 // Stitch Suka Culinary Design Tokens (samakan dengan layar Absensi lainnya)
 private val StitchPrimary = Color(0xFF450700)
@@ -389,7 +392,7 @@ private fun OutletPickerCard(
             }
         }
 
-        DropdownMenu(
+        SukaDropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
             modifier = Modifier.width(290.dp).heightIn(max = 430.dp),
@@ -432,18 +435,11 @@ private fun OutletPickerCard(
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 18.dp),
                         )
                     } else filtered.forEach { outlet ->
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    outlet.name,
-                                    fontSize = 14.sp,
-                                    fontWeight = if (outlet.id == selectedId) FontWeight.Bold else FontWeight.SemiBold,
-                                    color = if (outlet.id == selectedId) StitchSecondaryContainer else StitchOnSurface,
-                                )
-                            },
-                            leadingIcon = { Icon(Icons.Filled.Storefront, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                        SukaDropdownMenuItem(
+                            text = outlet.name,
+                            selected = (outlet.id == selectedId),
+                            leadingIcon = Icons.Filled.Storefront,
                             onClick = { onSelect(outlet.id); expanded = false },
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
                         )
                     }
                 }
@@ -665,17 +661,12 @@ private fun StatusFilterMenu(selected: RekapStatusFilter, onSelect: (RekapStatus
                 Icon(Icons.Filled.ExpandMore, contentDescription = null, tint = StitchOnSurfaceVariant, modifier = Modifier.size(16.dp))
             }
         }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        SukaDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            SukaDropdownHeader(title = "FILTER STATUS", onClose = { expanded = false })
             RekapStatusFilter.entries.forEach { filter ->
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            filter.label,
-                            fontSize = 14.sp,
-                            fontWeight = if (filter == selected) FontWeight.Bold else FontWeight.Normal,
-                            color = if (filter == selected) StitchPrimary else StitchOnSurface,
-                        )
-                    },
+                SukaDropdownMenuItem(
+                    text = filter.label,
+                    selected = (filter == selected),
                     onClick = { onSelect(filter); expanded = false },
                 )
             }
