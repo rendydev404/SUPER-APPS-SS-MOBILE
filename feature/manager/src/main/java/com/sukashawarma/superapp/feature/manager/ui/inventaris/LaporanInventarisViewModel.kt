@@ -68,10 +68,14 @@ class LaporanInventarisViewModel : ViewModel() {
         muatUlang()
     }
 
-    fun muatUlang() {
+    fun muatUlang(silent: Boolean = false) {
+        val sudahAdaData = _state.value.outlets.isNotEmpty()
+        val senyap = silent || sudahAdaData
         pemuatan?.cancel()
         pemuatan = viewModelScope.launch {
-            _state.value = _state.value.copy(memuat = true, galat = null)
+            if (!senyap) {
+                _state.value = _state.value.copy(memuat = true, galat = null)
+            }
             try {
                 val data = SidakRepository.muat()
                 _state.value = _state.value.copy(
@@ -83,10 +87,16 @@ class LaporanInventarisViewModel : ViewModel() {
                 throw e
             } catch (e: Exception) {
                 android.util.Log.e("LaporanInventarisVM", "muatUlang() gagal", e)
-                _state.value = _state.value.copy(
-                    memuat = false,
-                    galat = "Gagal memuat laporan inventaris. Coba lagi.",
-                )
+                if (!senyap) {
+                    _state.value = _state.value.copy(
+                        memuat = false,
+                        galat = "Gagal memuat laporan inventaris. Coba lagi.",
+                    )
+                }
+            } finally {
+                if (_state.value.memuat) {
+                    _state.value = _state.value.copy(memuat = false)
+                }
             }
         }
     }
