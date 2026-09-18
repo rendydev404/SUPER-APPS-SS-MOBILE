@@ -43,7 +43,12 @@ class SuperappApplication : Application() {
 
         // Sesi habis / logout: pelacakan lokasi kehilangan `outlet_staff_id` tujuannya,
         // jadi harus mati bersama sesi, bukan menunggu user mematikannya manual.
-        AppSession.onSignOut = { LocationTracking.stop(this) }
+        AppSession.onSignOut = {
+            LocationTracking.stop(this)
+            // Cache dan descriptor wajah ikut pergi bersama sesinya. Antrean tulis TIDAK —
+            // isinya kerja yang belum ada di mana pun selain perangkat ini.
+            ModeOffline.bersihkanDataOffline(this, lingkup)
+        }
         // Menjadwalkan ulang tiap app dibuka. Alarm yang sudah ada ditimpa lewat
         // FLAG_UPDATE_CURRENT, jadi ini sekaligus jaring pengaman kalau OEM
         // membersihkan alarm proses yang lama tidak dipakai.
