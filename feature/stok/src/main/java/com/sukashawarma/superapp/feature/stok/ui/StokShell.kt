@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.Sell
+import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.Tune
@@ -68,8 +69,10 @@ import com.sukashawarma.superapp.core.ui.RealtimeRefresh
 import com.sukashawarma.superapp.core.ui.RealtimeTables
 import com.sukashawarma.superapp.domain.session.AppSession
 import com.sukashawarma.superapp.feature.stok.data.MutasiRepository
+import com.sukashawarma.superapp.feature.stok.data.ReturRepository
 import com.sukashawarma.superapp.feature.stok.data.WasteApprovalAccess
 import com.sukashawarma.superapp.feature.stok.domain.MutasiBadge
+import com.sukashawarma.superapp.feature.stok.domain.LencanaRetur
 import com.sukashawarma.superapp.feature.stok.domain.StokAkses
 import com.sukashawarma.superapp.feature.stok.ui.area.HargaBahanScreen
 import com.sukashawarma.superapp.feature.stok.ui.area.WasteApprovalScreen
@@ -88,6 +91,8 @@ import com.sukashawarma.superapp.feature.stok.ui.opname.OpnameScreen
 import com.sukashawarma.superapp.feature.stok.ui.opname.PersetujuanOpnameScreen
 import com.sukashawarma.superapp.feature.stok.ui.permintaan.PermintaanScreen
 import com.sukashawarma.superapp.feature.stok.ui.po.PenerimaanPoScreen
+import com.sukashawarma.superapp.feature.stok.ui.retur.ReturScreen
+import com.sukashawarma.superapp.feature.stok.ui.vendor.TerimaVendorScreen
 
 /**
  * Tujuan di modul Stok. Label pendek untuk bilah bawah, label panjang untuk lembar
@@ -103,9 +108,11 @@ private enum class TabStok(
     PERMINTAAN("Permintaan", "Permintaan Bahan", Icons.Default.Assignment),
     OPNAME("Opname", "Stok Opname", Icons.Default.Description),
     TERIMA_PO("Terima PO", "Penerimaan PO Supplier", Icons.Default.LocalShipping),
+    TERIMA_VENDOR("Terima Vendor", "Terima dari Vendor", Icons.Default.LocalShipping),
     WASTE("Waste", "Persetujuan Waste", Icons.Default.DeleteSweep),
     LEDGER("Ledger", "Buku Ledger Stok", Icons.Default.MenuBook),
     MUTASI("Mutasi", "Mutasi Antar Outlet", Icons.Default.SwapHoriz),
+    RETUR("Retur", "Retur & Refund Bahan", Icons.Default.Restore),
     ENTRI("Entri Manual", "Entri Manual & Lapor Waste", Icons.Default.EditNote),
     RIWAYAT_WASTE("Riwayat Waste", "Riwayat Waste Saya", Icons.Default.History),
     PERSETUJUAN_OPNAME("Approval Opname", "Persetujuan Opname", Icons.Default.FactCheck),
@@ -134,6 +141,7 @@ private fun tujuanUntukPeran(): List<TabStok> {
     val bolehHarga = StokAkses.melihatHargaBahan(role)
     val bolehWaste = WasteApprovalAccess.allowed(role)
     val bolehPo = StokAkses.melihatPenerimaanPo(role)
+    val bolehVendor = StokAkses.bisaTerimaVendor(staff?.outletId)
 
     return buildList {
         if (StokAkses.melihatDashboard(role)) add(TabStok.DASHBOARD)
@@ -155,6 +163,10 @@ private fun tujuanUntukPeran(): List<TabStok> {
         }
         // Sisanya masuk laci, tanpa mengulang yang sudah di bilah.
         if (TabStok.MUTASI !in this) add(TabStok.MUTASI)
+        // Tanpa gerbang peran: web memasukkan `/stok/refund` ke kitchenAdminMoreItems,
+        // leaderMoreItems, DAN crewMoreItems. Yang berbeda per peran hanya tab dan
+        // tombol di dalamnya — lihat ReturAkses.
+        add(TabStok.RETUR)
         add(TabStok.ENTRI)
         // Pasangan Entri Manual: di sana orang melapor waste, di sini ia melihat
         // hasilnya. Tanpa gerbang peran, sama seperti Entri Manual — kueri-nya sudah
@@ -162,6 +174,7 @@ private fun tujuanUntukPeran(): List<TabStok> {
         add(TabStok.RIWAYAT_WASTE)
         if (bolehWaste && TabStok.WASTE !in this) add(TabStok.WASTE)
         if (bolehPo && TabStok.TERIMA_PO !in this) add(TabStok.TERIMA_PO)
+        if (bolehVendor && TabStok.TERIMA_VENDOR !in this) add(TabStok.TERIMA_VENDOR)
         add(TabStok.PERSETUJUAN_OPNAME)
         if (bolehHarga) add(TabStok.HARGA)
 
@@ -222,11 +235,44 @@ private fun lencanaMutasi(): Int {
     return if (staff == null) 0 else jumlah
 }
 
+/**
+ * Jumlah tiket retur yang menunggu tindakan pengguna — cermin `usePendingReturBadge`.
+ *
+ * Bentuknya sengaja sama dengan [lencanaMutasi], termasuk kegagalan yang diabaikan
+ * diam-diam: lencana adalah petunjuk, dan pesan galat di bilah bawah yang selalu
+ * terlihat lebih mengganggu daripada angka yang telat menyusul.
+ *
+ * Yang ditarik hanya status dan outlet tiap tiket, bukan seluruh kartu beserta
+ * itemnya: angka ini hidup di bilah bawah SELURUH modul Stok, jadi ia ikut termuat
+ * di layar mana pun yang sedang dibuka.
+ */
+@Composable
+private fun lencanaRetur(): Int {
+    val staff by AppSession.staff.collectAsState()
+    val role = staff?.role
+    val outletId = staff?.outletId
+    var jumlah by remember { mutableStateOf(0) }
+    val scope = rememberCoroutineScope()
+
+    suspend fun muat() {
+        runCatching { ReturRepository.statusUntukBadge() }
+            .onSuccess { jumlah = LencanaRetur.hitung(it, role, outletId) }
+            .onFailure { android.util.Log.w("StokShell", "lencana retur gagal", it) }
+    }
+
+    LaunchedEffect(staff) {
+        if (staff != null) muat()
+    }
+    RealtimeRefresh(RealtimeTables.RETUR) {
+        if (staff != null) scope.launch { muat() }
+    }
+    return if (staff == null) 0 else jumlah
+}
+
 @Composable
 fun StokShell(
     onKeluar: () -> Unit,
     onBukaBahan: (outletId: String, bahanId: String, nama: String) -> Unit,
-    onBukaProduksi: (outletId: String) -> Unit,
     onBukaTransfer: () -> Unit,
 ) {
     val tabs = tujuanUntukPeran()
@@ -246,7 +292,10 @@ fun StokShell(
     // Peta, bukan satu angka: web memberi lencana pada beberapa tujuan sekaligus
     // (permintaan, waste, terima PO), dan bentuk ini menampung tambahan itu tanpa
     // mengubah tanda tangan BottomNavStok lagi.
-    val lencana = mapOf(TabStok.MUTASI to lencanaMutasi())
+    val lencana = mapOf(
+        TabStok.MUTASI to lencanaMutasi(),
+        TabStok.RETUR to lencanaRetur(),
+    )
 
     Column(Modifier.fillMaxSize().background(com.sukashawarma.superapp.presentation.theme.SukaSurface)) {
         Box(Modifier.weight(1f)) {
@@ -254,17 +303,20 @@ fun StokShell(
                 TabStok.DASHBOARD -> MonitoringScreen(
                     onKeluar = onKeluar,
                     onBukaBahan = onBukaBahan,
-                    onBukaProduksi = onBukaProduksi,
                     onBukaTransfer = onBukaTransfer,
                 )
                 TabStok.PERMINTAAN -> PermintaanScreen()
                 TabStok.OPNAME -> OpnameScreen()
-                TabStok.LEDGER -> LedgerScreen()
+                TabStok.LEDGER -> LedgerScreen(onEntriManual = { tab = TabStok.ENTRI })
                 TabStok.MUTASI -> MutasiScreen()
+                TabStok.RETUR -> ReturScreen(onBack = { tab = tabs.first() })
                 TabStok.ENTRI -> EntriManualScreen(onBack = { tab = tabs.first() })
                 TabStok.RIWAYAT_WASTE -> RiwayatWasteScreen(onBack = { tab = tabs.first() })
                 TabStok.PERSETUJUAN_OPNAME -> PersetujuanOpnameScreen(onBack = { tab = tabs.first() })
                 TabStok.TERIMA_PO -> PenerimaanPoScreen(onBack = { tab = tabs.first() })
+                TabStok.TERIMA_VENDOR ->
+                    if (StokAkses.bisaTerimaVendor(staff?.outletId)) TerimaVendorScreen(onBack = { tab = tabs.first() })
+                    else KeadaanTidakBerhak("Modul ini hanya untuk staf yang terhubung ke outlet.")
                 TabStok.HARGA -> if (hargaAccess) HargaBahanScreen(onBack = { tab = tabs.first() })
                     else KeadaanTidakBerhak("Modul ini hanya untuk pemegang master harga.")
                 TabStok.WASTE -> if (wasteAccess) WasteApprovalScreen(onBack = { tab = tabs.first() })
@@ -310,6 +362,8 @@ fun StokShell(
  */
 private val KELOMPOK_MENU_STOK = listOf(
     "Operasional" to listOf(
+        TabStok.TERIMA_VENDOR,
+        TabStok.RETUR,
         TabStok.LEDGER,
         TabStok.MUTASI,
         TabStok.ENTRI,
