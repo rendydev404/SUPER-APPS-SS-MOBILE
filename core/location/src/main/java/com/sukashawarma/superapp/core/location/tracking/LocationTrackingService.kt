@@ -82,7 +82,7 @@ class LocationTrackingService : Service() {
         private const val INTERVAL_IDLE_MS = 60_000L
 
         /** Ambang "bergerak". Di bawah ini GPS umumnya hanya derau saat orang berdiri diam. */
-        private const val MOVING_SPEED_MPS = 0.7f
+        private const val MOVING_SPEED_MPS = 0.9f
 
         /** Batas akurasi yang masih layak disimpan. Di atas ini bukan fix GPS. */
         private const val MAX_ACCURACY_M = 100f
@@ -129,8 +129,11 @@ class LocationTrackingService : Service() {
             val distM = if (prev != null) location.distanceTo(prev) else 0f
             val derivedSpeed = if (prev != null && dtSec > 0f) distM / dtSec else 0f
             val speed = if (location.hasSpeed() && location.speed > 0f) location.speed else derivedSpeed
-            // Deteksi bergerak: baik dari hardware speed sensor maupun perpindahan jarak nyata
-            val moving = speed > MOVING_SPEED_MPS || distM > 8f
+            // Deteksi bergerak:
+            // 1. Sensor kecepatan GPS terdeteksi > 0.9 m/s (~3.24 km/j), ATAU
+            // 2. Jarak perpindahan nyata > 20m DAN kecepatan turunan > 0.8 m/s.
+            // Menghindari derau GPS 8-10m saat HP diam 60 detik memicu moving = true palsu.
+            val moving = (speed > MOVING_SPEED_MPS) || (distM > 20f && derivedSpeed > 0.8f)
             if (moving != movingMode) requestUpdates(moving)
             lastRecordedLocation = location
 
