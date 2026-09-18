@@ -5,18 +5,24 @@ import androidx.lifecycle.viewModelScope
 import com.google.gson.JsonObject
 import com.sukashawarma.superapp.data.remote.Realtime
 import com.sukashawarma.superapp.domain.session.AppSession
+import com.sukashawarma.superapp.feature.chat.ChatKehadiran
 import com.sukashawarma.superapp.feature.chat.data.AnggotaGrup
+import com.sukashawarma.superapp.feature.chat.data.BacaanPesan
 import com.sukashawarma.superapp.feature.chat.data.ChatRepository
+import com.sukashawarma.superapp.feature.chat.data.DetailInfoPesan
+import com.sukashawarma.superapp.feature.chat.data.PembacaPesan
 import com.sukashawarma.superapp.feature.chat.data.PengaturanGrup
 import com.sukashawarma.superapp.feature.chat.data.PesanChat
 import com.sukashawarma.superapp.feature.chat.data.ReaksiPesan
 import com.sukashawarma.superapp.feature.chat.data.Sebutan
 import com.sukashawarma.superapp.feature.chat.domain.PelacakPengetik
 import com.sukashawarma.superapp.feature.chat.domain.Pengetik
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -26,6 +32,10 @@ data class KirimanTertunda(
     val kunci: String,
     val body: String,
     val fotoWebp: ByteArray?,
+    /** Rekaman suara yang menunggu diunggah. null = bukan pesan suara. */
+    val suaraM4a: ByteArray? = null,
+    val suaraMs: Int? = null,
+    val suaraWave: String? = null,
     val replyTo: PesanChat?,
     val dibuatMs: Long,
     /** Orang yang disebut; ikut bertahan agar kiriman yang diulang tetap
@@ -48,6 +58,15 @@ data class ChatState(
     val suntingTarget: PesanChat? = null,
     /** Reaksi dikelompokkan per id pesan supaya bubble tinggal melihat miliknya. */
     val reaksi: Map<String, List<ReaksiPesan>> = emptyMap(),
+    /** Catatan pembacaan per id pesan, untuk centang biru dan jumlah pembaca. */
+    val bacaan: Map<String, List<BacaanPesan>> = emptyMap(),
+    /** Pesan yang sedang dibuka detail info pembacaannya (Info Pesan). */
+    val infoTarget: PesanChat? = null,
+    /** Data detail pembaca dari RPC chat_info_pesan. */
+    val detailInfoPesan: DetailInfoPesan? = null,
+    /** Siapa saja yang sudah mendengarkan pesan suara yang sedang dibuka infonya. */
+    val pendengarSuara: List<PembacaPesan> = emptyList(),
+    val memuatInfo: Boolean = false,
     val pengaturan: PengaturanGrup = PengaturanGrup(),
     /** true bila akun ini boleh mengubah pengaturan grup (developer/admin/HR). */
     val pengelola: Boolean = false,
@@ -95,6 +114,23 @@ class ChatViewModel : ViewModel() {
         }
         viewModelScope.launch {
             Realtime.updates(ChatRepository.TABLE_REAKSI).collect { muatReaksi() }
+        }
+        viewModelScope.launch {
+            Realtime.updates(ChatRepository.TABLE_BACAAN).collect {
+                muatBacaan()
+                val target = _state.value.infoTarget
+                if (target != null) {
+                    segarkanInfoPesan(target.id, target.audioPath != null)
+                }
+            }
+        }
+        viewModelScope.launch {
+            Realtime.updates(ChatRepository.TABLE_SUARA_PUTAR).collect {
+                val target = _state.value.infoTarget
+                if (target != null && target.audioPath != null) {
+                    segarkanInfoPesan(target.id, true)
+                }
+            }
         }
         viewModelScope.launch {
             Realtime.updates(ChatRepository.TABLE_PENGATURAN).collect { muatPengaturan() }
@@ -222,6 +258,30 @@ class ChatViewModel : ViewModel() {
         ))
     }
 
+    /**
+     * Kirim voice note. Berkasnya dibaca ke memori di sini lalu dihapus dari
+     * cache: rekaman 5 menit pun di bawah 1,2 MB, dan menyimpan byte-nya di
+     * antrean membuat tombol "coba lagi" tetap bekerja walau cache sudah disapu.
+     */
+    fun kirimSuara(berkas: java.io.File, durasiMs: Int, wave: String) {
+        val isi = runCatching { berkas.readBytes() }.getOrNull()
+        berkas.delete()
+        if (isi == null || isi.isEmpty()) {
+            android.util.Log.e("ChatViewModel", "rekaman suara kosong / tidak terbaca")
+            return
+        }
+        antre(KirimanTertunda(
+            kunci = UUID.randomUUID().toString(),
+            body = "",
+            fotoWebp = null,
+            suaraM4a = isi,
+            suaraMs = durasiMs,
+            suaraWave = wave,
+            replyTo = _state.value.balasTarget,
+            dibuatMs = System.currentTimeMillis(),
+        ))
+    }
+
     fun kirimFoto(webp: ByteArray, keterangan: String, sebutan: List<Sebutan> = emptyList()) {
         antre(KirimanTertunda(
             kunci = UUID.randomUUID().toString(),
@@ -259,7 +319,16 @@ class ChatViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 val path = kiriman.fotoWebp?.let { ChatRepository.unggahFoto(userId, it) }
-                val tersimpan = ChatRepository.kirim(kiriman.body, path, kiriman.replyTo?.id, kiriman.mentions)
+                val pathSuara = kiriman.suaraM4a?.let { ChatRepository.unggahSuara(userId, it) }
+                val tersimpan = ChatRepository.kirim(
+                    body = kiriman.body,
+                    imagePath = path,
+                    replyToId = kiriman.replyTo?.id,
+                    mentions = kiriman.mentions,
+                    audioPath = pathSuara,
+                    audioMs = kiriman.suaraMs,
+                    audioWave = kiriman.suaraWave,
+                )
                 _state.value = _state.value.copy(
                     tertunda = _state.value.tertunda.filterNot { it.kunci == kiriman.kunci },
                     // Langsung ditempel supaya bubble tidak "hilang sekejap" menunggu
@@ -313,6 +382,7 @@ class ChatViewModel : ViewModel() {
                 throw e
             } catch (e: Exception) {
                 android.util.Log.e("ChatViewModel", "hapus gagal", e)
+                _pesanGalat.tryEmit(pesanRingkas(e))
                 muatUlang()
             }
         }
@@ -438,7 +508,9 @@ class ChatViewModel : ViewModel() {
         viewModelScope.launch {
             muatPesanSekarang(tandaiSelesai = true)
             muatReaksiSekarang()
+            muatBacaanSekarang()
             muatPengaturanSekarang()
+            muatAnggota()
         }
     }
 
@@ -452,6 +524,176 @@ class ChatViewModel : ViewModel() {
 
     private fun muatPengaturan() {
         viewModelScope.launch { muatPengaturanSekarang() }
+    }
+
+    private val sudahDitandaiDibaca = mutableSetOf<String>()
+
+    private var infoPesanJob: Job? = null
+
+    /** Buka lembar info pembacaan pesan (Info Pesan ala WA). */
+    fun bukaInfoPesan(pesan: PesanChat) {
+        infoPesanJob?.cancel()
+        _state.update {
+            it.copy(
+                infoTarget = pesan,
+                detailInfoPesan = null,
+                pendengarSuara = emptyList(),
+                memuatInfo = true,
+            )
+        }
+        val isAudio = pesan.audioPath != null
+        infoPesanJob = viewModelScope.launch {
+            segarkanInfoPesan(pesan.id, isAudio)
+            // Polling periodik 2 detik selama lembar menampilkan pesan ini (menjaga UI tetap real-time jika ada delay/drop jaringan)
+            while (isActive && _state.value.infoTarget?.id == pesan.id) {
+                delay(2000L)
+                if (isActive && _state.value.infoTarget?.id == pesan.id) {
+                    segarkanInfoPesan(pesan.id, isAudio)
+                }
+            }
+        }
+    }
+
+    fun tutupInfoPesan() {
+        infoPesanJob?.cancel()
+        infoPesanJob = null
+        _state.update {
+            it.copy(
+                infoTarget = null,
+                detailInfoPesan = null,
+                pendengarSuara = emptyList(),
+                memuatInfo = false,
+            )
+        }
+    }
+
+    private fun segarkanInfoPesan(messageId: String, isAudio: Boolean) {
+        viewModelScope.launch {
+            try {
+                val detail = ChatRepository.ambilInfoPesan(messageId)
+                val pendengar = if (isAudio) {
+                    try {
+                        ChatRepository.ambilPendengarSuara(messageId)
+                    } catch (_: Exception) {
+                        emptyList()
+                    }
+                } else {
+                    emptyList()
+                }
+                _state.update { curr ->
+                    if (curr.infoTarget?.id == messageId) {
+                        curr.copy(
+                            detailInfoPesan = detail,
+                            pendengarSuara = if (isAudio) pendengar else curr.pendengarSuara,
+                            memuatInfo = false,
+                        )
+                    } else {
+                        curr
+                    }
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.w("ChatViewModel", "segarkan info pesan gagal: ${e.message}")
+                _state.update { curr ->
+                    if (curr.infoTarget?.id == messageId) {
+                        curr.copy(memuatInfo = false)
+                    } else {
+                        curr
+                    }
+                }
+            }
+        }
+    }
+
+    private fun muatPendengarSuara(messageId: String) {
+        viewModelScope.launch {
+            try {
+                val daftar = ChatRepository.ambilPendengarSuara(messageId)
+                _state.update { curr ->
+                    if (curr.infoTarget?.id == messageId) {
+                        curr.copy(pendengarSuara = daftar)
+                    } else {
+                        curr
+                    }
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.w("ChatViewModel", "pendengar suara gagal: ${e.message}")
+            }
+        }
+    }
+
+    /** Catat bahwa akun ini sudah mendengarkan sebuah pesan suara. */
+    fun tandaiSuaraDiputar(messageId: String) {
+        if (!sudahDitandaiDengar.add(messageId)) return
+        viewModelScope.launch {
+            try {
+                ChatRepository.tandaiSuaraDiputar(messageId)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                sudahDitandaiDengar.remove(messageId)
+                android.util.Log.w("ChatViewModel", "tandai suara diputar gagal: ${e.message}")
+            }
+        }
+    }
+
+    private val sudahDitandaiDengar = mutableSetOf<String>()
+
+    fun muatDetailInfoPesan(messageId: String) {
+        val isAudio = _state.value.infoTarget?.let { it.id == messageId && it.audioPath != null } ?: false
+        segarkanInfoPesan(messageId, isAudio)
+    }
+
+    /**
+     * Tandai pesan rekan yang belum pernah ditandai dibaca oleh user aktif.
+     * Dijalankan secara batch dan aman dari duplikasi.
+     */
+    fun tandaiPesanDibaca(pesanList: List<PesanChat>) {
+        val uid = userId
+        if (uid.isBlank()) return
+        val belum = pesanList.filter { p ->
+            p.senderId != uid &&
+            p.id !in sudahDitandaiDibaca &&
+            _state.value.bacaan[p.id]?.none { it.userId == uid } != false
+        }.map { it.id }
+
+        if (belum.isEmpty()) return
+        sudahDitandaiDibaca.addAll(belum)
+
+        viewModelScope.launch {
+            try {
+                ChatRepository.tandaiDibaca(belum)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.w("ChatViewModel", "tandai dibaca gagal: ${e.message}")
+                sudahDitandaiDibaca.removeAll(belum.toSet())
+            }
+        }
+    }
+
+    private fun muatBacaan() {
+        viewModelScope.launch { muatBacaanSekarang() }
+    }
+
+    private suspend fun muatBacaanSekarang() {
+        try {
+            val semua = ChatRepository.ambilSemuaBacaan().groupBy { it.messageId }
+            _state.update { curr ->
+                if (semua != curr.bacaan) {
+                    curr.copy(bacaan = semua)
+                } else {
+                    curr
+                }
+            }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            android.util.Log.w("ChatViewModel", "bacaan tidak tersedia: ${e.message}")
+        }
     }
 
     private suspend fun muatPesanSekarang(tandaiSelesai: Boolean) {
@@ -470,10 +712,12 @@ class ChatViewModel : ViewModel() {
             // membuat seluruh daftar disusun ulang dan digambar ulang.
             if (sekarang.pesan == pesan && !sekarang.memuat && sekarang.galat == null) {
                 segarkanPengetik()
+                if (ChatKehadiran.terbuka) tandaiPesanDibaca(pesan)
                 return
             }
             _state.value = sekarang.copy(memuat = false, galat = null, pesan = pesan)
             segarkanPengetik()
+            if (ChatKehadiran.terbuka) tandaiPesanDibaca(pesan)
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
