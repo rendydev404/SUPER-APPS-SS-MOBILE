@@ -49,6 +49,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import com.sukashawarma.superapp.core.ui.RealtimeRefresh
+import com.sukashawarma.superapp.core.ui.RealtimeTables
 
 private val ORANGE = Color(0xFFEA580C)
 private val SLATE400 = Color(0xFF94A3B8)
@@ -115,6 +117,9 @@ fun HppMenuScreen(
 ) {
     val state by viewModel.state.collectAsState()
 
+    // HPP menu ikut bergeser begitu harga bahan diperbarui area manager.
+    RealtimeRefresh(RealtimeTables.BAHAN_BAKU_HARGA, RealtimeTables.BAHAN_BAKU) { viewModel.muatUlang() }
+
     Column(Modifier.fillMaxSize().background(Color(0xFFF8FAFC))) {
         HeaderStok(
             judul = "HPP Setiap Menu",
@@ -126,7 +131,7 @@ fun HppMenuScreen(
             onKembali = onBack,
             aksi = {
                 IconButton(onClick = viewModel::muatUlang) {
-                    Icon(Icons.Default.Refresh, "Muat ulang", tint = Color.White)
+                    Icon(Icons.Default.Refresh, "Muat ulang", tint = Color(0xFF1E293B))
                 }
             },
         )
