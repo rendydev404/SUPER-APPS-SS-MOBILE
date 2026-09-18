@@ -51,7 +51,46 @@ object Postgrest {
      */
     private suspend fun <T> parse(blok: suspend () -> T): T = withContext(Dispatchers.Default) { blok() }
 
-    suspend fun select(table: String, params: List<Pair<String, String>> = emptyList()): JsonArray = parse {
+    /**
+     * Tabel yang TIDAK boleh disajikan dari cache.
+     *
+     * Chat dikecualikan karena riwayat percakapan lama yang tampil tanpa beda apa pun dari
+     * yang baru itu menyesatkan: orang akan mengira pesan terakhir yang mereka lihat adalah
+     * pesan terakhir yang ada, lalu mengambil keputusan atas dasar itu. Chat memang
+     * online-only, dan lebih baik terlihat jelas kosong daripada terlihat terkini.
+     */
+    private val TANPA_CACHE = setOf(
+        "chat_messages",
+        "chat_message_reactions",
+        "chat_settings",
+        "private_chat_messages",
+    )
+
+    /**
+     * Pembacaan tabel, dengan cache sebagai jaring pengaman saat jaringan mati.
+     *
+     * Dipasang DI SINI, bukan satu per satu di tiap repository: puluhan layar memanggil
+     * fungsi ini, dan memasangnya per pemanggil berarti layar yang terlewat tetap jadi jalan
+     * buntu saat offline tanpa ada yang menyadarinya sampai ada crew yang mengeluh.
+     *
+     * Kuncinya memuat seluruh parameter query, termasuk filter `outlet_id`. Itu yang membuat
+     * data outlet lain tidak mungkin tertukar saat staf berpindah outlet — tanpa perlu
+     * membersihkan apa pun.
+     *
+     * Saat online perilakunya sama persis seperti sebelumnya: server tetap dipanggil, dan
+     * tidak ada satu pun layar yang bisa menampilkan angka basi selama sinyalnya masih ada.
+     * [rpc] sengaja TIDAK ikut di-cache — hasil hitungan server (laporan, saldo, HPP) yang
+     * basi tidak bisa dibedakan dari yang benar oleh siapa pun yang melihatnya.
+     */
+    suspend fun select(table: String, params: List<Pair<String, String>> = emptyList()): JsonArray {
+        if (table in TANPA_CACHE) return selectLangsung(table, params)
+        val kunci = "select:$table?" + params.joinToString("&") { "${it.first}=${it.second}" }
+        return CacheOffline.bacaArray(kunci, umurMaksMs = CacheOffline.UMUR_MAKS_BAWAAN_MS) {
+            selectLangsung(table, params)
+        }.data
+    }
+
+    private suspend fun selectLangsung(table: String, params: List<Pair<String, String>>): JsonArray = parse {
         val req = Request.Builder().url(urlFor(table, params)).get().build()
         val body = execute(req)
         if (body.isBlank()) JsonArray() else JsonParser.parseString(body).asJsonArray
