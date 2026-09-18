@@ -78,7 +78,7 @@ object AttendanceGates {
      * `oac_read_own_outlet` hanya membuka config outlet utama, sementara leader dan kru
      * multi-outlet bisa absen di outlet lain. Melempar exception bila gagal dimuat.
      */
-    suspend fun loadShiftOptions(outletId: String): List<ShiftOption>? {
+    suspend fun loadShiftOptions(outletId: String, role: String? = null): List<ShiftOption>? {
         val body = com.google.gson.JsonObject().apply { addProperty("p_outlet_id", outletId) }
         val cfg = Postgrest.rpc("attendance_shift_config", body).takeIf { it.isJsonObject }?.asJsonObject
             ?: return null
@@ -89,7 +89,8 @@ object AttendanceGates {
                 pilihShiftAktif = cfg.get("pilih_shift_aktif")?.takeIf { !it.isJsonNull }?.asBoolean,
                 shift2JamMasuk = cfg.optString("shift2_jam_masuk"),
                 shift2JamKeluar = cfg.optString("shift2_jam_keluar"),
-            )
+            ),
+            role = role,
         )
     }
 
