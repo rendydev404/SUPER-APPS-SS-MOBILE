@@ -19,6 +19,11 @@ object AuthPrefs {
     private const val KEY_BIOMETRIC_USER_ID = "biometric_user_id"
     private const val KEY_LAST_ACTIVE_USER_ID = "last_active_user_id"
 
+    private const val KEY_SESI_USER_ID = "sesi_user_id"
+    private const val KEY_SESI_STAFF_JSON = "sesi_staff_json"
+    private const val KEY_SESI_MITRA_JSON = "sesi_mitra_json"
+    private const val KEY_SESI_TERAKHIR_ONLINE_MS = "sesi_terakhir_online_ms"
+
     private lateinit var prefs: SharedPreferences
 
     fun init(context: Context) {
@@ -106,6 +111,58 @@ object AuthPrefs {
             .apply()
     }
 
+    /**
+     * Salinan profil sesi terakhir yang berhasil dimuat dari server, dipakai membuka
+     * aplikasi saat internet mati.
+     *
+     * Profilnya disimpan sebagai JSON mentah supaya modul ini tidak perlu mengenal
+     * StaffProfile maupun MitraProfile — keduanya milik `core:roles`, yang justru
+     * bergantung pada modul ini.
+     */
+    data class SnapshotSesi(
+        val userId: String,
+        val staffJson: String,
+        val mitraJson: String?,
+        val terakhirOnlineMs: Long,
+    )
+
+    /**
+     * Dipanggil setiap kali profil berhasil dimuat dari server, bukan hanya saat login.
+     * [terakhirOnlineMs] itulah yang membatasi berapa lama perangkat boleh dipakai tanpa
+     * pernah menyentuh server sama sekali.
+     */
+    fun simpanSnapshotSesi(userId: String, staffJson: String, mitraJson: String?) {
+        if (!::prefs.isInitialized) return
+        prefs.edit()
+            .putString(KEY_SESI_USER_ID, userId)
+            .putString(KEY_SESI_STAFF_JSON, staffJson)
+            .putString(KEY_SESI_MITRA_JSON, mitraJson)
+            .putLong(KEY_SESI_TERAKHIR_ONLINE_MS, System.currentTimeMillis())
+            .apply()
+    }
+
+    fun snapshotSesi(): SnapshotSesi? {
+        if (!::prefs.isInitialized) return null
+        val userId = prefs.getString(KEY_SESI_USER_ID, null) ?: return null
+        val staffJson = prefs.getString(KEY_SESI_STAFF_JSON, null) ?: return null
+        return SnapshotSesi(
+            userId = userId,
+            staffJson = staffJson,
+            mitraJson = prefs.getString(KEY_SESI_MITRA_JSON, null),
+            terakhirOnlineMs = prefs.getLong(KEY_SESI_TERAKHIR_ONLINE_MS, 0L),
+        )
+    }
+
+    fun hapusSnapshotSesi() {
+        if (!::prefs.isInitialized) return
+        prefs.edit()
+            .remove(KEY_SESI_USER_ID)
+            .remove(KEY_SESI_STAFF_JSON)
+            .remove(KEY_SESI_MITRA_JSON)
+            .remove(KEY_SESI_TERAKHIR_ONLINE_MS)
+            .apply()
+    }
+
     fun enableBiometric(userId: String, refreshToken: String) {
         if (!::prefs.isInitialized) return
         prefs.edit()
@@ -116,6 +173,11 @@ object AuthPrefs {
             .apply()
     }
 
+    /**
+     * Snapshot sesi ikut dibuang: tanpa biometrik tidak ada lagi gerbang yang bisa
+     * memverifikasi pemilik perangkat saat offline, jadi menyimpannya hanya menyisakan
+     * profil staf di disk tanpa ada yang bisa memakainya.
+     */
     fun disableBiometric() {
         if (!::prefs.isInitialized) return
         prefs.edit()
@@ -123,15 +185,21 @@ object AuthPrefs {
             .remove(KEY_BIOMETRIC_USER_ID)
             .remove(KEY_REFRESH_TOKEN)
             .apply()
+        hapusSnapshotSesi()
     }
 
     /**
      * Dipanggil saat sesi berakhir. Refresh token DIPERTAHANKAN bila biometrik
      * aktif — itulah yang membuat buka-dengan-sidik-jari masih bisa dipakai
      * setelah aplikasi ditutup. Tanpa biometrik, token dibuang.
+     *
+     * Snapshot sesi selalu ikut dibuang, bahkan saat biometrik aktif: keluar dari akun
+     * berarti mengakhiri sesi, dan masuk kembali harus melewati server sekali. Kalau
+     * snapshot dibiarkan, logout jadi tidak berarti apa-apa selama perangkat offline.
      */
     fun clear() {
         if (!::prefs.isInitialized) return
+        hapusSnapshotSesi()
         if (isBiometricEnabled()) return
         prefs.edit().remove(KEY_REFRESH_TOKEN).apply()
     }
