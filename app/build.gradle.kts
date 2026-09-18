@@ -115,6 +115,11 @@ dependencies {
     implementation("androidx.room:room-runtime:$roomVersion")
     implementation("androidx.room:room-ktx:$roomVersion")
 
+    // Penguras antrean offline saat aplikasi tidak dibuka. NetworkMonitor sudah memicu
+    // flush selama proses hidup; WorkManager menutup kasus proses sudah mati sementara
+    // antrean masih berisi kerja yang belum sampai ke server.
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
+
     // Network
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
