@@ -43,6 +43,7 @@ import com.sukashawarma.superapp.feature.stok.data.StokRepository
 import com.sukashawarma.superapp.feature.stok.domain.SaranTransfer
 import com.sukashawarma.superapp.feature.stok.domain.TransferSuggester
 import com.sukashawarma.superapp.feature.stok.domain.stokErrorMessage
+import com.sukashawarma.superapp.feature.stok.ui.HeaderStok
 import com.sukashawarma.superapp.feature.stok.ui.KeadaanGagal
 import com.sukashawarma.superapp.feature.stok.ui.KeadaanKosong
 import com.sukashawarma.superapp.feature.stok.ui.MemuatPenuh
@@ -95,24 +96,11 @@ fun TransferScreen(onKeluar: () -> Unit, viewModel: TransferViewModel = viewMode
     LaunchedEffect(Unit) { viewModel.muat() }
 
     Column(Modifier.fillMaxSize().background(SukaSurface)) {
-        Box(
-            Modifier.fillMaxWidth().background(
-                Brush.verticalGradient(listOf(Color(0xFFEA580C), Color(0xFFF97316)))
-            )
-        ) {
-            Row(
-                Modifier.statusBarsPadding().padding(start = 8.dp, end = 16.dp, top = 6.dp, bottom = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onKeluar) {
-                    Icon(Icons.Default.ArrowBack, "Kembali", tint = Color.White)
-                }
-                Column(Modifier.weight(1f)) {
-                    Text("Saran Transfer", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold)
-                    Text("Sekadar saran, tidak memindahkan stok", color = Color(0xFFFFEDD5), fontSize = 11.sp)
-                }
-            }
-        }
+        HeaderStok(
+            judul = "Saran Transfer",
+            subjudul = "Sekadar saran, tidak memindahkan stok",
+            onKembali = onKeluar,
+        )
 
         when {
             state.memuat -> MemuatPenuh()
