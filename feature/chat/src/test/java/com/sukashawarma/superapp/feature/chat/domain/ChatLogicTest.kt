@@ -280,4 +280,24 @@ class ChatLogicTest {
             )
         )
     }
+
+    @Test
+    fun `susunItemChat memasang dibacaOlehCount dengan tepat dari peta bacaan`() {
+        val now = java.time.ZonedDateTime.of(2026, 9, 14, 10, 0, 0, 0, zona).toInstant().toEpochMilli()
+        val cutoff = batasResetPesanMs(now, zona)
+        val p1 = pesan("m1", "me", cutoff + 10_000)
+        val p2 = pesan("m2", "me", cutoff + 20_000)
+        val items = susunItemChat(
+            pesan = listOf(p1, p2),
+            userId = "me",
+            nowMs = now,
+            zona = zona,
+            bacaanPerPesan = mapOf("m1" to 3, "m2" to 0),
+        )
+        val bubbles = items.filterIsInstance<ItemChat.Bubble>()
+        assertEquals(2, bubbles.size)
+        assertEquals(3, bubbles[0].dibacaOlehCount)
+        assertEquals(0, bubbles[1].dibacaOlehCount)
+        assertTrue(bubbles[0].milikSendiri)
+    }
 }
