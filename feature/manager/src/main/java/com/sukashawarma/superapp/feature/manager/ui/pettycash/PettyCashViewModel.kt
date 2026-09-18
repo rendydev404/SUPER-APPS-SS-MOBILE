@@ -19,6 +19,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 enum class TabPettyCash { REVIEW, RIWAYAT }
@@ -31,7 +32,7 @@ data class PettyCashUiState(
     val filterRiwayat: FilterRiwayat = FilterRiwayat.SEMUA,
     val filterTanggal: FilterTanggal = FilterTanggal.SEMUA,
     val semua: List<TopupPettyCash> = emptyList(),
-    val memuat: Boolean = true,
+    val memuat: Boolean = false,
     val sedangDiproses: Set<String> = emptySet(),
     val galat: String? = null,
     val kabar: String? = null,
@@ -58,43 +59,44 @@ class PettyCashViewModel : ViewModel() {
 
     init {
         muatDaftarOutlet()
-        muatUlang()
+        muatUlang(silent = true)
     }
 
     fun pilihTab(tab: TabPettyCash) {
         if (_state.value.tab == tab) return
-        _state.value = _state.value.copy(tab = tab)
+        _state.update { it.copy(tab = tab) }
     }
 
     // Penyaring bekerja di memori: seluruh 100 baris terbaru sudah ada di tangan,
     // jadi mengganti filter tidak perlu menyentuh jaringan sama sekali.
     fun pilihFilterReview(filter: FilterReview) {
-        _state.value = _state.value.copy(filterReview = filter)
+        _state.update { it.copy(filterReview = filter) }
     }
 
     fun pilihFilterRiwayat(filter: FilterRiwayat) {
-        _state.value = _state.value.copy(filterRiwayat = filter)
+        _state.update { it.copy(filterRiwayat = filter) }
     }
 
     fun pilihFilterTanggal(filter: FilterTanggal) {
-        _state.value = _state.value.copy(filterTanggal = filter)
+        _state.update { it.copy(filterTanggal = filter) }
     }
 
     /** Penyaring outlet menyentuh jaringan karena ia mempersempit query, bukan hasilnya. */
     fun pilihOutlet(outletId: String?) {
         if (_state.value.outletTerpilih == outletId) return
-        _state.value = _state.value.copy(outletTerpilih = outletId)
-        muatUlang()
+        _state.update { it.copy(outletTerpilih = outletId) }
+        muatUlang(silent = true)
     }
 
     fun tutupKabar() {
-        _state.value = _state.value.copy(kabar = null, galat = null)
+        _state.update { it.copy(kabar = null, galat = null) }
     }
 
     private fun muatDaftarOutlet() {
         viewModelScope.launch {
             try {
-                _state.value = _state.value.copy(daftarOutlet = WasteRepository.outletTerakses())
+                val outlet = WasteRepository.outletTerakses()
+                _state.update { it.copy(daftarOutlet = outlet) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -103,24 +105,37 @@ class PettyCashViewModel : ViewModel() {
         }
     }
 
-    fun muatUlang() {
+    fun muatUlang(silent: Boolean = false) {
+        val sudahAdaData = _state.value.semua.isNotEmpty()
+        val senyap = silent || sudahAdaData
+
+        // Pemuatan lama selalu dibatalkan: kalau ia dibiarkan berjalan, pergantian
+        // outlet saat refresh masih jalan tidak akan pernah mengambil data baru.
         pemuatan?.cancel()
         pemuatan = viewModelScope.launch {
-            val awal = _state.value
-            _state.value = awal.copy(memuat = true, galat = null)
+            val outletDiminta = _state.value.outletTerpilih
+            if (!senyap) {
+                _state.update { it.copy(memuat = true, galat = null) }
+            }
             try {
-                val daftar = PettyCashRepository.topups(awal.outletTerpilih)
-                _state.value = _state.value.copy(
-                    memuat = false,
-                    galat = null,
-                    role = AppSession.staff.value?.role,
-                    semua = daftar,
-                )
+                val daftar = PettyCashRepository.topups(outletDiminta)
+                _state.update {
+                    it.copy(
+                        memuat = false,
+                        galat = null,
+                        role = AppSession.staff.value?.role,
+                        semua = daftar,
+                    )
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 android.util.Log.e("PettyCashViewModel", "muatUlang() gagal", e)
-                _state.value = _state.value.copy(memuat = false, galat = pesanGalat(e))
+                if (!senyap) {
+                    _state.update { it.copy(memuat = false, galat = pesanGalat(e)) }
+                }
+            } finally {
+                _state.update { if (it.memuat) it.copy(memuat = false) else it }
             }
         }
     }
@@ -139,30 +154,36 @@ class PettyCashViewModel : ViewModel() {
 
     private fun jalankan(topup: TopupPettyCash, kabarSukses: String, aksi: suspend () -> Unit) {
         if (!_state.value.bolehMemproses) {
-            _state.value = _state.value.copy(
-                galat = "Peran Anda tidak berwenang memproses pengajuan petty cash.",
-            )
+            _state.update {
+                it.copy(galat = "Peran Anda tidak berwenang memproses pengajuan petty cash.")
+            }
             return
         }
-        if (topup.id in _state.value.sedangDiproses) return
+        // Kunci dipasang sebelum coroutine dimulai supaya ketukan ganda yang cepat
+        // tidak sempat mengirim dua RPC.
+        var lolos = false
+        _state.update {
+            lolos = topup.id !in it.sedangDiproses
+            if (lolos) it.copy(sedangDiproses = it.sedangDiproses + topup.id) else it
+        }
+        if (!lolos) return
 
         viewModelScope.launch {
-            _state.value = _state.value.copy(sedangDiproses = _state.value.sedangDiproses + topup.id)
             try {
                 aksi()
-                _state.value = _state.value.copy(kabar = kabarSukses)
+                _state.update { it.copy(kabar = kabarSukses) }
                 // Tidak ada pembaruan optimistis di sini. Status berikutnya ditentukan
                 // RPC (bisa 'forwarded_to_finance', bisa juga ditolak karena statusnya
                 // sudah berpindah), jadi menebaknya di layar berisiko menampilkan
                 // keadaan yang tidak pernah terjadi di server.
-                muatUlang()
+                muatUlang(silent = true)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 android.util.Log.e("PettyCashViewModel", "jalankan() gagal", e)
-                _state.value = _state.value.copy(galat = pesanAksiGagal(e))
+                _state.update { it.copy(galat = pesanAksiGagal(e)) }
             } finally {
-                _state.value = _state.value.copy(sedangDiproses = _state.value.sedangDiproses - topup.id)
+                _state.update { it.copy(sedangDiproses = it.sedangDiproses - topup.id) }
             }
         }
     }
