@@ -1,5 +1,7 @@
 package com.sukashawarma.superapp.presentation.absensi.cuti
 
+import androidx.compose.ui.platform.LocalContext
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -55,10 +57,21 @@ fun CutiScreen(
 ) {
     val state by viewModel.state.collectAsState()
     RealtimeRefresh(RealtimeTables.LEAVE_REQUESTS) { viewModel.refresh() }
+    // Pesan ini muncul setelah formulir tertutup, jadi ditampilkan sebagai toast alih-alih
+    // di dalam formulir — yang sudah tidak ada lagi di layar saat pengajuan masuk antrean.
+    val konteksAntrean = LocalContext.current
+    LaunchedEffect(state.pesanAntrean) {
+        val pesan = state.pesanAntrean ?: return@LaunchedEffect
+        Toast.makeText(konteksAntrean, pesan, Toast.LENGTH_LONG).show()
+        viewModel.clearPesanAntrean()
+    }
+
     val staff by AppSession.staff.collectAsState()
     var showForm by remember { mutableStateOf(false) }
 
     Scaffold(
+        // Samakan dengan latar isi; warna bawaan tema (krem) tampil sebagai pita di belakang nav.
+        containerColor = SukaSurface,
         // Cuti & Izin diakses dari tab "More" (index 3) di hub — bottom nav tetap tampil di
         // sini (bukan cuma di 4 tab utama) supaya user bisa lompat tab tanpa balik dulu.
         bottomBar = { AbsensiBottomNav(selectedIndex = 3, onSelect = onNavigateTab) },
