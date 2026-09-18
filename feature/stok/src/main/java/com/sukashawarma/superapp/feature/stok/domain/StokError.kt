@@ -24,6 +24,25 @@ private fun Postgrest.PostgrestException.sqlState(): String? = runCatching {
 }.getOrNull()
 
 /**
+ * Membaca `message` dari badan balasan PostgREST bila ada pesan spesifik dari server/database.
+ * Pesan teknis internal PostgreSQL (seperti RLS mentah atau syntax error) disaring agar
+ * pengguna tidak melihat teks teknis mentah.
+ */
+private fun Postgrest.PostgrestException.pesanRamahDb(): String? {
+    val pesan = runCatching {
+        com.google.gson.JsonParser.parseString(message.orEmpty())
+            .asJsonObject.get("message")?.asString?.trim()
+    }.getOrNull()?.takeIf { it.isNotBlank() } ?: return null
+
+    val teknis = pesan.startsWith("new row violates row-level", ignoreCase = true) ||
+        pesan.startsWith("permission denied", ignoreCase = true) ||
+        pesan.startsWith("canceling statement", ignoreCase = true) ||
+        pesan.startsWith("null value in column", ignoreCase = true)
+
+    return if (teknis) null else pesan
+}
+
+/**
  * Pesan error yang user-facing, dibedakan per penyebab.
  *
  * Meringkas semua kegagalan menjadi "periksa koneksi internet" membuat orang
@@ -32,14 +51,18 @@ private fun Postgrest.PostgrestException.sqlState(): String? = runCatching {
  * `AppSession.networkErrorMessage` yang sudah dipakai di modul Absensi.
  */
 fun stokErrorMessage(e: Throwable): String = when (e) {
-    is Postgrest.PostgrestException -> when {
-        e.sqlState() == SQLSTATE_STATEMENT_TIMEOUT ->
-            "Server terlalu lama memproses dan membatalkan permintaan. " +
-                "Data Anda BELUM tersimpan — silakan coba kirim lagi."
-        e.code == 401 || e.code == 403 -> "Anda tidak punya akses ke data outlet ini."
-        e.code == 404 -> "Data yang diminta tidak ditemukan di server."
-        e.code in 500..599 -> "Server sedang bermasalah. Coba lagi beberapa saat lagi."
-        else -> "Permintaan ditolak server (kode ${e.code})."
+    is Postgrest.PostgrestException -> {
+        val ramah = e.pesanRamahDb()
+        when {
+            e.sqlState() == SQLSTATE_STATEMENT_TIMEOUT ->
+                "Server terlalu lama memproses dan membatalkan permintaan. " +
+                    "Data Anda BELUM tersimpan — silakan coba kirim lagi."
+            e.code in 500..599 -> "Server sedang bermasalah. Coba lagi beberapa saat lagi."
+            ramah != null -> ramah
+            e.code == 401 || e.code == 403 -> "Anda tidak punya akses ke data outlet ini."
+            e.code == 404 -> "Data yang diminta tidak ditemukan di server."
+            else -> "Permintaan ditolak server (kode ${e.code})."
+        }
     }
     is UnknownHostException ->
         "Tidak ada koneksi internet. Periksa jaringan Wi-Fi/data seluler Anda."
