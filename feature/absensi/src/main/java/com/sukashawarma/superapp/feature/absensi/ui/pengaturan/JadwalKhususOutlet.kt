@@ -37,8 +37,9 @@ import androidx.compose.material.icons.filled.WbTwilight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import com.sukashawarma.superapp.core.ui.SukaDropdownHeader
+import com.sukashawarma.superapp.core.ui.SukaDropdownMenu
+import com.sukashawarma.superapp.core.ui.SukaDropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -656,7 +657,7 @@ private fun OutletPicker(
             }
         }
 
-        DropdownMenu(
+        SukaDropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
             modifier = Modifier.width(280.dp).heightIn(max = 400.dp),
@@ -699,18 +700,11 @@ private fun OutletPicker(
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 18.dp),
                         )
                     } else filtered.forEach { outlet ->
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    outlet.name,
-                                    fontSize = 14.sp,
-                                    fontWeight = if (outlet.id == selectedId) FontWeight.Bold else FontWeight.SemiBold,
-                                    color = if (outlet.id == selectedId) StitchPrimary else StitchOnSurface,
-                                )
-                            },
-                            leadingIcon = { Icon(Icons.Default.Storefront, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                        SukaDropdownMenuItem(
+                            text = outlet.name,
+                            selected = (outlet.id == selectedId),
+                            leadingIcon = Icons.Default.Storefront,
                             onClick = { onSelect(outlet); expanded = false },
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
                         )
                     }
                 }
