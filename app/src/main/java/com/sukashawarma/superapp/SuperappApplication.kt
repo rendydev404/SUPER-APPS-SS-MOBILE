@@ -10,6 +10,7 @@ import com.sukashawarma.superapp.domain.session.AppSession
 import com.sukashawarma.superapp.feature.absensi.notif.AbsenReminder
 import com.sukashawarma.superapp.feature.distribusi.data.VerifikasiDraftStore
 import com.sukashawarma.superapp.notif.FcmTokenRegistrar
+import com.sukashawarma.superapp.offline.ModeOffline
 import com.sukashawarma.superapp.notif.SuperappMessagingService
 import com.sukashawarma.superapp.data.location.LocationTrackingPrefs
 import com.sukashawarma.superapp.data.remote.SessionTokenHolder
@@ -32,6 +33,9 @@ class SuperappApplication : Application() {
         VerifikasiDraftStore.init(this)
         SupabaseClient.onRefreshNeeded = { AuthSessionManager.refresh() }
         NetworkMonitor.init(this)
+        // Setelah NetworkMonitor: pengurasan antrean offline mengamati isOnline, jadi
+        // sumbernya harus sudah hidup lebih dulu.
+        ModeOffline.pasang(this, lingkup)
 
         // Inisialisasi Update Manager dan WebSocket Realtime untuk update otomatis
         AppUpdateManager.initialize(this)
