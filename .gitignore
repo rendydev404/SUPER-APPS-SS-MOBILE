@@ -20,3 +20,4 @@ local.properties
 stitch-reference/
 *.fbf
 /*.png
+supabase/.temp/
