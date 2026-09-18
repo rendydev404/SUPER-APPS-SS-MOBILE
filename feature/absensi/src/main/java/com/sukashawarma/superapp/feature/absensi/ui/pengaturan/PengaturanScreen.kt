@@ -76,6 +76,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.sukashawarma.superapp.core.ui.RealtimeRefresh
+import com.sukashawarma.superapp.core.ui.RealtimeTables
 
 internal val StitchBackground = Color(0xFFF9F9FC)
 internal val StitchSurfaceLow = Color(0xFFF3F3F6)
@@ -97,6 +99,11 @@ private enum class WorkTimeTarget(val title: String) {
 @Composable
 fun PengaturanScreen(onExit: () -> Unit, viewModel: PengaturanViewModel = viewModel()) {
     val state by viewModel.state.collectAsState()
+
+    // Jam masuk, toleransi, dan radius geofence dipegang bersama satu outlet.
+    // Tanpa ini, dua supervisor bisa menyimpan nilai yang saling menimpa sambil
+    // sama-sama yakin sedang melihat angka terbaru.
+    RealtimeRefresh(RealtimeTables.ATTENDANCE_CONFIG) { viewModel.load() }
 
     var jamMasuk by remember(state.loading) { mutableStateOf(state.jamMasuk) }
     var jamKeluar by remember(state.loading) { mutableStateOf(state.jamKeluar) }
