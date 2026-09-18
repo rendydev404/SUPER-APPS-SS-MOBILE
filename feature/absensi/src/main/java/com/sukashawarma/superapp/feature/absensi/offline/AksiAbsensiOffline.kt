@@ -2,6 +2,7 @@ package com.sukashawarma.superapp.feature.absensi.offline
 
 import com.google.gson.JsonObject
 import com.sukashawarma.superapp.data.remote.Postgrest
+import com.sukashawarma.superapp.data.remote.abaikanDuplikat
 
 /**
  * Aksi absensi yang boleh menunggu di antrean perangkat saat internet mati.
@@ -35,7 +36,7 @@ object KasbonOffline {
         // deepCopy: payload yang sama dipakai lagi kalau kiriman ini gagal dan diulang,
         // jadi jangan disuntik in-place.
         val body = payload.deepCopy().apply { addProperty("client_op_id", clientOpId) }
-        Postgrest.insert("cash_advances", body, returning = false)
+        abaikanDuplikat { Postgrest.insert("cash_advances", body, returning = false) }
     }
 }
 
@@ -61,6 +62,6 @@ object CutiOffline {
 
     suspend fun kirim(clientOpId: String, payload: JsonObject, lampiranUrl: String?) {
         val body = payload.deepCopy().apply { addProperty("client_op_id", clientOpId) }
-        Postgrest.insert("leave_requests", body, returning = false)
+        abaikanDuplikat { Postgrest.insert("leave_requests", body, returning = false) }
     }
 }
