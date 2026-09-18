@@ -52,6 +52,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import com.sukashawarma.superapp.core.ui.RealtimeRefresh
+import com.sukashawarma.superapp.core.ui.RealtimeTables
 
 private val ORANGE = Color(0xFFEA580C)
 private val SLATE400 = Color(0xFF94A3B8)
@@ -125,6 +127,10 @@ fun LaporanPenjualanScreen(
     viewModel: LaporanPenjualanViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+
+    // Omzet & porsi terjual bergerak tiap kasir menutup pesanan. Layar Laporan
+    // milik Manager sudah berlangganan keduanya; layar ini tertinggal.
+    RealtimeRefresh(RealtimeTables.ORDERS, RealtimeTables.ORDER_ITEMS) { viewModel.muatUlang() }
     val r = state.ringkas
 
     Column(Modifier.fillMaxSize().background(Color(0xFFF8FAFC))) {
@@ -134,7 +140,7 @@ fun LaporanPenjualanScreen(
             onKembali = onBack,
             aksi = {
                 IconButton(onClick = viewModel::muatUlang) {
-                    Icon(Icons.Default.Refresh, "Muat ulang", tint = Color.White)
+                    Icon(Icons.Default.Refresh, "Muat ulang", tint = Color(0xFF1E293B))
                 }
             },
         )
