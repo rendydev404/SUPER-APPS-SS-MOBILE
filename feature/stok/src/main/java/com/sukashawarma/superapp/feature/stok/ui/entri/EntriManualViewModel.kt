@@ -5,6 +5,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sukashawarma.superapp.core.camera.keJpeg
 import com.sukashawarma.superapp.domain.session.AppSession
+import com.sukashawarma.superapp.data.remote.HasilAksi
+import com.sukashawarma.superapp.data.remote.LampiranOutbox
+import com.sukashawarma.superapp.data.remote.kirimAtauAntre
+import com.sukashawarma.superapp.feature.stok.offline.WasteOffline
 import com.sukashawarma.superapp.feature.stok.data.EntriManualRepository
 import com.sukashawarma.superapp.feature.stok.data.LedgerRepository
 import com.sukashawarma.superapp.feature.stok.data.StokRepository
@@ -15,6 +19,9 @@ import com.sukashawarma.superapp.feature.stok.domain.stokErrorMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 
 /** Jenis entri — nilainya persis kolom `ledger_stok.tipe` yang dipakai web. */
@@ -52,7 +59,14 @@ data class EntriManualUiState(
     val jumlah: String = "",
     val alasan: String = "",
     val catatan: String = "",
-    val fotoUrl: String? = null,
+    /**
+     * Foto bukti waste sebagai BERKAS LOKAL, bukan URL hasil unggahan.
+     *
+     * Dulu foto diunggah saat dipotret, jadi tanpa sinyal layar ini mentok di "Foto gagal
+     * diunggah" dan laporan waste tidak pernah bisa dibuat. Sekarang unggahannya menyatu
+     * dengan pengiriman, lewat jalur yang sama dengan antrean offline.
+     */
+    val fotoBukti: java.io.File? = null,
     val kameraTerbuka: Boolean = false,
     val mengunggahFoto: Boolean = false,
     val memuat: Boolean = true,
@@ -146,7 +160,7 @@ data class EntriManualUiState(
             jenis != JenisEntri.WASTE && jumlahSkalaLedger == null ->
                 "Faktor satuan bahan ini belum lengkap, jadi jumlahnya tidak bisa dicatat dengan aman."
             butuhAlasan && alasan.isBlank() -> "Alasan wajib diisi."
-            butuhFoto && fotoUrl == null -> "Foto bukti wajib diunggah."
+            butuhFoto && fotoBukti == null -> "Foto bukti wajib diambil."
             else -> null
         }
 }
@@ -188,7 +202,7 @@ class EntriManualViewModel : ViewModel() {
         _state.value = _state.value.copy(
             outletTerpilih = outlet,
             bahanTerpilih = null,
-            fotoUrl = null,
+            fotoBukti = null,
             memuat = true,
         )
         viewModelScope.launch { muatBahan(outlet.id) }
@@ -211,7 +225,7 @@ class EntriManualViewModel : ViewModel() {
         _state.value = _state.value.copy(
             jenis = jenis,
             alasan = "",
-            fotoUrl = if (jenis == JenisEntri.WASTE) _state.value.fotoUrl else null,
+            fotoBukti = if (jenis == JenisEntri.WASTE) _state.value.fotoBukti else null,
         )
     }
 
@@ -223,7 +237,7 @@ class EntriManualViewModel : ViewModel() {
             // diketik. Web memilih default yang sama.
             satuanInput = if (meta?.satuanKecil != null) SatuanInput.KECIL else SatuanInput.BESAR,
             jumlah = "",
-            fotoUrl = null,
+            fotoBukti = null,
         )
     }
 
@@ -238,55 +252,100 @@ class EntriManualViewModel : ViewModel() {
     fun tutupKamera() { _state.value = _state.value.copy(kameraTerbuka = false) }
     fun bersihkanPesan() { _state.value = _state.value.copy(pesan = null, error = null) }
 
-    fun simpanFoto(bitmap: Bitmap) {
-        val outletId = _state.value.outletTerpilih?.id ?: return
-        val bahanId = _state.value.bahanTerpilih?.bahanBakuId ?: return
+    /**
+     * Menyimpan foto bukti ke berkas lokal, TANPA mengunggahnya.
+     *
+     * Unggahan menyatu dengan pengiriman (lihat [kirim]) karena dua alasan: laporan waste
+     * jadi bisa dibuat saat internet mati, dan crew tidak perlu menunggu unggahan selesai
+     * sambil berdiri di depan bahan yang mau dibuang.
+     */
+    fun simpanFoto(bitmap: Bitmap, direktoriCache: java.io.File) {
         _state.value = _state.value.copy(kameraTerbuka = false, mengunggahFoto = true)
         viewModelScope.launch {
             try {
-                val url = EntriManualRepository.unggahBuktiWaste(outletId, bahanId, bitmap.keJpeg())
-                _state.value = _state.value.copy(mengunggahFoto = false, fotoUrl = url)
+                val berkas = withContext(Dispatchers.IO) {
+                    val dir = java.io.File(direktoriCache, "bukti_waste").apply { mkdirs() }
+                    // Nama tetap: memotret ulang menimpa berkas sebelumnya alih-alih
+                    // meninggalkan foto yatim yang tidak akan pernah terkirim.
+                    java.io.File(dir, "bukti.jpg").apply { writeBytes(bitmap.keJpeg()) }
+                }
+                _state.value = _state.value.copy(mengunggahFoto = false, fotoBukti = berkas)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
                     mengunggahFoto = false,
-                    error = "Foto gagal diunggah. Coba potret ulang.",
+                    error = "Foto gagal disimpan. Coba potret ulang.",
                 )
             }
         }
     }
 
     fun kirim() {
+        var lanjut = false
+        _state.update { current ->
+            val halangan = current.halangan
+            if (halangan != null) {
+                current.copy(error = halangan)
+            } else if (current.menyimpan) {
+                current
+            } else {
+                lanjut = true
+                current.copy(menyimpan = true, error = null, pesan = null)
+            }
+        }
+        if (!lanjut) return
+
         val s = _state.value
-        val halangan = s.halangan
-        if (halangan != null) {
-            _state.value = s.copy(error = halangan)
+        val outletId = s.outletTerpilih?.id ?: run {
+            _state.update { it.copy(menyimpan = false) }
             return
         }
-        if (s.menyimpan) return
-
-        val outletId = s.outletTerpilih!!.id
-        val bahan = s.bahanTerpilih!!
-        val qtyBesar = s.jumlahBesar!!
+        val bahan = s.bahanTerpilih ?: run {
+            _state.update { it.copy(menyimpan = false) }
+            return
+        }
+        val qtyBesar = s.jumlahBesar ?: run {
+            _state.update { it.copy(menyimpan = false) }
+            return
+        }
         val pengguna = AppSession.staff.value?.id
         if (pengguna == null) {
-            _state.value = s.copy(error = "Sesi tidak valid, silakan login ulang.")
+            _state.update { it.copy(menyimpan = false, error = "Sesi tidak valid, silakan login ulang.") }
             return
         }
 
         viewModelScope.launch {
-            _state.value = _state.value.copy(menyimpan = true, error = null, pesan = null)
             try {
+                var masukAntrean = false
                 if (s.jenis == JenisEntri.WASTE) {
-                    EntriManualRepository.laporWaste(
+                    val clientOpId = java.util.UUID.randomUUID().toString()
+                    val hasil = kirimAtauAntre(
+                        jenis = WasteOffline.JENIS,
+                        clientOpId = clientOpId,
+                        payload = WasteOffline.payload(
+                            outletId = outletId,
+                            bahanBakuId = bahan.bahanBakuId,
+                            qtyBesar = qtyBesar,
+                            alasan = s.alasan.trim(),
+                            dilaporkanOleh = pengguna,
+                        ),
+                        kirim = WasteOffline::kirim,
                         outletId = outletId,
-                        bahanBakuId = bahan.bahanBakuId,
-                        qtyBesar = qtyBesar,
-                        alasan = s.alasan.trim(),
-                        photoUrl = s.fotoUrl!!,
-                        dilaporkanOleh = pengguna,
+                        dibuatOleh = pengguna,
+                        lampiran = s.fotoBukti?.let {
+                            // Disalin ke berkas ber-nama unik: berkas "bukti.jpg" ditimpa
+                            // begitu crew memotret laporan berikutnya, dan laporan ini bisa
+                            // masih menunggu di antrean saat itu terjadi.
+                            // Disalin, BUKAN dipindah: kalau server menolak kiriman ini,
+                            // berkas aslinya harus masih ada supaya pratinjau foto di layar
+                            // tidak tiba-tiba kosong dan crew tidak perlu memotret ulang.
+                            val tetap = java.io.File(it.parentFile, "$clientOpId.jpg")
+                            it.copyTo(tetap, overwrite = true)
+                            LampiranOutbox(tetap, WasteOffline.BUCKET, WasteOffline.tujuanFoto(outletId, clientOpId))
+                        },
                     )
+                    masukAntrean = hasil == HasilAksi.MASUK_ANTREAN
                 } else {
                     // Skala baris saldo, bukan satuan besar — lihat [jumlahSkalaLedger].
                     val qtyLedger = s.jumlahSkalaLedger!!
@@ -312,25 +371,32 @@ class EntriManualViewModel : ViewModel() {
                     )
                 }
                 StokRepository.invalidate()
-                _state.value = _state.value.copy(
-                    menyimpan = false,
-                    jumlah = "",
-                    alasan = "",
-                    catatan = "",
-                    fotoUrl = null,
-                    bahanTerpilih = null,
-                    pesan = if (s.jenis == JenisEntri.WASTE) {
-                        "Laporan waste terkirim dan menunggu persetujuan."
-                    } else {
-                        "${s.jenis.label} tersimpan. Saldo sudah diperbarui."
-                    },
-                )
-                _state.value.outletTerpilih?.let { muatBahan(it.id) }
+                _state.update {
+                    it.copy(
+                        menyimpan = false,
+                        jumlah = "",
+                        alasan = "",
+                        catatan = "",
+                        fotoBukti = null,
+                        bahanTerpilih = null,
+                        pesan = if (masukAntrean) {
+                            "Laporan waste tersimpan di HP dan akan terkirim otomatis begitu ada internet."
+                        } else if (s.jenis == JenisEntri.WASTE) {
+                            "Laporan waste terkirim dan menunggu persetujuan."
+                        } else {
+                            "${s.jenis.label} tersimpan. Saldo sudah diperbarui."
+                        },
+                    )
+                }
+                // Saldo hanya dimuat ulang kalau kiriman benar-benar sampai server; saat
+                // offline pemuatan itu gagal dan menimpa pesan di atas dengan pesan galat.
+                if (!masukAntrean) _state.value.outletTerpilih?.let { muatBahan(it.id) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                android.util.Log.e("EntriManualViewModel", "kirim() gagal", e)
-                _state.value = _state.value.copy(menyimpan = false, error = stokErrorMessage(e))
+                _state.update {
+                    it.copy(menyimpan = false, error = stokErrorMessage(e))
+                }
             }
         }
     }
