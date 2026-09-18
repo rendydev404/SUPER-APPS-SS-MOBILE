@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import androidx.core.app.RemoteInput
+import com.sukashawarma.superapp.BuildConfig
 import com.sukashawarma.superapp.data.remote.SessionTokenHolder
 import com.sukashawarma.superapp.feature.chat.data.ChatRepository
 import kotlinx.coroutines.CoroutineScope
@@ -24,6 +25,7 @@ class BalasChatReceiver : BroadcastReceiver() {
 
     companion object {
         const val AKSI_TANDAI_DIBACA = "com.sukashawarma.superapp.TANDAI_DIBACA_CHAT"
+        const val AKSI_TEST_NOTIF = "com.sukashawarma.superapp.TEST_NOTIF_CHAT"
     }
 
     private val lingkup = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -33,7 +35,23 @@ class BalasChatReceiver : BroadcastReceiver() {
             ChatNotifikasi.tutup(context)
             return
         }
+        if (intent.action == AKSI_TEST_NOTIF) {
+            val pengirim = intent.getStringExtra("sender") ?: "Ahmad (Dapur)"
+            val pesan = intent.getStringExtra("pesan") ?: "Halo mas, stok pita shawarma sisa 3 pack ya!"
+            ChatNotifikasi.tampilkan(
+                context = context,
+                pengirim = pengirim,
+                isi = pesan,
+                namaGrup = "Chat Tim SS",
+            )
+            return
+        }
         if (intent.action != ChatNotifikasi.AKSI_BALAS) return
+
+        if (true || !BuildConfig.DEBUG) {
+            android.util.Log.w("BalasChatReceiver", "Fitur balas notifikasi dinonaktifkan saat chat terkunci.")
+            return
+        }
 
         val teks = RemoteInput.getResultsFromIntent(intent)
             ?.getCharSequence(ChatNotifikasi.KUNCI_BALASAN)
