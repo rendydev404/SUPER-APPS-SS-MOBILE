@@ -1,19 +1,19 @@
 package com.sukashawarma.superapp.feature.stok
 
-import androidx.compose.animation.AnimatedContentTransitionScope
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.sukashawarma.superapp.core.ui.keluarMaju
+import com.sukashawarma.superapp.core.ui.keluarMundur
+import com.sukashawarma.superapp.core.ui.masukMaju
+import com.sukashawarma.superapp.core.ui.masukMundur
+import com.sukashawarma.superapp.core.ui.navigateSekali
+import com.sukashawarma.superapp.core.ui.popAman
 import com.sukashawarma.superapp.feature.stok.ui.detail.DetailBahanScreen
 import com.sukashawarma.superapp.feature.stok.ui.StokShell
-import com.sukashawarma.superapp.feature.stok.ui.produksi.ProduksiScreen
 import com.sukashawarma.superapp.feature.stok.ui.transfer.TransferScreen
 
 /**
@@ -27,39 +27,18 @@ fun StokNavGraph(onExit: () -> Unit) {
     NavHost(
         navController = navController,
         startDestination = StokRoutes.MONITORING,
-        enterTransition = {
-            slideIntoContainer(
-                AnimatedContentTransitionScope.SlideDirection.Start,
-                tween(280, easing = FastOutSlowInEasing),
-            ) + fadeIn(tween(280))
-        },
-        exitTransition = {
-            slideOutOfContainer(
-                AnimatedContentTransitionScope.SlideDirection.Start,
-                tween(280, easing = FastOutSlowInEasing),
-            ) + fadeOut(tween(280))
-        },
-        popEnterTransition = {
-            slideIntoContainer(
-                AnimatedContentTransitionScope.SlideDirection.End,
-                tween(280, easing = FastOutSlowInEasing),
-            ) + fadeIn(tween(280))
-        },
-        popExitTransition = {
-            slideOutOfContainer(
-                AnimatedContentTransitionScope.SlideDirection.End,
-                tween(280, easing = FastOutSlowInEasing),
-            ) + fadeOut(tween(280))
-        },
+        enterTransition = { masukMaju() },
+        exitTransition = { keluarMaju() },
+        popEnterTransition = { masukMundur() },
+        popExitTransition = { keluarMundur() },
     ) {
         composable(StokRoutes.MONITORING) {
             StokShell(
                 onKeluar = onExit,
                 onBukaBahan = { outletId, bahanId, nama ->
-                    navController.navigate(StokRoutes.detail(outletId, bahanId, nama))
+                    navController.navigateSekali(StokRoutes.detail(outletId, bahanId, nama))
                 },
-                onBukaProduksi = { outletId -> navController.navigate(StokRoutes.produksi(outletId)) },
-                onBukaTransfer = { navController.navigate(StokRoutes.TRANSFER) },
+                onBukaTransfer = { navController.navigateSekali(StokRoutes.TRANSFER) },
             )
         }
 
@@ -75,22 +54,14 @@ fun StokNavGraph(onExit: () -> Unit) {
                 outletId = entry.arguments?.getString("outletId").orEmpty(),
                 bahanId = entry.arguments?.getString("bahanId").orEmpty(),
                 namaAwal = entry.arguments?.getString("nama").orEmpty(),
-                onKeluar = { navController.popBackStack() },
-            )
-        }
-
-        composable(
-            StokRoutes.PRODUKSI,
-            arguments = listOf(navArgument("outletId") { type = NavType.StringType }),
-        ) { entry ->
-            ProduksiScreen(
-                outletId = entry.arguments?.getString("outletId").orEmpty(),
-                onKeluar = { navController.popBackStack() },
+                // Pengecualian: detail satu bahan, jadi "kembali" berarti kembali ke
+                // daftarnya — bukan pulang ke Beranda seperti layar Stok lainnya.
+                onKeluar = { navController.popAman() },
             )
         }
 
         composable(StokRoutes.TRANSFER) {
-            TransferScreen(onKeluar = { navController.popBackStack() })
+            TransferScreen(onKeluar = onExit)
         }
     }
 }
