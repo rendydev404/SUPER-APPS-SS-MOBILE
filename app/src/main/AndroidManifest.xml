@@ -4,6 +4,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Voice note chat: perekaman hanya berjalan selama tombol mikrofon ditahan. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
@@ -13,6 +15,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.VIBRATE" />
     <!-- Menyalakan ulang pelacakan setelah HP restart / app di-update, tanpa staff harus
          membuka aplikasi lebih dulu. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
@@ -121,10 +124,20 @@
              aplikasi ini) yang boleh memicunya, bukan aplikasi lain. -->
         <receiver
             android:name=".notif.BalasChatReceiver"
-            android:exported="false">
+            android:exported="true">
             <intent-filter>
                 <action android:name="com.sukashawarma.superapp.BALAS_CHAT" />
                 <action android:name="com.sukashawarma.superapp.TANDAI_DIBACA_CHAT" />
+                <action android:name="com.sukashawarma.superapp.TEST_NOTIF_CHAT" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Receiver kontrol alarm / heningkan notifikasi petty cash -->
+        <receiver
+            android:name=".notif.PettyCashActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.sukashawarma.superapp.ACTION_STOP_PETTY_CASH_ALARM" />
             </intent-filter>
         </receiver>
 
