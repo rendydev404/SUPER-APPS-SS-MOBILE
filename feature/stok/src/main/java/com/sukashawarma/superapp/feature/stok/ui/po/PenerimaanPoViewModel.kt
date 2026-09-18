@@ -2,14 +2,19 @@ package com.sukashawarma.superapp.feature.stok.ui.po
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.sukashawarma.superapp.domain.session.AppSession
 import com.sukashawarma.superapp.feature.stok.data.ItemPo
 import com.sukashawarma.superapp.feature.stok.data.PenerimaanPoRepository
 import com.sukashawarma.superapp.feature.stok.data.PoInbound
 import com.sukashawarma.superapp.feature.stok.data.StokRepository
+import com.sukashawarma.superapp.feature.stok.domain.GerbangTerimaPo
+import com.sukashawarma.superapp.feature.stok.domain.PeringatanTerima
+import com.sukashawarma.superapp.feature.stok.domain.StokAkses
 import com.sukashawarma.superapp.feature.stok.domain.stokErrorMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /** Isian pemeriksaan fisik satu baris PO. */
@@ -31,7 +36,34 @@ data class PenerimaanPoUiState(
     val mengirim: Boolean = false,
     val pesan: String? = null,
     val error: String? = null,
+    /** Stok berjalan Gudang Pusat per bahan, satuan besar. Kosong = belum termuat. */
+    val stokGudang: Map<String, Double> = emptyMap(),
+    /** Terisi saat konfirmasi peringatan sedang ditampilkan. */
+    val konfirmasi: List<Pair<ItemPo, List<PeringatanTerima>>> = emptyList(),
+    /** Hak akses untuk menyimpan penerimaan (kitchen/admin/owner). */
+    val bolehVerifikasi: Boolean = true,
 ) {
+    /**
+     * Stok gudang bahan ini, atau null bila BELUM DIKETAHUI — query belum selesai,
+     * atau bahannya belum punya baris saldo. Sengaja tidak dipukul rata jadi nol.
+     */
+    fun stokBesar(bahanBakuId: String?): Double? =
+        if (bahanBakuId == null) null else stokGudang[bahanBakuId]
+
+    /** Peringatan untuk satu baris, memakai isian yang sedang diketik. */
+    fun peringatan(baris: ItemPo): List<PeringatanTerima> = GerbangTerimaPo.cek(
+        qtyDatang = isianUntuk(baris.id).qtyDatang.toDoubleOrNull() ?: 0.0,
+        qtyPesan = baris.qtyPesan,
+        qtyTerimaSebelumnya = baris.qtyTerimaSebelumnya,
+        stokGudangBesar = stokBesar(baris.bahanBakuId),
+    )
+
+    /** Stok gudang setelah baris ini disimpan; null bila stok awalnya tak diketahui. */
+    fun stokSetelah(baris: ItemPo): Double? = GerbangTerimaPo.stokSetelah(
+        stokGudangBesar = stokBesar(baris.bahanBakuId),
+        qtyDatang = isianUntuk(baris.id).qtyDatang.toDoubleOrNull() ?: 0.0,
+    )
+
     val daftarTampil: List<PoInbound>
         get() {
             val kueri = cari.trim().lowercase()
@@ -46,6 +78,7 @@ data class PenerimaanPoUiState(
     /** Alasan belum bisa dikirim, atau null bila sudah boleh. */
     val halangan: String?
         get() {
+            if (!bolehVerifikasi) return "Hanya kitchen, admin, atau owner yang dapat memverifikasi penerimaan PO."
             if (item.isEmpty()) return "PO ini tidak punya baris barang."
             val adaIsi = item.any { (isianUntuk(it.id).qtyDatang.toDoubleOrNull() ?: 0.0) > 0.0 }
             if (!adaIsi) return "Isi jumlah yang datang minimal pada satu barang."
@@ -93,7 +126,14 @@ class PenerimaanPoViewModel : ViewModel() {
     fun bersihkanPesan() { _state.value = _state.value.copy(pesan = null, error = null) }
 
     fun bukaPo(po: PoInbound) {
-        _state.value = _state.value.copy(poDibuka = po, memuatItem = true, item = emptyList(), isian = emptyMap())
+        val boleh = StokAkses.bisaVerifikasiPo(AppSession.staff.value?.role)
+        _state.value = _state.value.copy(
+            poDibuka = po,
+            memuatItem = true,
+            item = emptyList(),
+            isian = emptyMap(),
+            bolehVerifikasi = boleh,
+        )
         viewModelScope.launch {
             try {
                 val item = PenerimaanPoRepository.item(po.id)
@@ -107,6 +147,13 @@ class PenerimaanPoViewModel : ViewModel() {
                     )
                 }
                 _state.value = _state.value.copy(memuatItem = false, item = item, isian = isian)
+                // Stok gudang menyusul setelah daftarnya tampil. Kalau ikut ditunggu,
+                // satu query pelengkap menunda seluruh formulir; kalau gagal, petanya
+                // kosong dan aturan lompatan otomatis dilewati.
+                val stok = PenerimaanPoRepository.stokGudang(item.mapNotNull { it.bahanBakuId }.distinct())
+                if (_state.value.poDibuka?.id == po.id) {
+                    _state.value = _state.value.copy(stokGudang = stok)
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -117,7 +164,40 @@ class PenerimaanPoViewModel : ViewModel() {
     }
 
     fun tutupPo() {
-        _state.value = _state.value.copy(poDibuka = null, item = emptyList(), isian = emptyMap())
+        _state.value = _state.value.copy(
+            poDibuka = null, item = emptyList(), isian = emptyMap(),
+            stokGudang = emptyMap(), konfirmasi = emptyList(),
+        )
+    }
+
+    /**
+     * Gerbang sebelum penerimaan disimpan.
+     *
+     * Dipanggil layar sebagai ganti [kirim] langsung. Penerimaan yang melompat jauh
+     * dari stok berjalan atau melewati jumlah pesanan ditahan dulu — bukan ditolak.
+     * Ini penting karena `verifikasi_terima_po` memakai GREATEST(0, qty_baru -
+     * qty_lama): kelebihan input TIDAK bisa dikoreksi lewat formulir ini, hanya
+     * manual di database.
+     */
+    fun mintaKirim() {
+        val s = _state.value
+        val halangan = s.halangan
+        if (halangan != null) {
+            _state.value = s.copy(error = halangan)
+            return
+        }
+        val berperingatan = s.item
+            .map { it to s.peringatan(it) }
+            .filter { it.second.isNotEmpty() }
+        if (berperingatan.isNotEmpty()) {
+            _state.value = s.copy(konfirmasi = berperingatan)
+            return
+        }
+        kirim()
+    }
+
+    fun tutupKonfirmasi() {
+        _state.value = _state.value.copy(konfirmasi = emptyList())
     }
 
     private fun ubah(itemId: String, blok: (IsianItemPo) -> IsianItemPo) {
@@ -130,17 +210,29 @@ class PenerimaanPoViewModel : ViewModel() {
     fun ubahCatatan(itemId: String, teks: String) = ubah(itemId) { it.copy(catatan = teks) }
 
     fun kirim() {
+        var lanjut = false
+        _state.update { current ->
+            val halangan = current.halangan
+            if (current.poDibuka == null) {
+                current
+            } else if (halangan != null) {
+                current.copy(error = halangan)
+            } else if (current.mengirim) {
+                current
+            } else {
+                lanjut = true
+                current.copy(mengirim = true, error = null, pesan = null, konfirmasi = emptyList())
+            }
+        }
+        if (!lanjut) return
+
         val s = _state.value
-        val po = s.poDibuka ?: return
-        val halangan = s.halangan
-        if (halangan != null) {
-            _state.value = s.copy(error = halangan)
+        val po = s.poDibuka ?: run {
+            _state.update { it.copy(mengirim = false) }
             return
         }
-        if (s.mengirim) return
 
         viewModelScope.launch {
-            _state.value = _state.value.copy(mengirim = true, error = null, pesan = null)
             try {
                 PenerimaanPoRepository.verifikasi(
                     poId = po.id,
@@ -158,23 +250,28 @@ class PenerimaanPoViewModel : ViewModel() {
                     },
                 )
                 StokRepository.invalidate()
-                _state.value = _state.value.copy(
-                    mengirim = false,
-                    poDibuka = null,
-                    item = emptyList(),
-                    isian = emptyMap(),
-                    pesan = "PO ${po.nomorPo} diverifikasi. Stok gudang sudah bertambah.",
-                )
+                _state.update {
+                    it.copy(
+                        mengirim = false,
+                        poDibuka = null,
+                        item = emptyList(),
+                        isian = emptyMap(),
+                        stokGudang = emptyMap(),
+                        pesan = "PO ${po.nomorPo} diverifikasi. Stok gudang sudah bertambah.",
+                    )
+                }
                 muatUlang()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 android.util.Log.e("PenerimaanPoVM", "kirim() gagal", e)
-                _state.value = _state.value.copy(
-                    mengirim = false,
-                    error = e.message?.takeIf { it.isNotBlank() && e is IllegalStateException }
-                        ?: stokErrorMessage(e),
-                )
+                _state.update {
+                    it.copy(
+                        mengirim = false,
+                        error = e.message?.takeIf { msg -> msg.isNotBlank() && e is IllegalStateException }
+                            ?: stokErrorMessage(e),
+                    )
+                }
             }
         }
     }
