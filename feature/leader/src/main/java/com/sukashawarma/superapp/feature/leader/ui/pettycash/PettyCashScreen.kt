@@ -109,7 +109,7 @@ fun PettyCashScreen(
     val state by viewModel.state.collectAsState()
     val snackbar = remember { SnackbarHostState() }
 
-    RealtimeRefresh(RealtimeTables.PETTY_CASH_TOPUPS) { viewModel.muatUlang() }
+    RealtimeRefresh(RealtimeTables.PETTY_CASH_TOPUPS) { viewModel.muatUlang(silent = true) }
 
     LaunchedEffect(state.kabar, state.galat) {
         val pesan = state.kabar ?: state.galat
