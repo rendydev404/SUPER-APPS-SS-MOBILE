@@ -32,6 +32,13 @@ data class LedgerTransaksi(
     val opnameTanggal: String? = null,
     val opnameTipe: String? = null,
     val shipmentDestOutletName: String? = null,
+    /** Nama & satuan bahan untuk kejadian berbahan tunggal — tanpa ini kartunya hanya
+     *  memajang angka telanjang yang tidak bisa dibaca sebagai gram, kilo, atau pcs. */
+    val singleNamaBahan: String? = null,
+    val singleMeta: UnitMeta? = null,
+    /** Skala baris saldo bahan ini — menentukan apakah `singleQty` satuan terkecil
+     *  atau satuan besar. Lihat [com.sukashawarma.superapp.feature.stok.domain.UnitScale.formatQtyLedger]. */
+    val singleSaldoIsGram: Boolean = false,
 ) {
     val gabungan: Boolean get() = jumlahBahan > 1
 
@@ -53,6 +60,36 @@ data class LedgerDetailRow(
     val meta: UnitMeta,
     /** Diambil dari `stok_balance` per outlet+bahan, tidak tersedia di `ledger_stok`. */
     val saldoIsGram: Boolean = false,
+)
+
+/** Rincian menu pesanan untuk event penjualan / order. */
+data class OrderItemRow(
+    val id: String,
+    val menuItemName: String,
+    val quantity: Int,
+)
+
+/** Audit detail lengkap untuk satu transaksi tunggal pada ledger (cermin /stok/ledger/[id] di web). */
+data class LedgerAuditDetail(
+    val id: String,
+    val tipe: String,
+    val qty: Double,
+    val catatan: String?,
+    val saldoSebelum: Double?,
+    val saldoSesudah: Double?,
+    val createdAt: String?,
+    val bahanBakuId: String,
+    val namaBahan: String?,
+    val meta: UnitMeta?,
+    val saldoIsGram: Boolean = false,
+    val genericCreatorName: String? = null,
+    val wastePhotoUrl: String? = null,
+    val wasteReporterName: String? = null,
+    val wasteApproverName: String? = null,
+    val wasteCreatedAt: String? = null,
+    val wasteUpdatedAt: String? = null,
+    val refShipmentId: String? = null,
+    val refOpnameId: String? = null,
 )
 
 // ------------------------------------------------------------------- opname
@@ -103,6 +140,8 @@ data class OpnameItemRow(
     val saldoIsGram: Boolean,
     /** Bahan terukur memakai toleransi 5%; bahan hitungan memakai 0%. */
     val terukur: Boolean,
+    /** `bahan_baku.faktor_konversi`, untuk ambang gerbang nol saat finalisasi. */
+    val faktorKonversi: Double? = null,
     // Masukan pengguna, dalam tiga jenjang satuan.
     val besar: String = "",
     val tengah: String = "",
@@ -233,6 +272,12 @@ data class BahanBaku(
     val faktorTampilan: Double?,
     /** Satuan yang dipakai orang saat memesan; null = sama dengan satuan besar. */
     val satuanDistribusi: String?,
+    /**
+     * Boleh diretur/refund — hanya item core bernilai tinggi (Ayam, Sapi, Kulit).
+     * Dipakai menyaring katalog formulir retur, dan diperiksa ulang oleh RPC
+     * `ajukan_retur_stok` yang menolak bahan di luar daftar.
+     */
+    val isRefundable: Boolean = false,
 ) {
     val meta: UnitMeta
         get() = UnitMeta(
