@@ -12,6 +12,8 @@ object ChatRepository {
 
     const val TABLE = "chat_messages"
     const val TABLE_REAKSI = "chat_message_reactions"
+    const val TABLE_BACAAN = "chat_message_reads"
+    const val TABLE_SUARA_PUTAR = "chat_voice_plays"
     const val TABLE_PENGATURAN = "chat_settings"
     private const val BUCKET = "chat-media"
 
@@ -52,10 +54,16 @@ object ChatRepository {
         imagePath: String? = null,
         replyToId: String? = null,
         mentions: List<Sebutan> = emptyList(),
+        audioPath: String? = null,
+        audioMs: Int? = null,
+        audioWave: String? = null,
     ): PesanChat {
         val row = JsonObject().apply {
             addProperty("body", body)
             imagePath?.let { addProperty("image_path", it) }
+            audioPath?.let { addProperty("audio_path", it) }
+            audioMs?.let { addProperty("audio_ms", it) }
+            audioWave?.takeIf { it.isNotBlank() }?.let { addProperty("audio_wave", it.take(56)) }
             replyToId?.let { addProperty("reply_to_id", it) }
             if (mentions.isNotEmpty()) {
                 add("mentions", com.google.gson.JsonArray().apply {
@@ -83,6 +91,11 @@ object ChatRepository {
      */
     suspend fun unggahFoto(senderId: String, webp: ByteArray): String =
         StorageUtil.uploadWebp(BUCKET, "$senderId/${UUID.randomUUID()}.webp", webp, upsert = false)
+
+    /** Unggah rekaman suara. Folder pertama WAJIB id pengirim — syarat yang sama
+     *  dengan foto, ditegakkan policy `chat_media_insert_self`. */
+    suspend fun unggahSuara(senderId: String, m4a: ByteArray): String =
+        StorageUtil.uploadM4a(BUCKET, "$senderId/${UUID.randomUUID()}.m4a", m4a)
 
     /**
      * Semua reaksi untuk pesan yang sedang tampil.
@@ -223,6 +236,51 @@ object ChatRepository {
         Postgrest.rpc("chat_hapus_pesan", JsonObject().apply { addProperty("p_id", id) })
     }
 
+    /**
+     * Ambil semua catatan bacaan pesan yang masih aktif (< 24 jam / sejak siklus aktif).
+     */
+    suspend fun ambilSemuaBacaan(): List<BacaanPesan> {
+        val cutoffMs = batasResetPesanMs(System.currentTimeMillis())
+        val batas = Instant.ofEpochMilli(cutoffMs).toString()
+        val rows = Postgrest.select(
+            TABLE_BACAAN,
+            listOf(
+                "select" to "*",
+                "read_at" to "gte.$batas",
+            ),
+        )
+        return rows.mapNotNull { it?.asJsonObject?.let(::parseBacaan) }
+    }
+
+    /**
+     * Menandai batch pesan sebagai telah dibaca oleh user aktif lewat RPC `chat_tandai_dibaca`.
+     */
+    suspend fun tandaiDibaca(messageIds: List<String>): Int {
+        if (messageIds.isEmpty()) return 0
+        val payload = JsonObject().apply {
+            add("p_message_ids", com.google.gson.JsonArray().apply {
+                messageIds.distinct().forEach { add(it) }
+            })
+        }
+        val res = Postgrest.rpc("chat_tandai_dibaca", payload)
+        return runCatching { res.asInt }.getOrDefault(0)
+    }
+
+    /**
+     * Ambil detail info pesan (dibaca dan belum dibaca) lewat RPC `chat_info_pesan`.
+     */
+    suspend fun ambilInfoPesan(messageId: String): DetailInfoPesan {
+        val payload = JsonObject().apply {
+            addProperty("p_message_id", messageId)
+        }
+        val res = Postgrest.rpc("chat_info_pesan", payload)
+        if (!res.isJsonObject) {
+            throw IllegalStateException("Server tidak mengembalikan format info pesan yang valid.")
+        }
+        return parseDetailInfoPesan(res.asJsonObject)
+            ?: throw IllegalStateException("Gagal memproses data info pesan.")
+    }
+
     /** URL yang bisa dimuat Coil untuk `image_path` ("chat-media/<uid>/<file>.webp").
      *  Bucket privat: endpoint `authenticated` menuntut Authorization, yang sudah
      *  dibawa `AvatarStorage.imageLoader` lewat okHttpClient bersama. */
@@ -231,4 +289,30 @@ object ChatRepository {
         val objek = path.removePrefix("$BUCKET/")
         return "${SupabaseClient.BASE_URL}storage/v1/object/authenticated/$BUCKET/$objek"
     }
+
+    /**
+     * Tandai pesan suara sebagai sudah didengar oleh akun ini.
+     *
+     * RPC-nya sendiri yang menolak penanda dari pengirimnya — mendengar ulang
+     * rekaman sendiri bukan kabar yang berguna bagi siapa pun.
+     */
+    suspend fun tandaiSuaraDiputar(messageId: String) {
+        Postgrest.rpc(
+            "chat_tandai_suara_diputar",
+            JsonObject().apply { addProperty("p_message_id", messageId) },
+        )
+    }
+
+    /** Daftar orang yang sudah mendengarkan sebuah pesan suara. */
+    suspend fun ambilPendengarSuara(messageId: String): List<PembacaPesan> {
+        val res = Postgrest.rpc(
+            "chat_suara_pendengar",
+            JsonObject().apply { addProperty("p_message_id", messageId) },
+        )
+        if (!res.isJsonArray) return emptyList()
+        return res.asJsonArray.mapNotNull { it?.asJsonObject?.let(::parsePembacaPesan) }
+    }
+
+    /** URL rekaman suara — bucket dan aturan auth yang sama dengan [urlFoto]. */
+    fun urlSuara(path: String?): String? = urlFoto(path)
 }
