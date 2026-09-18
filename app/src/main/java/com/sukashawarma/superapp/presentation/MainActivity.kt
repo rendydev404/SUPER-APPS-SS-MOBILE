@@ -73,10 +73,12 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.sukashawarma.superapp.core.update.model.AppUpdateManifest
 import com.sukashawarma.superapp.core.update.ui.AppUpdateIndicator
 import com.sukashawarma.superapp.core.update.ui.AppUpdateSuccessIndicator
 import com.sukashawarma.superapp.core.update.ui.DraggableUpdateOverlay
 import kotlinx.coroutines.launch
+import android.content.Context
 
 object Routes {
     const val LOGIN = "login"
@@ -177,10 +179,6 @@ private fun RootNav() {
     val context = LocalContext.current
 
     val updateManifest by AppUpdateManager.availableUpdate.collectAsState()
-    val updateDownloadState by AppUpdateManager.downloadState.collectAsState()
-    val updateDownloadPayload by AppUpdateManager.downloadPayload.collectAsState()
-    val updateDownloadPayloadSize by AppUpdateManager.downloadPayloadSizeBytes.collectAsState()
-    val updateDownloadProgress by AppUpdateManager.downloadProgress.collectAsState()
     val recentlyInstalledVersion by AppUpdateManager.recentlyInstalledVersion.collectAsState()
 
     // Izin "Tampil di atas aplikasi lain" yang membuat aplikasi terbuka sendiri
@@ -234,12 +232,14 @@ private fun RootNav() {
     }
 
     // Otomatis terapkan update begitu siap dipasang tanpa harus diklik user
-    LaunchedEffect(updateDownloadState, izinBukaOtomatis) {
-        if (updateDownloadState == AppUpdateManager.DownloadState.READY_TO_INSTALL &&
-            izinBukaOtomatis == IzinBukaOtomatis.TIDAK_PERLU
-        ) {
-            kotlinx.coroutines.delay(1200)
-            AppUpdateManager.installDownloadedApk(context)
+    LaunchedEffect(izinBukaOtomatis) {
+        AppUpdateManager.downloadState.collect { state ->
+            if (state == AppUpdateManager.DownloadState.READY_TO_INSTALL &&
+                izinBukaOtomatis == IzinBukaOtomatis.TIDAK_PERLU
+            ) {
+                kotlinx.coroutines.delay(1200)
+                AppUpdateManager.installDownloadedApk(context)
+            }
         }
     }
 
@@ -443,30 +443,47 @@ private fun RootNav() {
                 )
             }
         } else updateManifest?.let { manifest ->
-            DraggableUpdateOverlay {
-                AppUpdateIndicator(
-                    manifest = manifest,
-                    downloadState = updateDownloadState,
-                    downloadPayload = updateDownloadPayload,
-                    downloadPayloadSizeBytes = updateDownloadPayloadSize,
-                    downloadProgress = updateDownloadProgress,
-                    onAction = {
-                        when (updateDownloadState) {
-                            AppUpdateManager.DownloadState.IDLE,
-                            AppUpdateManager.DownloadState.FAILED ->
-                                AppUpdateManager.startDownload(context, manifest)
-                            AppUpdateManager.DownloadState.READY_TO_INSTALL ->
-                                AppUpdateManager.installDownloadedApk(context)
-                            AppUpdateManager.DownloadState.AWAITING_USER_ACTION ->
-                                AppUpdateManager.continueInstallWithUserAction(context)
-                            AppUpdateManager.DownloadState.DOWNLOADING,
-                            AppUpdateManager.DownloadState.INSTALLING -> Unit
-                        }
-                    }
-                )
+            OverlayUpdateOtomatis(manifest = manifest, context = context)
+        }
+        }
+    }
+}
+
+/**
+ * Overlay update yang mengisolasi observasi downloadProgress dan downloadState
+ * agar lonjakan event saat mengunduh APK tidak memicu recomposition di seluruh RootNav.
+ */
+@Composable
+private fun OverlayUpdateOtomatis(
+    manifest: AppUpdateManifest,
+    context: Context,
+) {
+    val downloadState by AppUpdateManager.downloadState.collectAsState()
+    val downloadPayload by AppUpdateManager.downloadPayload.collectAsState()
+    val downloadPayloadSizeBytes by AppUpdateManager.downloadPayloadSizeBytes.collectAsState()
+    val downloadProgress by AppUpdateManager.downloadProgress.collectAsState()
+
+    DraggableUpdateOverlay {
+        AppUpdateIndicator(
+            manifest = manifest,
+            downloadState = downloadState,
+            downloadPayload = downloadPayload,
+            downloadPayloadSizeBytes = downloadPayloadSizeBytes,
+            downloadProgress = downloadProgress,
+            onAction = {
+                when (downloadState) {
+                    AppUpdateManager.DownloadState.IDLE,
+                    AppUpdateManager.DownloadState.FAILED ->
+                        AppUpdateManager.startDownload(context, manifest)
+                    AppUpdateManager.DownloadState.READY_TO_INSTALL ->
+                        AppUpdateManager.installDownloadedApk(context)
+                    AppUpdateManager.DownloadState.AWAITING_USER_ACTION ->
+                        AppUpdateManager.continueInstallWithUserAction(context)
+                    AppUpdateManager.DownloadState.DOWNLOADING,
+                    AppUpdateManager.DownloadState.INSTALLING -> Unit
+                }
             }
-        }
-        }
+        )
     }
 }
 
