@@ -23,7 +23,17 @@ import kotlinx.coroutines.withContext
  * yang schema-nya beda dari yang dipakai web).
  */
 object SubmitAttendanceUseCase {
-    suspend operator fun invoke(entity: PendingAttendanceEntity): SubmitAttendanceResult = withContext(Dispatchers.IO) {
+    /**
+     * [dariAntrean] menandai kiriman yang sempat menginap di perangkat karena internet mati.
+     * Untuk kiriman seperti itu server menilai telat/tepat dari `ts_client` (jam kejadian di
+     * HP), bukan dari jam tibanya — lihat `plan/offline-submit-attendance-ts-client.sql`.
+     * Tanpa penanda ini, absen masuk jam 08:00 yang baru terkirim jam 14:00 tercatat telat
+     * enam jam padahal orangnya datang tepat waktu.
+     */
+    suspend operator fun invoke(
+        entity: PendingAttendanceEntity,
+        dariAntrean: Boolean = false,
+    ): SubmitAttendanceResult = withContext(Dispatchers.IO) {
         try {
             val payloadObj = com.google.gson.JsonObject().apply {
                 addProperty("id", entity.id)
@@ -36,6 +46,7 @@ object SubmitAttendanceUseCase {
                 entity.gpsAccuracy?.let { addProperty("gps_accuracy", it) }
                 entity.selfiePath?.let { addProperty("selfie_path", it) }
                 addProperty("is_manual_button", entity.isManualButton)
+                addProperty("is_offline", dariAntrean)
                 // Dikirim sebagai angka JSON: server menolak string "1" (cermin isShiftKe web).
                 entity.shiftKe?.let { addProperty("shift_ke", it) }
                 // Penanda audit agar seluruh rekap bisa membedakan presensi dari
