@@ -43,8 +43,9 @@ import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import com.sukashawarma.superapp.core.ui.SukaDropdownHeader
+import com.sukashawarma.superapp.core.ui.SukaDropdownMenu
+import com.sukashawarma.superapp.core.ui.SukaDropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -109,6 +110,8 @@ import com.sukashawarma.superapp.presentation.theme.SukaOrange
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
+import com.sukashawarma.superapp.core.ui.RealtimeRefresh
+import com.sukashawarma.superapp.core.ui.RealtimeTables
 
 private val PASIR = Color(0xFFF5D6A0)
 private val KREM_KOLOM = Color(0xFFFFFAF5)
@@ -128,6 +131,13 @@ fun InventarisScreen(
     viewModel: InventarisViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+
+    // Menunggu `plan/inventaris-realtime-publication.sql` dijalankan di Supabase;
+    // sebelum itu langganan ini hidup tapi tidak pernah menerima event.
+    RealtimeRefresh(
+        RealtimeTables.INVENTARIS_SUBMISSIONS,
+        RealtimeTables.INVENTARIS_MASTER_ITEMS,
+    ) { viewModel.muatUlang(silent = true) }
     val snackbar = remember { SnackbarHostState() }
     val konteks = LocalContext.current
     val lembarKamera = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -194,7 +204,7 @@ fun InventarisScreen(
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             when {
-                state.memuat -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                state.memuat && state.outlets.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = SukaOrange)
                 }
                 state.berhasilDikirim -> PanelBerhasil(
@@ -968,10 +978,12 @@ private fun PilihanKondisi(terpilih: KondisiAset, onPilih: (KondisiAset) -> Unit
                 Icon(Icons.Default.ArrowDropDown, null, tint = SukaBrown)
             }
         }
-        DropdownMenu(expanded = terbuka, onDismissRequest = { terbuka = false }) {
+        SukaDropdownMenu(expanded = terbuka, onDismissRequest = { terbuka = false }) {
+            SukaDropdownHeader(title = "KONDISI ASET", onClose = { terbuka = false })
             KondisiAset.entries.forEach { kondisi ->
-                DropdownMenuItem(
-                    text = { Text(kondisi.label, fontSize = 13.sp) },
+                SukaDropdownMenuItem(
+                    text = kondisi.label,
+                    selected = (kondisi == terpilih),
                     onClick = {
                         terbuka = false
                         onPilih(kondisi)
