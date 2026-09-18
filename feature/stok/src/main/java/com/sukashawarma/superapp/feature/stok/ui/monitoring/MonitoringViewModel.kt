@@ -6,17 +6,15 @@ import com.sukashawarma.superapp.feature.stok.data.StokRepository
 import com.sukashawarma.superapp.feature.stok.data.model.MonitoringRow
 import com.sukashawarma.superapp.feature.stok.data.model.OutletRingkas
 import com.sukashawarma.superapp.feature.stok.domain.KategoriStok
-import com.sukashawarma.superapp.feature.stok.domain.ProduksiEstimator
 import com.sukashawarma.superapp.feature.stok.domain.StokStatus
 import com.sukashawarma.superapp.feature.stok.domain.UnitScale
 import com.sukashawarma.superapp.feature.stok.domain.bolehTampilDiOutlet
 import com.sukashawarma.superapp.feature.stok.domain.stokErrorMessage
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import kotlin.math.floor
 
 /** Pengurutan dalam tiap kategori — cermin `SortBy` di `CrewList.tsx`. */
 enum class UrutanStok(val label: String) {
@@ -37,20 +35,10 @@ data class MonitoringUiState(
     val cari: String = "",
     val urutan: UrutanStok = UrutanStok.NAMA,
     val filter: FilterKpi = FilterKpi.SEMUA,
-    val porsiPerBahan: Map<String, Int> = emptyMap(),
-    /**
-     * Apakah estimasi porsi sudah selesai dihitung.
-     *
-     * [jumlahKritis] ikut memakai aturan porsi, dan porsi baru tiba beberapa saat
-     * setelah daftar tampil. Tanpa penanda ini angka KPI naik sendiri di depan mata
-     * pengguna dan terbaca seperti data yang berubah-ubah.
-     */
-    val porsiSiap: Boolean = false,
 ) {
     val tampilkanPemilihOutlet: Boolean get() = outlets.size > 1
 
     fun status(row: MonitoringRow): StokStatus = row.status(
-        porsiTersisa = porsiPerBahan[row.bahanBakuId],
         marqueeWarning = outletTerpilih?.marqueeWarningThreshold ?: UnitScale.DEFAULT_MARQUEE_WARNING,
     )
 
@@ -102,10 +90,13 @@ class MonitoringViewModel : ViewModel() {
     private val _state = MutableStateFlow(MonitoringUiState())
     val state: StateFlow<MonitoringUiState> = _state
 
+    private var muatJob: Job? = null
+
     init { muatAwal() }
 
     fun muatAwal() {
-        viewModelScope.launch {
+        muatJob?.cancel()
+        muatJob = viewModelScope.launch {
             _state.value = _state.value.copy(memuat = true, error = null, tidakBerhak = false)
             try {
                 val outlets = StokRepository.accessibleOutlets()
@@ -120,6 +111,8 @@ class MonitoringViewModel : ViewModel() {
                 } ?: outlets.first()
                 _state.value = _state.value.copy(outlets = outlets, outletTerpilih = terpilih)
                 muatBahan()
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _state.value = _state.value.copy(memuat = false, error = stokErrorMessage(e))
             }
@@ -128,13 +121,12 @@ class MonitoringViewModel : ViewModel() {
 
     fun pilihOutlet(outlet: OutletRingkas) {
         if (outlet.id == _state.value.outletTerpilih?.id) return
+        muatJob?.cancel()
         _state.value = _state.value.copy(
             outletTerpilih = outlet,
-            porsiPerBahan = emptyMap(),
-            porsiSiap = false,
             semua = emptyList(),
         )
-        viewModelScope.launch { muatBahan() }
+        muatJob = viewModelScope.launch { muatBahan() }
     }
 
     fun ubahCari(teks: String) {
@@ -158,53 +150,18 @@ class MonitoringViewModel : ViewModel() {
 
     private suspend fun muatBahan() {
         val outlet = _state.value.outletTerpilih ?: return
-        _state.value = _state.value.copy(memuat = true, error = null, porsiSiap = false)
+        _state.value = _state.value.copy(memuat = true, error = null)
         try {
             val baris = StokRepository.monitoringOutlet(outlet.id)
                 // Bahan milik gudang pusat disembunyikan dari outlet biasa, sama seperti web.
                 .filter { bolehTampilDiOutlet(it.itemName, it.outletName) }
+            if (_state.value.outletTerpilih?.id != outlet.id) return
             _state.value = _state.value.copy(memuat = false, semua = baris)
-            hitungPorsiLatar()
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
+            if (_state.value.outletTerpilih?.id != outlet.id) return
             _state.value = _state.value.copy(memuat = false, error = stokErrorMessage(e))
-        }
-    }
-
-    /**
-     * Porsi per bahan dihitung setelah daftar tampil, supaya layar tidak menunggu query
-     * resep. Angkanya menyempurnakan status; selama belum siap, status tetap benar
-     * berdasarkan perbandingan saldo terhadap threshold.
-     */
-    private fun hitungPorsiLatar() {
-        val outletId = _state.value.outletTerpilih?.id ?: run {
-            // Tanpa outlet tidak ada porsi yang bisa dihitung; KPI tidak boleh
-            // menggantung di keadaan memuat selamanya.
-            _state.value = _state.value.copy(porsiSiap = true)
-            return
-        }
-        viewModelScope.launch {
-            try {
-                val resep = StokRepository.resep(outletId)
-                val saldo = _state.value.semua.associate { it.bahanBakuId to it.saldoNorm }
-                val porsi = withContext(Dispatchers.Default) {
-                    val hasil = HashMap<String, Int>()
-                    for (r in ProduksiEstimator.pilihResepBerlaku(resep)) {
-                        for (item in r.items) {
-                            val s = saldo[item.bahanBakuId] ?: continue
-                            val kebutuhan = item.kebutuhanSmallest ?: continue
-                            val p = floor(s / kebutuhan).toInt().coerceAtLeast(0)
-                            hasil[item.bahanBakuId] = minOf(hasil[item.bahanBakuId] ?: Int.MAX_VALUE, p)
-                        }
-                    }
-                    hasil
-                }
-                _state.value = _state.value.copy(porsiPerBahan = porsi, porsiSiap = true)
-            } catch (_: Exception) {
-                // Gagal memuat resep tidak boleh menjatuhkan layar monitoring; status
-                // tetap dihitung dari saldo terhadap threshold saja. KPI tetap
-                // ditandai siap supaya angkanya keluar, bukan memuat tanpa akhir.
-                _state.value = _state.value.copy(porsiSiap = true)
-            }
         }
     }
 }
