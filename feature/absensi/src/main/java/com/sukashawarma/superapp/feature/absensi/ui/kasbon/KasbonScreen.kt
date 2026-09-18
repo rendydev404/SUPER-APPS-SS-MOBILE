@@ -1,5 +1,7 @@
 package com.sukashawarma.superapp.presentation.absensi.kasbon
 
+import androidx.compose.ui.platform.LocalContext
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -52,6 +54,15 @@ fun KasbonScreen(
 ) {
     val state by viewModel.state.collectAsState()
     RealtimeRefresh(RealtimeTables.CASH_ADVANCES) { viewModel.refresh() }
+    // Pesan ini muncul setelah formulir tertutup, jadi ditampilkan sebagai toast alih-alih
+    // di dalam formulir — yang sudah tidak ada lagi di layar saat pengajuan masuk antrean.
+    val konteksAntrean = LocalContext.current
+    LaunchedEffect(state.pesanAntrean) {
+        val pesan = state.pesanAntrean ?: return@LaunchedEffect
+        Toast.makeText(konteksAntrean, pesan, Toast.LENGTH_LONG).show()
+        viewModel.clearPesanAntrean()
+    }
+
     var showForm by remember { mutableStateOf(false) }
 
     if (showForm) {
