@@ -1,11 +1,13 @@
 package com.sukashawarma.superapp.feature.chat.domain
 
+import androidx.compose.runtime.Immutable
 import com.sukashawarma.superapp.feature.chat.data.PesanChat
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Logika murni layar chat — tanpa Android, supaya bisa diuji JVM.
@@ -34,10 +36,13 @@ const val JARAK_GRUP_MS: Long = 5L * 60 * 1000
 /** Posisi bubble di dalam satu grup pengirim — menentukan bentuk sudut ala iMessage. */
 enum class PosisiGrup { TUNGGAL, AWAL, TENGAH, AKHIR }
 
+@Immutable
 sealed interface ItemChat {
     /** Pemisah "Hari Ini" / "Kemarin" / tanggal. */
+    @Immutable
     data class Pemisah(val label: String) : ItemChat
 
+    @Immutable
     data class Bubble(
         val pesan: PesanChat,
         val milikSendiri: Boolean,
@@ -49,6 +54,10 @@ sealed interface ItemChat {
          *  jalur gambar, dan bubble digambar ulang jauh lebih sering daripada
          *  isinya berubah. */
         val jam: String = "",
+        /** Jumlah orang yang sudah membaca pesan ini (sumber tanda centang biru ala WA). */
+        val dibacaOlehCount: Int = 0,
+        /** Apakah pesan sudah dibaca oleh SELURUH anggota grup (centang dua biru). */
+        val dibacaSemua: Boolean = false,
     ) : ItemChat
 }
 
@@ -57,6 +66,21 @@ private val FORMAT_TANGGAL = DateTimeFormatter.ofPattern("d MMMM yyyy", Locale("
 /** DateTimeFormatter aman dipakai bersama antar-thread, tidak seperti
  *  SimpleDateFormat yang sebelumnya dipanggil dari dalam composable. */
 private val FORMAT_JAM = DateTimeFormatter.ofPattern("HH:mm", Locale("id", "ID"))
+private val cacheJam = ConcurrentHashMap<Long, String>()
+private val cacheHari = ConcurrentHashMap<Long, LocalDate>()
+
+/**
+ * Format epoch millisecond ke string "HH:mm" WIB dengan cache ConcurrentHashMap,
+ * mencegah ribuan alokasi DateTimeFormatter dan Instant saat render list chat.
+ */
+fun formatJamWib(epochMilli: Long, zona: ZoneId = ZONA_WIB): String {
+    if (epochMilli <= 0L) return ""
+    return cacheJam.computeIfAbsent(epochMilli) { ms ->
+        runCatching {
+            Instant.ofEpochMilli(ms).atZone(zona).format(FORMAT_JAM)
+        }.getOrDefault("")
+    }
+}
 
 fun labelTanggal(hari: LocalDate, hariIni: LocalDate): String = when (hari) {
     hariIni -> "Hari Ini"
@@ -76,6 +100,8 @@ fun susunItemChat(
     userId: String,
     nowMs: Long,
     zona: ZoneId = ZONA_WIB,
+    bacaanPerPesan: Map<String, Int> = emptyMap(),
+    totalAnggotaLain: Int = 0,
 ): List<ItemChat> {
     val batasMs = batasResetPesanMs(nowMs, zona)
     val hidup = pesan
@@ -85,13 +111,16 @@ fun susunItemChat(
 
     val hariIni = Instant.ofEpochMilli(nowMs).atZone(zona).toLocalDate()
 
-    // Tanggal dan jam dihitung SEKALI per pesan, bukan tiga kali seperti versi
-    // sebelumnya (hari ini, hari sebelum, hari sesudah masing-masing memanggil
-    // atZone lagi). Konversi zona waktu adalah bagian termahal fungsi ini, dan
-    // pada daftar 500 pesan bedanya terasa di HP kelas bawah.
-    val waktu = hidup.map { it.createdAtMs.let(Instant::ofEpochMilli).atZone(zona) }
-    val hariPer = waktu.map { it.toLocalDate() }
-    val jamPer = waktu.map { it.format(FORMAT_JAM) }
+    if (cacheJam.size > 2000) {
+        cacheJam.clear()
+        cacheHari.clear()
+    }
+    val hariPer = hidup.map { p ->
+        cacheHari.computeIfAbsent(p.createdAtMs) { Instant.ofEpochMilli(it).atZone(zona).toLocalDate() }
+    }
+    val jamPer = hidup.map { p ->
+        cacheJam.computeIfAbsent(p.createdAtMs) { Instant.ofEpochMilli(it).atZone(zona).format(FORMAT_JAM) }
+    }
 
     val hasil = ArrayList<ItemChat>(hidup.size + 4)
 
@@ -115,12 +144,16 @@ fun susunItemChat(
             nyambungBawah -> PosisiGrup.TENGAH
             else -> PosisiGrup.AKHIR
         }
+        val jmlBaca = bacaanPerPesan[p.id] ?: 0
+        val dibacaSemua = totalAnggotaLain > 0 && jmlBaca >= totalAnggotaLain
         hasil += ItemChat.Bubble(
             pesan = p,
             milikSendiri = p.senderId == userId,
             posisi = posisi,
             tampilkanIdentitas = p.senderId != userId && !nyambungAtas,
             jam = jamPer[i],
+            dibacaOlehCount = jmlBaca,
+            dibacaSemua = dibacaSemua,
         )
     }
     return hasil
