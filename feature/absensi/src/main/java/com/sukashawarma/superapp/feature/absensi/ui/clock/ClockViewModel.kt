@@ -68,6 +68,9 @@ class ClockViewModel(
          *  auto-clear & scanning dicoba lagi — cukup lama utk dibaca dengan tenang, tidak
          *  berkedip-kedip tiap frame seperti sebelumnya. */
         private const val GUIDANCE_READ_MS = 2200L
+
+        /** `outlets.slug` Kantor Pusat — kunci yang dipakai migration pembuatnya. */
+        private const val SLUG_KANTOR_PUSAT = "kantor-pusat"
     }
     private val busy = AtomicBoolean(false)
 
@@ -79,6 +82,18 @@ class ClockViewModel(
     private val flushMutex = Mutex()
     private var pendingManualButton = false
     private var geofenceRadiusM = GpsMath.GEOFENCE_RADIUS_M
+
+    /**
+     * Absen ini terjadi di Kantor Pusat. Di sana tidak ada kasir, pesanan, maupun checklist
+     * tutup outlet, jadi seluruh gerbang absen pulang yang berakar di POS tidak berlaku —
+     * yang tersisa hanya aturan jam, dan itu ditegakkan server (`too_early_out`: paling
+     * cepat 30 menit sebelum jam pulang).
+     *
+     * Dikenali lewat `slug`, bukan `outlets.type`: tipe `office` memuat DUA lokasi yang
+     * berbeda sifatnya — Kantor Pusat dan GUDANG PUSAT yang merupakan gudang sungguhan dan
+     * tetap tunduk pada gerbang tutup outlet.
+     */
+    private var diKantorPusat = false
 
     private fun startLivenessTimeout() {
         livenessTimeoutJob?.cancel()
@@ -203,7 +218,7 @@ class ClockViewModel(
                 // Cache-nya ada di Postgrest.select, jadi koordinat outlet tetap terbaca saat
                 // sinyal mati — tanpa itu layar absensi mentok di "Gagal memuat koordinat
                 // outlet" dan seluruh mode offline absensi tidak pernah terjangkau.
-                Postgrest.selectOne("outlets", listOf("id" to "eq.$outletId", "select" to "lat,lng,is_active"))
+                Postgrest.selectOne("outlets", listOf("id" to "eq.$outletId", "select" to "lat,lng,is_active,slug"))
             } catch (e: Exception) {
                 setResult(false, "Gagal memuat koordinat outlet", ClockPhase.LOCATION_INVALID)
                 return@launch
@@ -212,6 +227,7 @@ class ClockViewModel(
                 setResult(false, "Gagal memuat koordinat outlet", ClockPhase.LOCATION_INVALID)
                 return@launch
             }
+            diKantorPusat = outlet.optString("slug") == SLUG_KANTOR_PUSAT
             if (!outlet.optBooleanOrTrue("is_active")) {
                 setResult(false, "Kamera absensi sedang dinonaktifkan oleh Pusat (Emergency Lock).", ClockPhase.LOCKED)
                 return@launch
@@ -633,23 +649,29 @@ class ClockViewModel(
      *
      * Di outlet dua shift hanya crew shift PENUTUP (yang pulang paling akhir) yang wajib
      * menunggu outlet ditutup — cermin `wajibTutupOutlet` di useClockKiosk.ts.
+     *
+     * Kantor Pusat ([diKantorPusat]) dilewati seluruhnya: tidak ada laci kasir yang bisa
+     * ditutup di sana, jadi gerbang ini hanya akan mengunci staf kantor selamanya.
      */
-    private suspend fun checkoutBlockMessage(staffId: String): String? = try {
-        val options = _state.value.shiftOptions
-        val wajibTutupOutlet = options == null ||
-            isShiftPenutup(options, AttendanceGates.latestInShiftJamKeluar(staffId))
-        when {
-            !wajibTutupOutlet -> null
-            !AttendanceGates.isClosingChecklistDone(outletId) ->
-                "Checklist penutupan outlet belum selesai. Selesaikan checklist tutup outlet terlebih dahulu sebelum absen pulang."
-            !AttendanceGates.isShiftClosed(outletId) ->
-                "Shift di POS Native masih terbuka. Tutup shift terlebih dahulu sebelum absen pulang."
-            AttendanceGates.hasUnfinishedOrders(outletId) ->
-                "Masih ada pesanan di POS Native yang belum selesai. Selesaikan atau batalkan pesanan terlebih dahulu sebelum absen pulang."
-            else -> null
+    private suspend fun checkoutBlockMessage(staffId: String): String? {
+        if (diKantorPusat) return null
+        return try {
+            val options = _state.value.shiftOptions
+            val wajibTutupOutlet = options == null ||
+                isShiftPenutup(options, AttendanceGates.latestInShiftJamKeluar(staffId))
+            when {
+                !wajibTutupOutlet -> null
+                !AttendanceGates.isClosingChecklistDone(outletId) ->
+                    "Checklist penutupan outlet belum selesai. Selesaikan checklist tutup outlet terlebih dahulu sebelum absen pulang."
+                !AttendanceGates.isShiftClosed(outletId) ->
+                    "Shift di POS Native masih terbuka. Tutup shift terlebih dahulu sebelum absen pulang."
+                AttendanceGates.hasUnfinishedOrders(outletId) ->
+                    "Masih ada pesanan di POS Native yang belum selesai. Selesaikan atau batalkan pesanan terlebih dahulu sebelum absen pulang."
+                else -> null
+            }
+        } catch (_: Exception) {
+            "Status shift dan pesanan POS Native belum dapat diverifikasi. Periksa koneksi internet lalu coba lagi."
         }
-    } catch (_: Exception) {
-        "Status shift dan pesanan POS Native belum dapat diverifikasi. Periksa koneksi internet lalu coba lagi."
     }
 
     private suspend fun flushQueue() {
