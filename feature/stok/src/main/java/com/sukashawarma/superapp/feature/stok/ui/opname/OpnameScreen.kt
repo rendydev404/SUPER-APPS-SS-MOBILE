@@ -70,6 +70,11 @@ import com.sukashawarma.superapp.presentation.theme.SukaOnSurfaceVariant
 import com.sukashawarma.superapp.presentation.theme.SukaSurface
 import com.sukashawarma.superapp.core.ui.RealtimeRefresh
 import com.sukashawarma.superapp.core.ui.RealtimeTables
+import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.heightIn
+import com.sukashawarma.superapp.feature.stok.domain.Penurunan
 
 @Composable
 fun OpnameScreen(viewModel: OpnameViewModel = viewModel()) {
@@ -81,6 +86,17 @@ fun OpnameScreen(viewModel: OpnameViewModel = viewModel()) {
     // menjahit callback menembus dua lapis untuk keuntungan yang tidak ada.
     var detailId by rememberSaveable { mutableStateOf<String?>(null) }
     BackHandler(enabled = detailId != null) { detailId = null }
+
+    // Gerbang penurunan drastis digambar di atas apa pun yang sedang tampil.
+    if (state.gerbangPenurunanTerbuka) {
+        DialogPenurunanDrastis(
+            penurunan = state.penurunan,
+            menyimpan = state.menyimpan,
+            onLewati = viewModel::lewatiPenurunan,
+            onLanjut = viewModel::finalisasi,
+            onBatal = viewModel::tutupGerbangPenurunan,
+        )
+    }
 
     val detailTerbuka = detailId
     if (detailTerbuka != null) {
@@ -296,7 +312,7 @@ private fun FormOpname(state: OpnameUiState, viewModel: OpnameViewModel) {
                 ) { Text("Simpan Draft", fontSize = 13.sp, fontWeight = FontWeight.Bold) }
 
                 Button(
-                    onClick = viewModel::finalisasi,
+                    onClick = viewModel::mintaFinalisasi,
                     modifier = Modifier.weight(1f),
                     enabled = !state.menyimpan,
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEA580C)),
@@ -441,4 +457,110 @@ private fun KolomAngka(
             ),
         )
     }
+}
+
+/**
+ * Konfirmasi terakhir sebelum opname difinalisasi — cermin modal penurunan drastis
+ * di `OpnameForm.tsx` web.
+ *
+ * Yang ditawarkan bukan cuma "lanjut atau batal". Baris yang nol-nya mencurigakan
+ * mendapat tombol "Belum dihitung", yang mengembalikannya ke keadaan kosong sehingga
+ * saldo sistemnya tidak disentuh sama sekali. Tanpa jalan keluar itu, kru yang
+ * mengetik 0 bermaksud "belum saya hitung" hanya punya satu pilihan: menekan lanjut.
+ */
+@Composable
+private fun DialogPenurunanDrastis(
+    penurunan: List<Penurunan>,
+    menyimpan: Boolean,
+    onLewati: (String) -> Unit,
+    onLanjut: () -> Unit,
+    onBatal: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = { if (!menyimpan) onBatal() },
+        title = {
+            Text(
+                "Periksa ${penurunan.size} bahan ini dulu",
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 16.sp,
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.heightIn(max = 380.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(
+                    "Hitungannya turun jauh di bawah catatan sistem. Finalisasi akan " +
+                        "memotong stoknya sebanyak selisih itu, dan tidak bisa dibatalkan " +
+                        "dari aplikasi.",
+                    fontSize = 12.sp,
+                    color = Color(0xFF64748B),
+                )
+                penurunan.forEach { baris ->
+                    Surface(
+                        shape = RoundedCornerShape(11.dp),
+                        color = if (baris.habisTotal) Color(0xFFFEF2F2) else Color(0xFFFFFBEB),
+                        border = BorderStroke(
+                            1.dp,
+                            if (baris.habisTotal) Color(0xFFFECACA) else Color(0xFFFDE68A),
+                        ),
+                    ) {
+                        Column(Modifier.padding(11.dp)) {
+                            Text(
+                                baris.calon.nama,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF1E293B),
+                            )
+                            Text(
+                                if (baris.habisTotal) {
+                                    "Ditandai HABIS, padahal sistem masih mencatat stok."
+                                } else {
+                                    "Turun jauh dari catatan sistem."
+                                },
+                                fontSize = 11.sp,
+                                color = Color(0xFF7C2D12),
+                            )
+                            if (baris.bolehLewati) {
+                                Spacer(Modifier.height(7.dp))
+                                OutlinedButton(
+                                    onClick = { onLewati(baris.calon.bahanBakuId) },
+                                    enabled = !menyimpan,
+                                    shape = RoundedCornerShape(9.dp),
+                                ) {
+                                    Text(
+                                        "Belum dihitung, lewati",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onLanjut,
+                enabled = !menyimpan,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEA580C)),
+                shape = RoundedCornerShape(11.dp),
+            ) {
+                Text(
+                    if (menyimpan) "Memproses…" else "Benar, finalisasi",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+        },
+        dismissButton = {
+            OutlinedButton(
+                onClick = onBatal,
+                enabled = !menyimpan,
+                shape = RoundedCornerShape(11.dp),
+            ) { Text("Periksa lagi", fontSize = 13.sp, fontWeight = FontWeight.Bold) }
+        },
+    )
 }
