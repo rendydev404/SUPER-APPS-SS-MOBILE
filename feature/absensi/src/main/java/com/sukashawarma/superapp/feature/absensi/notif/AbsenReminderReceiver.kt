@@ -14,8 +14,9 @@ import android.content.Intent
  */
 class AbsenReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        // Boot dan pembaruan hanya memulihkan jadwal; keduanya bukan waktu tayang.
-        if (intent.action == null) AbsenReminder.show(context)
+        // Alarm, boot, dan pembaruan sama-sama lewat schedule(): jadwal besok
+        // dipulihkan, dan pengingat hanya tayang bila sekarang masih di jendela
+        // 12:10. Alarm tidak presisi yang tertunda sampai sore tidak lagi tayang.
         AbsenReminder.schedule(context)
     }
 }
