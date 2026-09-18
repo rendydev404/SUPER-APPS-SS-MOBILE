@@ -48,12 +48,21 @@ class StokAksesTest {
         assertTrue(StokAkses.operasional(Role.CREW))
     }
 
-    /** Cermin web: penerimaan PO untuk pusat dan pengawas, inbound/outbound hanya kitchen. */
+    /** Cermin web (AppSidebar canReceivePO): penerimaan PO khusus untuk pusat; verifikasi khusus kitchen, admin, owner. */
     @Test
-    fun `penerimaan po lebih luas daripada inbound outbound`() {
+    fun `penerimaan po khusus pusat dan verifikasi dibatasi`() {
         assertTrue(StokAkses.melihatPenerimaanPo(Role.KITCHEN))
-        assertTrue(StokAkses.melihatPenerimaanPo(Role.LEADER))
+        assertTrue(StokAkses.melihatPenerimaanPo(Role.ADMIN))
+        assertTrue(StokAkses.melihatPenerimaanPo(Role.PURCHASING))
+        assertFalse(StokAkses.melihatPenerimaanPo(Role.LEADER))
+        assertFalse(StokAkses.melihatPenerimaanPo(Role.AREA_MANAGER))
         assertFalse(StokAkses.melihatPenerimaanPo(Role.CREW))
+
+        assertTrue(StokAkses.bisaVerifikasiPo(Role.KITCHEN))
+        assertTrue(StokAkses.bisaVerifikasiPo(Role.ADMIN))
+        assertTrue(StokAkses.bisaVerifikasiPo(Role.OWNER))
+        assertFalse(StokAkses.bisaVerifikasiPo(Role.PURCHASING))
+        assertFalse(StokAkses.bisaVerifikasiPo(Role.AREA_MANAGER))
 
         assertTrue(StokAkses.melihatInboundOutbound(Role.KITCHEN))
         assertFalse(StokAkses.melihatInboundOutbound(Role.ADMIN))
