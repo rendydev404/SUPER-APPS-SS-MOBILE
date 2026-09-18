@@ -9,7 +9,6 @@ import com.sukashawarma.superapp.data.local.AppDatabase
 import com.sukashawarma.superapp.data.local.entity.PendingAttendanceEntity
 import com.sukashawarma.superapp.data.location.LocationRepository
 import com.sukashawarma.superapp.data.remote.AbsensiWebApi
-import com.sukashawarma.superapp.data.remote.CacheOffline
 import com.sukashawarma.superapp.data.remote.NetworkMonitor
 import com.sukashawarma.superapp.data.remote.adalahGalatJaringan
 import com.sukashawarma.superapp.domain.face.FaceMatcherLokal
@@ -201,12 +200,10 @@ class ClockViewModel(
         _state.value = _state.value.copy(phase = ClockPhase.LOCATING, result = null)
         viewModelScope.launch {
             val outlet = try {
-                // Lewat cache: koordinat outlet praktis tidak pernah berubah, dan tanpa ini
-                // layar absensi mentok di "Gagal memuat koordinat outlet" begitu sinyal mati —
-                // seluruh mode offline absensi tidak akan pernah terjangkau.
-                CacheOffline.bacaObjek("outlet:$outletId", scope = outletId) {
-                    Postgrest.selectOne("outlets", listOf("id" to "eq.$outletId", "select" to "lat,lng,is_active"))
-                }.data
+                // Cache-nya ada di Postgrest.select, jadi koordinat outlet tetap terbaca saat
+                // sinyal mati — tanpa itu layar absensi mentok di "Gagal memuat koordinat
+                // outlet" dan seluruh mode offline absensi tidak pernah terjangkau.
+                Postgrest.selectOne("outlets", listOf("id" to "eq.$outletId", "select" to "lat,lng,is_active"))
             } catch (e: Exception) {
                 setResult(false, "Gagal memuat koordinat outlet", ClockPhase.LOCATION_INVALID)
                 return@launch
@@ -235,12 +232,10 @@ class ClockViewModel(
 
     private suspend fun loadGeofenceRadius(): Double {
         val outletConfig = runCatching {
-            CacheOffline.bacaObjek("attendance_config:$outletId", scope = outletId) {
-                Postgrest.selectOne(
-                    "outlet_attendance_config",
-                    listOf("outlet_id" to "eq.$outletId", "select" to "radius_m"),
-                )
-            }.data
+            Postgrest.selectOne(
+                "outlet_attendance_config",
+                listOf("outlet_id" to "eq.$outletId", "select" to "radius_m"),
+            )
         }.getOrNull()
         val outletRadius = outletConfig?.optInt("radius_m")?.toDouble()?.takeIf { it > 0 }
         if (outletRadius != null) return outletRadius
@@ -248,12 +243,10 @@ class ClockViewModel(
         // Fallback untuk outlet baru yang belum memiliki row exception. Pengaturan
         // pusat disimpan di global_settings dan berlaku ke seluruh outlet.
         val globalConfig = runCatching {
-            CacheOffline.bacaObjek("global_attendance_config") {
-                Postgrest.selectOne(
-                    "global_settings",
-                    listOf("key" to "eq.global_attendance_config", "select" to "value"),
-                )
-            }.data
+            Postgrest.selectOne(
+                "global_settings",
+                listOf("key" to "eq.global_attendance_config", "select" to "value"),
+            )
         }.getOrNull()?.get("value")?.takeIf { it.isJsonObject }?.asJsonObject
         return globalConfig?.optInt("radius_m")?.toDouble()?.takeIf { it > 0 }
             ?: GpsMath.GEOFENCE_RADIUS_M
