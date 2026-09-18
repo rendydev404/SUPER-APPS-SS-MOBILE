@@ -26,6 +26,9 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
+import com.sukashawarma.superapp.core.ui.SukaDropdownHeader
+import com.sukashawarma.superapp.core.ui.SukaDropdownMenu
+import com.sukashawarma.superapp.core.ui.SukaDropdownMenuItem
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -108,8 +111,15 @@ private fun Choice(label: String, options: List<String>, active: Boolean = false
                 Icon(Icons.Default.ExpandMore, null, tint = if (active) Orange600 else Slate400, modifier = Modifier.size(14.dp))
             }
         }
-        DropdownMenu(expanded, { expanded = false }) {
-            options.forEachIndexed { i, name -> DropdownMenuItem(text = { Text(name) }, onClick = { expanded = false; onSelect(i) }) }
+        SukaDropdownMenu(expanded, { expanded = false }) {
+            SukaDropdownHeader(title = "PILIH OPSI", onClose = { expanded = false })
+            options.forEachIndexed { i, name ->
+                SukaDropdownMenuItem(
+                    text = name,
+                    selected = (label == name),
+                    onClick = { expanded = false; onSelect(i) },
+                )
+            }
         }
     }
 }
@@ -337,11 +347,11 @@ fun HargaBahanScreen(onBack: () -> Unit, vm: HargaBahanViewModel = viewModel()) 
     val groups = remember(filtered, grouped) { if (grouped) filtered.groupBy { it.category }.toSortedMap() else mapOf("" to filtered) }
     Column(Modifier.fillMaxSize().background(Slate50)) {
         HeaderStok("Master Harga Bahan Baku", "Pantau pergerakan harga beli dari vendor", onBack) {
-            IconButton(onClick = { vm.refresh() }, enabled = !state.loading) { Icon(Icons.Default.Refresh, "Perbarui data", tint = Color.White) }
+            IconButton(onClick = { vm.refresh() }, enabled = !state.loading) { Icon(Icons.Default.Refresh, "Perbarui data", tint = Color(0xFF1E293B)) }
             IconButton(
                 onClick = { exportText = priceCsv(filtered); export.launch("laporan_harga_bahan_baku_${LocalDate.now()}.csv") },
                 enabled = filtered.isNotEmpty(),
-            ) { Icon(Icons.Default.Download, "Unduh rekap", tint = if (filtered.isEmpty()) Color(0x66FFFFFF) else Color.White) }
+            ) { Icon(Icons.Default.Download, "Unduh rekap", tint = if (filtered.isEmpty()) Color(0xFFCBD5E1) else Color(0xFF1E293B)) }
         }
         message?.let { PitaPesan(it, false) { message = null } }
         when {
