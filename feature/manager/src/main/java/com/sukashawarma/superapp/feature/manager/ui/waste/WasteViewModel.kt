@@ -19,6 +19,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -62,31 +63,33 @@ class WasteViewModel : ViewModel() {
 
     fun pilihTab(tab: TabWaste) {
         if (_state.value.tab == tab) return
-        _state.value = _state.value.copy(tab = tab)
+        _state.update { it.copy(tab = tab) }
     }
 
     fun pilihOutlet(outletId: String?) {
         if (_state.value.outletTerpilih == outletId) return
         // Halaman dikembalikan ke awal: halaman 5 dari penyaring lama hampir pasti
         // tidak ada di penyaring baru, dan layar kosong terlihat seperti galat.
-        _state.value = _state.value.copy(outletTerpilih = outletId, riwayat = halamanAwal())
+        _state.update { it.copy(outletTerpilih = outletId, riwayat = it.riwayat.copy(halaman = 1)) }
         muatUlang()
     }
 
     fun pilihPreset(preset: PresetPeriode) {
-        _state.value = _state.value.copy(preset = preset, kustom = null, riwayat = halamanAwal())
+        _state.update {
+            it.copy(preset = preset, kustom = null, riwayat = it.riwayat.copy(halaman = 1))
+        }
         muatUlang()
     }
 
     fun pilihRentangKustom(dari: LocalDate, sampai: LocalDate) {
         val rentang = if (sampai.isBefore(dari)) RentangTanggal(sampai, dari) else RentangTanggal(dari, sampai)
-        _state.value = _state.value.copy(kustom = rentang, riwayat = halamanAwal())
+        _state.update { it.copy(kustom = rentang, riwayat = it.riwayat.copy(halaman = 1)) }
         muatUlang()
     }
 
     fun pilihStatus(status: StatusWaste?) {
         if (_state.value.filterStatus == status) return
-        _state.value = _state.value.copy(filterStatus = status, riwayat = halamanAwal())
+        _state.update { it.copy(filterStatus = status, riwayat = it.riwayat.copy(halaman = 1)) }
         muatUlang()
     }
 
@@ -94,20 +97,19 @@ class WasteViewModel : ViewModel() {
         val batas = _state.value.riwayat.totalHalaman
         val tujuan = halaman.coerceIn(1, maxOf(1, batas))
         if (tujuan == _state.value.riwayat.halaman) return
-        _state.value = _state.value.copy(riwayat = _state.value.riwayat.copy(halaman = tujuan))
+        _state.update { it.copy(riwayat = it.riwayat.copy(halaman = tujuan)) }
         muatUlang()
     }
 
     fun tutupKabar() {
-        _state.value = _state.value.copy(kabar = null, galat = null)
+        _state.update { it.copy(kabar = null, galat = null) }
     }
-
-    private fun halamanAwal() = _state.value.riwayat.copy(halaman = 1)
 
     private fun muatDaftarOutlet() {
         viewModelScope.launch {
             try {
-                _state.value = _state.value.copy(daftarOutlet = WasteRepository.outletTerakses())
+                val outlet = WasteRepository.outletTerakses()
+                _state.update { it.copy(daftarOutlet = outlet) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -118,11 +120,15 @@ class WasteViewModel : ViewModel() {
         }
     }
 
-    fun muatUlang() {
+    fun muatUlang(silent: Boolean = false) {
+        val sudahAdaData = _state.value.menunggu.isNotEmpty() || _state.value.riwayat.baris.isNotEmpty()
+        val senyap = silent || sudahAdaData
         pemuatan?.cancel()
         pemuatan = viewModelScope.launch {
             val awal = _state.value
-            _state.value = awal.copy(memuat = true, galat = null)
+            if (!senyap) {
+                _state.update { it.copy(memuat = true, galat = null) }
+            }
             try {
                 val outletId = awal.outletTerpilih
                 val rentang = awal.rentang
@@ -134,22 +140,28 @@ class WasteViewModel : ViewModel() {
                     halaman = awal.riwayat.halaman,
                 )
                 val disetujui = WasteRepository.disetujuiPada(rentang, outletId)
-                _state.value = _state.value.copy(
-                    memuat = false,
-                    galat = null,
-                    role = AppSession.staff.value?.role,
-                    menunggu = menunggu,
-                    riwayat = riwayat,
-                    // Jumlah menunggu diambil dari antrean yang baru saja dibaca, bukan
-                    // query hitung terpisah: dua angka dari dua permintaan berbeda pernah
-                    // membuat badge dan isi daftar tidak sepakat di layar yang sama.
-                    ringkasan = susunRingkasanWaste(disetujui, menunggu.size),
-                )
+                _state.update {
+                    it.copy(
+                        memuat = false,
+                        galat = null,
+                        role = AppSession.staff.value?.role,
+                        menunggu = menunggu,
+                        riwayat = riwayat,
+                        // Jumlah menunggu diambil dari antrean yang baru saja dibaca, bukan
+                        // query hitung terpisah: dua angka dari dua permintaan berbeda pernah
+                        // membuat badge dan isi daftar tidak sepakat di layar yang sama.
+                        ringkasan = susunRingkasanWaste(disetujui, menunggu.size),
+                    )
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 android.util.Log.e("WasteViewModel", "muatUlang() gagal", e)
-                _state.value = _state.value.copy(memuat = false, galat = pesanGalat(e))
+                if (!senyap) {
+                    _state.update { it.copy(memuat = false, galat = pesanGalat(e)) }
+                }
+            } finally {
+                _state.update { if (it.memuat) it.copy(memuat = false) else it }
             }
         }
     }
@@ -159,7 +171,7 @@ class WasteViewModel : ViewModel() {
     fun tolak(laporan: LaporanWaste, alasan: String) {
         val keluhan = validasiAlasanPenolakan(alasan)
         if (keluhan != null) {
-            _state.value = _state.value.copy(galat = keluhan)
+            _state.update { it.copy(galat = keluhan) }
             return
         }
         proses(laporan, setujui = false, alasan = alasan)
@@ -169,37 +181,45 @@ class WasteViewModel : ViewModel() {
         val staff = AppSession.staff.value
         val halangan = halanganMemproses(staff?.role, staff?.id, laporan)
         if (halangan != null || staff == null) {
-            _state.value = _state.value.copy(galat = halangan ?: "Sesi tidak valid, silakan login ulang.")
+            _state.update { it.copy(galat = halangan ?: "Sesi tidak valid, silakan login ulang.") }
             return
         }
-        if (laporan.id in _state.value.sedangDiproses) return
+        // Kunci dipasang sebelum coroutine dimulai supaya ketukan ganda yang cepat
+        // tidak sempat mengirim dua RPC.
+        var lolos = false
+        _state.update {
+            lolos = laporan.id !in it.sedangDiproses
+            if (lolos) it.copy(sedangDiproses = it.sedangDiproses + laporan.id) else it
+        }
+        if (!lolos) return
 
         viewModelScope.launch {
-            _state.value = _state.value.copy(sedangDiproses = _state.value.sedangDiproses + laporan.id)
             try {
                 val kalah = WasteRepository.proses(laporan.id, setujui, staff.id, alasan)
                 if (kalah != null) {
-                    _state.value = _state.value.copy(galat = kalah)
+                    _state.update { it.copy(galat = kalah) }
                 } else {
-                    _state.value = _state.value.copy(
-                        // Baris dibuang dari antrean lebih dulu supaya tombol tidak bisa
-                        // ditekan dua kali sementara pemuatan ulang masih berjalan.
-                        menunggu = _state.value.menunggu.filterNot { it.id == laporan.id },
-                        kabar = if (setujui) {
-                            "Laporan waste disetujui. Stok otomatis terpotong."
-                        } else {
-                            "Laporan waste ditolak."
-                        },
-                    )
+                    _state.update { s ->
+                        s.copy(
+                            // Baris dibuang dari antrean lebih dulu supaya tombol tidak bisa
+                            // ditekan dua kali sementara pemuatan ulang masih berjalan.
+                            menunggu = s.menunggu.filterNot { it.id == laporan.id },
+                            kabar = if (setujui) {
+                                "Laporan waste disetujui. Stok otomatis terpotong."
+                            } else {
+                                "Laporan waste ditolak."
+                            },
+                        )
+                    }
                 }
                 muatUlang()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 android.util.Log.e("WasteViewModel", "proses() gagal", e)
-                _state.value = _state.value.copy(galat = pesanGalat(e))
+                _state.update { it.copy(galat = pesanGalat(e)) }
             } finally {
-                _state.value = _state.value.copy(sedangDiproses = _state.value.sedangDiproses - laporan.id)
+                _state.update { it.copy(sedangDiproses = it.sedangDiproses - laporan.id) }
             }
         }
     }
