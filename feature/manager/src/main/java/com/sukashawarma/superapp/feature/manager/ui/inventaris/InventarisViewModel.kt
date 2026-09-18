@@ -17,10 +17,14 @@ import com.sukashawarma.superapp.feature.manager.domain.kelompokPerSubsection
 import com.sukashawarma.superapp.feature.manager.domain.kemajuanIsian
 import com.sukashawarma.superapp.feature.manager.domain.mengisiInventaris
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.util.concurrent.ConcurrentHashMap
 
 data class InventarisUiState(
     val outlets: List<OutletPilihan> = emptyList(),
@@ -81,38 +85,50 @@ class InventarisViewModel : ViewModel() {
     val state: StateFlow<InventarisUiState> = _state
 
     private var pemuatan: Job? = null
+    private var jobPemuatanForm: Job? = null
 
     /**
      * Foto yang URL tanda tangannya sudah pernah diminta, dikunci "$itemId|$path".
      *
      * Kartu item meminta URL tiap kali masuk komposisi; tanpa catatan ini,
      * menggulir bolak-balik satu area akan memesan tanda tangan yang sama
-     * berulang kali.
+     * berulang kali. Himpunannya thread-safe karena kartu yang berbeda bisa
+     * memintanya dari coroutine yang berbeda pada saat yang sama.
      */
-    private val urlDiminta = mutableSetOf<String>()
+    private val urlDiminta: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
     init {
         muatUlang()
     }
 
-    fun muatUlang() {
+    fun muatUlang(silent: Boolean = false) {
+        val sudahAdaData = _state.value.outlets.isNotEmpty()
+        val senyap = silent || sudahAdaData
         pemuatan?.cancel()
         pemuatan = viewModelScope.launch {
-            _state.value = _state.value.copy(memuat = true, galat = null)
+            if (!senyap) {
+                _state.update { it.copy(memuat = true, galat = null) }
+            }
             try {
                 val referensi = InventarisRepository.referensi()
-                _state.value = _state.value.copy(
-                    memuat = false,
-                    role = AppSession.staff.value?.role,
-                    outlets = referensi.outlets,
-                    master = referensi.master,
-                    sudahTersimpan = referensi.sudahTersimpan,
-                )
+                _state.update {
+                    it.copy(
+                        memuat = false,
+                        role = AppSession.staff.value?.role,
+                        outlets = referensi.outlets,
+                        master = referensi.master,
+                        sudahTersimpan = referensi.sudahTersimpan,
+                    )
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 android.util.Log.e("InventarisViewModel", "muatUlang() gagal", e)
-                _state.value = _state.value.copy(memuat = false, galat = pesanGalat(e))
+                if (!senyap) {
+                    _state.update { it.copy(memuat = false, galat = pesanGalat(e)) }
+                }
+            } finally {
+                _state.update { if (it.memuat) it.copy(memuat = false) else it }
             }
         }
     }
@@ -120,54 +136,67 @@ class InventarisViewModel : ViewModel() {
     /** Membuka form satu outlet, memuat laporan lamanya sebagai isian awal. */
     fun mulaiIsi(outletId: String) {
         urlDiminta.clear()
-        _state.value = _state.value.copy(
-            outletDiisi = outletId,
-            memuatForm = true,
-            isian = emptyMap(),
-            catatan = "",
-            langkah = 0,
-            pencarian = "",
-            berhasilDikirim = false,
-            galat = null,
-        )
-        viewModelScope.launch {
+        _state.update {
+            it.copy(
+                outletDiisi = outletId,
+                memuatForm = true,
+                isian = emptyMap(),
+                catatan = "",
+                langkah = 0,
+                pencarian = "",
+                berhasilDikirim = false,
+                galat = null,
+            )
+        }
+        // Pemuatan form outlet sebelumnya dibatalkan supaya isian outlet lama tidak
+        // mendarat di form outlet yang baru dibuka.
+        jobPemuatanForm?.cancel()
+        jobPemuatanForm = viewModelScope.launch {
             try {
                 val lama = InventarisRepository.laporanTerkini(outletId)
                 // Isian disemai dari laporan lama supaya pengisian berikutnya adalah
                 // penyuntingan, bukan mengetik ulang 87 baris. Fotonya pun diwarisi:
                 // `submit_inventaris` menerima path lama selama laporannya memang milik
                 // outlet ini.
-                _state.value = _state.value.copy(
-                    memuatForm = false,
-                    laporanLama = lama,
-                    isian = lama?.isian.orEmpty(),
-                    catatan = lama?.catatan.orEmpty(),
-                )
+                _state.update {
+                    if (it.outletDiisi != outletId) {
+                        it
+                    } else {
+                        it.copy(
+                            memuatForm = false,
+                            laporanLama = lama,
+                            isian = lama?.isian.orEmpty(),
+                            catatan = lama?.catatan.orEmpty(),
+                        )
+                    }
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 android.util.Log.e("InventarisViewModel", "mulaiIsi() gagal", e)
-                _state.value = _state.value.copy(memuatForm = false, galat = pesanGalat(e))
+                _state.update { it.copy(memuatForm = false, galat = pesanGalat(e)) }
             }
         }
     }
 
     fun tutupForm() {
+        jobPemuatanForm?.cancel()
         urlDiminta.clear()
-        _state.value = _state.value.copy(
-            outletDiisi = null,
-            laporanLama = null,
-            isian = emptyMap(),
-            catatan = "",
-            langkah = 0,
-            pencarian = "",
-            berhasilDikirim = false,
-        )
+        _state.update {
+            it.copy(
+                outletDiisi = null,
+                laporanLama = null,
+                isian = emptyMap(),
+                catatan = "",
+                langkah = 0,
+                pencarian = "",
+                berhasilDikirim = false,
+            )
+        }
     }
 
     fun ubahIsian(itemId: String, ubah: (IsianItem) -> IsianItem) {
-        val sekarang = _state.value.isianUntuk(itemId)
-        _state.value = _state.value.copy(isian = _state.value.isian + (itemId to ubah(sekarang)))
+        _state.update { it.copy(isian = it.isian + (itemId to ubah(it.isianUntuk(itemId)))) }
     }
 
     fun ubahJumlah(itemId: String, teks: String) = ubahIsian(itemId) { it.copy(jumlah = teks) }
@@ -180,28 +209,30 @@ class InventarisViewModel : ViewModel() {
     fun ubahDepresiasi(itemId: String, teks: String) = ubahIsian(itemId) { it.copy(depresiasi = teks) }
 
     fun ubahCatatan(teks: String) {
-        _state.value = _state.value.copy(catatan = teks)
+        _state.update { it.copy(catatan = teks) }
     }
 
     fun pilihLangkah(langkah: Int) {
-        val batas = _state.value.kelompok.lastIndex.coerceAtLeast(0)
-        _state.value = _state.value.copy(langkah = langkah.coerceIn(0, batas))
+        _state.update {
+            val batas = it.kelompok.lastIndex.coerceAtLeast(0)
+            it.copy(langkah = langkah.coerceIn(0, batas))
+        }
     }
 
     fun ubahPencarian(teks: String) {
-        _state.value = _state.value.copy(pencarian = teks)
+        _state.update { it.copy(pencarian = teks) }
     }
 
     fun bukaKamera(itemId: String) {
-        _state.value = _state.value.copy(kameraUntuk = itemId)
+        _state.update { it.copy(kameraUntuk = itemId) }
     }
 
     fun tutupKamera() {
-        _state.value = _state.value.copy(kameraUntuk = null)
+        _state.update { it.copy(kameraUntuk = null) }
     }
 
     fun tutupKabar() {
-        _state.value = _state.value.copy(kabar = null, galat = null)
+        _state.update { it.copy(kabar = null, galat = null) }
     }
 
     /**
@@ -246,21 +277,26 @@ class InventarisViewModel : ViewModel() {
      */
     fun simpanFoto(itemId: String, bitmap: Bitmap) {
         val outletId = _state.value.outletDiisi ?: return
-        _state.value = _state.value.copy(
-            kameraUntuk = null,
-            mengunggah = _state.value.mengunggah + itemId,
-        )
+        _state.update {
+            it.copy(
+                kameraUntuk = null,
+                mengunggah = it.mengunggah + itemId,
+            )
+        }
         viewModelScope.launch {
             try {
-                val path = InventarisRepository.unggahFoto(outletId, itemId, bitmap.keJpeg())
+                // Kompresi JPEG satu foto kamera memakan ratusan milidetik; di UI
+                // thread itu terasa sebagai layar yang membeku sehabis memotret.
+                val jpeg = withContext(Dispatchers.Default) { bitmap.keJpeg() }
+                val path = InventarisRepository.unggahFoto(outletId, itemId, jpeg)
                 ubahIsian(itemId) { it.copy(fotoPath = path, fotoUrl = null) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 android.util.Log.e("InventarisViewModel", "simpanFoto() gagal", e)
-                _state.value = _state.value.copy(galat = "Foto gagal diunggah. Coba potret ulang.")
+                _state.update { it.copy(galat = "Foto gagal diunggah. Coba potret ulang.") }
             } finally {
-                _state.value = _state.value.copy(mengunggah = _state.value.mengunggah - itemId)
+                _state.update { it.copy(mengunggah = it.mengunggah - itemId) }
             }
         }
     }
@@ -270,17 +306,23 @@ class InventarisViewModel : ViewModel() {
         val outletId = awal.outletDiisi ?: return
         val halangan = awal.halangan
         if (halangan != null) {
-            _state.value = awal.copy(galat = halangan)
+            _state.update { it.copy(galat = halangan) }
             return
         }
         if (awal.mengunggah.isNotEmpty()) {
-            _state.value = awal.copy(galat = "Masih ada foto yang sedang diunggah.")
+            _state.update { it.copy(galat = "Masih ada foto yang sedang diunggah.") }
             return
         }
-        if (awal.mengirim) return
+        // Kunci dipasang sebelum coroutine dimulai supaya ketukan ganda yang cepat
+        // tidak sempat membuat dua laporan inventaris baru di database.
+        var lolos = false
+        _state.update {
+            lolos = !it.mengirim
+            if (lolos) it.copy(mengirim = true, galat = null) else it
+        }
+        if (!lolos) return
 
         viewModelScope.launch {
-            _state.value = _state.value.copy(mengirim = true, galat = null)
             try {
                 InventarisRepository.kirim(
                     outletId = outletId,
@@ -289,16 +331,19 @@ class InventarisViewModel : ViewModel() {
                     isian = awal.isian,
                     laporanLamaId = awal.laporanLama?.id,
                 )
-                _state.value = _state.value.copy(
-                    mengirim = false,
-                    berhasilDikirim = true,
-                    sudahTersimpan = _state.value.sudahTersimpan + outletId,
-                )
+                _state.update {
+                    it.copy(
+                        mengirim = false,
+                        berhasilDikirim = true,
+                        sudahTersimpan = it.sudahTersimpan + outletId,
+                    )
+                }
             } catch (e: CancellationException) {
+                _state.update { it.copy(mengirim = false) }
                 throw e
             } catch (e: Exception) {
                 android.util.Log.e("InventarisViewModel", "kirim() gagal", e)
-                _state.value = _state.value.copy(mengirim = false, galat = pesanKirimGagal(e))
+                _state.update { it.copy(mengirim = false, galat = pesanKirimGagal(e)) }
             }
         }
     }
