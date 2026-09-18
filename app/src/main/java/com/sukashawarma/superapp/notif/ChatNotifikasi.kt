@@ -20,6 +20,7 @@ import androidx.core.app.RemoteInput
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
+import com.sukashawarma.superapp.BuildConfig
 import com.sukashawarma.superapp.R
 import com.sukashawarma.superapp.data.remote.SupabaseClient
 import com.sukashawarma.superapp.presentation.MainActivity
@@ -199,7 +200,7 @@ object ChatNotifikasi {
             }
         }
 
-        return NotificationCompat.Builder(context, SALURAN)
+        val builder = NotificationCompat.Builder(context, SALURAN)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setLargeIcon(foto)
             .setStyle(gaya)
@@ -211,7 +212,13 @@ object ChatNotifikasi {
             // membuka pintu gelembung mengambang bila pengguna mengizinkannya.
             .setShortcutId(ID_PINTASAN)
             .setContentIntent(intentBuka(context))
-            .addAction(aksiBalas(context))
+
+        // Balas cepat dari bilah notifikasi dinonaktifkan saat chat terkunci (diuji sekarang).
+        if (false && BuildConfig.DEBUG) {
+            builder.addAction(aksiBalas(context))
+        }
+
+        return builder
     }
 
     /**
