@@ -2,7 +2,10 @@ package com.sukashawarma.superapp.feature.stok.data
 
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
+import com.sukashawarma.superapp.data.remote.HasilAksi
 import com.sukashawarma.superapp.data.remote.Postgrest
+import com.sukashawarma.superapp.data.remote.kirimAtauAntre
+import com.sukashawarma.superapp.feature.stok.offline.PermintaanOffline
 import com.sukashawarma.superapp.data.remote.optBoolean
 import com.sukashawarma.superapp.data.remote.optDouble
 import com.sukashawarma.superapp.data.remote.optInt
@@ -20,6 +23,8 @@ import com.sukashawarma.superapp.feature.stok.data.model.StatusPermintaan
 import com.sukashawarma.superapp.feature.stok.data.model.TargetJual
 import com.sukashawarma.superapp.feature.stok.data.model.TopUpRequest
 import com.sukashawarma.superapp.feature.stok.domain.StatusTopUp
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Permintaan bahan — cermin `app/actions/permintaan.ts` dan `hooks/usePermintaan.ts`.
@@ -184,8 +189,14 @@ object PermintaanRepository {
 
     // ---------------------------------------------------------------- katalog
 
+    @Volatile
     private var katalogCache: Pair<Long, List<BahanBaku>>? = null
+    private val katalogMutex = Mutex()
     private const val KATALOG_TTL_MS = 5 * 60_000L
+
+    fun invalidateKatalog() {
+        katalogCache = null
+    }
 
     /**
      * Master bahan baku aktif untuk katalog form — cermin `useBahanBaku` web
@@ -195,30 +206,36 @@ object PermintaanRepository {
         katalogCache?.let { (saat, data) ->
             if (System.currentTimeMillis() - saat < KATALOG_TTL_MS) return data
         }
-        val hasil = Postgrest.select(
-            "bahan_baku",
-            listOf(
-                "select" to "id,nama,kategori,satuan,satuan_tengah,satuan_kecil," +
-                    "faktor_tengah,faktor_tampilan,satuan_distribusi",
-                "is_active" to "eq.true",
-                "order" to "nama.asc",
-            ),
-        ).mapNotNull { el ->
-            val o = el.asJsonObject
-            BahanBaku(
-                id = o.optString("id") ?: return@mapNotNull null,
-                nama = o.optString("nama") ?: "(tanpa nama)",
-                kategori = o.optString("kategori"),
-                satuan = o.optString("satuan"),
-                satuanTengah = o.optString("satuan_tengah"),
-                satuanKecil = o.optString("satuan_kecil"),
-                faktorTengah = o.optDouble("faktor_tengah"),
-                faktorTampilan = o.optDouble("faktor_tampilan"),
-                satuanDistribusi = o.optString("satuan_distribusi"),
-            )
+        return katalogMutex.withLock {
+            katalogCache?.let { (saat, data) ->
+                if (System.currentTimeMillis() - saat < KATALOG_TTL_MS) return@withLock data
+            }
+            val hasil = Postgrest.select(
+                "bahan_baku",
+                listOf(
+                    "select" to "id,nama,kategori,satuan,satuan_tengah,satuan_kecil," +
+                        "faktor_tengah,faktor_tampilan,satuan_distribusi,is_refundable",
+                    "is_active" to "eq.true",
+                    "order" to "nama.asc",
+                ),
+            ).mapNotNull { el ->
+                val o = el.asJsonObject
+                BahanBaku(
+                    id = o.optString("id") ?: return@mapNotNull null,
+                    nama = o.optString("nama") ?: "(tanpa nama)",
+                    kategori = o.optString("kategori"),
+                    satuan = o.optString("satuan"),
+                    satuanTengah = o.optString("satuan_tengah"),
+                    satuanKecil = o.optString("satuan_kecil"),
+                    faktorTengah = o.optDouble("faktor_tengah"),
+                    faktorTampilan = o.optDouble("faktor_tampilan"),
+                    satuanDistribusi = o.optString("satuan_distribusi"),
+                    isRefundable = o.optBoolean("is_refundable"),
+                )
+            }
+            katalogCache = System.currentTimeMillis() to hasil
+            hasil
         }
-        katalogCache = System.currentTimeMillis() to hasil
-        return hasil
     }
 
     /**
@@ -420,23 +437,16 @@ object PermintaanRepository {
      * outlet yang sama bila ada bahan yang tumpang tindih — perilaku itu ada di
      * dalam fungsi database, bukan di sini.
      */
-    suspend fun buat(outletId: String, dibuatOleh: String, items: List<ItemDiminta>) {
-        val arr = JsonArray()
-        items.forEach { item ->
-            arr.add(
-                JsonObject().apply {
-                    addProperty("bahan_baku_id", item.bahanBakuId)
-                    addProperty("qty_diminta", item.qtyDiminta)
-                }
-            )
-        }
-        Postgrest.rpc("buat_permintaan_svc", JsonObject().apply {
-            addProperty("p_outlet_id", outletId)
-            add("p_items", arr)
-            addProperty("p_dibuat_oleh", dibuatOleh)
-            add("p_target_metadata", JsonArray())
-        })
-    }
+    suspend fun buat(outletId: String, dibuatOleh: String, items: List<ItemDiminta>): HasilAksi =
+        kirimAtauAntre(
+            jenis = PermintaanOffline.JENIS,
+            payload = PermintaanOffline.payload(
+                outletId, dibuatOleh, items.map { it.bahanBakuId to it.qtyDiminta },
+            ),
+            kirim = PermintaanOffline::kirim,
+            outletId = outletId,
+            dibuatOleh = dibuatOleh,
+        )
 
     data class ItemDisetujui(val bahanBakuId: String, val qtyDisetujui: Double)
 
