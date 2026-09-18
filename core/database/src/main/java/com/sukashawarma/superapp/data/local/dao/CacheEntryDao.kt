@@ -24,4 +24,21 @@ interface CacheEntryDao {
     /** Dipanggil saat logout — cache adalah data perusahaan, bukan milik perangkat. */
     @Query("DELETE FROM cache_entry")
     suspend fun hapusSemua()
+
+    /**
+     * Membuang entri terlama sehingga tersisa [batas] yang terbaru.
+     *
+     * Wajib ada karena sebagian query memuat stempel waktu di filternya (mis. "absensi 18 jam
+     * terakhir" menghitung batas waktunya dari jam sekarang). Kuncinya karena itu berbeda di
+     * setiap pemanggilan, dan tanpa pemangkasan setiap kali layar dibuka akan meninggalkan
+     * satu baris cache yang tidak akan pernah dibaca lagi.
+     */
+    @Query(
+        "DELETE FROM cache_entry WHERE kunci NOT IN (" +
+            "SELECT kunci FROM cache_entry ORDER BY fetchedAtMs DESC LIMIT :batas)"
+    )
+    suspend fun pangkas(batas: Int)
+
+    @Query("SELECT COUNT(*) FROM cache_entry")
+    suspend fun jumlah(): Int
 }
