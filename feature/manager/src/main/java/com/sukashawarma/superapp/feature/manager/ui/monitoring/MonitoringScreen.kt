@@ -36,8 +36,9 @@ import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DateRangePicker
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import com.sukashawarma.superapp.core.ui.SukaDropdownHeader
+import com.sukashawarma.superapp.core.ui.SukaDropdownMenu
+import com.sukashawarma.superapp.core.ui.SukaDropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -129,7 +130,7 @@ fun MonitoringScreen(
         RealtimeTables.CHECKLIST_RECORDS,
         RealtimeTables.OPNAME,
         RealtimeTables.OUTLET_STAFF,
-    ) { viewModel.muatUlang() }
+    ) { viewModel.muatUlang(silent = true) }
 
     Scaffold(
         containerColor = SukaCream,
@@ -181,9 +182,6 @@ private fun PanelPenyaring(state: MonitoringUiState, viewModel: MonitoringViewMo
                     fontWeight = FontWeight.Medium,
                     lineHeight = 16.sp,
                 )
-            }
-            if (state.memuat) {
-                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = SukaOrange)
             }
         }
 
@@ -304,10 +302,12 @@ private fun <T> PilihanTurun(
                 Icon(Icons.Default.ArrowDropDown, null, tint = SukaBrown)
             }
         }
-        DropdownMenu(expanded = terbuka, onDismissRequest = { terbuka = false }) {
+        SukaDropdownMenu(expanded = terbuka, onDismissRequest = { terbuka = false }) {
+            SukaDropdownHeader(title = "PILIH OPSI", onClose = { terbuka = false })
             pilihan.forEach { (nilaiPilihan, label) ->
-                DropdownMenuItem(
-                    text = { Text(label, fontSize = 12.sp, fontWeight = FontWeight.Bold) },
+                SukaDropdownMenuItem(
+                    text = label,
+                    selected = (label == nilai),
                     onClick = { terbuka = false; onPilih(nilaiPilihan) },
                 )
             }
