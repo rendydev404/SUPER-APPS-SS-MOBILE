@@ -14,6 +14,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.sukashawarma.superapp.core.ui.RealtimeRefresh
+import com.sukashawarma.superapp.core.ui.keluarMaju
+import com.sukashawarma.superapp.core.ui.keluarMundur
+import com.sukashawarma.superapp.core.ui.masukMaju
+import com.sukashawarma.superapp.core.ui.masukMundur
 import com.sukashawarma.superapp.core.ui.RealtimeTables
 import com.sukashawarma.superapp.domain.session.AppSession
 import com.sukashawarma.superapp.feature.leader.domain.LeaderAkses
@@ -34,7 +38,7 @@ import com.sukashawarma.superapp.feature.leader.ui.stok.StokScreen
  * ada layar yang bisa lupa memasangnya.
  */
 @Composable
-fun LeaderNavGraph(onExit: () -> Unit) {
+fun LeaderNavGraph(onExit: () -> Unit, tujuanAwal: TujuanLeader? = null) {
     val staff by AppSession.staff.collectAsState()
 
     // Gerbang kedua, setelah kartu modul di Beranda yang sudah disembunyikan. Web
@@ -67,6 +71,10 @@ fun LeaderNavGraph(onExit: () -> Unit) {
         }
     }
 
+    LaunchedEffect(tujuanAwal) {
+        if (tujuanAwal != null) pindah(tujuanAwal)
+    }
+
     Scaffold(
         bottomBar = {
             NavBawahLeader(
@@ -79,6 +87,10 @@ fun LeaderNavGraph(onExit: () -> Unit) {
         NavHost(
             navController = navController,
             startDestination = TujuanLeader.RINGKASAN.rute,
+            enterTransition = { masukMaju() },
+            exitTransition = { keluarMaju() },
+            popEnterTransition = { masukMundur() },
+            popExitTransition = { keluarMundur() },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(bottom = padding.calculateBottomPadding()),
@@ -92,13 +104,13 @@ fun LeaderNavGraph(onExit: () -> Unit) {
                 )
             }
             composable(TujuanLeader.PETTY_CASH.rute) {
-                PettyCashScreen(onExit = { pindah(TujuanLeader.RINGKASAN) })
+                PettyCashScreen(onExit = onExit)
             }
             composable(TujuanLeader.PENJUALAN.rute) {
-                PenjualanScreen(onExit = { pindah(TujuanLeader.RINGKASAN) })
+                PenjualanScreen(onExit = onExit)
             }
             composable(TujuanLeader.STOK.rute) {
-                StokScreen(onExit = { pindah(TujuanLeader.RINGKASAN) })
+                StokScreen(onExit = onExit)
             }
         }
     }
