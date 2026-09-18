@@ -54,6 +54,9 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import com.sukashawarma.superapp.core.ui.RealtimeRefresh
 import com.sukashawarma.superapp.core.ui.RealtimeTables
+import com.sukashawarma.superapp.core.ui.SukaDropdownHeader
+import com.sukashawarma.superapp.core.ui.SukaDropdownMenu
+import com.sukashawarma.superapp.core.ui.SukaDropdownMenuItem
 
 // Stitch Suka Culinary Design Tokens (samakan dengan ChecklistManageScreen)
 private val StitchPrimary = Color(0xFF450700)
@@ -379,19 +382,23 @@ private fun OutletPickerCard(
             }
         }
 
-        DropdownMenu(
+        SukaDropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            modifier = Modifier.width(290.dp).heightIn(max = 430.dp),
+            modifier = Modifier.width(300.dp).heightIn(max = 440.dp),
         ) {
-            Column(Modifier.padding(horizontal = 8.dp, vertical = 6.dp)) {
+            SukaDropdownHeader(
+                title = "PILIH OUTLET",
+                onClose = { expanded = false },
+            )
+            Column(Modifier.padding(horizontal = 10.dp, vertical = 4.dp)) {
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
-                    placeholder = { Text("Cari outlet", fontSize = 13.sp) },
+                    placeholder = { Text("Cari outlet...", fontSize = 13.sp) },
                     leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                     trailingIcon = {
                         if (query.isNotEmpty()) {
@@ -401,10 +408,18 @@ private fun OutletPickerCard(
                         }
                     },
                     colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color(0xFF1D1D1F),
+                        unfocusedTextColor = Color(0xFF1D1D1F),
                         focusedBorderColor = StitchSecondaryContainer,
-                        unfocusedBorderColor = StitchSurfaceContainerHigh,
-                        focusedContainerColor = StitchSurfaceContainerLowest,
-                        unfocusedContainerColor = StitchSurfaceContainerLowest,
+                        unfocusedBorderColor = Color(0xFFE5E5EA),
+                        focusedContainerColor = Color(0xFFF2F2F7),
+                        unfocusedContainerColor = Color(0xFFF2F2F7),
+                        focusedPlaceholderColor = Color(0xFF8E8E93),
+                        unfocusedPlaceholderColor = Color(0xFF8E8E93),
+                        focusedLeadingIconColor = StitchSecondaryContainer,
+                        unfocusedLeadingIconColor = Color(0xFF8E8E93),
+                        focusedTrailingIconColor = Color(0xFF8E8E93),
+                        unfocusedTrailingIconColor = Color(0xFF8E8E93),
                     ),
                 )
                 Spacer(Modifier.height(6.dp))
@@ -417,23 +432,19 @@ private fun OutletPickerCard(
                     if (filtered.isEmpty()) {
                         Text(
                             "Outlet tidak ditemukan",
-                            color = StitchOnSurfaceVariant,
+                            color = Color(0xFF8E8E93),
                             fontSize = 13.sp,
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 18.dp),
                         )
                     } else filtered.forEach { outlet ->
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    outlet.name,
-                                    fontSize = 14.sp,
-                                    fontWeight = if (outlet.id == selectedId) FontWeight.Bold else FontWeight.SemiBold,
-                                    color = if (outlet.id == selectedId) StitchSecondaryContainer else StitchOnSurface,
-                                )
+                        SukaDropdownMenuItem(
+                            title = outlet.name,
+                            selected = outlet.id == selectedId,
+                            leadingIcon = Icons.Filled.Storefront,
+                            onClick = {
+                                onSelect(outlet.id)
+                                expanded = false
                             },
-                            leadingIcon = { Icon(Icons.Filled.Storefront, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                            onClick = { onSelect(outlet.id); expanded = false },
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
                         )
                     }
                 }
