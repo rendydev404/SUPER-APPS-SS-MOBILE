@@ -17,9 +17,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.AlternateEmail
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Storefront
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -76,6 +79,7 @@ fun ProfilAnggotaSheet(
     memuat: Boolean,
     akuSendiri: Boolean,
     onTutup: () -> Unit,
+    onKirimPesanPribadi: ((userId: String, nama: String, avatar: String?) -> Unit)? = null,
 ) {
     val sheetState = rememberModalBottomSheetState()
     val nama = anggota?.username?.takeIf { it.isNotBlank() } ?: anggota?.nama ?: namaCadangan
@@ -171,6 +175,37 @@ fun ProfilAnggotaSheet(
                         PemisahBaris()
                         BarisProfil(Icons.Filled.Storefront, "Outlet", it)
                     }
+                }
+            }
+
+            if (!akuSendiri && anggota != null && onKirimPesanPribadi != null) {
+                Spacer(Modifier.height(16.dp))
+                Button(
+                    onClick = {
+                        onTutup()
+                        onKirimPesanPribadi(anggota.id, anggota.namaTampil, anggota.avatar)
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF34C759)
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Chat,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = Color.White
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Kirim Pesan Pribadi",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White
+                    )
                 }
             }
         }
