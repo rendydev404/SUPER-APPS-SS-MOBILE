@@ -38,8 +38,9 @@ import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import com.sukashawarma.superapp.core.ui.SukaDropdownHeader
+import com.sukashawarma.superapp.core.ui.SukaDropdownMenu
+import com.sukashawarma.superapp.core.ui.SukaDropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
@@ -220,7 +221,9 @@ fun EntriManualScreen(
                 Text("Foto bukti waste", color = SLATE900, fontSize = 14.sp, fontWeight = FontWeight.Black)
                 Spacer(Modifier.height(10.dp))
                 KameraFotoSheet(
-                    onDiambil = viewModel::simpanFoto,
+                    // cacheDir dikirim dari layar: ViewModel ini ViewModel biasa, bukan
+                    // AndroidViewModel, jadi tidak punya Context sendiri.
+                    onDiambil = { bitmap -> viewModel.simpanFoto(bitmap, konteks.cacheDir) },
                     onBatal = viewModel::tutupKamera,
                 )
             }
@@ -339,10 +342,12 @@ private fun PemilihOutlet(nomor: Int, state: EntriManualUiState, viewModel: Entr
                     Icon(Icons.Default.ArrowDropDown, null, tint = SLATE500)
                 }
             }
-            DropdownMenu(terbuka, { terbuka = false }) {
+            SukaDropdownMenu(terbuka, { terbuka = false }) {
+                SukaDropdownHeader(title = "PILIH OUTLET", onClose = { terbuka = false })
                 state.outlets.forEach { outlet ->
-                    DropdownMenuItem(
-                        text = { Text(outlet.name, fontSize = 13.sp) },
+                    SukaDropdownMenuItem(
+                        text = outlet.name,
+                        selected = (state.outletTerpilih?.id == outlet.id),
                         onClick = { terbuka = false; viewModel.pilihOutlet(outlet) },
                     )
                 }
@@ -694,7 +699,7 @@ private fun KartuRincian(
     onMintaFoto: () -> Unit,
 ) {
     val alasanBeres = !state.butuhAlasan || state.alasan.isNotBlank()
-    val fotoBeres = !state.butuhFoto || state.fotoUrl != null
+    val fotoBeres = !state.butuhFoto || state.fotoBukti != null
     KartuLangkah(nomor, if (state.jenis == JenisEntri.WASTE) "Alasan & bukti" else "Alasan", alasanBeres && fotoBeres) {
         if (state.butuhAlasan) {
             if (state.jenis == JenisEntri.WASTE) {
@@ -764,7 +769,9 @@ private fun KartuRincian(
 
 @Composable
 private fun BagianFoto(state: EntriManualUiState, onMintaFoto: () -> Unit) {
-    val url = state.fotoUrl
+    // Berkas lokal, bukan URL: fotonya baru diunggah saat laporan dikirim. Coil bisa
+    // menampilkan File apa adanya, jadi pratinjaunya tetap sama seperti sebelumnya.
+    val url = state.fotoBukti
     Text("Foto bukti (wajib)", color = SLATE400, fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
     Spacer(Modifier.height(7.dp))
     Box(
@@ -775,7 +782,7 @@ private fun BagianFoto(state: EntriManualUiState, onMintaFoto: () -> Unit) {
             state.mengunggahFoto -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 3.dp, color = ORANGE)
                 Spacer(Modifier.height(8.dp))
-                Text("Mengunggah…", color = SLATE500, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Text("Menyimpan…", color = SLATE500, fontSize = 11.sp, fontWeight = FontWeight.Bold)
             }
             url != null -> AsyncImage(
                 model = url,
