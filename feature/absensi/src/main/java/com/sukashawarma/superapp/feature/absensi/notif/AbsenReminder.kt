@@ -79,27 +79,39 @@ object AbsenReminder {
         context.getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
 
+    /** Batas keterlambatan tayang sesudah 12:10. */
+    private const val JENDELA_TAYANG_MS = 15 * 60_000L
+
     /**
-     * Perlukah menayangkan susulan sekarang?
+     * Bolehkah pengingat tayang sekarang?
      *
-     * Alarm tidak berbunyi saat perangkat mati, dan tidak ada yang menggantikannya
-     * ketika menyala kembali — jadwal berikutnya melompat ke besok dan pengingat
-     * hari itu hilang tanpa jejak. Staff yang HP-nya kehabisan baterai saat jam
-     * makan siang justru yang paling butuh diingatkan.
+     * Hanya di jendela 12:10 sampai 12:25, dan sekali per hari. Jendela ini
+     * menampung alarm yang ditunda doze atau alarm tidak presisi, serta HP yang
+     * baru menyala sesaat sesudah jadwal.
      *
-     * [terakhirTayang] adalah nomor hari epoch tayangan terakhir, -1 bila belum
-     * pernah. Susulan hanya untuk HARI INI: kalau perangkat baru menyala besok,
-     * pengingat kemarin sudah tidak ada gunanya.
+     * Versi sebelumnya menyusulkan pengingat KAPAN PUN sesudah 12:10 bila hari itu
+     * belum tayang. Karena [schedule] juga dipanggil saat app dibuka, boot, dan
+     * pembaruan APK, pengingat "Udah jam 12:10 nih" muncul pukul 16:07 sesudah
+     * aplikasi diperbarui. Pengingat yang datang berjam-jam terlambat itu keliru,
+     * bukan membantu.
+     *
+     * [terakhirTayang] adalah nomor hari epoch tayangan terakhir, -1 bila belum pernah.
      */
-    internal fun perluSusulan(sekarang: Long, terakhirTayang: Long): Boolean {
+    internal fun bolehTayang(sekarang: Long, terakhirTayang: Long): Boolean {
         val kalender = Calendar.getInstance().apply { timeInMillis = sekarang }
-        val hariIni = hariEpoch(kalender)
-        if (terakhirTayang == hariIni) return false
+        if (terakhirTayang == hariEpoch(kalender)) return false
         val jadwal = kalender.apply {
             set(Calendar.HOUR_OF_DAY, JAM); set(Calendar.MINUTE, MENIT)
             set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
         }.timeInMillis
-        return sekarang >= jadwal
+        return sekarang >= jadwal && sekarang < jadwal + JENDELA_TAYANG_MS
+    }
+
+    /** Tayangkan hanya bila [bolehTayang] mengizinkan. */
+    fun tayangkanBilaWaktunya(context: Context) {
+        if (bolehTayang(System.currentTimeMillis(), prefs(context).getLong(KEY_TERAKHIR, -1))) {
+            show(context)
+        }
     }
 
     private fun hariEpoch(kalender: Calendar): Long {
@@ -146,12 +158,9 @@ object AbsenReminder {
             alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, kapan, intent)
         }
 
-        // Menyusul tayangan yang terlewat karena perangkat mati saat jam 12:10.
-        // Dipanggil dari sini supaya tiap jalur yang memulihkan jadwal — boot,
-        // pembaruan APK, dan pembukaan app — sekaligus jadi kesempatan menyusul.
-        if (perluSusulan(System.currentTimeMillis(), prefs(context).getLong(KEY_TERAKHIR, -1))) {
-            show(context)
-        }
+        // Menyusul tayangan yang terlewat beberapa menit, misalnya HP baru menyala
+        // pukul 12:15. Di luar jendela tayang tidak ada yang ditampilkan.
+        tayangkanBilaWaktunya(context)
     }
 
     /**
