@@ -24,6 +24,9 @@ import java.util.concurrent.atomic.AtomicInteger
 object UpdateRealtimeManager {
     private const val TAG = "SuperappUpdateRealtime"
     private const val TOPIC = "realtime:public:native_updates"
+
+    /** Batas langkah tunda: 3 detik << 5 = 96 detik. */
+    private const val MAKS_TUNDA_LANGKAH = 5
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val refs = AtomicInteger(1)
     private val lock = Any()
@@ -105,6 +108,10 @@ object UpdateRealtimeManager {
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
             if (!isCurrent(webSocket)) return
             Log.w(TAG, "Realtime updater socket failed", t)
+            // 429 = batas laju sambungan Realtime Supabase. Mencoba lagi tiga
+            // detik kemudian hanya memperpanjang penolakannya — dan socket
+            // pembaruan aplikasi ikut menghabiskan jatah yang dipakai chat.
+            if (response?.code == 429) gagalBeruntun = MAKS_TUNDA_LANGKAH
             failAndReconnect(webSocket)
         }
 
@@ -114,7 +121,12 @@ object UpdateRealtimeManager {
         }
     }
 
+    /** Jumlah kegagalan beruntun; menentukan lama tunda sambungan ulang. */
+    private var gagalBeruntun = 0
+
     private fun startHeartbeat(webSocket: WebSocket) {
+        gagalBeruntun = 0
+
         heartbeatJob?.cancel()
         heartbeatJob = scope.launch {
             while (isActive && isCurrent(webSocket)) {
@@ -134,8 +146,15 @@ object UpdateRealtimeManager {
             if (socket !== failedSocket) return
             closeSocketLocked("channel failure")
             if (reconnectJob?.isActive == true) return
+            // Tunda berlipat: 3 detik, 6, 12, ... sampai 96 detik, plus sedikit
+            // acak. Versi sebelumnya selalu tiga detik — pada jaringan atau
+            // kuota yang sedang menolak, itu berarti ketukan tanpa henti
+            // sepanjang aplikasi hidup.
+            val langkah = gagalBeruntun.coerceAtMost(MAKS_TUNDA_LANGKAH)
+            gagalBeruntun = langkah + 1
+            val tunda = (3_000L shl langkah) + (0..1_500).random()
             reconnectJob = scope.launch {
-                delay(3_000)
+                delay(tunda)
                 connect()
             }
         }
