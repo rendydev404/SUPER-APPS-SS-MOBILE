@@ -1,5 +1,6 @@
 package com.sukashawarma.superapp.feature.chat.data
 
+import androidx.compose.runtime.Immutable
 import com.google.gson.JsonObject
 import java.time.OffsetDateTime
 
@@ -10,6 +11,7 @@ import java.time.OffsetDateTime
  * database, bukan join saat baca) — lihat migrasi 20300209000000. Kutipan reply
  * juga snapshot, supaya tetap tampil walau pesan asalnya sudah disapu job 24 jam.
  */
+@Immutable
 data class PesanChat(
     val id: String,
     val senderId: String,
@@ -17,6 +19,14 @@ data class PesanChat(
     val senderAvatar: String?,
     val body: String,
     val imagePath: String?,
+    /** Path rekaman suara di bucket `chat-media`. null = bukan pesan suara. */
+    val audioPath: String? = null,
+    /** Durasi rekaman (ms) menurut perekam — dipakai menggambar bubble tanpa
+     *  mengunduh berkasnya lebih dulu. */
+    val audioMs: Int? = null,
+    /** Amplitudo rekaman, satu digit '0'-'9' per bilah waveform. Kosong = belum
+     *  ada sampel (pesan lama), bubble menggambar bilah rata. */
+    val audioWave: String? = null,
     val replyToId: String?,
     val replyToName: String?,
     val replyToSnippet: String?,
@@ -53,9 +63,11 @@ data class PesanChat(
  * menggantinya kapan saja, dan potongan teks "@Budi" di pesan lama harus tetap
  * tersorot walau orangnya kini bernama lain.
  */
+@Immutable
 data class Sebutan(val id: String, val nama: String)
 
 /** Satu reaksi emoji pada sebuah pesan. Satu orang hanya punya satu per pesan. */
+@Immutable
 data class ReaksiPesan(
     val messageId: String,
     val userId: String,
@@ -64,6 +76,7 @@ data class ReaksiPesan(
 )
 
 /** Pengaturan grup, baris tunggal `chat_settings`. */
+@Immutable
 data class PengaturanGrup(
     val namaGrup: String = "Chat Tim",
     val deskripsi: String = "Ruang obrolan seluruh tim. Pesan terhapus otomatis setiap 03:00 AM.",
@@ -74,6 +87,100 @@ data class PengaturanGrup(
     /** ID wallpaper pilihan. Bawaan "default" (latar putih polos). */
     val wallpaper: String = "default",
 )
+
+/** Satu catatan pembacaan pesan (baris `chat_message_reads`). */
+@Immutable
+data class BacaanPesan(
+    val messageId: String,
+    val userId: String,
+    val userName: String = "",
+    val readAtMs: Long = 0L,
+)
+
+/** Satu anggota pembaca pada lembar Info Pesan. */
+@Immutable
+data class PembacaPesan(
+    val userId: String,
+    val nama: String,
+    val displayUsername: String?,
+    val avatarUrl: String?,
+    val role: String?,
+    val outletNama: String?,
+    val readAtMs: Long?,
+) {
+    val namaTampil: String
+        get() = displayUsername?.takeIf { it.isNotBlank() } ?: nama
+}
+
+/** Detail lengkap info pesan untuk lembar Info Pesan ala WhatsApp. */
+@Immutable
+data class DetailInfoPesan(
+    val messageId: String,
+    val senderId: String,
+    val createdAtMs: Long,
+    val dibaca: List<PembacaPesan>,
+    val belumDibaca: List<PembacaPesan>,
+)
+
+fun parseBacaan(o: JsonObject): BacaanPesan? {
+    fun teks(k: String): String? = o.get(k)?.takeIf { !it.isJsonNull }?.asString
+    val messageId = teks("message_id") ?: return null
+    val userId = teks("user_id") ?: return null
+    val readAt = teks("read_at")
+    val readAtMs = readAt?.let {
+        runCatching { OffsetDateTime.parse(it).toInstant().toEpochMilli() }.getOrNull()
+    } ?: 0L
+    return BacaanPesan(
+        messageId = messageId,
+        userId = userId,
+        userName = teks("user_name").orEmpty(),
+        readAtMs = readAtMs,
+    )
+}
+
+fun parsePembacaPesan(o: JsonObject): PembacaPesan? {
+    fun teks(k: String): String? = o.get(k)?.takeIf { !it.isJsonNull }?.asString
+    val userId = teks("user_id") ?: return null
+    val readAt = teks("read_at")
+    val readAtMs = readAt?.let {
+        runCatching { OffsetDateTime.parse(it).toInstant().toEpochMilli() }.getOrNull()
+    }
+    return PembacaPesan(
+        userId = userId,
+        nama = teks("nama")?.ifBlank { null } ?: "Tanpa Nama",
+        displayUsername = teks("display_username"),
+        avatarUrl = teks("avatar_url"),
+        role = teks("role"),
+        outletNama = teks("outlet_nama"),
+        readAtMs = readAtMs,
+    )
+}
+
+fun parseDetailInfoPesan(o: JsonObject): DetailInfoPesan? {
+    fun teks(k: String): String? = o.get(k)?.takeIf { !it.isJsonNull }?.asString
+    val messageId = teks("message_id") ?: return null
+    val senderId = teks("sender_id") ?: return null
+    val createdAt = teks("created_at")
+    val createdAtMs = createdAt?.let {
+        runCatching { OffsetDateTime.parse(it).toInstant().toEpochMilli() }.getOrNull()
+    } ?: 0L
+
+    val dibacaList = o.get("dibaca")?.takeIf { it.isJsonArray }?.asJsonArray?.mapNotNull {
+        it?.takeIf { el -> el.isJsonObject }?.asJsonObject?.let(::parsePembacaPesan)
+    }.orEmpty()
+
+    val belumDibacaList = o.get("belum_dibaca")?.takeIf { it.isJsonArray }?.asJsonArray?.mapNotNull {
+        it?.takeIf { el -> el.isJsonObject }?.asJsonObject?.let(::parsePembacaPesan)
+    }.orEmpty()
+
+    return DetailInfoPesan(
+        messageId = messageId,
+        senderId = senderId,
+        createdAtMs = createdAtMs,
+        dibaca = dibacaList,
+        belumDibaca = belumDibacaList,
+    )
+}
 
 fun parseReaksi(o: JsonObject): ReaksiPesan? {
     fun teks(k: String): String? = o.get(k)?.takeIf { !it.isJsonNull }?.asString
@@ -117,6 +224,9 @@ fun parsePesanChat(o: JsonObject): PesanChat? {
         senderAvatar = teks("sender_avatar"),
         body = teks("body").orEmpty(),
         imagePath = teks("image_path"),
+        audioPath = teks("audio_path"),
+        audioMs = o.get("audio_ms")?.takeIf { !it.isJsonNull }?.asInt,
+        audioWave = teks("audio_wave"),
         replyToId = teks("reply_to_id"),
         replyToName = teks("reply_to_name"),
         replyToSnippet = teks("reply_to_snippet"),
@@ -124,9 +234,9 @@ fun parsePesanChat(o: JsonObject): PesanChat? {
         createdAtMs = createdAtMs,
         mentions = o.get("mentions")?.takeIf { it.isJsonArray }?.asJsonArray?.mapNotNull { m ->
             val obj = m?.takeIf { it.isJsonObject }?.asJsonObject ?: return@mapNotNull null
-            val id = obj.get("id")?.takeIf { !it.isJsonNull }?.asString ?: return@mapNotNull null
+            val mId = obj.get("id")?.takeIf { !it.isJsonNull }?.asString ?: return@mapNotNull null
             val nama = obj.get("nama")?.takeIf { !it.isJsonNull }?.asString ?: return@mapNotNull null
-            Sebutan(id, nama)
+            Sebutan(mId, nama)
         }.orEmpty(),
         deletedByName = teks("deleted_by_name")?.ifBlank { null },
         deletedAtMs = teks("deleted_at")?.let {
@@ -145,6 +255,7 @@ fun parsePesanChat(o: JsonObject): PesanChat? {
  * kolom tampilan ini. Memakai model kepegawaian yang penuh di sini akan
  * mengundang layar lain membaca kolom yang tidak pernah dikirim server.
  */
+@Immutable
 data class AnggotaGrup(
     val id: String,
     val nama: String,
@@ -190,6 +301,7 @@ fun labelRole(role: String?): String = when (role) {
     "staff_pusat" -> "Staff Pusat"
     "purchasing" -> "Purchasing"
     "developer" -> "Developer"
+    "driver" -> "Driver"
     "korlap" -> "Korlap"
     "kepala_outlet" -> "Kepala Outlet"
     else -> role.replace('_', ' ').replaceFirstChar { it.uppercase() }
