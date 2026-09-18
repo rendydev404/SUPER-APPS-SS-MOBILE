@@ -47,6 +47,25 @@ object CacheOffline {
     /** Selaras dengan batas sesi offline: melewati ini, perangkat memang harus online dulu. */
     const val UMUR_MAKS_BAWAAN_MS = 7L * 24 * 60 * 60 * 1000
 
+    /**
+     * Balasan yang lebih besar dari ini tidak disalin.
+     *
+     * Batasnya bukan soal ruang disk melainkan soal apa yang masuk akal ditawarkan saat
+     * offline: balasan sebesar ini datang dari layar laporan/analitik, dan angka laporan
+     * yang basi tidak bisa dibedakan dari yang benar oleh siapa pun yang melihatnya.
+     */
+    private const val BATAS_SIMPAN_KARAKTER = 512 * 1024
+
+    /**
+     * Jumlah entri yang dipertahankan. Cukup untuk seluruh layar operasional yang wajar
+     * dibuka dalam satu hari, dan tidak membiarkan query bertimestamp menumpuk tanpa batas.
+     */
+    private const val BATAS_ENTRI = 400
+
+    /** Pemangkasan tidak perlu jalan di setiap penulisan; tiap 50 penulisan sudah cukup. */
+    private const val PANGKAS_TIAP = 50
+    private val penulisanSejakPangkas = java.util.concurrent.atomic.AtomicInteger(0)
+
     @Volatile private var db: AppDatabase? = null
 
     fun init(context: Context) {
@@ -130,8 +149,19 @@ object CacheOffline {
      */
     private suspend fun simpanKeCache(kunci: String, payload: String, waktuMs: Long, scope: String?) =
         withContext(Dispatchers.IO) {
+            if (payload.length > BATAS_SIMPAN_KARAKTER) {
+                Log.i(TAG, "'$kunci' terlalu besar (${payload.length}), tidak disalin ke cache")
+                return@withContext
+            }
             try {
-                db?.cacheEntryDao()?.simpan(CacheEntryEntity(kunci, payload, waktuMs, scope))
+                val dao = db?.cacheEntryDao() ?: return@withContext
+                dao.simpan(CacheEntryEntity(kunci, payload, waktuMs, scope))
+                // compareAndSet, bukan sekadar increment lalu reset: dua penulisan yang
+                // berbarengan tidak boleh sama-sama merasa gilirannya memangkas.
+                val hitungan = penulisanSejakPangkas.incrementAndGet()
+                if (hitungan >= PANGKAS_TIAP && penulisanSejakPangkas.compareAndSet(hitungan, 0)) {
+                    dao.pangkas(BATAS_ENTRI)
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "gagal menyimpan cache '$kunci'", e)
             }
