@@ -18,7 +18,9 @@ import com.sukashawarma.superapp.data.remote.Realtime
  * `20260713100001` supaya salah ketik tertangkap kompilator, bukan di lapangan.
  *
  * Yang TIDAK ada di publication dan karena itu tidak bisa realtime tanpa
- * migration: `surat_jalan_item`, `staff_outlets`, `permintaan_bahan_item`.
+ * migration: `surat_jalan_item`, `staff_outlets`, `permintaan_bahan_item`,
+ * `outlet_budget_config`, `outlet_budget_topup_requests`, serta dua tabel
+ * inventaris di bawah yang menunggu `plan/inventaris-realtime-publication.sql`.
  */
 object RealtimeTables {
     const val ATTENDANCE = "attendance"
@@ -36,6 +38,10 @@ object RealtimeTables {
     const val OPNAME = "opname"
     const val OPNAME_ITEM = "opname_item"
     const val SURAT_JALAN = "surat_jalan"
+
+    /** Tiket retur berpindah tangan antar peran (outlet -> AM/RM -> kurir -> gudang),
+     *  jadi layarnya hampir selalu terbuka di HP orang lain saat statusnya berubah. */
+    const val RETUR = "retur_stok"
     const val BAHAN_BAKU = "bahan_baku"
     const val BAHAN_BAKU_HARGA = "bahan_baku_harga"
     const val PURCHASE_ORDER = "purchase_order"
@@ -61,6 +67,15 @@ object RealtimeTables {
     // yang sekalian menyetel REPLICA IDENTITY FULL supaya payload UPDATE membawa
     // kolom lama — tanpa itu perpindahan status tidak bisa dibaca dari event.
     const val MUTASI = "mutasi_antar_outlet"
+
+    /**
+     * BELUM ADA DI PUBLICATION. Layar Sidak, Inventaris, dan Laporan Inventaris
+     * sudah berlangganan keduanya, tetapi tidak akan menerima apa pun sampai
+     * `plan/inventaris-realtime-publication.sql` dijalankan di project Supabase.
+     * Langganannya inert, bukan rusak: tidak error, sekadar tidak pernah ada kabar.
+     */
+    const val INVENTARIS_SUBMISSIONS = "inventaris_submissions"
+    const val INVENTARIS_MASTER_ITEMS = "inventaris_master_items"
 }
 
 /**
