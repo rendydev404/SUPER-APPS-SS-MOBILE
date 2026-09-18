@@ -43,6 +43,7 @@ import com.sukashawarma.superapp.feature.stok.data.model.LedgerEntry
 import com.sukashawarma.superapp.feature.stok.data.model.MonitoringRow
 import com.sukashawarma.superapp.feature.stok.domain.UnitScale
 import com.sukashawarma.superapp.feature.stok.domain.toLongString
+import com.sukashawarma.superapp.feature.stok.ui.HeaderStok
 import com.sukashawarma.superapp.feature.stok.ui.KeadaanGagal
 import com.sukashawarma.superapp.feature.stok.ui.KeadaanKosong
 import com.sukashawarma.superapp.feature.stok.ui.MemuatPenuh
@@ -66,29 +67,11 @@ fun DetailBahanScreen(
     RealtimeRefresh(RealtimeTables.LEDGER, RealtimeTables.STOK_BALANCE) { viewModel.muat(outletId, bahanId) }
 
     Column(Modifier.fillMaxSize().background(SukaSurface)) {
-        Box(
-            Modifier.fillMaxWidth().background(
-                Brush.verticalGradient(listOf(Color(0xFFEA580C), Color(0xFFF97316)))
-            )
-        ) {
-            Row(
-                Modifier.statusBarsPadding().padding(start = 8.dp, end = 16.dp, top = 6.dp, bottom = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onKeluar) {
-                    Icon(Icons.Default.ArrowBack, "Kembali", tint = Color.White)
-                }
-                Text(
-                    state.baris?.itemName ?: namaAwal,
-                    Modifier.weight(1f),
-                    color = Color.White,
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
+        HeaderStok(
+            judul = state.baris?.itemName ?: namaAwal,
+            subjudul = "Detail saldo & riwayat mutasi",
+            onKembali = onKeluar,
+        )
 
         when {
             state.memuat && state.baris == null -> MemuatPenuh()
