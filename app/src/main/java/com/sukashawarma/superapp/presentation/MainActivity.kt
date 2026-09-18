@@ -39,11 +39,13 @@ import com.sukashawarma.superapp.domain.session.isMitraArea
 import com.sukashawarma.superapp.domain.session.resolveStartDestination
 import com.sukashawarma.superapp.feature.distribusi.DistribusiNavGraph
 import com.sukashawarma.superapp.feature.leader.LeaderNavGraph
+import com.sukashawarma.superapp.feature.leader.ui.TujuanLeader
 import com.sukashawarma.superapp.feature.manager.ManagerNavGraph
 import com.sukashawarma.superapp.feature.manager.ui.TujuanManager
 import com.sukashawarma.superapp.feature.stok.StokNavGraph
 import com.sukashawarma.superapp.notif.ChatNotifikasi
 import com.sukashawarma.superapp.notif.NotifikasiTujuan
+import com.sukashawarma.superapp.notif.PettyCashAlarmManager
 import com.sukashawarma.superapp.presentation.absensi.AbsensiNavGraph
 import com.sukashawarma.superapp.presentation.home.HomeScreen
 import com.sukashawarma.superapp.presentation.login.LoginScreen
@@ -55,6 +57,13 @@ import com.sukashawarma.superapp.feature.profil.ui.ProfilScreen
 import com.sukashawarma.superapp.presentation.mitra.MitraNoProfileScreen
 import com.sukashawarma.superapp.presentation.theme.SukaSuperappTheme
 import androidx.compose.ui.platform.LocalContext
+import com.sukashawarma.superapp.core.ui.keluarMaju
+import com.sukashawarma.superapp.core.ui.keluarMundur
+import com.sukashawarma.superapp.core.ui.masukMaju
+import com.sukashawarma.superapp.core.ui.masukMundur
+import com.sukashawarma.superapp.core.ui.PitaOffline
+import com.sukashawarma.superapp.core.ui.popAman
+import com.sukashawarma.superapp.core.ui.popKe
 import com.sukashawarma.superapp.core.update.AppUpdateManager
 import com.sukashawarma.superapp.core.update.AppUpdateRelauncher
 import androidx.compose.material3.AlertDialog
@@ -134,6 +143,14 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun bacaTujuanNotifikasi(intent: Intent?) {
+        if (intent?.getBooleanExtra(PettyCashAlarmManager.EXTRA_STOP_ALARM, false) == true ||
+            intent?.getStringExtra(NotifikasiTujuan.EXTRA_RUTE) in setOf(
+                NotifikasiTujuan.MANAGER_PETTY_CASH,
+                NotifikasiTujuan.LEADER_PETTY_CASH
+            )
+        ) {
+            PettyCashAlarmManager.hentikan(this)
+        }
         NotifikasiTujuan.set(intent?.getStringExtra(NotifikasiTujuan.EXTRA_RUTE))
     }
 
@@ -263,7 +280,10 @@ private fun RootNav() {
     // Tujuan dari notifikasi yang diketuk. Ditahan sampai sesi benar-benar terbuka:
     // melompat ke halaman manajer sebelum login akan melewati layar login sama sekali.
     var tujuanManager by remember { mutableStateOf<TujuanManager?>(null) }
+    var tujuanLeader by remember { mutableStateOf<TujuanLeader?>(null) }
     val ruteNotifikasi by NotifikasiTujuan.rute.collectAsState()
+    val konteks = androidx.compose.ui.platform.LocalContext.current
+
     LaunchedEffect(ruteNotifikasi, staff, isMitra) {
         if (ruteNotifikasi == null || staff == null) return@LaunchedEffect
         // Chat berlaku untuk setiap pemegang akun, termasuk mitra — jadi
@@ -274,33 +294,64 @@ private fun RootNav() {
             return@LaunchedEffect
         }
         if (isMitra) return@LaunchedEffect
-        val tujuan = when (NotifikasiTujuan.ambil()) {
-            NotifikasiTujuan.MANAGER_PERSETUJUAN -> TujuanManager.PERSETUJUAN
-            NotifikasiTujuan.MANAGER_WASTE -> TujuanManager.WASTE
-            else -> null
-        } ?: return@LaunchedEffect
-        tujuanManager = tujuan
-        navController.navigate(Routes.MANAGER)
+
+        val rute = NotifikasiTujuan.ambil() ?: return@LaunchedEffect
+        if (rute in setOf(NotifikasiTujuan.MANAGER_PETTY_CASH, NotifikasiTujuan.LEADER_PETTY_CASH)) {
+            PettyCashAlarmManager.hentikan(konteks)
+        }
+
+        when (rute) {
+            NotifikasiTujuan.MANAGER_PERSETUJUAN -> {
+                tujuanManager = TujuanManager.PERSETUJUAN
+                navController.navigate(Routes.MANAGER)
+            }
+            NotifikasiTujuan.MANAGER_WASTE -> {
+                tujuanManager = TujuanManager.WASTE
+                navController.navigate(Routes.MANAGER)
+            }
+            NotifikasiTujuan.MANAGER_PETTY_CASH -> {
+                tujuanManager = TujuanManager.PETTY_CASH
+                navController.navigate(Routes.MANAGER)
+            }
+            NotifikasiTujuan.LEADER_PETTY_CASH -> {
+                tujuanLeader = TujuanLeader.PETTY_CASH
+                navController.navigate(Routes.LEADER)
+            }
+        }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        NavHost(navController = navController, startDestination = routeFor(destination)) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Di atas NavHost, bukan di dalam tiap layar: mode offline berlaku untuk seluruh
+        // aplikasi, dan memasangnya per layar berarti layar yang terlupakan akan menampilkan
+        // data cache tanpa satu pun tanda bahwa itu bukan keadaan terkini.
+        PitaOffline()
+        Box(modifier = Modifier.fillMaxSize()) {
+        NavHost(
+            navController = navController,
+            startDestination = routeFor(destination),
+            // Tanpa ini Navigation Compose memakai silang-pudar 700 ms bawaannya —
+            // pintu masuk tiap modul terasa berat. Geserannya dibagi bersama seluruh
+            // NavHost aplikasi lewat core:ui supaya iramanya sama di mana pun.
+            enterTransition = { masukMaju() },
+            exitTransition = { keluarMaju() },
+            popEnterTransition = { masukMundur() },
+            popExitTransition = { keluarMundur() },
+        ) {
             // Didaftarkan di luar percabangan mitra: profil adalah satu-satunya halaman
             // yang berlaku untuk SETIAP pemegang akun, termasuk mitra. Menaruhnya di
             // cabang non-mitra saja akan membuat navigate("profil") dari dashboard mitra
             // melempar IllegalArgumentException karena rutenya tidak ada di graph itu.
             composable(Routes.PROFIL) {
-                ProfilScreen(onExit = { navController.popBackStack() })
+                ProfilScreen(onExit = { navController.popAman() })
             }
 
             // Chat Tim juga berlaku untuk setiap pemegang akun — alasan penempatan
             // yang sama dengan PROFIL di atas.
             composable(Routes.CHAT) {
-                // Membuka ruangnya berarti pesannya sudah terbaca; notifikasi
-                // percakapan yang masih menggantung ditutup di sini.
-                val konteks = androidx.compose.ui.platform.LocalContext.current
-                LaunchedEffect(Unit) { ChatNotifikasi.tutup(konteks) }
-                ChatScreen(onBack = { navController.popBackStack() })
+                ChatScreen(
+                    onBack = { navController.popAman() },
+                    terkunci = !com.sukashawarma.superapp.BuildConfig.DEBUG,
+                )
             }
 
             composable(Routes.LOGIN) {
@@ -351,23 +402,29 @@ private fun RootNav() {
                     )
                 }
                 composable(Routes.SETTINGS) {
-                    SettingsScreen(onBack = { navController.popBackStack() })
+                    SettingsScreen(onBack = { navController.popAman() })
                 }
                 composable(Routes.ABSENSI) {
-                    AbsensiNavGraph(onExit = { navController.popBackStack() })
+                    AbsensiNavGraph(onExit = { navController.popKe(Routes.HOME) })
                 }
                 composable(Routes.STOK) {
-                    StokNavGraph(onExit = { navController.popBackStack() })
+                    StokNavGraph(onExit = { navController.popKe(Routes.HOME) })
                 }
                 composable(Routes.DISTRIBUSI) {
-                    DistribusiNavGraph(onExit = { navController.popBackStack() })
+                    DistribusiNavGraph(onExit = { navController.popKe(Routes.HOME) })
                 }
                 composable(Routes.LEADER) {
-                    LeaderNavGraph(onExit = { navController.popBackStack() })
+                    LaunchedEffect(Unit) { PettyCashAlarmManager.hentikan(konteks) }
+                    LeaderNavGraph(
+                        onExit = { navController.popKe(Routes.HOME) },
+                        tujuanAwal = tujuanLeader,
+                    )
+                    LaunchedEffect(Unit) { tujuanLeader = null }
                 }
                 composable(Routes.MANAGER) {
+                    LaunchedEffect(Unit) { PettyCashAlarmManager.hentikan(konteks) }
                     ManagerNavGraph(
-                        onExit = { navController.popBackStack() },
+                        onExit = { navController.popKe(Routes.HOME) },
                         tujuanAwal = tujuanManager,
                     )
                     // Dikosongkan setelah dipakai supaya membuka modul Manager lewat
@@ -408,6 +465,7 @@ private fun RootNav() {
                     }
                 )
             }
+        }
         }
     }
 }
