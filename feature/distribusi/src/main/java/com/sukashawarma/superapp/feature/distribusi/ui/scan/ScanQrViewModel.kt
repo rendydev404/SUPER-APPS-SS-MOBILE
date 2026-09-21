@@ -9,6 +9,7 @@ import com.sukashawarma.superapp.feature.distribusi.domain.distribusiErrorMessag
 import com.sukashawarma.superapp.feature.distribusi.domain.sudahDiterima
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 sealed interface HasilPindai {
@@ -59,10 +60,18 @@ class ScanQrViewModel : ViewModel() {
      * sekejap, dan navigasi bisa terjadi dua kali.
      */
     fun pindai(kode: String) {
-        if (_state.value.memproses) return
-        if (_state.value.hasil is HasilPindai.Terbuka) return
+        var shouldLaunch = false
+        _state.update { current ->
+            if (current.memproses || current.hasil is HasilPindai.Terbuka) {
+                current
+            } else {
+                shouldLaunch = true
+                current.copy(memproses = true, hasil = HasilPindai.Menunggu)
+            }
+        }
+        if (!shouldLaunch) return
+
         viewModelScope.launch {
-            _state.value = _state.value.copy(memproses = true, hasil = HasilPindai.Menunggu)
             try {
                 val sj = SuratJalanRepository.cariUntukVerifikasi(kode)
                 val hasil = when {

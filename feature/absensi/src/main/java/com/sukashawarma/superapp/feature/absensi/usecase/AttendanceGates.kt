@@ -27,6 +27,12 @@ object AttendanceGates {
         staffId: String,
         pendingDao: com.sukashawarma.superapp.data.local.dao.PendingAttendanceDao? = null
     ): NextAction {
+        val pendingLatest = try {
+            pendingDao?.getLatestForStaff(staffId)
+        } catch (_: Exception) {
+            null
+        }
+
         return try {
             // Cek riwayat absensi staf dalam 18 jam terakhir untuk mendukung shift malam yang melewati tengah malam.
             val cutoffIso = java.time.Instant.now().minus(18, java.time.temporal.ChronoUnit.HOURS).toString()
@@ -41,6 +47,20 @@ object AttendanceGates {
                 )
             )
             val latest = recentRows.firstOrNull()?.asJsonObject
+            val serverTsMs = latest?.optString("ts_server")?.let {
+                runCatching { java.time.Instant.parse(it).toEpochMilli() }.getOrNull()
+            } ?: 0L
+
+            // Jika antrean lokal belum tersinkronisasi dan lebih baru daripada data server,
+            // hormati status lokal agar user tidak diminta absen masuk ulang saat online pulih.
+            if (pendingLatest != null && pendingLatest.createdAtMs > serverTsMs) {
+                return when (pendingLatest.type) {
+                    "in" -> NextAction.OUT
+                    "out" -> NextAction.DONE
+                    else -> NextAction.IN
+                }
+            }
+
             val latestType = latest?.optString("type")
 
             // Jika absen terakhir dalam 18 jam adalah 'in', maka aksi berikutnya adalah 'out' (absen pulang).
@@ -64,7 +84,6 @@ object AttendanceGates {
             }
         } catch (_: Exception) {
             // Fallback offline: periksa antrean lokal Room
-            val pendingLatest = pendingDao?.getLatestForStaff(staffId)
             when (pendingLatest?.type) {
                 "in" -> NextAction.OUT
                 "out" -> NextAction.DONE

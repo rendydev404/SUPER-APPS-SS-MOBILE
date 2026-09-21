@@ -31,6 +31,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Checklist
+import androidx.compose.material.icons.filled.FactCheck
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Person
@@ -134,7 +135,14 @@ fun AbsensiNavGraph(onExit: () -> Unit) {
             )
         }
         composable(AbsensiRoutes.REKAP) { RekapScreen(onExit = onExit) }
-        composable(AbsensiRoutes.CHECKLIST) { ChecklistScreen(onExit = onExit) }
+        composable(AbsensiRoutes.CHECKLIST) {
+            val staff by AppSession.staff.collectAsState()
+            if (staff?.role == Role.ADMIN_HR) {
+                ChecklistMonitorScreen(onExit = onExit)
+            } else {
+                ChecklistScreen(onExit = onExit)
+            }
+        }
         composable(AbsensiRoutes.CHECKLIST_MONITOR) {
             val staff by AppSession.staff.collectAsState()
             if (staff?.role in SPV_TIER_ROLES) {
@@ -181,13 +189,15 @@ fun AbsensiNavGraph(onExit: () -> Unit) {
  */
 /** Role yang tab ke-3-nya berisi Enrollment Crew, bukan Profil: mereka yang memang bertugas
  *  mendaftarkan wajah kru. Crew (dan role lain) tetap mendapat tab Profile seperti biasa. */
-private val ENROLL_TAB_ROLES = setOf(Role.LEADER, Role.AREA_MANAGER, Role.REGIONAL_MANAGER)
+private val ENROLL_TAB_ROLES = setOf(Role.LEADER, Role.AREA_MANAGER, Role.REGIONAL_MANAGER, Role.DEVELOPER)
 
 /** Sumber tunggal isi bottom nav — jumlah tab tetap 4, hanya slot index 2 yang berganti,
- *  supaya geometri bubble/notch dan `pendingTab` dari layar sub-route tidak ikut berubah. */
-private fun absensiBottomTabs(enrollTab: Boolean) = listOf(
+ *  supaya geometri bubble/notch dan `pendingTab` dari layar sub-route tidak ikut berubah.
+ *  Untuk role HR, slot index 1 berganti dari Checklist ke Monitor. */
+private fun absensiBottomTabs(enrollTab: Boolean, isHr: Boolean = false) = listOf(
     Triple("Home", Icons.Default.Home, 0),
-    Triple("Checklist", Icons.Default.Checklist, 1),
+    if (isHr) Triple("Monitor", Icons.Default.FactCheck, 1)
+    else Triple("Checklist", Icons.Default.Checklist, 1),
     if (enrollTab) Triple("Enroll", Icons.Default.PersonAdd, 2)
     else Triple("Profile", Icons.Default.Person, 2),
     Triple("More", Icons.Default.MoreHoriz, 3)
@@ -201,6 +211,12 @@ private fun isEnrollTabRole(): Boolean {
     return staff?.role in ENROLL_TAB_ROLES
 }
 
+@Composable
+private fun isHrRole(): Boolean {
+    val staff by AppSession.staff.collectAsState()
+    return staff?.role == Role.ADMIN_HR
+}
+
 /**
  * Bottom nav 4 tab yang sama dipakai di [AbsensiMainPagerScreen] (pager, `selectedIndex`
  * mengikuti halaman aktif) maupun di layar sub-route seperti [CutiScreen] (tak pernah punya
@@ -210,7 +226,7 @@ private fun isEnrollTabRole(): Boolean {
  */
 @Composable
 fun AbsensiBottomNav(selectedIndex: Int, onSelect: (Int) -> Unit) {
-    val tabs = absensiBottomTabs(isEnrollTabRole())
+    val tabs = absensiBottomTabs(enrollTab = isEnrollTabRole(), isHr = isHrRole())
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -446,6 +462,7 @@ fun AbsensiMainPagerScreen(
     val pagerState = rememberPagerState(initialPage = 0) { 4 }
     val coroutineScope = rememberCoroutineScope()
     val enrollTab = isEnrollTabRole()
+    val isHr = isHrRole()
     var moreSheetVisible by rememberSaveable { mutableStateOf(false) }
 
     // More adalah quick action, bukan tab pager. Jadi sheet dibuka di atas
@@ -514,17 +531,21 @@ fun AbsensiMainPagerScreen(
                         isActive = !moreSheetVisible &&
                             (pagerState.currentPage == 0 || pagerState.targetPage == 0),
                         onExit = onExit,
-                        // Absen hadir berlanjut ke checklist: itu tugas berikutnya kru
-                        // begitu masuk, dan sebelumnya mereka harus mencarinya sendiri.
+                        // Absen hadir berlanjut ke checklist untuk kru. Role HR hanya memantau,
+                        // tidak mengisi checklist, jadi tidak ditarik ke tab 1.
                         // Dijaga `currentPage == 0` supaya kru yang sudah telanjur
                         // menggeser ke tab lain tidak ditarik balik.
                         onAbsenMasukSelesai = {
-                            if (pagerState.currentPage == 0) {
+                            if (pagerState.currentPage == 0 && !isHr) {
                                 coroutineScope.launch { pagerState.animateScrollToPage(1) }
                             }
                         },
                     )
-                    1 -> ChecklistScreen(onExit = onExit)
+                    1 -> if (isHr) {
+                        ChecklistMonitorScreen(onExit = onExit)
+                    } else {
+                        ChecklistScreen(onExit = onExit)
+                    }
                     // Slot yang sama dengan tab index 2 di bottom nav — ikut berganti isi
                     // supaya label tab dan halaman yang muncul selalu cocok.
                     2 -> if (enrollTab) {

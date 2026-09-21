@@ -168,6 +168,8 @@ import com.sukashawarma.superapp.feature.chat.ui.suara.PitaKomposerSuara
 import com.sukashawarma.superapp.feature.chat.ui.suara.TombolMicChat
 import com.sukashawarma.superapp.feature.chat.ui.suara.rememberPerekamSuara
 import com.sukashawarma.superapp.feature.chat.ui.suara.rememberStatusRekam
+import com.sukashawarma.superapp.feature.chat.data.ChatWallpaperPrefs
+import com.sukashawarma.superapp.feature.chat.data.ChatWallpapers
 import com.sukashawarma.superapp.feature.chat.data.PesanChat
 import com.sukashawarma.superapp.feature.chat.data.ReaksiPesan
 import com.sukashawarma.superapp.feature.chat.data.Sebutan
@@ -250,7 +252,10 @@ private fun warnaNama(senderId: String): Color = WarnaNama[indeksWarnaNama(sende
 @Composable
 fun ChatScreen(
     onBack: () -> Unit,
-    terkunci: Boolean = !com.sukashawarma.superapp.feature.chat.BuildConfig.DEBUG,
+    terkunci: Boolean = false,
+    tabAwal: com.sukashawarma.superapp.feature.chat.ui.pribadi.TabChatUtama = com.sukashawarma.superapp.feature.chat.ui.pribadi.TabChatUtama.GRUP,
+    targetAreaId: String? = null,
+    onAreaTerbuka: ((String) -> Unit)? = null,
 ) {
     if (terkunci) {
         LayarChatTerkunci(onBack = onBack)
@@ -263,7 +268,7 @@ fun ChatScreen(
     val isDeveloper = staff?.role == com.sukashawarma.superapp.domain.model.Role.DEVELOPER ||
         staff?.roleRaw?.equals("developer", ignoreCase = true) == true
 
-    var tabAktif by remember { mutableStateOf(com.sukashawarma.superapp.feature.chat.ui.pribadi.TabChatUtama.GRUP) }
+    var tabAktif by remember { mutableStateOf(tabAwal) }
     var partnerChatAktif by remember { mutableStateOf<Triple<String, String, String?>?>(null) }
     var devMonitorDetail by remember { mutableStateOf<com.sukashawarma.superapp.feature.chat.data.PercakapanPengawasanItem?>(null) }
     var sheetPilihKontak by remember { mutableStateOf(false) }
@@ -335,6 +340,7 @@ fun ChatScreen(
             isDeveloper = isDeveloper,
             onPilihTab = { tabAktif = it },
             onBack = onBack,
+            tampilkanArea = com.sukashawarma.superapp.feature.chat.BuildConfig.DEBUG,
         )
 
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
@@ -347,6 +353,16 @@ fun ChatScreen(
                         onMulaiChatPribadi = { id, nama, avatar ->
                             partnerChatAktif = Triple(id, nama, avatar)
                         }
+                    )
+                }
+                com.sukashawarma.superapp.feature.chat.ui.pribadi.TabChatUtama.AREA -> {
+                    com.sukashawarma.superapp.feature.chat.ui.area.LayarChatArea(
+                        onMulaiChatPribadi = { id, nama, avatar ->
+                            partnerChatAktif = Triple(id, nama, avatar)
+                        },
+                        modifier = Modifier.fillMaxSize(),
+                        initialAreaId = targetAreaId,
+                        onAreaTerbuka = onAreaTerbuka,
                     )
                 }
                 com.sukashawarma.superapp.feature.chat.ui.pribadi.TabChatUtama.PRIBADI -> {
@@ -405,6 +421,9 @@ private fun ChatScreenContent(
     val state by viewModel.state.collectAsState()
     val staff by AppSession.staff.collectAsState()
     val userId = staff?.id.orEmpty()
+    val isDeveloper = remember(staff) {
+        ChatWallpapers.bolehUbahWallpaper(staff?.role, staff?.roleRaw)
+    }
 
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -470,6 +489,18 @@ private fun ChatScreenContent(
     var sorotKunci by remember { mutableIntStateOf(0) }
     // Foto yang sedang dibuka layar penuh: URL siap muat + judulnya.
     var fotoDibuka by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var revisiWallpaper by remember { mutableIntStateOf(0) }
+    val wallpaperEfektif = remember(revisiWallpaper, state.pengaturan.wallpaper, isDeveloper) {
+        if (isDeveloper) {
+            val tersimpan = ChatWallpaperPrefs.getWallpaperTim(context)
+            if (tersimpan != ChatWallpaperPrefs.ID_BAWAAN) tersimpan else state.pengaturan.wallpaper
+        } else {
+            state.pengaturan.wallpaper
+        }
+    }
+    val dimmingEfektif = remember(revisiWallpaper, state.pengaturan.wallpaper, isDeveloper) {
+        ChatWallpaperPrefs.getDimmingTim(context)
+    }
 
     // Sorotan padam sendiri. Membiarkannya menyala terus membuat pesan itu
     // tampak "terpilih" selamanya, padahal ia hanya sedang ditunjukkan.
@@ -697,7 +728,7 @@ private fun ChatScreenContent(
         )
 
         Box(Modifier.weight(1f).fillMaxWidth()) {
-            WallpaperLatarChat(state.pengaturan.wallpaper)
+            WallpaperLatarChat(wallpaperId = wallpaperEfektif, dimming = dimmingEfektif)
             when {
                 state.memuat -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = BiruIos, strokeWidth = 3.dp, modifier = Modifier.size(30.dp))
@@ -1107,6 +1138,7 @@ private fun ChatScreenContent(
         InfoGrupSheet(
             awal = state.pengaturan,
             bolehSunting = state.pengelola,
+            bolehUbahWallpaper = isDeveloper,
             menyimpan = menyimpanPengaturan,
             galat = galatPengaturan,
             anggota = state.anggota,
@@ -1115,7 +1147,8 @@ private fun ChatScreenContent(
             onKlikAnggota = { profilDibuka = Triple(it.id, it.nama, it.avatar) },
             onSimpan = { nama, deskripsi, hanyaAdmin, fotoJpeg, hapusFoto, wallpaper ->
                 menyimpanPengaturan = true
-                viewModel.simpanPengaturan(nama, deskripsi, hanyaAdmin, fotoJpeg, hapusFoto, wallpaper) { galat ->
+                val wallpaperFinal = if (isDeveloper) wallpaper else state.pengaturan.wallpaper
+                viewModel.simpanPengaturan(nama, deskripsi, hanyaAdmin, fotoJpeg, hapusFoto, wallpaperFinal) { galat ->
                     menyimpanPengaturan = false
                     galatPengaturan = galat
                     if (galat == null) {
@@ -1124,13 +1157,33 @@ private fun ChatScreenContent(
                     }
                 }
             },
-            onGantiWallpaper = { idBaru ->
-                viewModel.simpanWallpaper(idBaru) { galat ->
-                    if (galat != null) {
-                        Toast.makeText(context, galat, Toast.LENGTH_SHORT).show()
+            onGantiWallpaper = { idBaru, _, untukSemua ->
+                if (!isDeveloper) {
+                    Toast.makeText(context, "Hanya role Developer yang dapat mengubah wallpaper chat.", Toast.LENGTH_SHORT).show()
+                    return@InfoGrupSheet
+                }
+                revisiWallpaper++
+                if (untukSemua) {
+                    if (idBaru.startsWith("file:", ignoreCase = true) || idBaru.startsWith("/")) {
+                        Toast.makeText(context, "Menerapkan wallpaper tim…", Toast.LENGTH_SHORT).show()
+                        viewModel.simpanWallpaperFoto(idBaru) { galat ->
+                            if (galat != null) {
+                                Toast.makeText(context, "Gagal mengunggah wallpaper tim: $galat", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "Wallpaper chat tim berhasil diperbarui.", Toast.LENGTH_SHORT).show()
+                            }
+                        }
                     } else {
-                        Toast.makeText(context, "Wallpaper chat berhasil diterapkan.", Toast.LENGTH_SHORT).show()
+                        viewModel.simpanWallpaper(idBaru) { galat ->
+                            if (galat != null) {
+                                Toast.makeText(context, galat, Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "Wallpaper chat tim berhasil diterapkan.", Toast.LENGTH_SHORT).show()
+                            }
+                        }
                     }
+                } else {
+                    Toast.makeText(context, "Wallpaper chat berhasil diterapkan.", Toast.LENGTH_SHORT).show()
                 }
             },
             onTutup = { sheetInfo = false },

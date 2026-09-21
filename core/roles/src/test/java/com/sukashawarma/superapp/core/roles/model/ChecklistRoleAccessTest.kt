@@ -1,4 +1,4 @@
-﻿package com.sukashawarma.superapp.domain.model
+package com.sukashawarma.superapp.domain.model
 
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -38,5 +38,18 @@ class ChecklistRoleAccessTest {
 
         // Crew biasa tidak boleh monitor
         assertFalse("Crew tidak boleh monitor checklist", Role.CREW in SPV_TIER_ROLES)
+    }
+
+    @Test
+    fun `monitoring semua outlet diizinkan untuk RM, Admin, dan HR`() {
+        val multiOutletMonitorRoles = setOf(Role.REGIONAL_MANAGER, Role.ADMIN_HR, Role.ADMIN)
+        assertTrue("Admin HR harus bisa memantau semua outlet", Role.ADMIN_HR in multiOutletMonitorRoles)
+        assertTrue("Regional Manager harus bisa memantau semua outlet", Role.REGIONAL_MANAGER in multiOutletMonitorRoles)
+        assertTrue("Admin harus bisa memantau semua outlet", Role.ADMIN in multiOutletMonitorRoles)
+
+        // Leader dan SPV outlet hanya memantau outletnya sendiri
+        assertFalse("Leader tidak boleh memantau lintas outlet sembarangan", Role.LEADER in multiOutletMonitorRoles)
+        assertFalse("SPV tidak boleh memantau lintas outlet sembarangan", Role.SPV in multiOutletMonitorRoles)
+        assertFalse("Crew tidak boleh memantau", Role.CREW in multiOutletMonitorRoles)
     }
 }

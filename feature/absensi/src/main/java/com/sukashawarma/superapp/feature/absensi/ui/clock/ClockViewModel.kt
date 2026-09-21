@@ -28,6 +28,8 @@ import com.sukashawarma.superapp.domain.liveness.LivenessDetector
 import com.sukashawarma.superapp.domain.liveness.pickChallenge
 import com.sukashawarma.superapp.domain.model.ClockPhase
 import com.sukashawarma.superapp.domain.model.ClockResult
+import com.sukashawarma.superapp.domain.model.Role
+import com.sukashawarma.superapp.domain.session.AppSession
 import com.sukashawarma.superapp.domain.usecase.AttendanceGates
 import com.sukashawarma.superapp.domain.usecase.NextAction
 import com.sukashawarma.superapp.feature.absensi.shift.isShiftPenutup
@@ -80,6 +82,7 @@ class ClockViewModel(
     private var livenessDetector: LivenessDetector? = null
     private var livenessTimeoutJob: Job? = null
     private val flushMutex = Mutex()
+    private val submitMutex = Mutex()
     private var pendingManualButton = false
     private var geofenceRadiusM = GpsMath.GEOFENCE_RADIUS_M
 
@@ -523,103 +526,109 @@ class ClockViewModel(
     }
 
     fun onSelfieCaptured(jpegBytes: ByteArray?) {
-        if (_state.value.phase != ClockPhase.SUBMITTING) return
-        _state.value = _state.value.copy(selfieCaptureRequestId = null)
+        val s = _state.value
+        if (s.phase != ClockPhase.SUBMITTING || s.selfieCaptureRequestId == null) return
+        _state.value = s.copy(selfieCaptureRequestId = null)
         viewModelScope.launch { doSubmit(pendingManualButton, jpegBytes) }
     }
 
     private suspend fun doSubmit(isManualButton: Boolean, jpegBytes: ByteArray?) {
-        val s = _state.value
-        val staffId = s.whoId ?: return
-        _state.value = s.copy(phase = ClockPhase.SUBMITTING)
+        if (!submitMutex.tryLock()) return
+        try {
+            val s = _state.value
+            val staffId = s.whoId ?: return
+            _state.value = s.copy(phase = ClockPhase.SUBMITTING)
 
-        // Order baru dapat masuk setelah liveness selesai. Cek ulang sebelum
-        // mengirim absen pulang agar gate tetap konsisten dengan kondisi POS terbaru.
-        if (s.action == "out" && NetworkMonitor.isOnline.value) {
-            checkoutBlockMessage(staffId)?.let { message ->
-                setResult(false, message, ClockPhase.RESULT)
-                scheduleReset(3500)
+            // Order baru dapat masuk setelah liveness selesai. Cek ulang sebelum
+            // mengirim absen pulang agar gate tetap konsisten dengan kondisi POS terbaru.
+            if (s.action == "out" && NetworkMonitor.isOnline.value) {
+                checkoutBlockMessage(staffId)?.let { message ->
+                    setResult(false, message, ClockPhase.RESULT)
+                    scheduleReset(3500)
+                    return
+                }
+            }
+
+            val id = UUID.randomUUID().toString()
+            val nowIso = Instant.now().toString()
+            val entity = PendingAttendanceEntity(
+                id = id,
+                outletId = outletId,
+                outletStaffId = staffId,
+                type = s.action,
+                gpsLat = s.deviceCoords?.lat,
+                gpsLng = s.deviceCoords?.lng,
+                gpsAccuracy = s.deviceAccuracy,
+                isMock = false,
+                isManualButton = isManualButton,
+                tsClientIso = nowIso,
+                selfiePath = null,
+                createdAtMs = System.currentTimeMillis(),
+                // Hanya nomor shift yang dikirim; server memetakan ke jam di config outlet.
+                shiftKe = if (s.action == "in" && s.shiftOptions != null) s.selectedShiftKe else null,
+            )
+
+            if (!NetworkMonitor.isOnline.value) {
+                val localPath = jpegBytes?.let { bytes ->
+                    try {
+                        val dir = File(getApplication<Application>().cacheDir, "offline_selfies")
+                        if (!dir.exists()) dir.mkdirs()
+                        val file = File(dir, "$id.jpg")
+                        file.writeBytes(bytes)
+                        file.absolutePath
+                    } catch (_: Exception) {
+                        null
+                    }
+                }
+                db.pendingAttendanceDao().insert(entity.copy(selfiePath = localPath))
+                selesaiBerhasil(s.action, if (s.action == "in") "Selamat bekerja! (Offline)" else "Hati-hati di jalan! (Offline)")
                 return
             }
-        }
 
-        val id = UUID.randomUUID().toString()
-        val nowIso = Instant.now().toString()
-        val entity = PendingAttendanceEntity(
-            id = id,
-            outletId = outletId,
-            outletStaffId = staffId,
-            type = s.action,
-            gpsLat = s.deviceCoords?.lat,
-            gpsLng = s.deviceCoords?.lng,
-            gpsAccuracy = s.deviceAccuracy,
-            isMock = false,
-            isManualButton = isManualButton,
-            tsClientIso = nowIso,
-            selfiePath = null,
-            createdAtMs = System.currentTimeMillis(),
-            // Hanya nomor shift yang dikirim; server memetakan ke jam di config outlet.
-            shiftKe = if (s.action == "in" && s.shiftOptions != null) s.selectedShiftKe else null,
-        )
-
-        if (!NetworkMonitor.isOnline.value) {
-            val localPath = jpegBytes?.let { bytes ->
+            // Sama dengan web: ambil frame sebelum submit, unggah ke bucket `selfies`, lalu
+            // kirim path object (tanpa nama bucket) sebagai `attendance.selfie_path`.
+            val selfiePath = jpegBytes?.let { bytes ->
                 try {
-                    val dir = File(getApplication<Application>().cacheDir, "offline_selfies")
-                    if (!dir.exists()) dir.mkdirs()
-                    val file = File(dir, "$id.jpg")
-                    file.writeBytes(bytes)
-                    file.absolutePath
+                    StorageUtil.uploadJpeg("selfies", "$outletId/$id.jpg", bytes).removePrefix("selfies/")
                 } catch (_: Exception) {
-                    null
+                    null // Jangan mengirim path palsu bila upload gagal.
                 }
             }
-            db.pendingAttendanceDao().insert(entity.copy(selfiePath = localPath))
-            selesaiBerhasil(s.action, if (s.action == "in") "Selamat bekerja! (Offline)" else "Hati-hati di jalan! (Offline)")
-            return
-        }
-
-        // Sama dengan web: ambil frame sebelum submit, unggah ke bucket `selfies`, lalu
-        // kirim path object (tanpa nama bucket) sebagai `attendance.selfie_path`.
-        val selfiePath = jpegBytes?.let { bytes ->
-            try {
-                StorageUtil.uploadJpeg("selfies", "$outletId/$id.jpg", bytes).removePrefix("selfies/")
-            } catch (_: Exception) {
-                null // Jangan mengirim path palsu bila upload gagal.
-            }
-        }
-        val res = try {
-            SubmitAttendanceUseCase(entity.copy(selfiePath = selfiePath))
-        } catch (e: Exception) {
-            val localPath = jpegBytes?.let { bytes ->
-                try {
-                    val dir = File(getApplication<Application>().cacheDir, "offline_selfies")
-                    if (!dir.exists()) dir.mkdirs()
-                    val file = File(dir, "$id.jpg")
-                    file.writeBytes(bytes)
-                    file.absolutePath
-                } catch (_: Exception) {
-                    null
+            val res = try {
+                SubmitAttendanceUseCase(entity.copy(selfiePath = selfiePath))
+            } catch (e: Exception) {
+                val localPath = jpegBytes?.let { bytes ->
+                    try {
+                        val dir = File(getApplication<Application>().cacheDir, "offline_selfies")
+                        if (!dir.exists()) dir.mkdirs()
+                        val file = File(dir, "$id.jpg")
+                        file.writeBytes(bytes)
+                        file.absolutePath
+                    } catch (_: Exception) {
+                        null
+                    }
                 }
+                db.pendingAttendanceDao().insert(entity.copy(selfiePath = localPath))
+                selesaiBerhasil(s.action, if (s.action == "in") "Selamat bekerja! (Tersimpan offline)" else "Hati-hati di jalan! (Tersimpan offline)")
+                return
             }
-            db.pendingAttendanceDao().insert(entity.copy(selfiePath = localPath))
-            selesaiBerhasil(s.action, if (s.action == "in") "Selamat bekerja! (Tersimpan offline)" else "Hati-hati di jalan! (Tersimpan offline)")
-            return
-        }
 
-        if (res.ok) {
-            refreshAttendance()
-            // Status was returned in reason when OK in UseCase
-            val status = res.reason
-            selesaiBerhasil(s.action, if (s.action == "in") "Selamat bekerja! ($status)" else "Hati-hati di jalan! ($status)")
-        } else {
-            if (res.reason == "shift_required") {
-                // Config outlet berubah jadi dua shift sejak layar dibuka → muat ulang & tanya.
-                _state.value = _state.value.copy(selectedShiftKe = null)
-                loadShiftContext()
+            if (res.ok) {
+                refreshAttendance()
+                // Status was returned in reason when OK in UseCase
+                val status = res.reason
+                selesaiBerhasil(s.action, if (s.action == "in") "Selamat bekerja! ($status)" else "Hati-hati di jalan! ($status)")
+            } else {
+                if (res.reason == "shift_required") {
+                    // Config outlet berubah jadi dua shift sejak layar dibuka → muat ulang & tanya.
+                    _state.value = _state.value.copy(selectedShiftKe = null)
+                    loadShiftContext()
+                }
+                setResult(false, gagalText(res.reason), ClockPhase.RESULT)
+                scheduleReset(1000)
             }
-            setResult(false, gagalText(res.reason), ClockPhase.RESULT)
-            scheduleReset(1000)
+        } finally {
+            submitMutex.unlock()
         }
     }
 
@@ -654,7 +663,7 @@ class ClockViewModel(
      * ditutup di sana, jadi gerbang ini hanya akan mengunci staf kantor selamanya.
      */
     private suspend fun checkoutBlockMessage(staffId: String): String? {
-        if (diKantorPusat) return null
+        if (diKantorPusat || AppSession.staff.value?.role == Role.ADMIN_HR) return null
         return try {
             val options = _state.value.shiftOptions
             val wajibTutupOutlet = options == null ||

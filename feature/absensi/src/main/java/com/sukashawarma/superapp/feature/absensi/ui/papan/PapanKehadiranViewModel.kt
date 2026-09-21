@@ -115,7 +115,7 @@ data class PapanKehadiranUiState(
     val filter: BoardState? = null,
     val query: String = "",
     val lastRefresh: String = "",
-    /** Regional manager memantau semua outlet, jadi outlet dipilih dulu baru data dimuat. */
+    /** RM/AM memantau lebih dari satu outlet, jadi outlet dipilih dulu baru data dimuat. */
     val canChooseOutlet: Boolean = false,
     val loadingOutlets: Boolean = false,
     val outlets: List<PapanOutletOption> = emptyList(),
@@ -130,6 +130,9 @@ data class PapanKehadiranUiState(
 }
 
 private const val GLOBAL_OUTLET_ID = "00000000-0000-0000-0000-000000000000"
+
+/** Role yang memilih outlet dulu sebelum data dimuat: RM/dev semua cabang, AM cabang binaannya. */
+private val OUTLET_CHOOSER_ROLES = setOf(Role.REGIONAL_MANAGER, Role.AREA_MANAGER, Role.DEVELOPER)
 
 /** Role yang boleh melihat banner peringatan keamanan — cermin `isSpvOrAdmin` di web. */
 private val ALERT_ROLES = setOf(
@@ -150,7 +153,7 @@ class PapanKehadiranViewModel : ViewModel() {
     init {
         val staff = AppSession.staff.value
         val canSeeAlerts = staff?.role in ALERT_ROLES
-        if (staff?.role == Role.REGIONAL_MANAGER) {
+        if (staff?.role in OUTLET_CHOOSER_ROLES) {
             _state.value = _state.value.copy(canChooseOutlet = true, canSeeAlerts = canSeeAlerts, loading = false)
             loadOutlets()
         } else {
@@ -163,21 +166,38 @@ class PapanKehadiranViewModel : ViewModel() {
         }
     }
 
-    /** Daftar outlet tidak dibatasi di client — RLS backend yang menentukan mana yang
-     *  boleh dilihat (sama seperti [[EnrollViewModel]] & [[ChecklistMonitorViewModel]]). */
+    /**
+     * Daftar outlet untuk pemilih. Regional manager & developer melihat seluruh cabang aktif
+     * (RLS `outlets` memang `USING (true)`). Area manager dibatasi ke outlet BINAANNYA lewat
+     * `staff_outlets` miliknya sendiri — tanpa penyaring ini AM melihat ~30 cabang padahal
+     * hanya membina beberapa (cermin `CakupanOutletRepository` di modul Manager).
+     */
     private fun loadOutlets() {
         _state.value = _state.value.copy(loadingOutlets = true, error = null)
         viewModelScope.launch {
             try {
-                val rows = Postgrest.select(
-                    "outlets",
-                    listOf(
-                        "is_active" to "eq.true",
-                        "id" to "neq.$GLOBAL_OUTLET_ID",
-                        "select" to "id,name",
-                        "order" to "name.asc",
-                    )
+                val staff = AppSession.staff.value
+                val filter = mutableListOf(
+                    "is_active" to "eq.true",
+                    "id" to "neq.$GLOBAL_OUTLET_ID",
+                    "select" to "id,name",
+                    "order" to "name.asc",
                 )
+                if (staff?.role == Role.AREA_MANAGER) {
+                    val binaan = Postgrest.select(
+                        "staff_outlets",
+                        listOf("staff_id" to "eq.${staff.id}", "select" to "outlet_id"),
+                    ).mapNotNull { it.asJsonObject.optString("outlet_id") }.toSet()
+                    if (binaan.isEmpty()) {
+                        _state.value = _state.value.copy(
+                            loadingOutlets = false,
+                            error = "Akun Anda belum ditugaskan ke outlet binaan mana pun. Hubungi admin untuk pengaturan penempatan.",
+                        )
+                        return@launch
+                    }
+                    filter += "id" to "in.(${binaan.joinToString(",")})"
+                }
+                val rows = Postgrest.select("outlets", filter)
                 _state.value = _state.value.copy(
                     loadingOutlets = false,
                     outlets = rows.map { el ->

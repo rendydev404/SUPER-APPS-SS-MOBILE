@@ -11,6 +11,7 @@ import com.sukashawarma.superapp.data.remote.optString
 import com.sukashawarma.superapp.domain.session.AppSession
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.IOException
 
@@ -114,6 +115,7 @@ class PengaturanViewModel : ViewModel() {
     }
 
     fun update(jamMasuk: String, jamKeluar: String, toleransiMenit: Int, radiusM: Int) {
+        if (_state.value.saving) return
         val outletId = AppSession.staff.value?.outletId
         if (outletId == null) {
             _state.value = _state.value.copy(
@@ -134,7 +136,16 @@ class PengaturanViewModel : ViewModel() {
         val safeJamMasuk = normalizedJamMasuk ?: return
         val safeJamKeluar = normalizedJamKeluar ?: return
 
-        _state.value = _state.value.copy(saving = true, saved = false, saveError = null)
+        var lanjut = false
+        _state.update { current ->
+            if (current.saving) current
+            else {
+                lanjut = true
+                current.copy(saving = true, saved = false, saveError = null)
+            }
+        }
+        if (!lanjut) return
+
         viewModelScope.launch {
             try {
                 Postgrest.rpc(
@@ -254,12 +265,22 @@ class PengaturanViewModel : ViewModel() {
                 "Shift 2 sama persis dengan Shift 1 — ubah jamnya atau matikan pilihan shift"
             else -> null
         }
+        if (_state.value.savingJadwal) return
         if (shiftError != null) {
             _state.value = _state.value.copy(jadwalError = shiftError, jadwalMessage = null)
             return
         }
 
-        _state.value = _state.value.copy(savingJadwal = true, jadwalError = null, jadwalMessage = null)
+        var lanjut = false
+        _state.update { current ->
+            if (current.savingJadwal) current
+            else {
+                lanjut = true
+                current.copy(savingJadwal = true, jadwalError = null, jadwalMessage = null)
+            }
+        }
+        if (!lanjut) return
+
         viewModelScope.launch {
             try {
                 Postgrest.rpc(

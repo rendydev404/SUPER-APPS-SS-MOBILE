@@ -11,6 +11,9 @@ import com.sukashawarma.superapp.feature.chat.ChatBacaan
 import com.sukashawarma.superapp.feature.chat.data.ChatRepository
 import com.sukashawarma.superapp.domain.session.AppSession
 import com.sukashawarma.superapp.domain.util.JakartaTime
+import com.sukashawarma.superapp.feature.home.domain.BonusBulanan
+import com.sukashawarma.superapp.feature.home.domain.skemaBonusUntuk
+import com.sukashawarma.superapp.feature.home.domain.susunBonusBulanan
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -47,6 +50,13 @@ data class HomeUiState(
      *  dari sekadar "ada pesan baru" menjadi "ada yang memanggil Anda". */
     val chatAdaSebutan: Boolean = false,
     val memuatSorotan: Boolean = true,
+    /**
+     * Estimasi insentif bulan berjalan. `null` selagi memuat, gagal, atau role
+     * ini memang tidak punya skema bonus — kartu hanya tampil bila [adaSkemaBonus].
+     */
+    val bonus: BonusBulanan? = null,
+    val memuatBonus: Boolean = true,
+    val adaSkemaBonus: Boolean = false,
 ) {
     /** Jam absen terakhir hari ini dalam WIB, mis. "07:12". */
     val jamAbsen: String? get() = todayAttendance?.tsServerIso?.let { iso ->
@@ -175,7 +185,29 @@ class HomeViewModel : ViewModel() {
             _state.value = _state.value.copy(memuatSorotan = false)
             return
         }
+        val skemaBonus = skemaBonusUntuk(role)
+        _state.value = _state.value.copy(adaSkemaBonus = skemaBonus != null, memuatBonus = skemaBonus != null)
         viewModelScope.launch {
+            val bonus = async {
+                if (skemaBonus == null || staff == null) null
+                else runCatching {
+                    // Bulan berjalan menurut WIB — RPC-nya juga memotong periode di
+                    // Asia/Jakarta, jadi keduanya sepakat soal "bulan ini".
+                    val kini = JakartaTime.now()
+                    val body = com.google.gson.JsonObject().apply {
+                        addProperty("p_month", kini.monthValue)
+                        addProperty("p_year", kini.year)
+                        // Skema kru menerima filter outlet; AM/RM tidak punya parameter itu.
+                        if (skemaBonus == com.sukashawarma.superapp.feature.home.domain.SkemaBonus.KRU) {
+                            addProperty("p_outlet_id", outletId)
+                        }
+                    }
+                    val baris = Postgrest.rpc(skemaBonus.rpc, body)
+                        .takeIf { it.isJsonArray }?.asJsonArray
+                        ?.map { it.asJsonObject } ?: emptyList()
+                    susunBonusBulanan(skemaBonus, staff.id, baris, kini.monthValue, kini.year)
+                }.getOrNull()
+            }
             val stok = async {
                 if (outletId == null || role !in STOK_ROLES) null
                 else runCatching {
@@ -235,6 +267,8 @@ class HomeViewModel : ViewModel() {
                 wasteMenunggu = waste.await(),
                 pettyCashButuhAksi = pettyCash.await(),
                 memuatSorotan = false,
+                bonus = bonus.await(),
+                memuatBonus = false,
             )
         }
     }

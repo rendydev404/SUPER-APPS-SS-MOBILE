@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.io.File
 import java.util.UUID
 
 /** Kiriman yang belum diakui server — bubble jam pasir / gagal di ujung daftar. */
@@ -439,12 +440,24 @@ class ChatViewModel : ViewModel() {
                     hapusFoto -> ""
                     else -> null
                 }
-                wallpaper?.let { wp ->
+                val pathWallpaper = when {
+                    wallpaper == null -> null
+                    wallpaper.startsWith("file:", ignoreCase = true) || wallpaper.startsWith("/") -> {
+                        val file = File(wallpaper.removePrefix("file:"))
+                        if (file.exists() && file.isFile) {
+                            ChatRepository.unggahFotoGrup(userId, file.readBytes())
+                        } else {
+                            "default"
+                        }
+                    }
+                    else -> wallpaper
+                }
+                pathWallpaper?.let { wp ->
                     _state.value = _state.value.copy(
                         pengaturan = _state.value.pengaturan.copy(wallpaper = wp)
                     )
                 }
-                ChatRepository.simpanPengaturan(nama, deskripsi, hanyaAdmin, namaSendiri, path, wallpaper)
+                ChatRepository.simpanPengaturan(nama, deskripsi, hanyaAdmin, namaSendiri, path, pathWallpaper)
                 muatUlang()
                 onSelesai(null)
             } catch (e: kotlinx.coroutines.CancellationException) {
@@ -473,6 +486,39 @@ class ChatViewModel : ViewModel() {
             } catch (e: Exception) {
                 android.util.Log.e("ChatViewModel", "simpan wallpaper gagal", e)
                 onSelesai(e.message ?: "Gagal menyimpan wallpaper.")
+            }
+        }
+    }
+
+    /**
+     * Unggah berkas foto kustom dan simpan sebagai wallpaper tim ke Supabase Storage & Database.
+     */
+    fun simpanWallpaperFoto(filePathOrUri: String, onSelesai: (String?) -> Unit = {}) {
+        viewModelScope.launch {
+            try {
+                val clean = filePathOrUri.removePrefix("file:")
+                val file = File(clean)
+                if (!file.exists() || !file.isFile) {
+                    onSelesai("Berkas foto tidak ditemukan di perangkat.")
+                    return@launch
+                }
+                // Tampilkan secara optimis di layar pengelola tanpa jeda
+                _state.value = _state.value.copy(
+                    pengaturan = _state.value.pengaturan.copy(wallpaper = filePathOrUri)
+                )
+                val bytes = file.readBytes()
+                val pathStorage = ChatRepository.unggahFotoGrup(userId, bytes)
+                _state.value = _state.value.copy(
+                    pengaturan = _state.value.pengaturan.copy(wallpaper = pathStorage)
+                )
+                ChatRepository.simpanWallpaper(pathStorage, namaSendiri)
+                muatUlang()
+                onSelesai(null)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.e("ChatViewModel", "simpan wallpaper foto gagal", e)
+                onSelesai(e.message ?: "Gagal mengunggah foto wallpaper tim.")
             }
         }
     }

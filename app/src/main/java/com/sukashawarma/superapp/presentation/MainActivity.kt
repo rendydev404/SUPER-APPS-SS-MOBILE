@@ -153,7 +153,9 @@ class MainActivity : FragmentActivity() {
         ) {
             PettyCashAlarmManager.hentikan(this)
         }
-        NotifikasiTujuan.set(intent?.getStringExtra(NotifikasiTujuan.EXTRA_RUTE))
+        val rute = intent?.getStringExtra(NotifikasiTujuan.EXTRA_RUTE)
+        val areaId = intent?.getStringExtra(NotifikasiTujuan.EXTRA_AREA_ID)
+        NotifikasiTujuan.set(rute, areaId)
     }
 
     override fun onResume() {
@@ -209,7 +211,7 @@ private fun RootNav() {
             title = { Text("Buka otomatis setelah update") },
             text = {
                 Text(
-                    "Aktifkan izin \"Tampil di atas aplikasi lain\" untuk SUKA Superapp " +
+                    "Aktifkan izin \"Tampil di atas aplikasi lain\" untuk SUKA Kerja Superapps " +
                         "agar aplikasi langsung terbuka lagi begitu update selesai dipasang."
                 )
             },
@@ -288,7 +290,7 @@ private fun RootNav() {
         if (ruteNotifikasi == null || staff == null) return@LaunchedEffect
         // Chat berlaku untuk setiap pemegang akun, termasuk mitra — jadi
         // ditangani sebelum penjaga isMitra di bawah.
-        if (ruteNotifikasi == NotifikasiTujuan.CHAT) {
+        if (ruteNotifikasi == NotifikasiTujuan.CHAT || ruteNotifikasi == NotifikasiTujuan.CHAT_AREA) {
             NotifikasiTujuan.ambil()
             navController.navigate(Routes.CHAT)
             return@LaunchedEffect
@@ -348,9 +350,18 @@ private fun RootNav() {
             // Chat Tim juga berlaku untuk setiap pemegang akun — alasan penempatan
             // yang sama dengan PROFIL di atas.
             composable(Routes.CHAT) {
+                // Chat Area belum dirilis ke produksi: target area dari notifikasi diabaikan.
+                val targetAreaId = remember {
+                    NotifikasiTujuan.ambilArea().takeIf { com.sukashawarma.superapp.BuildConfig.DEBUG }
+                }
                 ChatScreen(
                     onBack = { navController.popAman() },
-                    terkunci = !com.sukashawarma.superapp.BuildConfig.DEBUG,
+                    terkunci = false,
+                    tabAwal = if (targetAreaId != null) com.sukashawarma.superapp.feature.chat.ui.pribadi.TabChatUtama.AREA else com.sukashawarma.superapp.feature.chat.ui.pribadi.TabChatUtama.GRUP,
+                    targetAreaId = targetAreaId,
+                    onAreaTerbuka = { areaId ->
+                        com.sukashawarma.superapp.notif.ChatAreaNotifikasi.tutup(konteks, areaId)
+                    }
                 )
             }
 

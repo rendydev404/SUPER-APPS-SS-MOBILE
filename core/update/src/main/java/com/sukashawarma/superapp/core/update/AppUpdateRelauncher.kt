@@ -181,7 +181,7 @@ object AppUpdateRelauncher {
         )
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_sys_download_done)
-            .setContentTitle("SUKA Superapp sudah diperbarui")
+            .setContentTitle("SUKA Kerja Superapps sudah diperbarui")
             .setContentText("Ketuk untuk membuka kembali aplikasi")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(pendingIntent)

@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 
 enum class TabChatUtama {
     GRUP,
+    AREA,
     PRIBADI,
     PANTAU_DEV
 }

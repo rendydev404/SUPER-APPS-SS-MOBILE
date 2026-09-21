@@ -50,8 +50,10 @@ import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.Keyboard
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Wallpaper
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -64,6 +66,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import com.sukashawarma.superapp.feature.chat.data.ChatWallpaperPrefs
+import com.sukashawarma.superapp.feature.chat.data.ChatWallpapers
+import com.sukashawarma.superapp.feature.chat.data.WallpaperLatarChat
+import com.sukashawarma.superapp.feature.chat.ui.PilihWallpaperSheet
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -181,8 +187,12 @@ fun LayarChatPribadi(
     var sorotPesanId by remember { mutableStateOf<String?>(null) }
     var sorotKunci by remember { mutableIntStateOf(0) }
 
-    val myId = AppSession.staff.value?.id.orEmpty()
-    val myAvatar = AppSession.staff.value?.avatarUrl
+    val staff by AppSession.staff.collectAsState()
+    val myId = staff?.id.orEmpty()
+    val myAvatar = staff?.avatarUrl
+    val isDeveloper = remember(staff) {
+        ChatWallpapers.bolehUbahWallpaper(staff?.role, staff?.roleRaw)
+    }
 
     fun siapkanFoto(kerja: suspend () -> ByteArray?) {
         sedangKompres = true
@@ -238,6 +248,24 @@ fun LayarChatPribadi(
         }
     }
 
+    var sheetWallpaperPribadi by remember { mutableStateOf(false) }
+    var revisiWallpaperPribadi by remember { mutableIntStateOf(0) }
+    val wallpaperPribadiAktif = remember(revisiWallpaperPribadi, isDeveloper) {
+        if (isDeveloper) {
+            ChatWallpaperPrefs.getWallpaperPribadi(context)
+        } else {
+            val wallpaperTim = ChatWallpaperPrefs.getWallpaperTim(context)
+            if (wallpaperTim != ChatWallpaperPrefs.ID_BAWAAN) wallpaperTim else ChatWallpaperPrefs.ID_DEFAULT
+        }
+    }
+    val dimmingPribadiAktif = remember(revisiWallpaperPribadi, isDeveloper) {
+        if (isDeveloper) {
+            ChatWallpaperPrefs.getDimmingPribadi(context)
+        } else {
+            ChatWallpaperPrefs.getDimmingTim(context)
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -273,6 +301,28 @@ fun LayarChatPribadi(
                         )
                     }
                 },
+                actions = {
+                    if (isDeveloper) {
+                        IconButton(onClick = { sheetWallpaperPribadi = true }) {
+                            Icon(
+                                imageVector = Icons.Filled.Wallpaper,
+                                contentDescription = "Ganti Wallpaper",
+                                tint = BiruIos
+                            )
+                        }
+                    } else {
+                        IconButton(onClick = {
+                            Toast.makeText(context, "Wallpaper chat dikunci oleh Developer.", Toast.LENGTH_SHORT).show()
+                        }) {
+                            Icon(
+                                imageVector = Icons.Filled.Lock,
+                                contentDescription = "Wallpaper Terkunci",
+                                tint = Color(0xFF8E8E93).copy(alpha = 0.7f),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
             )
         },
@@ -286,6 +336,10 @@ fun LayarChatPribadi(
         ) {
             // Daftar Pesan Chat Pribadi
             Box(modifier = Modifier.weight(1f)) {
+                WallpaperLatarChat(
+                    wallpaperId = wallpaperPribadiAktif,
+                    dimming = dimmingPribadiAktif,
+                )
                 if (state.memuat && state.pesanList.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(color = BiruIos)
@@ -568,6 +622,31 @@ fun LayarChatPribadi(
                     Text("Batal")
                 }
             }
+        )
+    }
+
+    if (sheetWallpaperPribadi && isDeveloper) {
+        PilihWallpaperSheet(
+            wallpaperAwal = wallpaperPribadiAktif,
+            dimmingAwal = dimmingPribadiAktif,
+            bisaTerapkanSemua = false,
+            judul = "Wallpaper Obrolan Pribadi",
+            onTerapkanLengkap = { idBaru, dimming, _ ->
+                if (isDeveloper) {
+                    ChatWallpaperPrefs.setWallpaperPribadi(context, idBaru)
+                    ChatWallpaperPrefs.setDimmingPribadi(context, dimming)
+                    revisiWallpaperPribadi++
+                    Toast.makeText(context, "Wallpaper obrolan pribadi diterapkan.", Toast.LENGTH_SHORT).show()
+                }
+            },
+            onResetBawaan = {
+                if (isDeveloper) {
+                    ChatWallpaperPrefs.resetWallpaperPribadi(context)
+                    revisiWallpaperPribadi++
+                    Toast.makeText(context, "Wallpaper kembali ke bawaan.", Toast.LENGTH_SHORT).show()
+                }
+            },
+            onTutup = { sheetWallpaperPribadi = false },
         )
     }
 }

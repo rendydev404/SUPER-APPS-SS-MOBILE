@@ -102,7 +102,7 @@ class ChecklistMonitorViewModel : ViewModel() {
 
     init {
         val staff = AppSession.staff.value
-        if (staff?.role == Role.REGIONAL_MANAGER) {
+        if (staff?.role in setOf(Role.REGIONAL_MANAGER, Role.ADMIN_HR, Role.ADMIN, Role.DEVELOPER)) {
             _state.value = _state.value.copy(canChooseOutlet = true, loading = false)
             loadOutlets()
         } else {
@@ -115,7 +115,7 @@ class ChecklistMonitorViewModel : ViewModel() {
     }
 
     /** Daftar outlet tidak dibatasi di client — RLS backend yang menentukan outlet mana
-     *  yang benar-benar boleh dilihat Regional Manager (sama seperti [[EnrollViewModel]]). */
+     *  yang benar-benar boleh dilihat (sama seperti [[EnrollViewModel]]). */
     private fun loadOutlets() {
         _state.value = _state.value.copy(loadingOutlets = true, error = null)
         viewModelScope.launch {
@@ -133,7 +133,17 @@ class ChecklistMonitorViewModel : ViewModel() {
                     val o = el.asJsonObject
                     MonitorOutletOption(id = o.optString("id") ?: "", name = o.optString("name") ?: "-")
                 }
-                _state.value = _state.value.copy(loadingOutlets = false, outlets = outlets)
+                val defaultOutlet = _state.value.selectedOutletId?.let { id -> outlets.find { it.id == id } }
+                    ?: outlets.firstOrNull()
+                _state.value = _state.value.copy(
+                    loadingOutlets = false,
+                    outlets = outlets,
+                    selectedOutletId = defaultOutlet?.id,
+                    selectedOutletName = defaultOutlet?.name,
+                )
+                if (defaultOutlet != null) {
+                    load()
+                }
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
                     loadingOutlets = false,

@@ -5,12 +5,16 @@ import android.content.pm.PackageManager
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.*
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -20,6 +24,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -32,6 +38,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
@@ -273,8 +280,11 @@ fun ClockScreen(
             // Top App Bar — di LUAR area scroll (bukan child dari Column yang di-scroll)
             // supaya selalu ikut/menempel di atas, bukan ikut ter-scroll menghilang.
             TopBar(
-                staffName = staff?.namaTampil,
+                staffName = staff?.namaTampil ?: staff?.name,
                 avatarPath = staff?.avatarUrl,
+                outletName = selectedOutletName,
+                shiftInfo = state.selectedShift?.let { "${it.nama} (${it.rentang})" },
+                isOnline = state.isOnline,
                 onBackClick = onExit,
                 scrollProgress = scrollProgress,
             )
@@ -284,13 +294,13 @@ fun ClockScreen(
                     .weight(1f)
                     .verticalScroll(scrollState)
             ) {
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 24.dp),
-                    verticalArrangement = Arrangement.spacedBy(24.dp)
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
                     if (outletsState.hasChoice || outletsState.error != null) {
                         AttendanceOutletSelector(
@@ -302,9 +312,6 @@ fun ClockScreen(
                             onRetry = { outletsViewModel.load() },
                         )
                     }
-
-                    // Greeting
-                    GreetingSection(staff?.name, selectedOutletName)
 
                     val shiftTerpilih = state.selectedShift
                     if (shiftTerpilih != null && state.nextAction == com.sukashawarma.superapp.domain.usecase.NextAction.IN) {
@@ -1032,67 +1039,288 @@ private fun ClockModernOverlay(
 private fun TopBar(
     staffName: String?,
     avatarPath: String?,
+    outletName: String?,
+    shiftInfo: String?,
+    isOnline: Boolean = true,
     onBackClick: () -> Unit,
     scrollProgress: Float = 0f,
 ) {
-    // Micro-animasi "collapsing header": begitu user scroll ke bawah, header memepet rata
-    // (radius bawah hilang), memunculkan shadow tipis, dan sedikit memampat (avatar & padding
-    // mengecil) — bukan on/off tiba-tiba, tapi interpolasi halus mengikuti scrollProgress.
     val cornerRadius by animateDpAsState(
-        targetValue = lerp(24.dp, 0.dp, scrollProgress),
+        targetValue = lerp(26.dp, 0.dp, scrollProgress),
         animationSpec = tween(200, easing = FastOutSlowInEasing),
         label = "topBarCorner"
     )
     val elevation by animateDpAsState(
-        targetValue = lerp(0.dp, 6.dp, scrollProgress),
+        targetValue = lerp(4.dp, 8.dp, scrollProgress),
         animationSpec = tween(200, easing = FastOutSlowInEasing),
         label = "topBarElevation"
     )
     val avatarSize by animateDpAsState(
-        targetValue = lerp(48.dp, 40.dp, scrollProgress),
+        targetValue = lerp(44.dp, 36.dp, scrollProgress),
         animationSpec = tween(200, easing = FastOutSlowInEasing),
         label = "topBarAvatar"
     )
-    val bottomPadding by animateDpAsState(
-        targetValue = lerp(24.dp, 14.dp, scrollProgress),
-        animationSpec = tween(200, easing = FastOutSlowInEasing),
-        label = "topBarBottomPadding"
+
+    // Jam digital real-time (WIB) yang otomatis diperbarui
+    var currentTimeStr by remember {
+        mutableStateOf(
+            JakartaTime.now().format(DateTimeFormatter.ofPattern("HH:mm 'WIB'", Locale("id", "ID")))
+        )
+    }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(10_000)
+            currentTimeStr = JakartaTime.now().format(DateTimeFormatter.ofPattern("HH:mm 'WIB'", Locale("id", "ID")))
+        }
+    }
+
+    // Sapaan hangat dinamis berdasarkan waktu di Jakarta
+    val currentHour = remember { JakartaTime.now().hour }
+    val sapaanWaktu = when (currentHour) {
+        in 4..10 -> "Selamat Pagi"
+        in 11..14 -> "Selamat Siang"
+        in 15..17 -> "Selamat Sore"
+        else -> "Selamat Malam"
+    }
+
+    // Gradien hangat khas brand SUKA Shawarma (Suka Orange ke Deep Amber)
+    val warmGradient = Brush.verticalGradient(
+        listOf(
+            Color(0xFFF29744), // Suka Orange
+            Color(0xFFE86F21),
+            Color(0xFFC7550C), // Deep warm spice
+        )
     )
 
-    Row(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .shadow(elevation, RoundedCornerShape(bottomStart = cornerRadius, bottomEnd = cornerRadius))
-            .background(Color.White, RoundedCornerShape(bottomStart = cornerRadius, bottomEnd = cornerRadius))
-            .padding(start = 8.dp, end = 24.dp, top = 48.dp, bottom = bottomPadding),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+            .clip(RoundedCornerShape(bottomStart = cornerRadius, bottomEnd = cornerRadius))
+            .background(warmGradient)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBackClick) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Kembali ke daftar aplikasi",
-                    tint = Color(0xFF11142D),
+        // Lapisan Wallpaper Doodle Infinity (Mirip Chat Wallpaper SUKA Shawarma - Shawarma, Clock, Chef Hat, Spices)
+        Image(
+            painter = painterResource(com.sukashawarma.superapp.feature.absensi.R.drawable.bg_header_doodle_pattern),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .matchParentSize()
+                .alpha(0.16f)
+        )
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    start = 16.dp,
+                    end = 20.dp,
+                    top = 44.dp,
+                    bottom = lerp(20.dp, 12.dp, scrollProgress)
                 )
+        ) {
+            // Baris Atas: Tombol Back & Identitas Staf (Dikelompokkan Rapi di Kiri)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Tombol Back frosted glass bulat
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.22f))
+                        .clickable(onClick = onBackClick),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Kembali ke daftar aplikasi",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                // Profil Avatar Staf bulat dengan border putih bersih
+                Box(
+                    modifier = Modifier.size(avatarSize),
+                    contentAlignment = Alignment.Center
+                ) {
+                    AvatarStaf(
+                        path = avatarPath,
+                        nama = staffName,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape)
+                            .border(BorderStroke(2.dp, Color.White), CircleShape),
+                        warnaLatar = Color.White.copy(alpha = 0.35f),
+                        warnaHuruf = Color.White,
+                    )
+                    if (isOnline) {
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF10B981))
+                                .border(BorderStroke(1.5.dp, Color.White), CircleShape)
+                                .align(Alignment.BottomEnd)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                // Nama Modul & Status Online
+                Column(
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = "SUKA Kerja",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        color = Color.White
+                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(top = 1.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(if (isOnline) Color(0xFF10B981) else Color.White.copy(alpha = 0.6f))
+                        )
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text(
+                            text = if (scrollProgress > 0.5f && !outletName.isNullOrBlank()) {
+                                "Outlet $outletName"
+                            } else if (isOnline) {
+                                "Online"
+                            } else {
+                                "Offline"
+                            },
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color.White.copy(alpha = 0.9f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
             }
-            Spacer(modifier = Modifier.width(4.dp))
-            // Foto profil yang diatur staff sendiri di halaman Profil; tanpa foto,
-            // AvatarStaf menampilkan huruf awal nama.
-            AvatarStaf(
-                path = avatarPath,
-                nama = staffName,
-                modifier = Modifier.size(avatarSize),
-                warnaLatar = Color(0xFFFFF4EC),
-                warnaHuruf = Color(0xFFE86F21),
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Column {
-                Text("SUKA Kerja", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color(0xFF11142D))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(Color(0xFF10B981)))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Online", fontSize = 12.sp, color = Color(0xFF10B981))
+
+            // Bagian Hero yang dapat mengerut halus saat di-scroll (Greeting & Pills)
+            AnimatedVisibility(
+                visible = scrollProgress < 0.5f,
+                enter = expandVertically(animationSpec = tween(200)) + fadeIn(animationSpec = tween(150)),
+                exit = shrinkVertically(animationSpec = tween(200)) + fadeOut(animationSpec = tween(150))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .graphicsLayer { alpha = (1f - scrollProgress * 2f).coerceIn(0f, 1f) }
+                ) {
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Baris Tengah: Sapaan Leluasa & Outlet
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = "$sapaanWaktu, ${staffName?.trim() ?: "Kru"}!",
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 22.sp,
+                            color = Color.White,
+                            letterSpacing = (-0.3).sp,
+                            lineHeight = 28.sp,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.LocationOn,
+                                contentDescription = null,
+                                tint = Color.White.copy(alpha = 0.9f),
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Outlet ${outletName ?: "Suka Shawarma"}",
+                                fontSize = 13.sp,
+                                color = Color.White.copy(alpha = 0.92f),
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Baris Pills Frosted Glass (Jam Real-time & Info Shift)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Pill 1: Jam Live WIB
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = Color.White.copy(alpha = 0.22f),
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.35f)),
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Schedule,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = currentTimeStr,
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+
+                        // Pill 2: Info Shift
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = Color.White.copy(alpha = 0.22f),
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.35f)),
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Event,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = shiftInfo ?: "Presensi Kehadiran",
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -1101,20 +1329,7 @@ private fun TopBar(
 
 @Composable
 private fun GreetingSection(staffName: String?, outletName: String?) {
-    Column {
-        Text(
-            text = "Halo, ${staffName ?: "tes"}!",
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = 24.sp,
-            color = Color(0xFF11142D)
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = "Anda berada di outlet ${outletName ?: "tes"}",
-            fontSize = 14.sp,
-            color = Color.Gray
-        )
-    }
+    // Sapaan telah terintegrasi langsung di Hero TopBar hangat di atas
 }
 
 @Composable

@@ -176,6 +176,10 @@ object AppUpdateManager {
 
     /** REST check idempoten ke baris key='superapp_update' di global_settings. */
     suspend fun checkForUpdate() {
+        // Build debug tidak boleh mengikuti rilis: patch pasti gagal (base-nya beda
+        // tanda tangan), lalu jatuh ke APK penuh dan menimpa dirinya jadi release —
+        // device uji jadi tidak bisa dipasangi debug lagi tanpa uninstall.
+        if (BuildConfig.DEBUG) return
         try {
             val row = Postgrest.selectOne("global_settings", listOf("key" to "eq.superapp_update")) ?: return
             val valueObj = row.getAsJsonObject("value") ?: return
@@ -192,6 +196,7 @@ object AppUpdateManager {
 
     /** Dipanggil saat event postgres_changes tiba dari Supabase Realtime. */
     fun handleRealtimePayload(record: JSONObject) {
+        if (BuildConfig.DEBUG) return
         if (record.optString("key") != "superapp_update") return
         val v = record.optJSONObject("value") ?: return
         val manifest = AppUpdateManifest(
@@ -282,7 +287,7 @@ object AppUpdateManager {
 
         val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         val request = DownloadManager.Request(Uri.parse(payloadUrl))
-            .setTitle("Update SUKA Superapp")
+            .setTitle("Update SUKA Kerja Superapps")
             .setDescription(
                 if (delta != null) "Mengunduh patch hemat ${manifest.versionName}"
                 else "Mengunduh versi ${manifest.versionName}"

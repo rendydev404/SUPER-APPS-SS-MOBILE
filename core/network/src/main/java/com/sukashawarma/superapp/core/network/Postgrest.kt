@@ -111,12 +111,12 @@ object Postgrest {
         if (res.isBlank()) JsonArray() else JsonParser.parseString(res).asJsonArray
     }
 
-    suspend fun upsert(table: String, body: JsonElement, onConflict: String? = null, ignoreDuplicates: Boolean = false): JsonArray {
+    suspend fun upsert(table: String, body: JsonElement, onConflict: String? = null, ignoreDuplicates: Boolean = false, returning: Boolean = true): JsonArray {
         val params = onConflict?.let { listOf("on_conflict" to it) } ?: emptyList()
         val prefer = buildString {
             append("resolution=")
             append(if (ignoreDuplicates) "ignore-duplicates" else "merge-duplicates")
-            append(",return=representation")
+            append(if (returning) ",return=representation" else ",return=minimal")
         }
         val req = Request.Builder()
             .url(urlFor(table, params))

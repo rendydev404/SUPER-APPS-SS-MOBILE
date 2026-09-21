@@ -108,6 +108,12 @@ fun DashboardScreen(
     var konfirmasiTutup by remember { mutableStateOf<SuratJalanRingkas?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     val daftarState = rememberLazyListState()
+
+    // LaunchedEffect ikut berjalan pada komposisi pertamanya. Composable ini baru
+    // menyusun LazyColumn setelah data tiba, jadi jalan pertama itu jatuh persis
+    // saat layar dibuka -- dan menggulirkan pengguna melewati banner, statistik,
+    // dan kolom cari. Gulir hanya boleh terjadi karena pengguna pindah halaman.
+    var gulirPertamaDilewati by remember { mutableStateOf(false) }
     val halamanSuratJalan = halamanSuratJalan(state.terlihat, state.halamanAktif)
     // Indeks item daftar konstan untuk dua susunan: dengan atau tanpa filter outlet.
     val indeksDaftar = if (state.rincianOutlet.size > 1) 5 else 3
@@ -131,7 +137,11 @@ fun DashboardScreen(
     }
 
     LaunchedEffect(state.halamanAktif) {
-        if (state.terlihat.isNotEmpty()) daftarState.animateScrollToItem(indeksDaftar)
+        if (!gulirPertamaDilewati) {
+            gulirPertamaDilewati = true
+        } else if (state.terlihat.isNotEmpty()) {
+            daftarState.animateScrollToItem(indeksDaftar)
+        }
     }
 
     Scaffold(

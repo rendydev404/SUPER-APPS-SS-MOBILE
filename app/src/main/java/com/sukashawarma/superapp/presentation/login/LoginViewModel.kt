@@ -44,7 +44,7 @@ class LoginViewModel : ViewModel() {
         viewModelScope.launch {
             _state.value = _state.value.copy(loading = true, error = null)
 
-            val cocok = BiometricAuth.authenticate(activity, "Masuk ke SUKA Superapp")
+            val cocok = BiometricAuth.authenticate(activity, "Masuk ke SUKA Kerja Superapps")
             if (!cocok) {
                 _state.value = _state.value.copy(loading = false)
                 return@launch

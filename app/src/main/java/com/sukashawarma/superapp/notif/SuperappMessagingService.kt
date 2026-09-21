@@ -47,7 +47,7 @@ class SuperappMessagingService : FirebaseMessagingService() {
     override fun onMessageReceived(message: RemoteMessage) {
         super.onMessageReceived(message)
         Log.d(TAG, "FCM masuk: type=${message.data["type"]} url=${message.data["url"]}")
-        val judul = message.data["title"] ?: message.notification?.title ?: "SUKA Superapp"
+        val judul = message.data["title"] ?: message.notification?.title ?: "SUKA Kerja Superapps"
         val isi = message.data["body"] ?: message.notification?.body ?: return
         // `url` dibaca sebagai cadangan karena edge function `send-push` hanya
         // meneruskan title/body/type/url ke FCM — field lain di payload trigger
@@ -89,6 +89,45 @@ class SuperappMessagingService : FirebaseMessagingService() {
                 pengirimNama = pengirim,
                 isi = isi,
                 avatarPath = message.data["sender_avatar"]?.takeIf { it.isNotBlank() },
+            )
+            return
+        }
+
+        // Push notifikasi pesan obrolan grup area (Area Manager & Crew)
+        if (message.data["type"] == "area_chat" || mentah?.startsWith("/chat/area") == true) {
+            // Chat Area belum dirilis ke produksi: jangan tampilkan notifikasinya.
+            if (!com.sukashawarma.superapp.BuildConfig.DEBUG) return
+            val pengirimId = message.data["sender_id"]
+                ?: mentah?.substringAfter("from=", "")?.takeIf { it.isNotBlank() }
+            if (pengirimId != null && pengirimId == AppSession.staff.value?.id) {
+                Log.d(TAG, "Push chat area dilewati: pesan dari diri sendiri.")
+                return
+            }
+            if (ChatKehadiran.terbuka) {
+                Log.d(TAG, "Push chat area dilewati: layar chat sedang terlihat.")
+                return
+            }
+
+            val areaId = message.data["area_id"]
+                ?: mentah?.substringAfter("id=", "")?.substringBefore("&")?.takeIf { it.isNotBlank() }
+                ?: "area_umum"
+            val namaArea = message.data["group_name"]
+                ?: message.data["title"]?.takeIf { it.isNotBlank() }
+                ?: "Obrolan Area"
+            val pengirim = message.data["sender_name"]
+                ?: message.data["sender"]?.takeIf { it.isNotBlank() }
+                ?: judul
+            val avatar = message.data["sender_avatar"]?.takeIf { it.isNotBlank() }
+                ?: message.data["group_photo"]?.takeIf { it.isNotBlank() }
+
+            ChatAreaNotifikasi.tampilkan(
+                context = this,
+                areaId = areaId,
+                namaArea = namaArea,
+                pengirim = pengirim,
+                isi = isi,
+                avatarPath = avatar,
+                disebut = message.data["mention"] == "1",
             )
             return
         }

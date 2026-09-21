@@ -123,6 +123,7 @@ object LocationTrackingRepository {
             trails,
             onConflict = "outlet_staff_id,recorded_at",
             ignoreDuplicates = true,
+            returning = false,
         )
 
         val latest = points.maxByOrNull { it.recordedAt } ?: points.last()

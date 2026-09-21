@@ -225,10 +225,14 @@ object PersetujuanRepository {
             "limit" to "50",
         )
         if (trimmed.isNotEmpty()) {
-            if (trimmed.all { it.isDigit() }) {
-                params.add("order_number" to "eq.$trimmed")
+            val numVal = trimmed.toLongOrNull()
+            // PostgreSQL INTEGER (32-bit signed) maksimum 2.147.483.647.
+            // Jika angka <= batas integer, cocokkan order_number.
+            // Jika melebihi (misal nomor HP/nomor resi eksternal) atau teks, cari ke customer_name, customer_phone, atau external_order_id.
+            if (trimmed.all { it.isDigit() } && numVal != null && numVal <= 2147483647L) {
+                params.add("order_number" to "eq.$numVal")
             } else {
-                params.add("customer_name" to "ilike.*$trimmed*")
+                params.add("or" to "(customer_name.ilike.*$trimmed*,customer_phone.ilike.*$trimmed*,external_order_id.ilike.*$trimmed*)")
             }
         }
         return Postgrest.select("orders", params).mapNotNull { elemen ->

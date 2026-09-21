@@ -23,6 +23,7 @@ import com.sukashawarma.superapp.feature.distribusi.domain.distribusiErrorMessag
 import com.sukashawarma.superapp.feature.distribusi.domain.sudahDiterima
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 enum class LangkahVerifikasi(val kunci: String) {
@@ -289,10 +290,21 @@ class VerifikasiViewModel(private val suratJalanId: String) : ViewModel() {
      * supaya crew bisa mencoba ulang tanpa mengisi dari awal.
      */
     fun finalisasi() {
-        val s = _state.value
-        if (!s.ttdLengkap || s.memfinalisasi) return
+        var lanjut = false
+        var snapshot: VerifikasiUiState? = null
+        _state.update { s ->
+            if (!s.ttdLengkap || s.memfinalisasi) {
+                s
+            } else {
+                lanjut = true
+                snapshot = s
+                s.copy(memfinalisasi = true, error = null)
+            }
+        }
+        if (!lanjut) return
+        val s = snapshot ?: return
+
         viewModelScope.launch {
-            _state.value = s.copy(memfinalisasi = true, error = null)
             try {
                 s.items.forEach { tampil ->
                     val isian = s.isian[tampil.item.id] ?: return@forEach

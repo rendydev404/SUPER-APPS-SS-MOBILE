@@ -4,6 +4,7 @@ import android.graphics.BitmapFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
@@ -45,12 +46,14 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -75,8 +78,10 @@ import coil.compose.AsyncImage
 import com.sukashawarma.superapp.core.ui.AvatarStorage
 import com.sukashawarma.superapp.core.ui.AvatarStaf
 import com.sukashawarma.superapp.feature.chat.data.AnggotaGrup
+import com.sukashawarma.superapp.feature.chat.data.ChatWallpaperPrefs
 import com.sukashawarma.superapp.feature.chat.data.ChatWallpapers
 import com.sukashawarma.superapp.feature.chat.data.PengaturanGrup
+import com.sukashawarma.superapp.feature.chat.data.WallpaperLatarChat
 import com.sukashawarma.superapp.feature.chat.data.labelRole
 
 /**
@@ -98,6 +103,7 @@ private val PemisahInfo = Color(0x1F3C3C43)
 fun InfoGrupSheet(
     awal: PengaturanGrup,
     bolehSunting: Boolean,
+    bolehUbahWallpaper: Boolean = false,
     menyimpan: Boolean,
     galat: String?,
     anggota: List<AnggotaGrup>,
@@ -105,7 +111,7 @@ fun InfoGrupSheet(
     userId: String,
     onKlikAnggota: (AnggotaGrup) -> Unit,
     onSimpan: (nama: String, deskripsi: String, hanyaAdmin: Boolean, fotoJpeg: ByteArray?, hapusFoto: Boolean, wallpaper: String) -> Unit,
-    onGantiWallpaper: (String) -> Unit = {},
+    onGantiWallpaper: (idWallpaper: String, dimming: Float, untukSemua: Boolean) -> Unit = { _, _, _ -> },
     onTutup: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -117,8 +123,12 @@ fun InfoGrupSheet(
     var fotoBaru by remember { mutableStateOf<ByteArray?>(null) }
     var pratinjauBaru by remember { mutableStateOf<ImageBitmap?>(null) }
     var hapusFoto by remember { mutableStateOf(false) }
-    var wallpaper by remember { mutableStateOf(awal.wallpaper) }
+    var wallpaper by remember(awal.wallpaper) { mutableStateOf(awal.wallpaper) }
     var sheetPilihWallpaper by remember { mutableStateOf(false) }
+    var revisiWallpaperLokal by remember { mutableIntStateOf(0) }
+    val wallpaperPribadi = remember(revisiWallpaperLokal) { ChatWallpaperPrefs.getWallpaperTim(konteks) }
+    val dimmingPribadi = remember(revisiWallpaperLokal) { ChatWallpaperPrefs.getDimmingTim(konteks) }
+    val wallpaperAktif = if (bolehUbahWallpaper && wallpaperPribadi != ChatWallpaperPrefs.ID_BAWAAN) wallpaperPribadi else wallpaper
     // Tertutup saat dibuka: daftar anggota se-perusahaan jauh lebih panjang
     // daripada seluruh isi lembar ini digabung, dan menggulirinya untuk mencapai
     // tombol Simpan bukan yang dicari orang saat membuka info grup.
@@ -135,7 +145,8 @@ fun InfoGrupSheet(
     }
 
     val berubah = nama != awal.namaGrup || deskripsi != awal.deskripsi ||
-        hanyaAdmin != awal.hanyaAdmin || fotoBaru != null || hapusFoto
+        hanyaAdmin != awal.hanyaAdmin || fotoBaru != null || hapusFoto ||
+        wallpaper != awal.wallpaper
 
     ModalBottomSheet(
         onDismissRequest = onTutup,
@@ -239,56 +250,85 @@ fun InfoGrupSheet(
             Spacer(Modifier.height(18.dp))
             LabelBagian("Wallpaper Chat")
             Kartu {
-                val wallpaperItem = remember(wallpaper) { ChatWallpapers.cari(wallpaper) }
+                val namaWallpaper = remember(wallpaperAktif) {
+                    when {
+                        wallpaperAktif.startsWith("file:", ignoreCase = true) || wallpaperAktif.startsWith("/") -> "Foto Galeri Kustom"
+                        wallpaperAktif.startsWith("color:", ignoreCase = true) -> {
+                            ChatWallpapers.DAFTAR_WARNA.firstOrNull { it.id.equals(wallpaperAktif, ignoreCase = true) }?.nama ?: "Warna Solid"
+                        }
+                        else -> ChatWallpapers.cari(wallpaperAktif).nama
+                    }
+                }
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .then(if (bolehSunting) Modifier.clickable { sheetPilihWallpaper = true } else Modifier)
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable(enabled = bolehUbahWallpaper) {
+                            if (bolehUbahWallpaper) {
+                                sheetPilihWallpaper = true
+                            }
+                        }
                         .padding(horizontal = 14.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Box(
                         Modifier
-                            .size(42.dp)
+                            .size(44.dp)
                             .clip(RoundedCornerShape(8.dp))
                             .background(Color.White)
                             .border(1.dp, PemisahInfo, RoundedCornerShape(8.dp)),
                         contentAlignment = Alignment.Center,
                     ) {
-                        val resId = wallpaperItem.drawableRes
-                        if (resId != null) {
-                            Image(
-                                painter = painterResource(id = resId),
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize(),
-                            )
-                        } else {
-                            Icon(
-                                Icons.Filled.FormatColorReset,
-                                contentDescription = null,
-                                tint = Color(0xFF8E8E93),
-                                modifier = Modifier.size(20.dp),
-                            )
-                        }
+                        WallpaperLatarChat(wallpaperId = wallpaperAktif, dimming = dimmingPribadi)
                     }
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                namaWallpaper,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Color.Black,
+                            )
+                            if (!bolehUbahWallpaper) {
+                                Spacer(Modifier.width(6.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = Color(0xFFF2F2F7),
+                                    border = BorderStroke(0.5.dp, Color(0xFFD1D1D6)),
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Icon(
+                                            Icons.Filled.Lock,
+                                            contentDescription = "Terkunci",
+                                            tint = AbuInfo,
+                                            modifier = Modifier.size(10.dp),
+                                        )
+                                        Spacer(Modifier.width(3.dp))
+                                        Text(
+                                            "Terkunci",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = AbuInfo,
+                                        )
+                                    }
+                                }
+                            }
+                        }
                         Text(
-                            wallpaperItem.nama,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = Color.Black,
-                        )
-                        Text(
-                            if (bolehSunting) wallpaperItem.deskripsi else "Hanya pengelola yang dapat mengubah wallpaper",
+                            if (!bolehUbahWallpaper) "Hanya Developer yang dapat mengubah wallpaper chat"
+                            else if (wallpaperPribadi != ChatWallpaperPrefs.ID_BAWAAN) "Kustom pribadi (hanya di HP ini)"
+                            else "Wallpaper tim: $namaWallpaper",
                             fontSize = 12.sp,
                             color = AbuInfo,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
-                    if (bolehSunting) {
+                    if (bolehUbahWallpaper) {
                         Text(
                             "Ganti",
                             fontSize = 14.sp,
@@ -305,9 +345,9 @@ fun InfoGrupSheet(
                     } else {
                         Icon(
                             Icons.Filled.Lock,
-                            contentDescription = "Hanya pengelola",
-                            tint = AbuInfo,
-                            modifier = Modifier.size(16.dp),
+                            contentDescription = "Terkunci",
+                            tint = Color(0xFF8E8E93),
+                            modifier = Modifier.size(18.dp),
                         )
                     }
                 }
@@ -423,12 +463,35 @@ fun InfoGrupSheet(
         }
     }
 
-    if (sheetPilihWallpaper) {
+    if (sheetPilihWallpaper && bolehUbahWallpaper) {
         PilihWallpaperSheet(
-            wallpaperAwal = wallpaper,
-            onTerapkan = { baru ->
-                wallpaper = baru
-                onGantiWallpaper(baru)
+            wallpaperAwal = wallpaperAktif,
+            dimmingAwal = dimmingPribadi,
+            bisaTerapkanSemua = true,
+            judul = "Wallpaper Chat Tim",
+            onTerapkanLengkap = { baru, dimming, untukSemua ->
+                if (bolehUbahWallpaper) {
+                    if (untukSemua) {
+                        wallpaper = baru
+                        ChatWallpaperPrefs.resetWallpaperTim(konteks)
+                        ChatWallpaperPrefs.setDimmingTim(konteks, dimming)
+                        onGantiWallpaper(baru, dimming, true)
+                    } else {
+                        ChatWallpaperPrefs.setWallpaperTim(konteks, baru)
+                        ChatWallpaperPrefs.setDimmingTim(konteks, dimming)
+                        onGantiWallpaper(baru, dimming, false)
+                    }
+                    revisiWallpaperLokal++
+                }
+            },
+            onResetBawaan = {
+                if (bolehUbahWallpaper) {
+                    wallpaper = "default"
+                    ChatWallpaperPrefs.resetWallpaperTim(konteks)
+                    ChatWallpaperPrefs.setDimmingTim(konteks, 0f)
+                    onGantiWallpaper("default", 0f, true)
+                    revisiWallpaperLokal++
+                }
             },
             onTutup = { sheetPilihWallpaper = false },
         )

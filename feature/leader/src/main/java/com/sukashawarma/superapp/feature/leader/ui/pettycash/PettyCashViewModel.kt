@@ -19,6 +19,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class PettyCashUiState(
@@ -158,14 +159,20 @@ class PettyCashViewModel : ViewModel() {
     /** Mengirim pengajuan baru. Validasi form dijalankan lebih dulu supaya galat yang
      *  bisa dijelaskan tidak perlu menempuh perjalanan ke server untuk ditolak di sana. */
     fun kirim() {
-        val form = _state.value.form
-        galatForm(form)?.let { pesan ->
-            _state.value = _state.value.copy(galat = pesan)
-            return
+        var formKirim: FormTopup? = null
+        _state.update { current ->
+            if (current.mengirim) return
+            val form = current.form
+            val pesan = galatForm(form)
+            if (pesan != null) {
+                return@update current.copy(galat = pesan)
+            }
+            formKirim = form
+            current.copy(mengirim = true, galat = null)
         }
+        val form = formKirim ?: return
 
         viewModelScope.launch {
-            _state.value = _state.value.copy(mengirim = true, galat = null)
             try {
                 PengajuanRepository.ajukan(form)
                 _state.value = _state.value.copy(
@@ -195,11 +202,18 @@ class PettyCashViewModel : ViewModel() {
      * menebaknya di layar berisiko menampilkan keadaan yang tak pernah terjadi.
      */
     fun serahkan(pengajuan: Pengajuan) {
-        if (pengajuan.id in _state.value.sedangDiproses) return
+        var lanjut = false
+        _state.update { current ->
+            if (pengajuan.id in current.sedangDiproses) {
+                current
+            } else {
+                lanjut = true
+                current.copy(sedangDiproses = current.sedangDiproses + pengajuan.id)
+            }
+        }
+        if (!lanjut) return
+
         viewModelScope.launch {
-            _state.value = _state.value.copy(
-                sedangDiproses = _state.value.sedangDiproses + pengajuan.id,
-            )
             try {
                 PengajuanRepository.serahkanKeCrew(pengajuan.id)
                 _state.value = _state.value.copy(
@@ -214,9 +228,7 @@ class PettyCashViewModel : ViewModel() {
                     galat = pesanGalatAksi(e, "menyerahkan dana"),
                 )
             } finally {
-                _state.value = _state.value.copy(
-                    sedangDiproses = _state.value.sedangDiproses - pengajuan.id,
-                )
+                _state.update { it.copy(sedangDiproses = it.sedangDiproses - pengajuan.id) }
             }
         }
     }

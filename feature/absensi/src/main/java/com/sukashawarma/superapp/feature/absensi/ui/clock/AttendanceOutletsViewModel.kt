@@ -13,6 +13,8 @@ import com.sukashawarma.superapp.domain.model.Role
 import com.sukashawarma.superapp.domain.session.AppSession
 import com.sukashawarma.superapp.feature.absensi.shift.KandidatOutlet
 import com.sukashawarma.superapp.feature.absensi.shift.pilihOutletTerdekat
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -59,6 +61,7 @@ fun formatDistanceShort(meters: Double): String = GpsMath.formatDistanceShort(me
 private val ALL_OUTLET_ROLES = setOf(
     Role.SPV, Role.OWNER, Role.ADMIN, Role.ADMIN_HR,
     Role.KORLAP, Role.REGIONAL_MANAGER, Role.AREA_MANAGER,
+    Role.DEVELOPER,
 )
 
 /**
@@ -86,6 +89,7 @@ class AttendanceOutletsViewModel(application: Application) : AndroidViewModel(ap
 
     /** Setelah user memilih sendiri, jangan pernah dipindah diam-diam oleh GPS. */
     private var manualSelection = false
+    private var locateJob: Job? = null
 
     init { load() }
 
@@ -137,35 +141,44 @@ class AttendanceOutletsViewModel(application: Application) : AndroidViewModel(ap
      * sebagai "terdekat" karena jaraknya tidak bisa dihitung.
      */
     private fun locateAndSort() {
+        locateJob?.cancel()
         _state.value = _state.value.copy(locating = true)
-        viewModelScope.launch {
-            val fix = locationRepository.fastFix() ?: locationRepository.preciseFix()
-            if (fix == null) {
-                _state.value = _state.value.copy(locating = false)
-                return@launch
-            }
-            val device = LatLng(fix.lat, fix.lng)
-            val measured = _state.value.outlets
-                .map { outlet ->
-                    val coords = outlet.coords
-                    outlet.copy(distanceM = coords?.let { GpsMath.haversineMeters(it, device) })
+        locateJob = viewModelScope.launch {
+            try {
+                val fix = locationRepository.fastFix() ?: locationRepository.preciseFix()
+                if (fix == null) {
+                    _state.value = _state.value.copy(locating = false)
+                    return@launch
                 }
-                .sortedBy { it.distanceM ?: Double.MAX_VALUE }
+                val device = LatLng(fix.lat, fix.lng)
+                val measured = _state.value.outlets
+                    .map { outlet ->
+                        val coords = outlet.coords
+                        outlet.copy(distanceM = coords?.let { GpsMath.haversineMeters(it, device) })
+                    }
+                    .sortedBy { it.distanceM ?: Double.MAX_VALUE }
 
-            // Bukan sekadar elemen pertama hasil sort: `outlet tes` menyalin koordinat BNR, jadi
-            // jarak seri dan pemenangnya harus outlet operasional (lihat pilihOutletTerdekat).
-            val nearestId = pilihOutletTerdekat(
-                measured.map { KandidatOutlet(it.id, it.type, it.coords) },
-                device,
-            )
-            val autoPick = !manualSelection && nearestId != null
+                // Bukan sekadar elemen pertama hasil sort: `outlet tes` menyalin koordinat BNR, jadi
+                // jarak seri dan pemenangnya harus outlet operasional (lihat pilihOutletTerdekat).
+                val nearestId = pilihOutletTerdekat(
+                    measured.map { KandidatOutlet(it.id, it.type, it.coords) },
+                    device,
+                )
+                val autoPick = !manualSelection && nearestId != null
 
-            _state.value = _state.value.copy(
-                locating = false,
-                outlets = measured,
-                selectedId = if (autoPick) nearestId else _state.value.selectedId,
-                autoDetected = autoPick,
-            )
+                _state.value = _state.value.copy(
+                    locating = false,
+                    outlets = measured,
+                    selectedId = if (autoPick) nearestId else _state.value.selectedId,
+                    autoDetected = autoPick,
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } finally {
+                if (_state.value.locating) {
+                    _state.value = _state.value.copy(locating = false)
+                }
+            }
         }
     }
 

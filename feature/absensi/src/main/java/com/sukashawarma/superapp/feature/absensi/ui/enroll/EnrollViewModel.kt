@@ -86,7 +86,7 @@ class EnrollViewModel(
         // tidak mau smart-cast propertinya jadi non-null di dalam `when`.
         val outletId = staff?.outletId
         when {
-            staff?.role == Role.REGIONAL_MANAGER -> loadOutlets(binaanSaja = false)
+            staff?.role in setOf(Role.REGIONAL_MANAGER, Role.DEVELOPER) -> loadOutlets(binaanSaja = false)
             // Area Manager membina beberapa outlet, dan `outletId` hanya menyebut satu
             // di antaranya — outlet asalnya. Mengunci daftar crew ke sana membuat crew
             // outlet binaannya yang lain tidak pernah bisa di-enroll.

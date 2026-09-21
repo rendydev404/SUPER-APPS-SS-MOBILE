@@ -26,7 +26,7 @@ object BiometricAuth {
 
     suspend fun authenticate(
         activity: Activity,
-        title: String = "Masuk ke SUKA Superapp",
+        title: String = "Masuk ke SUKA Kerja Superapps",
         subtitle: String = "Gunakan sidik jari untuk membuka akun Anda",
         negativeButtonText: String = "Gunakan password"
     ): Boolean {

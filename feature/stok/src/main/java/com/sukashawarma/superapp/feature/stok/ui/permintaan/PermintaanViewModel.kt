@@ -490,27 +490,31 @@ class PermintaanViewModel : ViewModel() {
      * dari database, yang mengulang pemeriksaan yang sama.
      */
     fun ajukanTopUp(nominal: Long, kategoriPeriode: String) {
-        val s = _state.value
-        val outlet = s.outletTerpilih ?: return
-        val budget = s.budget ?: return
-        if (nominal <= 0L) {
-            _state.value = s.copy(pesan = "Nominal tidak valid.")
-            return
+        var outletId: String? = null
+        _state.update { s ->
+            if (s.memprosesTopUp) return@update s
+            val outlet = s.outletTerpilih ?: return@update s
+            val budget = s.budget ?: return@update s
+            if (nominal <= 0L) {
+                return@update s.copy(pesan = "Nominal tidak valid.")
+            }
+            val maks = Budget.maksTopUp(budget.nominal, budget.sisa)
+            if (nominal > maks) {
+                return@update s.copy(pesan = "Maksimal top-up adalah ${formatRupiah(maks)}.")
+            }
+            outletId = outlet.id
+            s.copy(memprosesTopUp = true, error = null, pesan = null)
         }
-        val maks = Budget.maksTopUp(budget.nominal, budget.sisa)
-        if (nominal > maks) {
-            _state.value = s.copy(pesan = "Maksimal top-up adalah ${formatRupiah(maks)}.")
-            return
-        }
+        val oid = outletId ?: return
+
         viewModelScope.launch {
-            _state.value = _state.value.copy(memprosesTopUp = true, error = null, pesan = null)
             try {
-                PermintaanRepository.ajukanTopUp(outlet.id, nominal.toDouble(), kategoriPeriode)
+                PermintaanRepository.ajukanTopUp(oid, nominal.toDouble(), kategoriPeriode)
                 _state.value = _state.value.copy(
                     memprosesTopUp = false, topUpTerbuka = false,
                     pesan = "Permintaan top-up berhasil diajukan.",
                 )
-                muatBudgetOutlet(outlet.id)
+                muatBudgetOutlet(oid)
             } catch (e: Exception) {
                 _state.value = _state.value.copy(memprosesTopUp = false, error = stokErrorMessage(e))
             }
@@ -519,9 +523,16 @@ class PermintaanViewModel : ViewModel() {
 
     /** `aksi`: `approve_am`, `approve_finance`, atau `reject`. */
     fun prosesTopUp(requestId: String, aksi: String) {
-        val outlet = _state.value.outletTerpilih ?: return
+        var outletId: String? = null
+        _state.update { s ->
+            if (s.memprosesTopUp) return@update s
+            val outlet = s.outletTerpilih ?: return@update s
+            outletId = outlet.id
+            s.copy(memprosesTopUp = true, error = null, pesan = null)
+        }
+        val oid = outletId ?: return
+
         viewModelScope.launch {
-            _state.value = _state.value.copy(memprosesTopUp = true, error = null, pesan = null)
             try {
                 PermintaanRepository.prosesTopUp(requestId, aksi)
                 _state.value = _state.value.copy(
@@ -529,7 +540,7 @@ class PermintaanViewModel : ViewModel() {
                     pesan = if (aksi == "reject") "Pengajuan top-up ditolak."
                     else "Pengajuan top-up disetujui.",
                 )
-                muatBudgetOutlet(outlet.id)
+                muatBudgetOutlet(oid)
             } catch (e: Exception) {
                 _state.value = _state.value.copy(memprosesTopUp = false, error = stokErrorMessage(e))
             }

@@ -20,8 +20,17 @@ object NotifikasiTujuan {
     private val _rute = MutableStateFlow<String?>(null)
     val rute: StateFlow<String?> = _rute
 
-    fun set(nilai: String?) {
+    /** ID area target bila notifikasi berasal dari percakapan grup area tertentu. */
+    private val _areaId = MutableStateFlow<String?>(null)
+    val areaId: StateFlow<String?> = _areaId
+
+    fun set(nilai: String?, targetArea: String? = null) {
         if (!nilai.isNullOrBlank()) _rute.value = nilai
+        if (!targetArea.isNullOrBlank()) _areaId.value = targetArea
+    }
+
+    fun setArea(targetArea: String?) {
+        _areaId.value = targetArea
     }
 
     fun ambil(): String? {
@@ -30,8 +39,15 @@ object NotifikasiTujuan {
         return nilai
     }
 
+    fun ambilArea(): String? {
+        val nilai = _areaId.value
+        _areaId.value = null
+        return nilai
+    }
+
     /** Nama extra pada Intent notifikasi. */
     const val EXTRA_RUTE = "notif_rute"
+    const val EXTRA_AREA_ID = "notif_area_id"
 
     /** Rute yang dikenali. Payload di luar daftar ini diabaikan, bukan dipercaya. */
     const val MANAGER_PERSETUJUAN = "manager_persetujuan"
@@ -39,4 +55,5 @@ object NotifikasiTujuan {
     const val MANAGER_PETTY_CASH = "manager_petty_cash"
     const val LEADER_PETTY_CASH = "leader_petty_cash"
     const val CHAT = "chat"
+    const val CHAT_AREA = "chat_area"
 }

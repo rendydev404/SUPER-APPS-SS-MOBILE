@@ -9,6 +9,9 @@ import com.sukashawarma.superapp.data.remote.optJsonArray
 import com.sukashawarma.superapp.data.remote.optString
 import com.sukashawarma.superapp.domain.session.AppSession
 import com.sukashawarma.superapp.domain.util.JakartaTime
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -42,6 +45,7 @@ class ChecklistViewModel : ViewModel() {
     private var recordId: String? = null
     private val recordMutex = Mutex()
     private val pendingToggles = ConcurrentHashMap<String, Boolean>()
+    private val itemToggleJobs = ConcurrentHashMap<String, Job>()
 
     init { load() }
 
@@ -129,9 +133,11 @@ class ChecklistViewModel : ViewModel() {
             }
         )
 
-        viewModelScope.launch {
+        itemToggleJobs[itemId]?.cancel()
+        val job = viewModelScope.launch {
             try {
                 val rid = recordId ?: ensureRecord(outletId)
+                ensureActive()
                 if (checked) {
                     Postgrest.upsert(
                         "daily_checklist_ticks",
@@ -145,12 +151,16 @@ class ChecklistViewModel : ViewModel() {
                 } else {
                     Postgrest.delete("daily_checklist_ticks", listOf("record_id" to "eq.$rid", "item_id" to "eq.$itemId"))
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _state.value = _state.value.copy(error = "Gagal menyimpan centang: ${e.message}")
             } finally {
+                itemToggleJobs.remove(itemId)
                 pendingToggles.remove(itemId)
             }
         }
+        itemToggleJobs[itemId] = job
     }
 
     private suspend fun ensureRecord(outletId: String): String = recordMutex.withLock {
