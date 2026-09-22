@@ -10,8 +10,8 @@ import com.sukashawarma.superapp.feature.leader.domain.akhirHariIso
 import com.sukashawarma.superapp.feature.leader.domain.awalHariIso
 import com.sukashawarma.superapp.feature.leader.domain.hariIniJakarta
 import com.sukashawarma.superapp.feature.leader.domain.jamTransaksiTerakhir
+import com.sukashawarma.superapp.feature.leader.domain.ringkasStok
 import com.sukashawarma.superapp.feature.leader.domain.susunPerOutlet
-import com.sukashawarma.superapp.feature.stok.domain.bolehTampilDiOutlet
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 
@@ -38,7 +38,7 @@ object RingkasanRepository {
         val pesanan = async { pesananSelesai(ids, dari, sampai) }
         val saldo = async { utama?.let { saldoPettyCash(it) } ?: 0L }
         val shift = async { utama?.let { shiftAktif(it) } }
-        val stok = async { utama?.let { jumlahItemStok(it) } ?: 0 }
+        val stok = async { ringkasStok(utama?.let { StokCabangRepository.bahan(it) }.orEmpty()) }
         val kru = async { utama?.let { jumlahKruAktif(it) } ?: 0 }
         val hadir = async { utama?.let { jumlahHadir(it, dari, sampai) } ?: 0 }
 
@@ -56,7 +56,7 @@ object RingkasanRepository {
             sisaPettyCash = saldo.await(),
             adaShiftAktif = shiftBaris != null,
             shift = shiftBaris,
-            jumlahItemStok = stok.await(),
+            stok = stok.await(),
             hadir = hadir.await(),
             totalKru = kru.await(),
             perOutlet = susunPerOutlet(ids, nama, barisPesanan),
@@ -138,29 +138,6 @@ object RingkasanRepository {
             disesuaikanPada = baris.optString("admin_petty_cash_updated_at"),
         )
     }
-
-    /**
-     * Cacah bahan yang saldonya masih ada di cabang.
-     *
-     * Web menghitungnya dari `inventory_batches` — tabel yang TIDAK ADA di database
-     * ini (migrasi `20260709000001_merge_fifo_po` mencatatnya sebagai dibatalkan dan
-     * menghapus `inventory_items`), sehingga angka "Stok Cabang" di web selalu nol.
-     * Native membacanya dari `monitoring_view_scoped`, view yang sama yang dipakai
-     * modul Stok dan berisi saldo sungguhan. `gt.0` aman walau skala saldonya
-     * campuran; bahan gudang pusat disaring sama seperti halaman Stok Cabang.
-     */
-    private suspend fun jumlahItemStok(outletId: String): Int =
-        Postgrest.select(
-            "monitoring_view_scoped",
-            listOf(
-                "select" to "item_name,outlet_name",
-                "outlet_id" to "eq.$outletId",
-                "current_qty" to "gt.0",
-            ),
-        ).count {
-            val b = it.asJsonObject
-            bolehTampilDiOutlet(b.optString("item_name").orEmpty(), b.optString("outlet_name").orEmpty())
-        }
 
     private suspend fun jumlahKruAktif(outletId: String): Int =
         Postgrest.select(
