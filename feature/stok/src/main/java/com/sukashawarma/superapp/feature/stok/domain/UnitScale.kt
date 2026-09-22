@@ -6,7 +6,10 @@ import kotlin.math.floor
  * Metadata satuan satu bahan, disalin apa adanya dari `bahan_baku`.
  *
  * `faktorTampilan` = berapa satuan terkecil dalam satu satuan besar.
- * `faktorTengah`   = berapa satuan terkecil dalam satu satuan tengah.
+ * `faktorTengah`   = berapa satuan TENGAH dalam satu satuan besar (BAWANG: 20 Kg
+ *                    per Bal), bukan satuan terkecil per satuan tengah. Satuan
+ *                    terkecil per satuan tengah = `faktorTampilan / faktorTengah`,
+ *                    sama seperti `decomposeTriUnit` dan web.
  */
 data class UnitMeta(
     val satuan: String? = null,
@@ -53,8 +56,10 @@ object UnitScale {
         faktor(meta.faktorTampilan)?.let { qtySmallest / it }
 
     /** Satuan tengah -> satuan terkecil. */
-    fun smallestFromTengah(qtyTengah: Double, meta: UnitMeta): Double? =
-        faktor(meta.faktorTengah)?.let { qtyTengah * it }
+    fun smallestFromTengah(qtyTengah: Double, meta: UnitMeta): Double? {
+        val fBesar = faktor(meta.faktorTampilan) ?: return null
+        return faktor(meta.faktorTengah)?.let { qtyTengah * fBesar / it }
+    }
 
     /**
      * Saldo apa adanya dari DB -> satuan terkecil, memakai penanda skala barisnya.
@@ -130,8 +135,9 @@ object UnitScale {
             bagian += "${besar.toLongString()} ${meta.satuan ?: "besar"}"
             sisa -= besar * fBesar
         }
-        val fTengah = faktor(meta.faktorTengah)
-        if (fTengah != null && fTengah < fBesar) {
+        // Satuan terkecil per satuan tengah; faktor_tengah sendiri = tengah per besar.
+        val fTengah = faktor(meta.faktorTengah)?.let { fBesar / it }
+        if (meta.satuanTengah != null && fTengah != null && fTengah < fBesar) {
             val tengah = floor(sisa / fTengah)
             if (tengah > 0) {
                 bagian += "${tengah.toLongString()} ${meta.satuanTengah ?: "tengah"}"
