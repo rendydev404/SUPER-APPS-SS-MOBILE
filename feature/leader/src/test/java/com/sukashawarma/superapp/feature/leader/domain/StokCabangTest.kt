@@ -79,6 +79,23 @@ class StokCabangTest {
         assertEquals(StatusStok.KRITIS, b.status)
     }
 
+    /**
+     * Kartu "Stok Cabang" di Ringkasan harus berbunyi sama dengan lencana layar Stok
+     * Cabang — dulu ia mencacah bahan bersaldo > 0, angka yang tidak ada di layar mana pun.
+     */
+    @Test
+    fun `ringkasan stok mencacah kritis dan menipis seperti layar stok`() {
+        val r = ringkasStok(
+            listOf(
+                bahan("A", StatusStok.KRITIS),
+                bahan("B", StatusStok.KRITIS),
+                bahan("C", StatusStok.MENIPIS),
+                bahan("D", StatusStok.AMAN),
+            )
+        )
+        assertEquals(RingkasanStok(kritis = 2, menipis = 1, total = 4), r)
+    }
+
     @Test
     fun `yang paling genting muncul lebih dulu`() {
         val hasil = urutkanStok(
