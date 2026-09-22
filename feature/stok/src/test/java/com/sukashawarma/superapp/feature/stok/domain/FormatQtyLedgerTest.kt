@@ -28,14 +28,20 @@ class FormatQtyLedgerTest {
     }
 
     /**
-     * Inilah angka di layar yang memicu perbaikan ini: 50 pada baris satuan besar
-     * sempat dibaca sebagai satuan terkecil, lalu jenjang TENGAH-nya memunculkan
-     * "4 Pouch 2 Gram" — pemecahan yang benar untuk 50 gram, tapi salah total untuk
-     * 50 kg.
+     * Sisa di bawah satu satuan besar turun ke jenjang tengah. Metadatanya data nyata
+     * `bahan_baku` MAYONAISE: 1 Dus = 12 Kg = 12.000 Gram — `faktor_tengah` adalah
+     * jumlah Kg per Dus, bukan gram per Kg.
      */
     @Test
     fun `sisa di bawah satu satuan besar turun ke jenjang tengah`() {
-        assertEquals("-4 Pouch 2 Gram", UnitScale.formatQtyLedger(-50.0, mayonaise, saldoIsGram = true))
+        val mayonaiseDus = UnitMeta(
+            satuan = "Dus",
+            satuanTengah = "Kg",
+            satuanKecil = "Gram",
+            faktorTengah = 12.0,
+            faktorTampilan = 12000.0,
+        )
+        assertEquals("-1 Kg 50 Gram", UnitScale.formatQtyLedger(-1050.0, mayonaiseDus, saldoIsGram = true))
     }
 
     @Test
