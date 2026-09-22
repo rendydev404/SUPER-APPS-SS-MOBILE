@@ -86,6 +86,15 @@ fun bahanCabang(
     )
 }
 
+/** Cacah status seluruh bahan satu cabang — dipakai lencana Stok Cabang dan kartu Ringkasan. */
+data class RingkasanStok(val kritis: Int, val menipis: Int, val total: Int)
+
+fun ringkasStok(daftar: List<BahanCabang>): RingkasanStok = RingkasanStok(
+    kritis = daftar.count { it.status == StatusStok.KRITIS },
+    menipis = daftar.count { it.status == StatusStok.MENIPIS },
+    total = daftar.size,
+)
+
 /**
  * Urutan tampil: yang paling genting lebih dulu, lalu abjad.
  *
