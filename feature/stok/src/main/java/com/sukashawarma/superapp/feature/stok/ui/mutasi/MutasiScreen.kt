@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.LocalShipping
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -44,8 +45,11 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -54,6 +58,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -75,20 +80,39 @@ import com.sukashawarma.superapp.feature.stok.ui.PitaPesan
 import com.sukashawarma.superapp.feature.stok.ui.waktuSingkat
 import com.sukashawarma.superapp.presentation.theme.SukaOnSurface
 import com.sukashawarma.superapp.presentation.theme.SukaOnSurfaceVariant
+import com.sukashawarma.superapp.presentation.theme.SukaOrange
 import com.sukashawarma.superapp.presentation.theme.SukaSurface
-import com.sukashawarma.superapp.core.ui.RealtimeRefresh
-import com.sukashawarma.superapp.core.ui.RealtimeTables
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MutasiScreen(viewModel: MutasiViewModel = viewModel()) {
     val state by viewModel.state.collectAsState()
-    RealtimeRefresh(RealtimeTables.LEDGER, RealtimeTables.STOK_BALANCE) { viewModel.muatAwal() }
+    val pullRefreshState = rememberPullToRefreshState()
+
+    if (pullRefreshState.isRefreshing) {
+        LaunchedEffect(true) {
+            viewModel.segarkanManual()
+        }
+    }
+
+    LaunchedEffect(state.memuat) {
+        if (!state.memuat) {
+            pullRefreshState.endRefresh()
+        }
+    }
 
     if (state.formTerbuka) {
         FormAjukan(state, viewModel)
     } else {
     Column(Modifier.fillMaxSize().background(SukaSurface)) {
-        HeaderStok(judul = "Mutasi Antar Outlet", subjudul = "Kirim & terima transfer stok")
+        HeaderStok(
+            judul = "Mutasi Antar Outlet",
+            subjudul = "Kirim & terima transfer stok",
+        ) {
+            IconButton(onClick = viewModel::muatAwal) {
+                Icon(Icons.Default.Refresh, "Segarkan", tint = Color(0xFF1E293B))
+            }
+        }
 
         if (!state.tidakBerhak && state.outlets.size > 1) {
             PemilihOutlet(state.outlets, state.outletTerpilih, viewModel::pilihOutlet)
@@ -110,20 +134,33 @@ fun MutasiScreen(viewModel: MutasiViewModel = viewModel()) {
             }
         }
 
-        when {
-            state.tidakBerhak -> KeadaanTidakBerhak("Akun Anda belum terhubung dengan outlet mana pun.")
-            state.memuat && state.outlets.isEmpty() -> MemuatPenuh()
-            state.error != null && state.daftar.isEmpty() -> KeadaanGagal(state.error!!, viewModel::muatAwal)
-            state.daftar.isEmpty() -> KeadaanKosong("Belum ada mutasi yang melibatkan outlet ini.")
-            else -> LazyColumn(
-                Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(9.dp),
-            ) {
-                items(state.daftar, key = { it.id }) { m ->
-                    KartuMutasi(m) { viewModel.bukaDetail(m) }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .nestedScroll(pullRefreshState.nestedScrollConnection)
+        ) {
+            when {
+                state.tidakBerhak -> KeadaanTidakBerhak("Akun Anda belum terhubung dengan outlet mana pun.")
+                state.memuat && state.outlets.isEmpty() -> MemuatPenuh()
+                state.error != null && state.daftar.isEmpty() -> KeadaanGagal(state.error!!, viewModel::muatAwal)
+                state.daftar.isEmpty() -> KeadaanKosong("Belum ada mutasi yang melibatkan outlet ini.")
+                else -> LazyColumn(
+                    Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(9.dp),
+                ) {
+                    items(state.daftar, key = { it.id }) { m ->
+                        KartuMutasi(m) { viewModel.bukaDetail(m) }
+                    }
                 }
             }
+
+            PullToRefreshContainer(
+                state = pullRefreshState,
+                modifier = Modifier.align(Alignment.TopCenter),
+                containerColor = Color.White,
+                contentColor = SukaOrange,
+            )
         }
     }
 

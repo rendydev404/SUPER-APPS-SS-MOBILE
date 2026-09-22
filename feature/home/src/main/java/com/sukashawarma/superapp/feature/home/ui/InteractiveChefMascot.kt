@@ -254,7 +254,7 @@ fun InteractiveChefMascot(
                         return@clickable
                     }
 
-                    val msg = generateChefMessage(userName, todayAttendance, stokKritis)
+                    val msg = pesanChef(userName, todayAttendance, stokKritis)
                     val hasAction = todayAttendance == null && "absen" in msg.lowercase()
                     onSpeechTrigger?.invoke(msg, hasAction)
                 }
@@ -455,36 +455,25 @@ fun CartoonCloudSpeechBubble(
 /**
  * Generator kata-kata kontekstual sesuai status absensi, stok kritis, dan jam kerja.
  */
-private fun generateChefMessage(
-    userName: String,
-    att: TodayAttendance?,
-    stokKritis: Int?
-): String {
+private fun pesanChef(userName: String, att: TodayAttendance?, stokKritis: Int?): String {
     val firstName = userName.trim().split(" ").firstOrNull() ?: userName
     val randomRoll = Random.nextInt(100)
     return when {
-        att == null -> {
-            listOf(
-                "Halo $firstName! Yuk absen masuk dulu ✨",
-                "Semangat shift baru! Absen dulu yuk $firstName! 🌯",
-                "Udah siap hari ini? Absen dulu ya $firstName! 🔥",
-                "Senyum dulu! Jangan lupa absen masuk ya 😊"
-            ).random()
-        }
-        stokKritis != null && stokKritis > 0 && randomRoll < 35 -> {
+        att == null -> listOf(
+            "Halo $firstName! Yuk absen masuk dulu ✨",
+            "Semangat shift baru! Absen dulu yuk $firstName! 🌯",
+            "Udah siap hari ini? Absen dulu ya $firstName! 🔥",
+            "Senyum dulu! Jangan lupa absen masuk ya 😊",
+        ).random()
+        stokKritis != null && stokKritis > 0 && randomRoll < 35 ->
             "Perhatian! Ada $stokKritis bahan menipis di gudang 📦⚠️"
-        }
-        att.type == "in" -> {
-            listOf(
-                "Semangat shift-nya $firstName! Shawarma terbaik menanti 🌯🔥",
-                "Tips Chef: Jaga senyum ramah & saus garlic merata! 😄✨",
-                "Kerja hebat hari ini! Layani pelanggan sepenuh hati 🙌",
-                "Tetap terhidrasi ya $firstName, minum air putih dulu! 💧",
-                "Shawarma lezat di tangan tim terbaik hari ini! 💪🌯"
-            ).random()
-        }
-        else -> {
-            "Kerja luar biasa hari ini, $firstName! Selamat istirahat! 🌙🎉"
-        }
+        att.type == "in" -> listOf(
+            "Semangat shift-nya $firstName! Shawarma terbaik menanti 🌯🔥",
+            "Tips Chef: Jaga senyum ramah & saus garlic merata! 😄✨",
+            "Kerja hebat hari ini! Layani pelanggan sepenuh hati 🙌",
+            "Tetap terhidrasi ya $firstName, minum air putih dulu! 💧",
+            "Shawarma lezat di tangan tim terbaik hari ini! 💪🌯",
+        ).random()
+        else -> "Kerja luar biasa hari ini, $firstName! Selamat istirahat! 🌙🎉"
     }
 }

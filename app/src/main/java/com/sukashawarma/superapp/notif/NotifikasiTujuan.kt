@@ -33,6 +33,21 @@ object NotifikasiTujuan {
         _areaId.value = targetArea
     }
 
+    /** Lawan bicara pribadi yang diminta notifikasi: (id, nama, avatar). */
+    private val _partner = MutableStateFlow<Triple<String, String, String?>?>(null)
+    val partner: StateFlow<Triple<String, String, String?>?> = _partner
+
+    fun setPartner(id: String?, nama: String?, avatar: String?) {
+        if (id.isNullOrBlank()) return
+        _partner.value = Triple(id, nama?.takeIf { it.isNotBlank() } ?: "Rekan kerja", avatar?.takeIf { it.isNotBlank() })
+    }
+
+    fun ambilPartner(): Triple<String, String, String?>? {
+        val nilai = _partner.value
+        _partner.value = null
+        return nilai
+    }
+
     fun ambil(): String? {
         val nilai = _rute.value
         _rute.value = null
@@ -48,6 +63,9 @@ object NotifikasiTujuan {
     /** Nama extra pada Intent notifikasi. */
     const val EXTRA_RUTE = "notif_rute"
     const val EXTRA_AREA_ID = "notif_area_id"
+    const val EXTRA_PARTNER_ID = "notif_partner_id"
+    const val EXTRA_PARTNER_NAMA = "notif_partner_nama"
+    const val EXTRA_PARTNER_AVATAR = "notif_partner_avatar"
 
     /** Rute yang dikenali. Payload di luar daftar ini diabaikan, bukan dipercaya. */
     const val MANAGER_PERSETUJUAN = "manager_persetujuan"
@@ -56,4 +74,5 @@ object NotifikasiTujuan {
     const val LEADER_PETTY_CASH = "leader_petty_cash"
     const val CHAT = "chat"
     const val CHAT_AREA = "chat_area"
+    const val CHAT_PRIBADI = "chat_pribadi"
 }

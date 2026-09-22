@@ -85,9 +85,8 @@ fun StokScreen(
     val state by viewModel.state.collectAsState()
     val snackbar = remember { SnackbarHostState() }
 
-    // Saldo bergerak tiap mutasi; `stok_balance` dan `ledger_stok` sama-sama ada di
-    // publication realtime, sedangkan view yang dibaca layar ini berdiri di atasnya.
-    RealtimeRefresh(RealtimeTables.STOK_BALANCE, RealtimeTables.LEDGER) { viewModel.muatUlang() }
+    // Saldo bergerak tiap mutasi; dipicu oleh `stok_balance` pada publication realtime.
+    RealtimeRefresh(RealtimeTables.STOK_BALANCE) { viewModel.muatUlang() }
 
     LaunchedEffect(state.galat) {
         state.galat?.let {

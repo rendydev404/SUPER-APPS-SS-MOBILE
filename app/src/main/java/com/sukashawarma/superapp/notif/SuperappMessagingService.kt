@@ -56,24 +56,32 @@ class SuperappMessagingService : FirebaseMessagingService() {
         // meneruskannya, tanpa perlu mengubah apa pun di sisi ini.
         val mentah = message.data["route"] ?: message.data["url"]
 
+        // Semua jalur chat lewat satu penyaring yang bisa diuji. Di sinilah
+        // pesan pribadi yang salah alamat (atau siaran legacy `send-push` yang
+        // menyiram semua perangkat) dihentikan SEBELUM digambar — apa pun
+        // keadaan trigger di server.
+        val sayaId = AppSession.staff.value?.id
+        val saring = PushChatPenyaring.putuskan(
+            data = message.data,
+            sayaId = sayaId,
+            partnerTerbuka = ChatKehadiran.partnerTerbuka,
+            chatTerbuka = ChatKehadiran.terbuka,
+        )
+
         // Push notifikasi pesan chat pribadi 1-on-1
-        if (message.data["type"] == "private_chat" || mentah?.startsWith("/chat/private") == true) {
-            val pengirimId = message.data["sender_id"]
-                ?: mentah?.substringAfter("from=", "")?.takeIf { it.isNotBlank() }
-            if (pengirimId != null && pengirimId == AppSession.staff.value?.id) {
-                return
-            }
-            // Langsung akui tersampaikan ke Supabase di latar belakang agar pengirim mendapat centang 2 abu
-            lingkup.launch {
-                try {
-                    com.sukashawarma.superapp.feature.chat.data.PrivateChatRepository.tandaiSemuaTersampaikan()
-                } catch (e: Exception) {
-                    Log.e(TAG, "Gagal mengakui chat pribadi tersampaikan", e)
+        if (saring.jenis == PushChatPenyaring.Jenis.PRIBADI) {
+            if (saring.akuiTersampaikan) {
+                // Akui tersampaikan di latar belakang agar pengirim mendapat centang 2 abu.
+                lingkup.launch {
+                    try {
+                        com.sukashawarma.superapp.feature.chat.data.PrivateChatRepository.tandaiSemuaTersampaikan()
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Gagal mengakui chat pribadi tersampaikan", e)
+                    }
                 }
             }
-
-            if (ChatKehadiran.terbuka) {
-                Log.d(TAG, "Push chat pribadi dilewati: layar chat sedang terlihat.")
+            if (saring.tolak != null) {
+                Log.d(TAG, "Push chat pribadi dilewati: ${saring.tolak}.")
                 return
             }
 
@@ -85,7 +93,7 @@ class SuperappMessagingService : FirebaseMessagingService() {
             // saling menimpa, dan masing-masing membawa foto profilnya sendiri.
             ChatPribadiNotifikasi.tampilkan(
                 context = this,
-                pengirimId = pengirimId ?: pengirim,
+                pengirimId = saring.pengirimId ?: pengirim,
                 pengirimNama = pengirim,
                 isi = isi,
                 avatarPath = message.data["sender_avatar"]?.takeIf { it.isNotBlank() },
@@ -94,17 +102,11 @@ class SuperappMessagingService : FirebaseMessagingService() {
         }
 
         // Push notifikasi pesan obrolan grup area (Area Manager & Crew)
-        if (message.data["type"] == "area_chat" || mentah?.startsWith("/chat/area") == true) {
+        if (saring.jenis == PushChatPenyaring.Jenis.AREA) {
             // Chat Area belum dirilis ke produksi: jangan tampilkan notifikasinya.
             if (!com.sukashawarma.superapp.BuildConfig.DEBUG) return
-            val pengirimId = message.data["sender_id"]
-                ?: mentah?.substringAfter("from=", "")?.takeIf { it.isNotBlank() }
-            if (pengirimId != null && pengirimId == AppSession.staff.value?.id) {
-                Log.d(TAG, "Push chat area dilewati: pesan dari diri sendiri.")
-                return
-            }
-            if (ChatKehadiran.terbuka) {
-                Log.d(TAG, "Push chat area dilewati: layar chat sedang terlihat.")
+            if (saring.tolak != null) {
+                Log.d(TAG, "Push chat area dilewati: ${saring.tolak}.")
                 return
             }
 
@@ -136,21 +138,12 @@ class SuperappMessagingService : FirebaseMessagingService() {
         // dan membawa payload lengkap: nama grup, foto grup, dan nama pengirim.
         // (Jalur lama '/chat?from=' ikut dikenali supaya perangkat yang belum
         // memperbarui basis datanya tidak kehilangan notifikasi.)
-        if (message.data["type"] == "chat" || mentah?.startsWith("/chat") == true) {
-            val pengirimId = message.data["sender_id"]
-                ?: mentah?.substringAfter("from=", "")?.takeIf { it.isNotBlank() }
-            // Jangan memberi tahu seseorang tentang pesannya sendiri, dan jangan
-            // berbunyi untuk percakapan yang sedang dibuka di layar.
-            //
-            // Kedua penolakan ini DICATAT. Tanpa jejaknya, notifikasi yang tidak
-            // muncul tidak bisa dibedakan dari notifikasi yang tidak pernah
-            // sampai — dan penelusurannya terpaksa menebak ke arah server.
-            if (pengirimId != null && pengirimId == AppSession.staff.value?.id) {
-                Log.d(TAG, "Push chat dilewati: pesan dari diri sendiri.")
-                return
-            }
-            if (ChatKehadiran.terbuka) {
-                Log.d(TAG, "Push chat dilewati: layar chat sedang terlihat.")
+        if (saring.jenis == PushChatPenyaring.Jenis.GRUP) {
+            // Penolakan DICATAT. Tanpa jejaknya, notifikasi yang tidak muncul
+            // tidak bisa dibedakan dari notifikasi yang tidak pernah sampai —
+            // dan penelusurannya terpaksa menebak ke arah server.
+            if (saring.tolak != null) {
+                Log.d(TAG, "Push chat dilewati: ${saring.tolak}.")
                 return
             }
             // Seluruh kunci payload dicatat, bukan hanya yang dipakai. Penanda

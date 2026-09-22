@@ -153,6 +153,10 @@ class MutasiViewModel : ViewModel() {
         viewModelScope.launch { muatDaftar() }
     }
 
+    fun segarkanManual() {
+        viewModelScope.launch { muatDaftar() }
+    }
+
     private suspend fun muatDaftar() {
         val outlet = _state.value.outletTerpilih ?: return
         // id kosong -> tanpa penyaring outlet, yang oleh repository diartikan

@@ -96,16 +96,100 @@ data class WasteReview(val id: String, val outletId: String, val bahanId: String
     }
 }
 
+data class WasteHistoryItem(
+    val id: String,
+    val outletId: String,
+    val outletName: String,
+    val bahanId: String,
+    val bahanName: String,
+    val qty: Double,
+    val reason: String,
+    val photoUrl: String?,
+    val status: String,
+    val rejectionReason: String?,
+    val reporterName: String,
+    val deciderName: String?,
+    val createdAt: String?,
+    val updatedAt: String?,
+    val meta: UnitMeta,
+) {
+    val isApproved: Boolean get() = status.equals("APPROVED", ignoreCase = true)
+    val isRejected: Boolean get() = status.equals("REJECTED", ignoreCase = true)
+    val quantityLabel: String get() {
+        val parts = decomposeTriUnit(qty, false, meta.satuanTengah, meta.faktorTengah, meta.satuanKecil, meta.faktorTampilan)
+        return listOf(parts.besar to meta.satuan, parts.tengah to meta.satuanTengah, parts.kecil to meta.satuanKecil)
+            .filter { it.first != 0.0 && !it.second.isNullOrBlank() }.joinToString(" · ") { "${formatAngkaStok(it.first)} ${it.second}" }.ifBlank { "0 ${meta.satuan.orEmpty()}" }
+    }
+}
+
 object WasteApprovalRepository {
     private const val KOLOM = "*,bahan_baku(nama,satuan,satuan_tengah,faktor_tengah,satuan_kecil,faktor_tampilan)," +
         "outlets(name),reported_by_staff:outlet_staff!reported_by(name)"
 
-    suspend fun load(): List<WasteReview> {
+    private const val KOLOM_RIWAYAT = "*,bahan_baku(nama,satuan,satuan_tengah,faktor_tengah,satuan_kecil,faktor_tampilan)," +
+        "outlets(name),reported_by_staff:outlet_staff!reported_by(name),approver_staff:outlet_staff!approved_by(name)"
+
+    suspend fun load(outletId: String? = null): List<WasteReview> {
         WasteApprovalAccess.requireAccess()
-        val ids = StokRepository.accessibleOutlets().map { it.id }
-        if (ids.isEmpty()) return emptyList()
+        val allAccessibleIds = StokRepository.accessibleOutlets().map { it.id }
+        if (allAccessibleIds.isEmpty()) return emptyList()
+
+        val targetIds = if (!outletId.isNullOrBlank()) {
+            if (outletId in allAccessibleIds) listOf(outletId) else return emptyList()
+        } else {
+            allAccessibleIds
+        }
+
         return withBalances(allRows("stok_waste_reports", listOf("select" to KOLOM,
-            "status" to "eq.PENDING", "outlet_id" to "in.(${ids.joinToString(",")})", "order" to "created_at.desc,id.asc")))
+            "status" to "eq.PENDING", "outlet_id" to "in.(${targetIds.joinToString(",")})", "order" to "created_at.desc,id.asc")))
+    }
+
+    suspend fun loadHistory(outletId: String? = null, limit: Int = 50): List<WasteHistoryItem> {
+        WasteApprovalAccess.requireAccess()
+        val allAccessibleIds = StokRepository.accessibleOutlets().map { it.id }
+        if (allAccessibleIds.isEmpty()) return emptyList()
+
+        val targetIds = if (!outletId.isNullOrBlank()) {
+            if (outletId in allAccessibleIds) listOf(outletId) else return emptyList()
+        } else {
+            allAccessibleIds
+        }
+
+        val rows = allRows("stok_waste_reports", listOf(
+            "select" to KOLOM_RIWAYAT,
+            "status" to "in.(APPROVED,REJECTED)",
+            "outlet_id" to "in.(${targetIds.joinToString(",")})",
+            "order" to "updated_at.desc.nullslast,created_at.desc",
+            "limit" to limit.toString()
+        ))
+
+        return rows.map { row ->
+            val bahanRow = row.optJsonObject("bahan_baku") ?: JsonObject()
+            val meta = UnitMeta(
+                bahanRow.optString("satuan"),
+                bahanRow.optString("satuan_tengah"),
+                bahanRow.optString("satuan_kecil"),
+                bahanRow.optDouble("faktor_tengah"),
+                bahanRow.optDouble("faktor_tampilan")
+            )
+            WasteHistoryItem(
+                id = row.optString("id").orEmpty(),
+                outletId = row.optString("outlet_id").orEmpty(),
+                outletName = row.optJsonObject("outlets")?.optString("name").orEmpty(),
+                bahanId = row.optString("bahan_baku_id").orEmpty(),
+                bahanName = bahanRow.optString("nama").orEmpty(),
+                qty = row.optDouble("qty") ?: 0.0,
+                reason = row.optString("reason").orEmpty(),
+                photoUrl = row.optString("photo_url"),
+                status = row.optString("status")?.uppercase().orEmpty(),
+                rejectionReason = row.optString("rejection_reason"),
+                reporterName = row.optJsonObject("reported_by_staff")?.optString("name").orEmpty(),
+                deciderName = row.optJsonObject("approver_staff")?.optString("name"),
+                createdAt = row.optString("created_at"),
+                updatedAt = row.optString("updated_at"),
+                meta = meta
+            )
+        }
     }
 
     /**

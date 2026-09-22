@@ -21,3 +21,6 @@ stitch-reference/
 *.fbf
 /*.png
 supabase/.temp/
+
+# Rahasia lokal (kunci service_role Supabase untuk skrip rilis)
+.env

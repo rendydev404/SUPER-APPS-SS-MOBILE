@@ -77,7 +77,6 @@ import com.sukashawarma.superapp.feature.stok.domain.StokAkses
 import com.sukashawarma.superapp.feature.stok.ui.area.HargaBahanScreen
 import com.sukashawarma.superapp.feature.stok.ui.area.WasteApprovalScreen
 import com.sukashawarma.superapp.feature.stok.ui.entri.EntriManualScreen
-import com.sukashawarma.superapp.feature.stok.ui.entri.RiwayatWasteScreen
 import com.sukashawarma.superapp.feature.stok.ui.laporan.ArusBarangScreen
 import com.sukashawarma.superapp.feature.stok.ui.laporan.HppMenuScreen
 import com.sukashawarma.superapp.feature.stok.ui.laporan.LaporanPenjualanScreen
@@ -114,7 +113,6 @@ private enum class TabStok(
     MUTASI("Mutasi", "Mutasi Antar Outlet", Icons.Default.SwapHoriz),
     RETUR("Retur", "Retur & Refund Bahan", Icons.Default.Restore),
     ENTRI("Entri Manual", "Entri Manual & Lapor Waste", Icons.Default.EditNote),
-    RIWAYAT_WASTE("Riwayat Waste", "Riwayat Waste Saya", Icons.Default.History),
     PERSETUJUAN_OPNAME("Approval Opname", "Persetujuan Opname", Icons.Default.FactCheck),
     HARGA("Harga Bahan", "Master Harga Bahan Baku", Icons.Default.Sell),
 
@@ -168,10 +166,6 @@ private fun tujuanUntukPeran(): List<TabStok> {
         // tombol di dalamnya — lihat ReturAkses.
         add(TabStok.RETUR)
         add(TabStok.ENTRI)
-        // Pasangan Entri Manual: di sana orang melapor waste, di sini ia melihat
-        // hasilnya. Tanpa gerbang peran, sama seperti Entri Manual — kueri-nya sudah
-        // dibatasi ke laporan milik akun yang sedang masuk.
-        add(TabStok.RIWAYAT_WASTE)
         if (bolehWaste && TabStok.WASTE !in this) add(TabStok.WASTE)
         if (bolehPo && TabStok.TERIMA_PO !in this) add(TabStok.TERIMA_PO)
         if (bolehVendor && TabStok.TERIMA_VENDOR !in this) add(TabStok.TERIMA_VENDOR)
@@ -311,7 +305,6 @@ fun StokShell(
                 TabStok.MUTASI -> MutasiScreen()
                 TabStok.RETUR -> ReturScreen(onBack = { tab = tabs.first() })
                 TabStok.ENTRI -> EntriManualScreen(onBack = { tab = tabs.first() })
-                TabStok.RIWAYAT_WASTE -> RiwayatWasteScreen(onBack = { tab = tabs.first() })
                 TabStok.PERSETUJUAN_OPNAME -> PersetujuanOpnameScreen(onBack = { tab = tabs.first() })
                 TabStok.TERIMA_PO -> PenerimaanPoScreen(onBack = { tab = tabs.first() })
                 TabStok.TERIMA_VENDOR ->
@@ -367,7 +360,6 @@ private val KELOMPOK_MENU_STOK = listOf(
         TabStok.LEDGER,
         TabStok.MUTASI,
         TabStok.ENTRI,
-        TabStok.RIWAYAT_WASTE,
         TabStok.WASTE,
         TabStok.TERIMA_PO,
         TabStok.PERSETUJUAN_OPNAME,

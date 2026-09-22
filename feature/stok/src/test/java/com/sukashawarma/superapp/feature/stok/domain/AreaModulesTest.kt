@@ -64,4 +64,61 @@ class AreaModulesTest {
         assertTrue(report.copy(balance = null).deficit)
         assertEquals("1 Bal · 5 Pack", report.quantityLabel)
     }
+    @Test fun `waste history item correctly reflects approval and rejection status with decider`() {
+        val meta = UnitMeta("Kg", null, null, null, null)
+        val approved = WasteHistoryItem(
+            id = "w1",
+            outletId = "out-1",
+            outletName = "Cibinong",
+            bahanId = "b1",
+            bahanName = "Lettuce",
+            qty = 2.0,
+            reason = "Busuk",
+            photoUrl = null,
+            status = "APPROVED",
+            rejectionReason = null,
+            reporterName = "Yunus",
+            deciderName = "Indra Adam Sami",
+            createdAt = "2026-09-21T15:02:00Z",
+            updatedAt = "2026-09-21T15:11:00Z",
+            meta = meta
+        )
+        assertTrue(approved.isApproved)
+        assertFalse(approved.isRejected)
+        assertEquals("Indra Adam Sami", approved.deciderName)
+        assertEquals("2 Kg", approved.quantityLabel)
+
+        val rejected = approved.copy(
+            id = "w2",
+            status = "REJECTED",
+            rejectionReason = "Foto kurang jelas",
+            deciderName = "Muhtar Arifin"
+        )
+        assertFalse(rejected.isApproved)
+        assertTrue(rejected.isRejected)
+        assertEquals("Muhtar Arifin", rejected.deciderName)
+        assertEquals("Foto kurang jelas", rejected.rejectionReason)
+    }
+    @Test fun `waste approval tabs have expected enum values`() {
+        val tabs = com.sukashawarma.superapp.feature.stok.ui.area.WasteApprovalTab.values()
+        assertEquals(2, tabs.size)
+        assertEquals(com.sukashawarma.superapp.feature.stok.ui.area.WasteApprovalTab.MENUNGGU, tabs[0])
+        assertEquals(com.sukashawarma.superapp.feature.stok.ui.area.WasteApprovalTab.RIWAYAT, tabs[1])
+    }
+    @Test fun `waste history status filter filters correctly`() {
+        val meta = UnitMeta("Kg", null, null, null, null)
+        val approved = WasteHistoryItem("1", "out", "Out", "b", "Bahan", 1.0, "r", null, "APPROVED", null, "Staff", "Approver", null, null, meta)
+        val rejected = WasteHistoryItem("2", "out", "Out", "b", "Bahan", 1.0, "r", null, "REJECTED", "Alasan", "Staff", "Rejector", null, null, meta)
+        val state = com.sukashawarma.superapp.feature.stok.ui.area.WasteState(history = listOf(approved, rejected))
+
+        assertEquals(2, state.filteredHistory.size)
+
+        val approvedOnly = state.copy(historyFilter = com.sukashawarma.superapp.feature.stok.ui.area.WasteHistoryStatusFilter.DISETUJUI)
+        assertEquals(1, approvedOnly.filteredHistory.size)
+        assertEquals("APPROVED", approvedOnly.filteredHistory.first().status)
+
+        val rejectedOnly = state.copy(historyFilter = com.sukashawarma.superapp.feature.stok.ui.area.WasteHistoryStatusFilter.DITOLAK)
+        assertEquals(1, rejectedOnly.filteredHistory.size)
+        assertEquals("REJECTED", rejectedOnly.filteredHistory.first().status)
+    }
 }

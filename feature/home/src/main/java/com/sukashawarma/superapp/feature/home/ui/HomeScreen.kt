@@ -926,7 +926,7 @@ private fun CurvedHeaderSection(
                     )
                 }
 
-                // Maskot 3D Chef Dinamis & Interaktif (Idle float, gyro tilt, tap reaction, combo party)
+                // Maskot 3D Chef Dinamis & Interaktif (Idle float, gyro tilt, tap reaction, kedip, lambaian)
                 InteractiveChefMascot(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)

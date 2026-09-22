@@ -32,6 +32,11 @@ object RealtimeTables {
     const val CHECKLIST_TICKS = "daily_checklist_ticks"
     const val CHECKLIST_ITEMS = "checklist_items"
     const val STOK_BALANCE = "stok_balance"
+    /**
+     * Dicabut dari publication realtime database demi kestabilan & performa (858k+ baris).
+     * Layar mutasi menggunakan user-driven refresh (tombol Segarkan) dan aksi lokal.
+     */
+    @Deprecated("Dicabut dari publication realtime database demi performa")
     const val LEDGER = "ledger_stok"
     const val WASTE_REPORTS = "stok_waste_reports"
     const val PERMINTAAN = "permintaan_bahan"

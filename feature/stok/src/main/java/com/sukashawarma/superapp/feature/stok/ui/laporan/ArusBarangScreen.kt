@@ -23,11 +23,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import com.sukashawarma.superapp.core.ui.SukaDropdownHeader
 import com.sukashawarma.superapp.core.ui.SukaDropdownMenu
 import com.sukashawarma.superapp.core.ui.SukaDropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
@@ -50,8 +52,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.sukashawarma.superapp.core.ui.RealtimeRefresh
-import com.sukashawarma.superapp.core.ui.RealtimeTables
 import com.sukashawarma.superapp.feature.stok.data.ArusBarangRepository
 import com.sukashawarma.superapp.feature.stok.data.BarisArusBarang
 import com.sukashawarma.superapp.feature.stok.data.StokRepository
@@ -172,14 +172,16 @@ fun ArusBarangScreen(
     viewModel: ArusBarangViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
-    RealtimeRefresh(RealtimeTables.LEDGER) { viewModel.muatAwal() }
-
     Column(Modifier.fillMaxSize().background(Color(0xFFF8FAFC))) {
         HeaderStok(
             judul = "Inbound / Outbound",
             subjudul = state.outletTerpilih?.name ?: "Arus barang gudang",
             onKembali = onBack,
-        )
+        ) {
+            IconButton(onClick = viewModel::muatAwal) {
+                Icon(Icons.Default.Refresh, "Segarkan", tint = Color(0xFF1E293B))
+            }
+        }
 
         if (state.memuat) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

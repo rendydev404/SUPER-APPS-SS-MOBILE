@@ -17,6 +17,19 @@ object ChatKehadiran {
         private set
 
     /**
+     * Id lawan bicara yang percakapan PRIBADI-nya sedang terbuka, atau null.
+     *
+     * Dibedakan dari [terbuka] karena aturannya berbeda: pesan pribadi hanya
+     * boleh dibungkam bila percakapan dengan orang ITU yang sedang dilihat.
+     * Pesan pribadi dari orang lain — atau yang tiba saat pengguna sedang di
+     * tab grup — tetap harus berbunyi, persis WhatsApp yang hanya mendiamkan
+     * obrolan yang sedang dibuka.
+     */
+    @Volatile
+    var partnerTerbuka: String? = null
+        private set
+
+    /**
      * Nama grup terakhir yang diketahui, dipakai sebagai judul percakapan di
      * notifikasi. Pengelola bisa menggantinya kapan saja, dan notifikasi tidak
      * punya jalur sendiri untuk membacanya dari server.
@@ -35,5 +48,14 @@ object ChatKehadiran {
 
     fun keluar() {
         terbuka = false
+    }
+
+    fun masukPribadi(partnerId: String) {
+        partnerTerbuka = partnerId
+    }
+
+    /** Hanya melepas bila yang keluar memang percakapan yang tercatat. */
+    fun keluarPribadi(partnerId: String) {
+        if (partnerTerbuka == partnerId) partnerTerbuka = null
     }
 }

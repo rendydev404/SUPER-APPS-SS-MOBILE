@@ -49,8 +49,11 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -58,6 +61,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -333,9 +337,23 @@ fun LedgerScreen(
     viewModel: LedgerViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
-    RealtimeRefresh(RealtimeTables.LEDGER, RealtimeTables.STOK_BALANCE) { viewModel.muatAwal() }
+    // Catatan Performa: Buku mutasi (858k+ baris) tidak mendengarkan realtime
+    // agar tidak terjadi thundering herd / pemuatan berulang tiap kali kasir jualan.
+    // Pengguna memuat data otomatis saat masuk layar, atau manual via tombol Segarkan di header.
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val glosariumSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    val pullRefreshState = rememberPullToRefreshState()
+    if (pullRefreshState.isRefreshing) {
+        LaunchedEffect(true) {
+            viewModel.segarkan()
+        }
+    }
+    LaunchedEffect(state.memuat) {
+        if (!state.memuat) {
+            pullRefreshState.endRefresh()
+        }
+    }
 
     Column(Modifier.fillMaxSize().background(SukaSurface)) {
         HeaderStok(judul = "Ledger Stok", subjudul = "Buku Kas & Riwayat Mutasi Bahan") {
@@ -477,39 +495,52 @@ fun LedgerScreen(
                         }
                     }
 
-                    // 4. Daftar Transaksi
+                    // 4. Daftar Transaksi (Pull-to-Refresh standar industri)
                     val terfilter = state.transaksiTerfilter
-                    if (terfilter.isEmpty() && !state.memuat) {
-                        KeadaanKosong("Belum Ada Catatan Pergerakan")
-                    } else {
-                        LazyColumn(
-                            Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(9.dp),
-                        ) {
-                            items(terfilter, key = { it.transaksiKey }) { t ->
-                                KartuTransaksi(t) { viewModel.bukaDetail(t) }
-                            }
-                            if (!state.habis && state.kataKunci.isEmpty() && state.filterAktif == KategoriLedger.SEMUA) {
-                                item(key = "lagi") {
-                                    Surface(
-                                        Modifier.fillMaxWidth().clickable { viewModel.muatLagi() },
-                                        shape = RoundedCornerShape(14.dp),
-                                        color = Color.White,
-                                        border = BorderStroke(1.dp, Color(0xFFE7ECF2)),
-                                    ) {
-                                        Text(
-                                            if (state.memuatLagi) "Memuat…" else "Muat lebih banyak",
-                                            Modifier.fillMaxWidth().padding(14.dp),
-                                            color = Color(0xFFEA580C),
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            textAlign = TextAlign.Center,
-                                        )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .nestedScroll(pullRefreshState.nestedScrollConnection)
+                    ) {
+                        if (terfilter.isEmpty() && !state.memuat) {
+                            KeadaanKosong("Belum Ada Catatan Pergerakan")
+                        } else {
+                            LazyColumn(
+                                Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(9.dp),
+                            ) {
+                                items(terfilter, key = { it.transaksiKey }) { t ->
+                                    KartuTransaksi(t) { viewModel.bukaDetail(t) }
+                                }
+                                if (!state.habis && state.kataKunci.isEmpty() && state.filterAktif == KategoriLedger.SEMUA) {
+                                    item(key = "lagi") {
+                                        Surface(
+                                            Modifier.fillMaxWidth().clickable { viewModel.muatLagi() },
+                                            shape = RoundedCornerShape(14.dp),
+                                            color = Color.White,
+                                            border = BorderStroke(1.dp, Color(0xFFE7ECF2)),
+                                        ) {
+                                            Text(
+                                                if (state.memuatLagi) "Memuat…" else "Muat lebih banyak",
+                                                Modifier.fillMaxWidth().padding(14.dp),
+                                                color = Color(0xFFEA580C),
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                textAlign = TextAlign.Center,
+                                            )
+                                        }
                                     }
                                 }
                             }
                         }
+
+                        PullToRefreshContainer(
+                            state = pullRefreshState,
+                            modifier = Modifier.align(Alignment.TopCenter),
+                            containerColor = Color.White,
+                            contentColor = SukaOrange,
+                        )
                     }
                 }
             }

@@ -61,6 +61,18 @@ class AreaResolverTest {
     }
 
     @Test
+    fun `kru outlet pamulang dipetakan ke area chairul rizky`() {
+        val area = AreaResolver.tentukanAreaPengguna(
+            role = Role.CREW,
+            roleRaw = "crew",
+            namaPengguna = "Kru Pamulang",
+            outletNama = "MITRA PAMULANG"
+        )
+        assertEquals("chairul_rizky", area.areaId)
+        assertTrue(area.outlets.contains("PAMULANG"))
+    }
+
+    @Test
     fun `hak ganti area hanya untuk pimpinan dan pengembang`() {
         assertTrue(AreaResolver.bolehGantiArea(Role.REGIONAL_MANAGER, "regional_manager"))
         assertTrue(AreaResolver.bolehGantiArea(Role.DEVELOPER, "developer"))

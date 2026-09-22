@@ -83,7 +83,7 @@ fun MonitoringScreen(
     viewModel: MonitoringViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
-    RealtimeRefresh(RealtimeTables.STOK_BALANCE, RealtimeTables.LEDGER, RealtimeTables.BAHAN_BAKU) { viewModel.muatAwal() }
+    RealtimeRefresh(RealtimeTables.STOK_BALANCE, RealtimeTables.BAHAN_BAKU) { viewModel.muatAwal() }
 
     Column(Modifier.fillMaxSize().background(Color(0xFFF8FAFC))) {
         Header(

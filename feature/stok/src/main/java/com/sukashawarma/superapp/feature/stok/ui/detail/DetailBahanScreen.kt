@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -64,14 +65,18 @@ fun DetailBahanScreen(
 ) {
     val state by viewModel.state.collectAsState()
     LaunchedEffect(outletId, bahanId) { viewModel.muat(outletId, bahanId) }
-    RealtimeRefresh(RealtimeTables.LEDGER, RealtimeTables.STOK_BALANCE) { viewModel.muat(outletId, bahanId) }
+    RealtimeRefresh(RealtimeTables.STOK_BALANCE) { viewModel.muat(outletId, bahanId) }
 
     Column(Modifier.fillMaxSize().background(SukaSurface)) {
         HeaderStok(
             judul = state.baris?.itemName ?: namaAwal,
             subjudul = "Detail saldo & riwayat mutasi",
             onKembali = onKeluar,
-        )
+        ) {
+            IconButton(onClick = viewModel::cobaLagi) {
+                Icon(Icons.Default.Refresh, "Segarkan", tint = Color(0xFF1E293B))
+            }
+        }
 
         when {
             state.memuat && state.baris == null -> MemuatPenuh()

@@ -52,6 +52,14 @@ class AreaManagerNamaTest {
     }
 
     @Test
+    fun `outlet mitra pamulang dipetakan ke chairul rizky pada cadangan`() {
+        assertEquals(
+            "Chairul Rizky",
+            AreaManagerNama.untuk("o-pamulang", "MITRA PAMULANG", emptyMap(), Role.REGIONAL_MANAGER, "RM User"),
+        )
+    }
+
+    @Test
     fun `outlet di luar semua daftar menjadi Lainnya`() {
         assertEquals(
             "Lainnya",

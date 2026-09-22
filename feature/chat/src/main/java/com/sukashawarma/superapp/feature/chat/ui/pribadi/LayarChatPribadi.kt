@@ -115,6 +115,7 @@ import com.sukashawarma.superapp.core.ui.AvatarStaf
 import com.sukashawarma.superapp.core.ui.AvatarStorage
 import com.sukashawarma.superapp.domain.session.AppSession
 import com.sukashawarma.superapp.domain.util.JakartaTime
+import com.sukashawarma.superapp.feature.chat.ChatKehadiran
 import com.sukashawarma.superapp.feature.chat.data.PesanPribadi
 import com.sukashawarma.superapp.feature.chat.data.PrivateChatRepository
 import com.sukashawarma.superapp.feature.chat.ui.suara.BubbleSuara
@@ -168,6 +169,12 @@ fun LayarChatPribadi(
     val statusRekam = rememberStatusRekam()
     DisposableEffect(Unit) {
         onDispose { PemutarSuara.hentikan() }
+    }
+    // Catat percakapan ini sebagai yang sedang dibuka: push dari lawan bicara
+    // yang sama tidak perlu berbunyi, sedangkan dari orang lain tetap tampil.
+    DisposableEffect(partnerId) {
+        ChatKehadiran.masukPribadi(partnerId)
+        onDispose { ChatKehadiran.keluarPribadi(partnerId) }
     }
 
     // Alur foto WhatsApp style

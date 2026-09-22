@@ -156,6 +156,13 @@ class MainActivity : FragmentActivity() {
         val rute = intent?.getStringExtra(NotifikasiTujuan.EXTRA_RUTE)
         val areaId = intent?.getStringExtra(NotifikasiTujuan.EXTRA_AREA_ID)
         NotifikasiTujuan.set(rute, areaId)
+        if (rute == NotifikasiTujuan.CHAT_PRIBADI) {
+            NotifikasiTujuan.setPartner(
+                intent.getStringExtra(NotifikasiTujuan.EXTRA_PARTNER_ID),
+                intent.getStringExtra(NotifikasiTujuan.EXTRA_PARTNER_NAMA),
+                intent.getStringExtra(NotifikasiTujuan.EXTRA_PARTNER_AVATAR),
+            )
+        }
     }
 
     override fun onResume() {
@@ -290,7 +297,10 @@ private fun RootNav() {
         if (ruteNotifikasi == null || staff == null) return@LaunchedEffect
         // Chat berlaku untuk setiap pemegang akun, termasuk mitra — jadi
         // ditangani sebelum penjaga isMitra di bawah.
-        if (ruteNotifikasi == NotifikasiTujuan.CHAT || ruteNotifikasi == NotifikasiTujuan.CHAT_AREA) {
+        if (ruteNotifikasi == NotifikasiTujuan.CHAT ||
+            ruteNotifikasi == NotifikasiTujuan.CHAT_AREA ||
+            ruteNotifikasi == NotifikasiTujuan.CHAT_PRIBADI
+        ) {
             NotifikasiTujuan.ambil()
             navController.navigate(Routes.CHAT)
             return@LaunchedEffect
@@ -354,14 +364,25 @@ private fun RootNav() {
                 val targetAreaId = remember {
                     NotifikasiTujuan.ambilArea().takeIf { com.sukashawarma.superapp.BuildConfig.DEBUG }
                 }
+                // Notifikasi pesan pribadi membuka LANGSUNG percakapan orangnya,
+                // bukan mendarat di tab grup lalu menyuruh pengguna mencari sendiri.
+                val targetPartner = remember { NotifikasiTujuan.ambilPartner() }
                 ChatScreen(
                     onBack = { navController.popAman() },
                     terkunci = false,
-                    tabAwal = if (targetAreaId != null) com.sukashawarma.superapp.feature.chat.ui.pribadi.TabChatUtama.AREA else com.sukashawarma.superapp.feature.chat.ui.pribadi.TabChatUtama.GRUP,
+                    tabAwal = when {
+                        targetPartner != null -> com.sukashawarma.superapp.feature.chat.ui.pribadi.TabChatUtama.PRIBADI
+                        targetAreaId != null -> com.sukashawarma.superapp.feature.chat.ui.pribadi.TabChatUtama.AREA
+                        else -> com.sukashawarma.superapp.feature.chat.ui.pribadi.TabChatUtama.GRUP
+                    },
                     targetAreaId = targetAreaId,
                     onAreaTerbuka = { areaId ->
                         com.sukashawarma.superapp.notif.ChatAreaNotifikasi.tutup(konteks, areaId)
-                    }
+                    },
+                    targetPartner = targetPartner,
+                    onPribadiTerbuka = { partnerId ->
+                        com.sukashawarma.superapp.notif.ChatPribadiNotifikasi.tutup(konteks, partnerId)
+                    },
                 )
             }
 

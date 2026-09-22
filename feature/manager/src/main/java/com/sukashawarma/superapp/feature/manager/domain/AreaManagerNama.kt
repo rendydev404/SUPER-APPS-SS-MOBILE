@@ -42,7 +42,7 @@ object AreaManagerNama {
     private val CADANGAN: List<Pair<String, List<String>>> = listOf(
         "Abu Bakar" to listOf("EMPANG", "BCC", "DRAMAGA", "PALEDANG", "CICURUG", "CIMANGGU"),
         "Muchtar" to listOf("CIBINONG", "CISEENG", "SENTUL", "PAJAJARAN"),
-        "Chairul Rizky" to listOf("SUKMAJAYA", "BEJI", "SAWANGAN", "CIRENDEU", "JAGAKARSA"),
+        "Chairul Rizky" to listOf("SUKMAJAYA", "BEJI", "SAWANGAN", "CIRENDEU", "JAGAKARSA", "PAMULANG"),
         "Tri Rizky" to listOf("KALISARI", "CIBUBUR", "CILENGSI", "CILEUNGSI"),
         "Mulyadi" to listOf("PEKAYON", "JATIASIH", "JATIWARINGIN"),
     )

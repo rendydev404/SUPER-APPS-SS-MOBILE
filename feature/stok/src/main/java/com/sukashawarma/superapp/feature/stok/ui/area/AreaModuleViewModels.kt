@@ -3,6 +3,7 @@ package com.sukashawarma.superapp.feature.stok.ui.area
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sukashawarma.superapp.feature.stok.data.*
+import com.sukashawarma.superapp.feature.stok.data.model.OutletRingkas
 import com.sukashawarma.superapp.feature.stok.domain.stokErrorMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -42,25 +43,138 @@ class HargaBahanViewModel : ViewModel() {
     }
 }
 
-data class WasteState(val loading: Boolean = true, val reports: List<WasteReview> = emptyList(),
-    val error: String? = null, val message: String? = null, val busy: Boolean = false,
-    val confirmation: WasteReview? = null, val rejecting: WasteReview? = null)
+enum class WasteApprovalTab {
+    MENUNGGU,
+    RIWAYAT
+}
+
+enum class WasteHistoryStatusFilter(val label: String) {
+    SEMUA("Semua"),
+    DISETUJUI("Disetujui"),
+    DITOLAK("Ditolak")
+}
+
+enum class WastePendingFilter(val label: String) {
+    SEMUA("Semua"),
+    BERISIKO("Berisiko")
+}
+
+data class WasteState(
+    val loading: Boolean = true,
+    val reports: List<WasteReview> = emptyList(),
+    val error: String? = null,
+    val message: String? = null,
+    val busy: Boolean = false,
+    val confirmation: WasteReview? = null,
+    val rejecting: WasteReview? = null,
+    val tab: WasteApprovalTab = WasteApprovalTab.MENUNGGU,
+    val selectedOutletId: String? = null,
+    val outlets: List<OutletRingkas> = emptyList(),
+    val history: List<WasteHistoryItem> = emptyList(),
+    val historyLoading: Boolean = false,
+    val historyError: String? = null,
+    val historyFilter: WasteHistoryStatusFilter = WasteHistoryStatusFilter.SEMUA,
+    val pendingFilter: WastePendingFilter = WastePendingFilter.SEMUA,
+) {
+    val filteredReports: List<WasteReview>
+        get() = when (pendingFilter) {
+            WastePendingFilter.SEMUA -> reports
+            WastePendingFilter.BERISIKO -> reports.filter { it.deficit }
+        }
+
+    val filteredHistory: List<WasteHistoryItem>
+        get() = when (historyFilter) {
+            WasteHistoryStatusFilter.SEMUA -> history
+            WasteHistoryStatusFilter.DISETUJUI -> history.filter { it.isApproved }
+            WasteHistoryStatusFilter.DITOLAK -> history.filter { it.isRejected }
+        }
+}
 
 class WasteApprovalViewModel : ViewModel() {
     private val mutable = MutableStateFlow(WasteState())
     val state = mutable.asStateFlow()
     private var job: Job? = null
-    init { refresh() }
-    fun refresh() {
-        if (mutable.value.busy || job?.isActive == true) return
-        job = viewModelScope.launch { load() }
+    private var historyJob: Job? = null
+
+    init {
+        loadOutlets()
+        refresh()
     }
+
+    private fun loadOutlets() {
+        viewModelScope.launch {
+            try {
+                val list = StokRepository.accessibleOutlets()
+                mutable.update { it.copy(outlets = list) }
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun selectTab(tab: WasteApprovalTab) {
+        if (mutable.value.tab == tab) return
+        mutable.update { it.copy(tab = tab) }
+        if (tab == WasteApprovalTab.RIWAYAT && mutable.value.history.isEmpty() && !mutable.value.historyLoading) {
+            loadHistory()
+        }
+    }
+
+    fun selectOutlet(outletId: String?) {
+        if (mutable.value.selectedOutletId == outletId) return
+        mutable.update { it.copy(selectedOutletId = outletId) }
+        refresh()
+    }
+
+    fun refresh() {
+        if (mutable.value.busy) return
+        job?.cancel()
+        job = viewModelScope.launch { load() }
+        loadHistory()
+    }
+
     private suspend fun load() {
         mutable.update { it.copy(loading = it.reports.isEmpty(), error = null) }
-        try { val rows = WasteApprovalRepository.load(); mutable.update { it.copy(loading = false, reports = rows) } }
+        try {
+            val rows = WasteApprovalRepository.load(mutable.value.selectedOutletId)
+            mutable.update { it.copy(loading = false, reports = rows) }
+        }
         catch (e: CancellationException) { throw e }
         catch (e: Exception) { mutable.update { it.copy(loading = false, error = stokErrorMessage(e)) } }
     }
+
+    fun loadHistory() {
+        historyJob?.cancel()
+        historyJob = viewModelScope.launch {
+            mutable.update { it.copy(historyLoading = it.history.isEmpty(), historyError = null) }
+            try {
+                val rows = WasteApprovalRepository.loadHistory(mutable.value.selectedOutletId)
+                mutable.update { it.copy(history = rows, historyLoading = false) }
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { mutable.update { it.copy(historyLoading = false, historyError = stokErrorMessage(e)) } }
+        }
+    }
+
+    fun setHistoryFilter(filter: WasteHistoryStatusFilter) {
+        mutable.update {
+            val next = if (it.historyFilter == filter && filter != WasteHistoryStatusFilter.SEMUA) {
+                WasteHistoryStatusFilter.SEMUA
+            } else {
+                filter
+            }
+            it.copy(historyFilter = next)
+        }
+    }
+
+    fun setPendingFilter(filter: WastePendingFilter) {
+        mutable.update {
+            val next = if (it.pendingFilter == filter && filter != WastePendingFilter.SEMUA) {
+                WastePendingFilter.SEMUA
+            } else {
+                filter
+            }
+            it.copy(pendingFilter = next)
+        }
+    }
+
     fun clearMessage() { mutable.update { it.copy(message = null, error = null) } }
     fun dismiss() { if (!mutable.value.busy) mutable.update { it.copy(confirmation = null, rejecting = null) } }
     fun reject(report: WasteReview) { if (!mutable.value.busy) mutable.update { it.copy(rejecting = report) } }
@@ -104,5 +218,6 @@ class WasteApprovalViewModel : ViewModel() {
             s.copy(reports = s.reports.filterNot { it.id == report.id }, confirmation = null, rejecting = null, message = pesan)
         }
         job = viewModelScope.launch { load() }
+        loadHistory()
     }
 }

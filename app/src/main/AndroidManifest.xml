@@ -132,6 +132,13 @@
             </intent-filter>
         </receiver>
 
+        <!-- Balas cepat & tandai dibaca dari notifikasi pesan PRIBADI.
+             Tidak diekspor: hanya PendingIntent milik aplikasi ini (dari
+             ChatPribadiNotifikasi) yang boleh memicunya. -->
+        <receiver
+            android:name=".notif.BalasChatPribadiReceiver"
+            android:exported="false" />
+
         <!-- Receiver kontrol alarm / heningkan notifikasi petty cash -->
         <receiver
             android:name=".notif.PettyCashActionReceiver"

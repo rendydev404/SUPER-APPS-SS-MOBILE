@@ -256,6 +256,10 @@ fun ChatScreen(
     tabAwal: com.sukashawarma.superapp.feature.chat.ui.pribadi.TabChatUtama = com.sukashawarma.superapp.feature.chat.ui.pribadi.TabChatUtama.GRUP,
     targetAreaId: String? = null,
     onAreaTerbuka: ((String) -> Unit)? = null,
+    /** Lawan bicara yang percakapan pribadinya langsung dibuka (id, nama, avatar) — dari notifikasi. */
+    targetPartner: Triple<String, String, String?>? = null,
+    /** Dipanggil tiap sebuah percakapan pribadi dibuka; app menutup notifikasinya di sini. */
+    onPribadiTerbuka: ((String) -> Unit)? = null,
 ) {
     if (terkunci) {
         LayarChatTerkunci(onBack = onBack)
@@ -269,7 +273,10 @@ fun ChatScreen(
         staff?.roleRaw?.equals("developer", ignoreCase = true) == true
 
     var tabAktif by remember { mutableStateOf(tabAwal) }
-    var partnerChatAktif by remember { mutableStateOf<Triple<String, String, String?>?>(null) }
+    var partnerChatAktif by remember { mutableStateOf<Triple<String, String, String?>?>(targetPartner) }
+    LaunchedEffect(partnerChatAktif?.first) {
+        partnerChatAktif?.first?.let { onPribadiTerbuka?.invoke(it) }
+    }
     var devMonitorDetail by remember { mutableStateOf<com.sukashawarma.superapp.feature.chat.data.PercakapanPengawasanItem?>(null) }
     var sheetPilihKontak by remember { mutableStateOf(false) }
 

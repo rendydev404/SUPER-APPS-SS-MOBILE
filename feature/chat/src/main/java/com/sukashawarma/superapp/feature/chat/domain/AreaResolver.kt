@@ -32,7 +32,7 @@ object AreaResolver {
             areaId = "chairul_rizky",
             namaArea = "Area Chairul Rizky",
             amName = "Chairul Rizky",
-            outlets = listOf("SUKMAJAYA", "BEJI", "SAWANGAN", "CIRENDEU", "JAGAKARSA"),
+            outlets = listOf("SUKMAJAYA", "BEJI", "SAWANGAN", "CIRENDEU", "JAGAKARSA", "PAMULANG"),
             deskripsi = "Ruang obrolan Tim Area Chairul Rizky (Depok & Jaksel).",
         ),
         AreaInfo(
