@@ -1,5 +1,7 @@
 package com.sukashawarma.superapp.feature.leader.domain
 
+import com.sukashawarma.superapp.feature.stok.domain.StokStatus
+import com.sukashawarma.superapp.feature.stok.domain.UnitMeta
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -16,21 +18,49 @@ class StokCabangTest {
             status = status,
         )
 
+    private val tepung = UnitMeta(satuan = "Kg", satuanKecil = "Gram", faktorTampilan = 1000.0)
+
     @Test
-    fun `status view dipetakan ke tiga tingkat yang dipakai layar`() {
-        assertEquals(StatusStok.KRITIS, StatusStok.dariView("below"))
-        assertEquals(StatusStok.MENIPIS, StatusStok.dariView("warning"))
-        assertEquals(StatusStok.AMAN, StatusStok.dariView("ok"))
+    fun `status skala dipetakan ke tiga tingkat yang dipakai layar`() {
+        assertEquals(StatusStok.KRITIS, StatusStok.dariSkala(StokStatus.BELOW))
+        assertEquals(StatusStok.MENIPIS, StatusStok.dariSkala(StokStatus.WARNING))
+        assertEquals(StatusStok.AMAN, StatusStok.dariSkala(StokStatus.OK))
+    }
+
+    /** Faktor satuan kosong tidak boleh membanjiri lencana merah. */
+    @Test
+    fun `status tak dapat dihitung dibaca aman`() {
+        assertEquals(StatusStok.AMAN, StatusStok.dariSkala(StokStatus.UNKNOWN))
     }
 
     /**
-     * Nilai baru dari view tidak boleh membanjiri lencana merah dengan hal yang
-     * belum tentu bermasalah.
+     * Bug yang dilaporkan: saldo 2032 tersimpan dalam gram (`saldo_is_gram`), dulu
+     * tampil "2032 Kg" berstatus aman. Setelah dinormalkan: 2 Kg 32 Gram, dan
+     * dengan batas 5 Kg itu kritis (di bawah setengahnya).
      */
     @Test
-    fun `status tak dikenal dan null dibaca aman`() {
-        assertEquals(StatusStok.AMAN, StatusStok.dariView("status_baru"))
-        assertEquals(StatusStok.AMAN, StatusStok.dariView(null))
+    fun `saldo gram dinormalkan sebelum ditampilkan dan dibandingkan`() {
+        val b = bahanCabang("t", "TEPUNG", 2032.0, saldoIsGram = true, threshold = 5.0, meta = tepung)
+        assertEquals("2 Kg 32 Gram", b.saldoTeks)
+        assertEquals("5 Kg", b.batasTeks)
+        assertEquals(StatusStok.KRITIS, b.status)
+    }
+
+    @Test
+    fun `saldo satuan besar legacy tidak dikali dua kali`() {
+        val b = bahanCabang("t", "TEPUNG", 4.0, saldoIsGram = false, threshold = 5.0, meta = tepung)
+        assertEquals("4 Kg", b.saldoTeks)
+        assertEquals(StatusStok.MENIPIS, b.status)
+    }
+
+    @Test
+    fun `faktor kosong menampilkan angka mentah dengan satuan skala barisnya`() {
+        val tanpaFaktor = tepung.copy(faktorTampilan = null)
+        val gram = bahanCabang("t", "TEPUNG", 2032.0, saldoIsGram = true, threshold = 5.0, meta = tanpaFaktor)
+        assertEquals("2032 Gram", gram.saldoTeks)
+        assertEquals("5 Kg", gram.batasTeks)
+        val besar = bahanCabang("t", "TEPUNG", 3.0, saldoIsGram = false, threshold = 5.0, meta = tanpaFaktor)
+        assertEquals("3 Kg", besar.saldoTeks)
     }
 
     @Test
