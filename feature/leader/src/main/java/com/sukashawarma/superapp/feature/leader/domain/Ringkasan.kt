@@ -37,7 +37,8 @@ data class RingkasanLeader(
     val sisaPettyCash: Long,
     val adaShiftAktif: Boolean,
     val shift: ShiftAktif?,
-    val jumlahItemStok: Int,
+    /** Dihitung dari daftar yang sama dengan layar Stok Cabang, jadi angkanya identik. */
+    val stok: RingkasanStok,
     val hadir: Int,
     val totalKru: Int,
     val perOutlet: List<BarisOutlet>,
@@ -74,7 +75,7 @@ data class RingkasanLeader(
             sisaPettyCash = 0L,
             adaShiftAktif = false,
             shift = null,
-            jumlahItemStok = 0,
+            stok = RingkasanStok(kritis = 0, menipis = 0, total = 0),
             hadir = 0,
             totalKru = 0,
             perOutlet = emptyList(),
