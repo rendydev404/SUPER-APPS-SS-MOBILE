@@ -10,6 +10,7 @@ import com.sukashawarma.superapp.feature.leader.domain.RingkasanStok
 import com.sukashawarma.superapp.feature.leader.domain.ringkasStok
 import com.sukashawarma.superapp.feature.leader.domain.saringStok
 import com.sukashawarma.superapp.feature.leader.ui.pesanGalatMuat
+import com.sukashawarma.superapp.feature.stok.data.StokRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -88,6 +89,8 @@ class StokViewModel : ViewModel() {
 
     fun muatUlang() {
         val outletId = _state.value.outletTerpilih ?: return
+        // Sumbernya cache StokRepository; tarik-segarkan harus membuangnya dulu.
+        StokRepository.invalidate()
         pemuatan?.cancel()
         pemuatan = viewModelScope.launch {
             _state.value = _state.value.copy(memuat = true)
