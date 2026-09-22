@@ -63,6 +63,22 @@ class StokCabangTest {
         assertEquals("3 Kg", besar.saldoTeks)
     }
 
+    /**
+     * Bug yang dilaporkan kedua: bahan bersatuan tengah tampil ngawur. BAWANG
+     * (1 Bal = 20 Kg = 20.000 Gram) bersaldo 1.500 gram dulu tertulis "75 Kg",
+     * padahal layar Stok menulis 0 Bal 1 Kg 500 Gram.
+     */
+    @Test
+    fun `saldo bersatuan tengah sama dengan layar stok`() {
+        val bawang = UnitMeta(
+            satuan = "Bal", satuanTengah = "Kg", satuanKecil = "Gram",
+            faktorTengah = 20.0, faktorTampilan = 20000.0,
+        )
+        val b = bahanCabang("b", "BAWANG", 1500.0, saldoIsGram = true, threshold = 1.0, meta = bawang)
+        assertEquals("1 Kg 500 Gram", b.saldoTeks)
+        assertEquals(StatusStok.KRITIS, b.status)
+    }
+
     @Test
     fun `yang paling genting muncul lebih dulu`() {
         val hasil = urutkanStok(
