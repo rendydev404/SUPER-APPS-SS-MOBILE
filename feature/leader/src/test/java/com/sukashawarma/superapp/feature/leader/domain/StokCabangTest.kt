@@ -1,5 +1,6 @@
 package com.sukashawarma.superapp.feature.leader.domain
 
+import com.sukashawarma.superapp.feature.stok.data.model.MonitoringRow
 import com.sukashawarma.superapp.feature.stok.domain.StokStatus
 import com.sukashawarma.superapp.feature.stok.domain.UnitMeta
 import org.junit.Assert.assertEquals
@@ -33,50 +34,61 @@ class StokCabangTest {
         assertEquals(StatusStok.AMAN, StatusStok.dariSkala(StokStatus.UNKNOWN))
     }
 
+    private fun baris(qty: Double, isGram: Boolean, threshold: Double?, meta: UnitMeta, nama: String = "TEPUNG") =
+        MonitoringRow(
+            outletId = "o", outletName = "Outlet", bahanBakuId = "b", itemName = nama,
+            currentQty = qty, threshold = threshold, statusView = null, isFlagged = false,
+            saldoIsGram = isGram, lastOpnameDate = null, kategori = null, satuan = meta.satuan, meta = meta,
+        )
+
     /**
-     * Bug yang dilaporkan: saldo 2032 tersimpan dalam gram (`saldo_is_gram`), dulu
-     * tampil "2032 Kg" berstatus aman. Setelah dinormalkan: 2 Kg 32 Gram, dan
-     * dengan batas 5 Kg itu kritis (di bawah setengahnya).
+     * Angka dan status HARUS identik dengan kartu di layar Monitoring modul Stok:
+     * dihitung dari `MonitoringRow` yang sama, dipecah `decomposeTriUnit` yang sama.
      */
     @Test
     fun `saldo gram dinormalkan sebelum ditampilkan dan dibandingkan`() {
-        val b = bahanCabang("t", "TEPUNG", 2032.0, saldoIsGram = true, threshold = 5.0, meta = tepung)
-        assertEquals("2 Kg 32 Gram", b.saldoTeks)
+        val b = bahanCabang(baris(2032.0, true, 5.0, tepung))
+        assertEquals("2 Kg 32 Gr", b.saldoTeks)
         assertEquals("5 Kg", b.batasTeks)
         assertEquals(StatusStok.KRITIS, b.status)
     }
 
     @Test
     fun `saldo satuan besar legacy tidak dikali dua kali`() {
-        val b = bahanCabang("t", "TEPUNG", 4.0, saldoIsGram = false, threshold = 5.0, meta = tepung)
+        val b = bahanCabang(baris(4.0, false, 5.0, tepung))
         assertEquals("4 Kg", b.saldoTeks)
         assertEquals(StatusStok.MENIPIS, b.status)
     }
 
     @Test
-    fun `faktor kosong menampilkan angka mentah dengan satuan skala barisnya`() {
+    fun `faktor kosong menampilkan angka mentah seperti layar stok`() {
         val tanpaFaktor = tepung.copy(faktorTampilan = null)
-        val gram = bahanCabang("t", "TEPUNG", 2032.0, saldoIsGram = true, threshold = 5.0, meta = tanpaFaktor)
-        assertEquals("2032 Gram", gram.saldoTeks)
-        assertEquals("5 Kg", gram.batasTeks)
-        val besar = bahanCabang("t", "TEPUNG", 3.0, saldoIsGram = false, threshold = 5.0, meta = tanpaFaktor)
-        assertEquals("3 Kg", besar.saldoTeks)
+        assertEquals("2032 Kg", bahanCabang(baris(2032.0, true, 5.0, tanpaFaktor)).saldoTeks)
+        assertEquals(StatusStok.AMAN, bahanCabang(baris(2032.0, true, 5.0, tanpaFaktor)).status)
     }
 
-    /**
-     * Bug yang dilaporkan kedua: bahan bersatuan tengah tampil ngawur. BAWANG
-     * (1 Bal = 20 Kg = 20.000 Gram) bersaldo 1.500 gram dulu tertulis "75 Kg",
-     * padahal layar Stok menulis 0 Bal 1 Kg 500 Gram.
-     */
+    /** BAWANG: 1 Bal = 20 Kg = 20.000 Gram; 1.500 gram = 1 Kg 500 Gram, bukan "75 Kg". */
     @Test
     fun `saldo bersatuan tengah sama dengan layar stok`() {
         val bawang = UnitMeta(
             satuan = "Bal", satuanTengah = "Kg", satuanKecil = "Gram",
             faktorTengah = 20.0, faktorTampilan = 20000.0,
         )
-        val b = bahanCabang("b", "BAWANG", 1500.0, saldoIsGram = true, threshold = 1.0, meta = bawang)
-        assertEquals("1 Kg 500 Gram", b.saldoTeks)
+        val b = bahanCabang(baris(1500.0, true, 1.0, bawang, nama = "BAWANG"))
+        assertEquals("1 Kg 500 Gr", b.saldoTeks)
         assertEquals(StatusStok.KRITIS, b.status)
+    }
+
+    @Test
+    fun `saldo nol tetap menulis satuan besarnya`() {
+        assertEquals("0 Kg", bahanCabang(baris(0.0, true, 5.0, tepung)).saldoTeks)
+    }
+
+    /** Ambang porsi milik outlet ikut dipakai, sama seperti `MonitoringUiState.status`. */
+    @Test
+    fun `ambang marquee outlet diteruskan ke penentu status`() {
+        val b = bahanCabang(baris(9000.0, true, 5.0, tepung), marqueeWarning = 3)
+        assertEquals(StatusStok.AMAN, b.status)
     }
 
     /**
@@ -135,35 +147,12 @@ class StokCabangTest {
     @Test
     fun `saldo dan batas ditulis dengan satuannya`() {
         val b = bahan("Daging", StatusStok.AMAN, saldo = 12.5, batas = 5.0)
-        assertEquals("12,5 kg", b.saldoTeks)
+        assertEquals("12.5 kg", b.saldoTeks)
         assertEquals("5 kg", b.batasTeks)
     }
 
     @Test
     fun `bahan tanpa titik pesan ulang tidak mengarang batas minimal`() {
         assertNull(bahan("Daging", StatusStok.AMAN, batas = null).batasTeks)
-    }
-
-    @Test
-    fun `kuantitas membuang nol di belakang dan memakai koma desimal`() {
-        assertEquals("12", kuantitas(12.0))
-        assertEquals("12,5", kuantitas(12.5))
-        assertEquals("12,35", kuantitas(12.346))
-        assertEquals("0", kuantitas(0.0))
-    }
-
-    /**
-     * `12.345` sebagai `Double` sebenarnya bernilai 12.34499999999999975…, jadi
-     * pembulatannya turun ke 12,34 — bukan naik ke 12,35 seperti dugaan pertama.
-     *
-     * Dikunci di sini karena `toFixed(2)` di JavaScript membulatkan angka yang sama
-     * ke atas, sehingga satu bahan bisa tertulis beda satu sen antara HP dan laptop.
-     * Selisih itu tidak mengubah keputusan siapa pun soal stok, jadi tidak dikejar —
-     * tapi kalau suatu saat ada yang melaporkannya, penjelasannya ada di sini dan
-     * bukan misteri baru.
-     */
-    @Test
-    fun `pecahan yang jatuh tepat di tengah mengikuti nilai Double sesungguhnya`() {
-        assertEquals("12,34", kuantitas(12.345))
     }
 }
