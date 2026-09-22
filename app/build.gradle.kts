@@ -28,8 +28,8 @@ android {
         applicationId = "com.sukashawarma.superapp"
         minSdk = 26
         targetSdk = 34
-        versionCode = 25
-        versionName = "1.3.5"
+        versionCode = 26
+        versionName = "1.3.6"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
