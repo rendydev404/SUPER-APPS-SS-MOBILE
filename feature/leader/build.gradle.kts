@@ -37,6 +37,9 @@ dependencies {
     implementation(project(":core:ui"))
     implementation(project(":core:roles"))
     implementation(project(":core:network"))
+    // Normalisasi satuan saldo (UnitScale) dipinjam dari modul Stok supaya angka
+    // stok cabang di dashboard leader tidak pernah berbeda dari layar Stok.
+    implementation(project(":feature:stok"))
     implementation("androidx.navigation:navigation-compose:2.7.7")
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
