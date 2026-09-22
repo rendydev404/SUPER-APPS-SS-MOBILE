@@ -6,7 +6,8 @@ import com.sukashawarma.superapp.feature.leader.data.OutletLeader
 import com.sukashawarma.superapp.feature.leader.data.OutletLeaderRepository
 import com.sukashawarma.superapp.feature.leader.data.StokCabangRepository
 import com.sukashawarma.superapp.feature.leader.domain.BahanCabang
-import com.sukashawarma.superapp.feature.leader.domain.StatusStok
+import com.sukashawarma.superapp.feature.leader.domain.RingkasanStok
+import com.sukashawarma.superapp.feature.leader.domain.ringkasStok
 import com.sukashawarma.superapp.feature.leader.domain.saringStok
 import com.sukashawarma.superapp.feature.leader.ui.pesanGalatMuat
 import kotlinx.coroutines.CancellationException
@@ -28,8 +29,10 @@ data class StokUiState(
     // Lencana ringkasan dihitung dari SELURUH isi cabang, bukan dari hasil
     // pencarian: "3 kritis" harus tetap berbunyi tiga walau kotak cari sedang
     // menyaring satu nama.
-    val jumlahKritis: Int get() = semua.count { it.status == StatusStok.KRITIS }
-    val jumlahMenipis: Int get() = semua.count { it.status == StatusStok.MENIPIS }
+    // Rumusnya dipakai juga oleh kartu Stok Cabang di Ringkasan.
+    private val ringkas: RingkasanStok get() = ringkasStok(semua)
+    val jumlahKritis: Int get() = ringkas.kritis
+    val jumlahMenipis: Int get() = ringkas.menipis
 }
 
 /**
