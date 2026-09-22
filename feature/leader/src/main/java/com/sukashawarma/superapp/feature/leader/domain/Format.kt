@@ -29,22 +29,6 @@ fun rupiah(nilai: Long): String =
 /** Bilangan cacah dengan pemisah ribuan — untuk jumlah transaksi. */
 fun cacah(nilai: Int): String = ribuan(nilai.toLong())
 
-/**
- * Kuantitas stok: dua angka di belakang koma, nol di belakang dibuang.
- *
- * `12.0` menjadi `12`, `12.5` menjadi `12,5`, `12.345` menjadi `12,35` — cermin
- * `Number(qty.toFixed(2))` di halaman stok web, dengan koma desimal Indonesia.
- */
-fun kuantitas(nilai: Double): String {
-    val dibulatkan = kotlin.math.round(nilai * 100) / 100
-    val teks = if (dibulatkan == kotlin.math.floor(dibulatkan) && !dibulatkan.isInfinite()) {
-        dibulatkan.toLong().toString()
-    } else {
-        dibulatkan.toString().trimEnd('0').trimEnd('.')
-    }
-    return teks.replace('.', ',')
-}
-
 /** Hari ini menurut jam Jakarta — dasar seluruh batas "hari ini" di modul ini. */
 fun hariIniJakarta(): LocalDate = LocalDate.now(ZONA_JAKARTA)
 
