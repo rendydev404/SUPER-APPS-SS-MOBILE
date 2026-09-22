@@ -1,8 +1,11 @@
 package com.sukashawarma.superapp.feature.leader.domain
 
+import com.sukashawarma.superapp.feature.stok.data.model.MonitoringRow
 import com.sukashawarma.superapp.feature.stok.domain.StokStatus
-import com.sukashawarma.superapp.feature.stok.domain.UnitMeta
 import com.sukashawarma.superapp.feature.stok.domain.UnitScale
+import com.sukashawarma.superapp.feature.stok.domain.decomposeTriUnit
+import com.sukashawarma.superapp.feature.stok.domain.formatAngkaStok
+import com.sukashawarma.superapp.feature.stok.domain.formatSatuan
 
 /**
  * Tingkat kecukupan sebuah bahan di cabang.
@@ -43,46 +46,51 @@ data class BahanCabang(
     /** Saldo siap tampil ("2 Kg 32 Gram"); null = tulis [saldo] mentah dengan [satuan]. */
     val saldoBerjenjang: String? = null,
 ) {
-    val saldoTeks: String get() = saldoBerjenjang ?: "${kuantitas(saldo)} $satuan".trim()
+    val saldoTeks: String get() = saldoBerjenjang ?: "${formatAngkaStok(saldo)} $satuan".trim()
 
     /** Null saat bahan belum punya titik pesan ulang — layar menyebutnya "belum diatur". */
     val batasTeks: String?
-        get() = batasMinimal?.let { "${kuantitas(it)} $satuan".trim() }
+        get() = batasMinimal?.let { "${formatAngkaStok(it)} $satuan".trim() }
 }
 
 /**
- * Bangun [BahanCabang] dari satu baris `monitoring_view_scoped`.
+ * Bangun [BahanCabang] dari baris yang SAMA dengan kartu di layar Monitoring modul
+ * Stok: status lewat [MonitoringRow.status] dengan ambang porsi outlet, saldo dipecah
+ * [decomposeTriUnit] (port `compositeUnit.ts` web) lalu ditulis dengan
+ * [formatAngkaStok]/[formatSatuan] — angka yang tampil di sini dan di sana identik.
  *
- * `current_qty` berskala campuran: satuan terkecil bila [saldoIsGram], satuan besar
- * bila tidak. Membacanya mentah membuat 2.032 gram tepung tampil "2032 Kg" dan
- * statusnya ikut salah. Normalisasinya memakai [UnitScale] milik modul Stok, jadi
- * angka dan status di sini identik dengan layar Stok.
- *
- * Bila faktor satuan tidak dapat dipakai, saldo ditampilkan mentah dengan satuan
- * yang sesuai skala barisnya — bukan ditebak.
+ * Jenjang bernilai nol dilewati supaya muat satu baris; bila semuanya nol,
+ * ditulis "0" pada satuan besarnya.
  */
 fun bahanCabang(
-    id: String,
-    nama: String,
-    currentQty: Double,
-    saldoIsGram: Boolean,
-    threshold: Double?,
-    meta: UnitMeta,
+    row: MonitoringRow,
+    marqueeWarning: Int = UnitScale.DEFAULT_MARQUEE_WARNING,
 ): BahanCabang {
-    val saldoNorm = UnitScale.normalizeSaldo(currentQty, saldoIsGram, meta)
-    val thresholdNorm = UnitScale.normalizeThreshold(threshold, meta)
-    val berjenjang = saldoNorm?.let { UnitScale.formatBerjenjang(it, meta) }
-        ?: if (saldoIsGram) "${kuantitas(currentQty)} ${meta.satuanKecil.orEmpty()}".trim() else null
+    val tri = decomposeTriUnit(
+        qty = row.currentQty,
+        saldoIsGram = row.saldoIsGram,
+        satuanTengah = row.meta.satuanTengah,
+        faktorTengah = row.meta.faktorTengah,
+        satuanKecil = row.meta.satuanKecil,
+        faktorTampilan = row.meta.faktorTampilan,
+    )
+    val jenjang = buildList {
+        if (tri.besar != 0.0) add("${formatAngkaStok(tri.besar)} ${formatSatuan(row.meta.satuan)}")
+        if (row.meta.satuanTengah != null && tri.tengah != 0.0) {
+            add("${formatAngkaStok(tri.tengah)} ${formatSatuan(row.meta.satuanTengah)}")
+        }
+        if (row.meta.satuanKecil != null && tri.kecil != 0.0) {
+            add("${formatAngkaStok(tri.kecil)} ${formatSatuan(row.meta.satuanKecil)}")
+        }
+    }.ifEmpty { listOf("0 ${formatSatuan(row.meta.satuan)}") }
     return BahanCabang(
-        id = id,
-        nama = nama,
-        saldo = currentQty,
-        // Satuan besar: dipakai batasTeks (threshold selalu di satuan besar) dan
-        // fallback saldo baris non-gram.
-        satuan = meta.satuan.orEmpty(),
-        batasMinimal = threshold,
-        status = StatusStok.dariSkala(UnitScale.status(saldoNorm, thresholdNorm)),
-        saldoBerjenjang = berjenjang,
+        id = row.bahanBakuId,
+        nama = row.itemName,
+        saldo = row.currentQty,
+        satuan = formatSatuan(row.satuan),
+        batasMinimal = row.threshold,
+        status = StatusStok.dariSkala(row.status(marqueeWarning = marqueeWarning)),
+        saldoBerjenjang = jenjang.joinToString(" ").trim(),
     )
 }
 
