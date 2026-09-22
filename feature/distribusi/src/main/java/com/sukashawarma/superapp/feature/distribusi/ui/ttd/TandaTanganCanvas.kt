@@ -4,7 +4,8 @@ import android.graphics.Bitmap
 import android.util.Base64
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,13 +17,20 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import java.io.ByteArrayOutputStream
@@ -45,50 +53,86 @@ fun bitmapKeDataUrlPng(bitmap: Bitmap): String {
  * Papan goresan tanda tangan. Jalur direkam sebagai daftar titik, lalu
  * dirender ulang ke `Bitmap` saat disimpan — merender dari data yang sama
  * dengan yang dilihat pengguna, bukan menangkap ulang layar.
+ *
+ * Performa: tiap goresan disimpan sebagai satu `Path` (satu draw call per
+ * goresan, bukan satu `drawLine` per titik). Gerakan jari hanya menaikkan
+ * [versi], yang dibaca di dalam fase draw — jadi menggores tidak pernah
+ * memicu recomposition, cukup redraw kanvas ini saja.
  */
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun TandaTanganCanvas(onSelesai: (String) -> Unit, onBatal: () -> Unit) {
-    val jalur = remember { mutableStateListOf<MutableList<Offset>>() }
+    // Sumber kebenaran untuk ekspor PNG; sengaja bukan state.
+    val jalur = remember { ArrayList<ArrayList<Offset>>() }
+    val garis = remember { ArrayList<Path>() }
+    val versi = remember { mutableIntStateOf(0) }
+    var adaGoresan by remember { mutableStateOf(false) }
+    val kuas = remember { Stroke(width = 4f, cap = StrokeCap.Round, join = StrokeJoin.Round) }
 
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Canvas(
             Modifier.fillMaxWidth().height(180.dp)
                 .clip(RoundedCornerShape(14.dp)).background(Color.White)
                 .pointerInput(Unit) {
-                    detectDragGestures(
-                        onDragStart = { titik -> jalur.add(mutableListOf(titik)) },
-                        onDrag = { perubahan, _ ->
+                    awaitEachGesture {
+                        // Tanpa touch slop: goresan mulai tepat di titik sentuh,
+                        // dan konsumsi langsung mencegah LazyColumn induk ikut menggulir.
+                        val turun = awaitFirstDown()
+                        turun.consume()
+                        val titik = arrayListOf(turun.position)
+                        val path = Path().apply { moveTo(turun.position.x, turun.position.y) }
+                        jalur.add(titik)
+                        garis.add(path)
+                        versi.intValue++
+
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val perubahan = event.changes.firstOrNull { it.id == turun.id } ?: break
+                            if (!perubahan.pressed) break
+                            // Titik historis = sampel sentuhan di antara dua frame;
+                            // tanpa ini garis cepat terlihat patah-patah.
+                            perubahan.historical.forEach { tambahTitik(titik, path, it.position) }
+                            tambahTitik(titik, path, perubahan.position)
                             perubahan.consume()
-                            jalur.lastOrNull()?.add(perubahan.position)
-                        },
-                    )
+                            versi.intValue++
+                        }
+                        if (!adaGoresan && titik.size > 1) adaGoresan = true
+                    }
                 }
         ) {
-            jalur.forEach { garis ->
-                for (i in 1 until garis.size) {
-                    drawLine(
-                        color = Color.Black,
-                        start = garis[i - 1],
-                        end = garis[i],
-                        strokeWidth = 4f,
-                        cap = StrokeCap.Round,
-                    )
-                }
-            }
+            versi.intValue // baca di fase draw: invalidasi hanya menggambar ulang
+            garis.forEach { drawPath(it, Color.Black, style = kuas) }
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { jalur.clear() }, modifier = Modifier.weight(1f)) {
+            OutlinedButton(
+                onClick = {
+                    jalur.clear()
+                    garis.clear()
+                    adaGoresan = false
+                    versi.intValue++
+                },
+                modifier = Modifier.weight(1f),
+            ) {
                 Text("Hapus")
             }
             OutlinedButton(onClick = onBatal, modifier = Modifier.weight(1f)) { Text("Batal") }
             Button(
                 onClick = { onSelesai(bitmapKeDataUrlPng(renderJalur(jalur, 600, 240))) },
-                enabled = jalur.any { it.size > 1 },
+                enabled = adaGoresan,
                 modifier = Modifier.weight(1f),
             ) { Text("Simpan") }
         }
     }
+}
+
+/** Kurva kuadratik lewat titik tengah: garis halus tanpa sudut patah,
+ *  dengan biaya yang sama dengan `lineTo`. */
+private fun tambahTitik(titik: ArrayList<Offset>, path: Path, baru: Offset) {
+    val lama = titik.last()
+    if (lama == baru) return
+    path.quadraticBezierTo(lama.x, lama.y, (lama.x + baru.x) / 2f, (lama.y + baru.y) / 2f)
+    titik.add(baru)
 }
 
 /** Menggambar ulang jalur ke bitmap berlatar putih pada ukuran tetap, supaya
