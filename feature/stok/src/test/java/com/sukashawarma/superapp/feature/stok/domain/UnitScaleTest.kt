@@ -10,8 +10,17 @@ class UnitScaleTest {
         satuan = "kg",
         satuanTengah = "pak",
         satuanKecil = "gr",
-        faktorTengah = 250.0,
+        faktorTengah = 4.0, // 4 pak per kg -> 250 gr per pak
         faktorTampilan = 1000.0,
+    )
+
+    /** Data nyata `bahan_baku`: 1 Bal = 20 Kg = 20.000 Gram. */
+    private val bawang = UnitMeta(
+        satuan = "Bal",
+        satuanTengah = "Kg",
+        satuanKecil = "Gram",
+        faktorTengah = 20.0,
+        faktorTampilan = 20000.0,
     )
 
     @Test
@@ -98,5 +107,16 @@ class UnitScaleTest {
     @Test
     fun `format berjenjang menyerah bila faktor tidak memadai`() {
         assertNull(UnitScale.formatBerjenjang(2280.0, kg.copy(faktorTampilan = null)))
+    }
+
+    /**
+     * `faktor_tengah` = jumlah satuan tengah dalam SATU satuan besar, sama seperti
+     * `decomposeTriUnit` (port web). Dulu dibaca sebagai gram per satuan tengah,
+     * sehingga 1.500 gram bawang tampil "75 Kg" di Stok Cabang leader.
+     */
+    @Test
+    fun `format berjenjang membaca faktor tengah sebagai jumlah tengah per besar`() {
+        assertEquals("1 Kg 500 Gram", UnitScale.formatBerjenjang(1500.0, bawang))
+        assertEquals("2 Bal 3 Kg 250 Gram", UnitScale.formatBerjenjang(43250.0, bawang))
     }
 }
