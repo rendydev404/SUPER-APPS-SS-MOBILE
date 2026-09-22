@@ -293,8 +293,12 @@ private fun BarisStatKecil(data: RingkasanLeader) {
             )
             KartuAngka(
                 judul = "Stok Cabang",
-                nilai = cacah(data.jumlahItemStok),
-                keterangan = "Bahan tersedia",
+                nilai = "${cacah(data.stok.kritis)} Kritis",
+                keterangan = if (data.stok.kritis == 0 && data.stok.menipis == 0) {
+                    "Semua aman"
+                } else {
+                    "${cacah(data.stok.menipis)} menipis"
+                },
                 ikon = Icons.Default.Inventory2,
                 warnaIkon = AMBER,
                 modifier = Modifier.weight(1f),
