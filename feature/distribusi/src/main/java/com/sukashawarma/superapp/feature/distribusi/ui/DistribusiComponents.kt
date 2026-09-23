@@ -1,9 +1,6 @@
 package com.sukashawarma.superapp.feature.distribusi.ui
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,36 +8,32 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Inbox
-import androidx.compose.material.icons.filled.WarningAmber
-import androidx.compose.material3.Button
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.sukashawarma.superapp.core.ui.ios.KartuIos
+import com.sukashawarma.superapp.core.ui.ios.KeadaanIos
+import com.sukashawarma.superapp.core.ui.ios.LencanaIos
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.TombolKeduaIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
 import com.sukashawarma.superapp.feature.distribusi.data.model.SuratJalanRingkas
 import com.sukashawarma.superapp.feature.distribusi.domain.StatusSuratJalan
-import com.sukashawarma.superapp.presentation.theme.SukaGray100
-import com.sukashawarma.superapp.presentation.theme.SukaGray500
-import com.sukashawarma.superapp.presentation.theme.SukaOnSurface
-import com.sukashawarma.superapp.presentation.theme.SukaOrange
-import com.sukashawarma.superapp.presentation.theme.SukaSurface
 import java.time.OffsetDateTime
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 private val BULAN = arrayOf(
     "Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des",
@@ -68,34 +61,17 @@ fun formatTanggal(iso: String?): String {
     return "${tanggal.dayOfMonth} ${BULAN[tanggal.monthValue - 1]} ${tanggal.year}"
 }
 
-private val HijauTeks = Color(0xFF0A7D2C)
-private val HijauLatar = Color(0xFFE7F6EC)
-private val BiruTeks = Color(0xFF1D4ED8)
-private val BiruLatar = Color(0xFFE6EDFD)
-private val MerahTeks = Color(0xFFB91C1C)
-private val MerahLatar = Color(0xFFFDECEC)
-private val AbuTeks = Color(0xFF6B7280)
-
 @Composable
 fun LencanaStatus(status: StatusSuratJalan?, adaSelisih: Boolean) {
-    val (teks, warnaTeks, warnaLatar) = when {
-        status == null -> Triple("Tidak Dikenal", AbuTeks, SukaGray100)
-        adaSelisih && status.nilai.startsWith("diterima") ->
-            Triple("Ada Selisih", MerahTeks, MerahLatar)
-        status == StatusSuratJalan.SELESAI -> Triple(status.label, HijauTeks, HijauLatar)
-        status == StatusSuratJalan.DITERIMA_LENGKAP -> Triple(status.label, HijauTeks, HijauLatar)
-        status == StatusSuratJalan.DITERIMA_SEBAGIAN -> Triple(status.label, MerahTeks, MerahLatar)
-        else -> Triple(status.label, BiruTeks, BiruLatar)
+    val (teks, nada) = when {
+        status == null -> "Tidak Dikenal" to NadaIos.NETRAL
+        adaSelisih && status.nilai.startsWith("diterima") -> "Ada Selisih" to NadaIos.BAHAYA
+        status == StatusSuratJalan.SELESAI -> status.label to NadaIos.SUKSES
+        status == StatusSuratJalan.DITERIMA_LENGKAP -> status.label to NadaIos.SUKSES
+        status == StatusSuratJalan.DITERIMA_SEBAGIAN -> status.label to NadaIos.BAHAYA
+        else -> status.label to NadaIos.INFO
     }
-    Surface(shape = RoundedCornerShape(50), color = warnaLatar) {
-        Text(
-            teks,
-            Modifier.padding(horizontal = 9.dp, vertical = 3.dp),
-            color = warnaTeks,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.ExtraBold,
-        )
-    }
+    LencanaIos(teks, nada)
 }
 
 /**
@@ -109,79 +85,68 @@ fun KartuSuratJalan(
     onKlik: () -> Unit,
     onAksi: (() -> Unit)? = null,
 ) {
-    Surface(
-        Modifier.fillMaxWidth().clickable(onClick = onKlik),
-        shape = RoundedCornerShape(18.dp),
-        color = Color.White,
-        border = BorderStroke(1.dp, SukaOrange.copy(alpha = 0.18f)),
-    ) {
-        Column(Modifier.padding(14.dp)) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    KartuIos(onKlik = onKlik) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.size(40.dp).clip(CircleShape).background(WarnaIos.Aksen.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(IkonIos.Description, null, tint = WarnaIos.Aksen, modifier = Modifier.size(20.dp))
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
                 Text(
                     "SJ ${baris.nomorDokumen ?: baris.id.take(8).uppercase()}",
-                    Modifier.weight(1f),
-                    color = SukaOnSurface,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.ExtraBold,
+                    style = TipeIos.Utama,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                LencanaStatus(baris.status, baris.adaSelisih)
+                Text(
+                    "${baris.namaOutlet ?: "Gudang Pusat"} · ${formatTanggal(baris.dibuatPada)}",
+                    style = TipeIos.Catatan,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
-            Spacer(Modifier.height(6.dp))
-            Text(
-                baris.namaOutlet ?: "Gudang Pusat",
-                color = SukaGray500,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(formatTanggal(baris.dibuatPada), color = SukaGray500, fontSize = 11.sp)
-            if (aksiLabel != null && onAksi != null) {
-                Spacer(Modifier.height(10.dp))
-                Button(onClick = onAksi, modifier = Modifier.fillMaxWidth()) {
-                    Text(aksiLabel, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    Icon(Icons.Default.ChevronRight, null)
-                }
-            }
+            Spacer(Modifier.width(8.dp))
+            LencanaStatus(baris.status, baris.adaSelisih)
+        }
+        if (aksiLabel != null && onAksi != null) {
+            Spacer(Modifier.height(12.dp))
+            TombolKeduaIos(aksiLabel, onAksi, ikon = IkonIos.CheckCircle)
         }
     }
 }
 
 @Composable
-fun LayarKosong(judul: String, keterangan: String) {
-    Column(
-        Modifier.fillMaxSize().background(SukaSurface).padding(32.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Icon(Icons.Default.Inbox, null, tint = SukaGray500, modifier = Modifier.height(44.dp))
-        Spacer(Modifier.height(12.dp))
-        Text(judul, color = SukaOnSurface, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
-        Spacer(Modifier.height(6.dp))
-        Text(keterangan, color = SukaGray500, fontSize = 12.sp)
+fun LayarKosong(
+    judul: String,
+    keterangan: String,
+    ikon: ImageVector = IkonIos.Inbox,
+    nada: NadaIos = NadaIos.NETRAL,
+) {
+    Box(Modifier.fillMaxSize().background(WarnaIos.Latar), contentAlignment = Alignment.Center) {
+        KeadaanIos(ikon, judul, keterangan, nada = nada)
     }
 }
 
 @Composable
 fun LayarGalat(pesan: String, onCobaLagi: () -> Unit) {
-    Column(
-        Modifier.fillMaxSize().background(SukaSurface).padding(32.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Icon(Icons.Default.WarningAmber, null, tint = MerahTeks, modifier = Modifier.height(44.dp))
-        Spacer(Modifier.height(12.dp))
-        Text(pesan, color = SukaOnSurface, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-        Spacer(Modifier.height(14.dp))
-        Button(onClick = onCobaLagi) { Text("Coba Lagi") }
+    Box(Modifier.fillMaxSize().background(WarnaIos.Latar), contentAlignment = Alignment.Center) {
+        KeadaanIos(
+            IkonIos.CloudOff,
+            "Gagal memuat",
+            pesan,
+            nada = NadaIos.BAHAYA,
+            teksAksi = "Coba Lagi",
+            onAksi = onCobaLagi,
+        )
     }
 }
 
 @Composable
 fun LayarMemuat() {
-    Box(Modifier.fillMaxSize().background(SukaSurface), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator(color = SukaOrange)
+    Box(Modifier.fillMaxSize().background(WarnaIos.Latar), contentAlignment = Alignment.Center) {
+        CircularProgressIndicator(color = WarnaIos.Aksen)
     }
 }
