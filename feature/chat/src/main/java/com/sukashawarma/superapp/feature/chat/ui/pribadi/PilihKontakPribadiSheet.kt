@@ -1,5 +1,15 @@
 package com.sukashawarma.superapp.feature.chat.ui.pribadi
 
+import androidx.compose.foundation.lazy.itemsIndexed
+import com.sukashawarma.superapp.core.ui.ios.KeadaanIos
+import com.sukashawarma.superapp.core.ui.ios.KolomCariIos
+import com.sukashawarma.superapp.core.ui.ios.LabelSeksiIos
+import com.sukashawarma.superapp.core.ui.ios.PemisahIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.TombolBundarIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -75,7 +85,7 @@ fun PilihKontakPribadiSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = Color(0xFFF2F2F7),
+        containerColor = WarnaIos.Latar,
         shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
     ) {
         Column(
@@ -92,39 +102,22 @@ fun PilihKontakPribadiSheet(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Chat Pribadi Baru",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF1C1C1E)
+                        style = TipeIos.Judul2,
                     )
                     Text(
                         text = "Pilih staf atau rekan kerja untuk mulai mengobrol",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF8E8E93)
+                        style = TipeIos.Catatan,
                     )
                 }
-                IconButton(onClick = onDismiss) {
-                    Icon(imageVector = Icons.Default.Close, contentDescription = "Tutup", tint = Color(0xFF8E8E93))
-                }
+                TombolBundarIos(IkonIos.Close, "Tutup", onDismiss, warnaIkon = WarnaIos.LabelKedua)
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Kolom Pencarian iOS style
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                placeholder = { Text("Cari nama, cabang, atau jabatan...", fontSize = 14.sp) },
-                leadingIcon = {
-                    Icon(imageVector = Icons.Default.Search, contentDescription = null, tint = Color(0xFF8E8E93))
-                },
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = Color.White,
-                    unfocusedContainerColor = Color.White,
-                    focusedBorderColor = Color(0xFF007AFF),
-                    unfocusedBorderColor = Color(0xFFE5E5EA),
-                ),
+            KolomCariIos(
+                nilai = query,
+                onUbah = { query = it },
+                placeholder = "Cari nama, cabang, atau jabatan...",
                 modifier = Modifier.fillMaxWidth()
             )
 
@@ -137,43 +130,29 @@ fun PilihKontakPribadiSheet(
                         .height(200.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(color = Color(0xFF007AFF))
+                    CircularProgressIndicator(color = WarnaIos.Biru)
                 }
             } else if (filtered.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(180.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = if (query.isNotBlank()) "Tidak ada kontak yang cocok dengan '$query'" else "Belum ada kontak tersedia",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFF8E8E93)
-                    )
-                }
+                KeadaanIos(
+                    ikon = if (query.isNotBlank()) IkonIos.Search else IkonIos.Person,
+                    judul = if (query.isNotBlank()) "Tidak ada kontak yang cocok dengan '$query'" else "Belum ada kontak tersedia",
+                    pesan = "",
+                )
             } else {
-                Text(
-                    text = "KONTAK (${filtered.size})",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF8E8E93),
-                    modifier = Modifier.padding(bottom = 8.dp)
+                LabelSeksiIos(
+                    "Kontak (${filtered.size})",
+                    Modifier.padding(start = 16.dp, bottom = 7.dp)
                 )
 
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Color.White)
+                        .clip(UkuranIos.SudutGrup)
+                        .background(WarnaIos.Kartu)
                 ) {
-                    items(filtered, key = { it.id }) { kontak ->
+                    itemsIndexed(filtered, key = { _, it -> it.id }) { i, kontak ->
                         BarisKontak(kontak = kontak, onClick = { onPilihKontak(kontak) })
-                        HorizontalDivider(
-                            color = Color(0xFFF2F2F7),
-                            thickness = 1.dp,
-                            modifier = Modifier.padding(start = 68.dp)
-                        )
+                        if (i < filtered.lastIndex) PemisahIos(inset = 70.dp)
                     }
                 }
             }
@@ -205,16 +184,14 @@ private fun BarisKontak(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = kontak.nama,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 15.sp,
-                color = Color(0xFF1C1C1E)
+                style = TipeIos.Utama,
+                fontSize = 16.sp,
             )
             val peran = labelRole(kontak.role)
             val outlet = kontak.outlet?.takeIf { it.isNotBlank() } ?: "Pusat"
             Text(
                 text = "$peran • $outlet",
-                fontSize = 13.sp,
-                color = Color(0xFF8E8E93)
+                style = TipeIos.Catatan,
             )
         }
     }
