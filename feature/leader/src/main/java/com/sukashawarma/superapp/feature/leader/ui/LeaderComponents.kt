@@ -1,43 +1,45 @@
 package com.sukashawarma.superapp.feature.leader.ui
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.sukashawarma.superapp.presentation.theme.SukaBrown
-import com.sukashawarma.superapp.presentation.theme.SukaGray400
-import com.sukashawarma.superapp.presentation.theme.SukaOrange
+import com.sukashawarma.superapp.core.ui.ios.BilahJudulIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.TombolBundarIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.ios.permukaanIos
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
 
 /**
  * Potongan tampilan yang dipakai lebih dari satu layar modul Leader.
  *
- * Nilai warna dan sudutnya adalah terjemahan langsung kelas Tailwind halaman web
- * (`rounded-[20px]`, `ring-1 ring-slate-100`, dst) supaya dua layar yang
- * menampilkan angka yang sama juga terlihat sama.
+ * Seluruhnya disusun dari token design system iOS di `core.ui.ios`, jadi kartu di sini
+ * serasi dengan modul lain walau tata letaknya tetap mengikuti halaman leader web.
+ * Yang ada di berkas ini hanyalah bentuk yang TIDAK disediakan core — petak angka
+ * berketerangan, bilah progres, dan keadaan kosong di dalam daftar.
  *
  * Sengaja tidak berbagi berkas dengan `feature/manager`: kedua modul tidak saling
  * bergantung, pola yang sama dipakai `ModulAkses` di beranda. Satu himpunan kecil
@@ -45,62 +47,25 @@ import com.sukashawarma.superapp.presentation.theme.SukaOrange
  * hanya demi sebuah kartu putih.
  */
 
-/** Garis batas kartu: `ring-slate-100` web. */
-val GarisKartu = SukaBrown.copy(alpha = 0.10f)
-
-val HijauLatar = Color(0xFFD1FAE5)
-val HijauGaris = Color(0xFFA7F3D0)
-val HijauTeks = Color(0xFF065F46)
-val MerahLatar = Color(0xFFFEE2E2)
-val MerahGaris = Color(0xFFFECACA)
-val MerahTeks = Color(0xFFB91C1C)
-val AmberLatar = Color(0xFFFEF3C7)
-val AmberGaris = Color(0xFFFCD34D)
-val AmberTeks = Color(0xFF92400E)
-val BiruLatar = Color(0xFFDBEAFE)
-val BiruGaris = Color(0xFFBFDBFE)
-val BiruTeks = Color(0xFF1D4ED8)
-
-/** Kartu putih bersudut 20dp — bentuk dasar setiap panel di halaman leader web. */
+/**
+ * Bilah judul keempat layar Leader: kembali di kiri, muat ulang di kanan.
+ *
+ * Satu tempat supaya keempat tab tidak bisa berbeda tinggi atau letak tombolnya —
+ * berpindah tab yang judulnya melompat terasa seperti membuka aplikasi lain.
+ */
 @Composable
-fun KartuPanel(
-    modifier: Modifier = Modifier,
-    isi: @Composable ColumnScope.() -> Unit,
-) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        color = Color.White,
-        border = BorderStroke(1.dp, GarisKartu),
-        shadowElevation = 2.dp,
-    ) {
-        Column(Modifier.padding(18.dp), content = isi)
+fun BilahJudulLeader(judul: String, onKembali: () -> Unit, onMuatUlang: () -> Unit) {
+    BilahJudulIos(judul = judul, onKembali = onKembali) {
+        TombolBundarIos(IkonIos.Refresh, "Muat ulang", onMuatUlang)
     }
-}
-
-/** Kepala panel: judul huruf besar dengan keterangan opsional di kanan. */
-@Composable
-fun JudulPanel(judul: String, keterangan: String? = null) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            judul.uppercase(),
-            Modifier.weight(1f),
-            color = SukaBrown,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Black,
-            letterSpacing = 0.8.sp,
-        )
-        if (keterangan != null) {
-            Text(keterangan, color = SukaGray400, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-        }
-    }
-    Spacer(Modifier.height(12.dp))
-    HorizontalDivider(color = GarisKartu)
-    Spacer(Modifier.height(14.dp))
 }
 
 /**
- * Kartu angka: label kecil, ikon berwarna, angka besar, lalu satu baris keterangan.
+ * Petak angka: ikon dalam lingkaran berwarna dan label, angka besar, lalu satu baris
+ * keterangan — bahasa [com.sukashawarma.superapp.core.ui.ios.PetakStatIos], tetapi
+ * angkanya di baris sendiri. Nominal rupiah terlalu lebar untuk diletakkan di samping
+ * ikon pada petak selebar setengah layar, dan keterangannya membawa informasi yang
+ * tidak boleh hilang ("3 menipis", "terakhir 14.05").
  *
  * [warnaNilai] dipisah dari [warnaIkon] karena saldo petty cash yang kritis berubah
  * merah sementara ikonnya tetap hijau — persis seperti di web.
@@ -113,45 +78,44 @@ fun KartuAngka(
     ikon: ImageVector,
     warnaIkon: Color,
     modifier: Modifier = Modifier,
-    warnaNilai: Color = SukaBrown,
+    warnaNilai: Color = WarnaIos.Label,
     ukuranNilai: Int = 26,
     tambahan: @Composable (() -> Unit)? = null,
 ) {
-    KartuPanel(modifier) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-            Text(
-                judul.uppercase(),
-                Modifier.weight(1f).padding(end = 8.dp),
-                color = SukaGray400,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Black,
-                letterSpacing = 0.7.sp,
-            )
+    Column(
+        modifier
+            .fillMaxWidth()
+            .permukaanIos(UkuranIos.SudutPetak)
+            .padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 12.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
-                Modifier.size(34.dp).background(warnaIkon.copy(alpha = 0.10f), RoundedCornerShape(12.dp)),
+                Modifier.size(30.dp).clip(CircleShape).background(warnaIkon),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(ikon, null, tint = warnaIkon, modifier = Modifier.size(17.dp))
+                Icon(IkonIos.aktif(ikon), null, tint = Color.White, modifier = Modifier.size(17.dp))
             }
+            Spacer(Modifier.width(10.dp))
+            Text(
+                judul,
+                Modifier.weight(1f),
+                color = WarnaIos.LabelKedua,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                lineHeight = 17.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
         Spacer(Modifier.height(10.dp))
         Text(
             nilai,
-            color = warnaNilai,
-            fontSize = ukuranNilai.sp,
-            fontWeight = FontWeight.Black,
+            style = TipeIos.AngkaBesar.copy(fontSize = ukuranNilai.sp, color = warnaNilai),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        Spacer(Modifier.height(3.dp))
-        Text(
-            keterangan,
-            color = SukaGray400,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Medium,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Spacer(Modifier.height(2.dp))
+        Text(keterangan, style = TipeIos.Catatan, maxLines = 2, overflow = TextOverflow.Ellipsis)
         if (tambahan != null) {
             Spacer(Modifier.height(8.dp))
             tambahan()
@@ -159,79 +123,45 @@ fun KartuAngka(
     }
 }
 
-/** Pil status berwarna — dipakai badge pengajuan, status pesanan, dan tingkat stok. */
-@Composable
-fun PilStatus(
-    teks: String,
-    latar: Color,
-    garis: Color,
-    warnaTeks: Color,
-    ikon: ImageVector? = null,
-) {
-    Surface(
-        shape = RoundedCornerShape(50),
-        color = latar,
-        border = BorderStroke(1.dp, garis),
-    ) {
-        Row(
-            Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (ikon != null) {
-                Icon(ikon, null, tint = warnaTeks, modifier = Modifier.size(12.dp))
-                Spacer(Modifier.width(4.dp))
-            }
-            Text(
-                teks.uppercase(),
-                color = warnaTeks,
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Black,
-                letterSpacing = 0.6.sp,
-                maxLines = 1,
-            )
-        }
-    }
-}
-
-/** Bilah pencapaian target. Hijau begitu target terlampaui, jingga selama masih di jalan. */
+/** Bilah pencapaian target. Hijau begitu target terlampaui, aksen selama masih di jalan. */
 @Composable
 fun BarProgres(rasio: Float, tercapai: Boolean, modifier: Modifier = Modifier) {
     Box(
         modifier
             .fillMaxWidth()
-            .height(12.dp)
-            .clip(RoundedCornerShape(50))
-            .background(SukaBrown.copy(alpha = 0.08f)),
+            .height(8.dp)
+            .clip(UkuranIos.SudutKapsul)
+            .background(WarnaIos.Isian),
     ) {
         Box(
             Modifier
                 .fillMaxWidth(rasio.coerceIn(0f, 1f))
-                .height(12.dp)
-                .clip(RoundedCornerShape(50))
-                .background(
-                    if (tercapai) {
-                        Brush.horizontalGradient(listOf(Color(0xFF10B981), Color(0xFF059669)))
-                    } else {
-                        Brush.horizontalGradient(listOf(SukaOrange, Color(0xFFF59E0B)))
-                    }
-                ),
+                .fillMaxHeight()
+                .clip(UkuranIos.SudutKapsul)
+                .background(if (tercapai) WarnaIos.Hijau else WarnaIos.Aksen),
         )
     }
 }
 
-/** Baris kosong yang seragam untuk panel tanpa data. */
+/**
+ * Keadaan kosong yang seragam untuk daftar dan panel tanpa data.
+ *
+ * Versi ringkas `KeadaanIos`: hanya satu kalimat, karena di sini kekosongan adalah
+ * bagian dari layar yang tetap berisi, bukan seluruh layar yang gagal.
+ */
 @Composable
-fun PanelKosong(teks: String) {
-    Box(Modifier.fillMaxWidth().padding(vertical = 28.dp), contentAlignment = Alignment.Center) {
-        Text(
-            teks,
-            color = SukaGray400,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-        )
+fun PanelKosong(teks: String, ikon: ImageVector = IkonIos.Inbox) {
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            Modifier.size(48.dp).clip(CircleShape).background(WarnaIos.Isian),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(ikon, null, tint = WarnaIos.Abu, modifier = Modifier.size(23.dp))
+        }
+        Spacer(Modifier.height(10.dp))
+        Text(teks, style = TipeIos.SubJudul, textAlign = TextAlign.Center)
     }
 }
-
-/** Jarak antar panel — `space-y-6` web. */
-@Composable
-fun JarakPanel() = Spacer(Modifier.height(16.dp))
