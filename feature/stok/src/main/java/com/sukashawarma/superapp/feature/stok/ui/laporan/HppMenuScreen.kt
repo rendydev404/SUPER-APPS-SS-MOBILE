@@ -1,8 +1,22 @@
 package com.sukashawarma.superapp.feature.stok.ui.laporan
 
-import androidx.compose.foundation.BorderStroke
+import com.sukashawarma.superapp.core.ui.ios.KartuIos
+import com.sukashawarma.superapp.core.ui.ios.KolomCariIos
+import com.sukashawarma.superapp.core.ui.ios.LabelSeksiIos
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.PemisahIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.TombolBundarIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.feature.stok.ui.BannerIos
+import com.sukashawarma.superapp.feature.stok.ui.MemuatPenuh
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
+import com.sukashawarma.superapp.core.ui.kaca.denganRuangNav
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,22 +29,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -52,11 +56,6 @@ import kotlinx.coroutines.launch
 import com.sukashawarma.superapp.core.ui.RealtimeRefresh
 import com.sukashawarma.superapp.core.ui.RealtimeTables
 
-private val ORANGE = Color(0xFFEA580C)
-private val SLATE400 = Color(0xFF94A3B8)
-private val SLATE500 = Color(0xFF64748B)
-private val SLATE900 = Color(0xFF0F172A)
-private val GARIS = Color(0xFFE2E8F0)
 
 data class HppMenuUiState(
     val menu: List<MenuHpp> = emptyList(),
@@ -120,7 +119,7 @@ fun HppMenuScreen(
     // HPP menu ikut bergeser begitu harga bahan diperbarui area manager.
     RealtimeRefresh(RealtimeTables.BAHAN_BAKU_HARGA, RealtimeTables.BAHAN_BAKU) { viewModel.muatUlang() }
 
-    Column(Modifier.fillMaxSize().background(Color(0xFFF8FAFC))) {
+    Column(Modifier.fillMaxSize().background(WarnaIos.Latar)) {
         HeaderStok(
             judul = "HPP Setiap Menu",
             subjudul = when {
@@ -130,39 +129,27 @@ fun HppMenuScreen(
             },
             onKembali = onBack,
             aksi = {
-                IconButton(onClick = viewModel::muatUlang) {
-                    Icon(Icons.Default.Refresh, "Muat ulang", tint = Color(0xFF1E293B))
-                }
+                TombolBundarIos(IkonIos.Refresh, "Muat ulang", viewModel::muatUlang)
             },
         )
 
         when {
-            state.memuat -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = ORANGE)
-            }
+            state.memuat -> MemuatPenuh()
             state.error != null -> PesanKosongLaporan(state.error!!)
             else -> Column(Modifier.fillMaxSize()) {
-                OutlinedTextField(
-                    value = state.cari,
-                    onValueChange = viewModel::ubahCari,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                    placeholder = { Text("Cari menu atau kategori…", fontSize = 12.5.sp, color = SLATE400) },
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = Color.White,
-                        unfocusedContainerColor = Color.White,
-                        focusedBorderColor = ORANGE,
-                        unfocusedBorderColor = GARIS,
-                    ),
+                KolomCariIos(
+                    nilai = state.cari,
+                    onUbah = viewModel::ubahCari,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = UkuranIos.TepiLayar, vertical = 12.dp),
+                    placeholder = "Cari menu atau kategori…",
                 )
                 if (state.tampil.isEmpty()) {
                     PesanKosongLaporan("Tidak ada menu yang cocok.")
                 } else {
                     LazyColumn(
                         Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(11.dp),
+                        contentPadding = PaddingValues(start = UkuranIos.TepiLayar, end = UkuranIos.TepiLayar, bottom = 16.dp).denganRuangNav(),
+                        verticalArrangement = Arrangement.spacedBy(UkuranIos.JarakKartu),
                     ) {
                         items(state.tampil, key = { it.resepId }) { menu ->
                             KartuHpp(
@@ -180,105 +167,83 @@ fun HppMenuScreen(
 
 @Composable
 private fun KartuHpp(menu: MenuHpp, terbuka: Boolean, onKlik: () -> Unit) {
-    val warna = when (menu.status) {
-        StatusFoodCost.OPTIMAL -> Color(0xFF15803D)
-        StatusFoodCost.WASPADA -> Color(0xFFB45309)
-        StatusFoodCost.KRITIS -> Color(0xFFB91C1C)
+    val nada = when (menu.status) {
+        StatusFoodCost.OPTIMAL -> NadaIos.SUKSES
+        StatusFoodCost.WASPADA -> NadaIos.PERINGATAN
+        StatusFoodCost.KRITIS -> NadaIos.BAHAYA
     }
-    Surface(
-        Modifier.fillMaxWidth().clickable(onClick = onKlik),
-        shape = RoundedCornerShape(15.dp),
-        color = Color.White,
-        border = BorderStroke(1.dp, GARIS),
-    ) {
-        Column(Modifier.padding(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        menu.menuNama,
-                        color = SLATE900,
-                        fontSize = 13.5.sp,
-                        fontWeight = FontWeight.Black,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(menu.kategori, color = SLATE400, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                }
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        if (menu.hargaJual > 0) "${menu.foodCostPersen.toInt()}%" else "—",
-                        color = warna,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Black,
-                    )
-                    Text("FOOD COST", color = SLATE400, fontSize = 8.5.sp, fontWeight = FontWeight.Black, letterSpacing = 0.6.sp)
-                }
+    KartuIos(onKlik = onKlik) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(menu.menuNama, style = TipeIos.Utama, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(menu.kategori, style = TipeIos.Catatan)
             }
-
-            Spacer(Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                KolomAngka("HPP", formatRupiah(menu.totalHpp), Modifier.weight(1f))
-                KolomAngka(
-                    "Harga jual",
-                    if (menu.hargaJual > 0) formatRupiah(menu.hargaJual) else "Belum diisi",
-                    Modifier.weight(1f),
-                )
-                KolomAngka("Margin", formatRupiah(menu.marginRupiah), Modifier.weight(1f))
-            }
-
-            if (menu.hargaJual <= 0.0) {
-                Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.width(8.dp))
+            Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    "Menu ini belum punya harga jual, jadi food cost-nya tidak bisa dihitung.",
-                    color = Color(0xFFB45309),
-                    fontSize = 11.sp,
-                    lineHeight = 15.sp,
-                    fontWeight = FontWeight.Medium,
+                    if (menu.hargaJual > 0) "${menu.foodCostPersen.toInt()}%" else "—",
+                    style = TipeIos.AngkaBesar.copy(fontSize = 22.sp, color = nada.teks),
                 )
+                Text("Food cost", style = TipeIos.Kecil)
             }
+        }
 
-            if (terbuka) {
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    "SUSUNAN BIAYA",
-                    color = SLATE400,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 0.7.sp,
-                )
-                Spacer(Modifier.height(6.dp))
-                menu.bahan.forEach { bahan ->
-                    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                bahan.nama,
-                                color = SLATE900,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Text(
-                                "${formatAngkaStok(bahan.qtyPerPorsi)} ${bahan.satuanResep} · ${bahan.kontribusiPersen}%",
-                                color = SLATE400,
-                                fontSize = 10.5.sp,
-                            )
+        Spacer(Modifier.height(12.dp))
+        Row(
+            Modifier.fillMaxWidth().clip(UkuranIos.SudutBlok).background(WarnaIos.Latar).padding(vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            KolomAngka("HPP", formatRupiah(menu.totalHpp), Modifier.weight(1f))
+            Box(Modifier.width(0.5.dp).height(30.dp).background(WarnaIos.Pemisah))
+            KolomAngka(
+                "Harga jual",
+                if (menu.hargaJual > 0) formatRupiah(menu.hargaJual) else "Belum diisi",
+                Modifier.weight(1f),
+            )
+            Box(Modifier.width(0.5.dp).height(30.dp).background(WarnaIos.Pemisah))
+            KolomAngka("Margin", formatRupiah(menu.marginRupiah), Modifier.weight(1f))
+        }
+
+        if (menu.hargaJual <= 0.0) {
+            Spacer(Modifier.height(8.dp))
+            BannerIos(
+                "Menu ini belum punya harga jual, jadi food cost-nya tidak bisa dihitung.",
+                NadaIos.PERINGATAN,
+            )
+        }
+
+        if (terbuka) {
+            Spacer(Modifier.height(14.dp))
+            LabelSeksiIos("Susunan biaya", Modifier.padding(start = 4.dp))
+            Spacer(Modifier.height(6.dp))
+            if (menu.bahan.isNotEmpty()) {
+                Column(Modifier.fillMaxWidth().clip(UkuranIos.SudutBlok).background(WarnaIos.Latar)) {
+                    menu.bahan.forEachIndexed { i, bahan ->
+                        if (i > 0) PemisahIos(inset = 12.dp)
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 9.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    bahan.nama,
+                                    style = TipeIos.Keterangan.copy(fontSize = 15.sp),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Text(
+                                    "${formatAngkaStok(bahan.qtyPerPorsi)} ${bahan.satuanResep} · ${bahan.kontribusiPersen}%",
+                                    style = TipeIos.Kecil,
+                                )
+                            }
+                            Spacer(Modifier.width(8.dp))
+                            Text(formatRupiah(bahan.subtotal), color = WarnaIos.LabelKedua, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                         }
-                        Text(
-                            formatRupiah(bahan.subtotal),
-                            color = SLATE500,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
                     }
                 }
-                if (menu.bahan.isEmpty()) {
-                    Text(
-                        "Resep ini belum punya bahan, jadi HPP-nya nol.",
-                        color = SLATE400,
-                        fontSize = 11.5.sp,
-                    )
-                }
+            }
+            if (menu.bahan.isEmpty()) {
+                Text("Resep ini belum punya bahan, jadi HPP-nya nol.", style = TipeIos.Catatan)
             }
         }
     }
@@ -286,9 +251,12 @@ private fun KartuHpp(menu: MenuHpp, terbuka: Boolean, onKlik: () -> Unit) {
 
 @Composable
 private fun KolomAngka(label: String, nilai: String, modifier: Modifier = Modifier) {
-    Column(modifier) {
-        Text(label.uppercase(), color = SLATE400, fontSize = 8.5.sp, fontWeight = FontWeight.Black, letterSpacing = 0.6.sp)
+    Column(modifier.padding(horizontal = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(label, style = TipeIos.Kecil.copy(fontWeight = FontWeight.Medium), maxLines = 1)
         Spacer(Modifier.height(2.dp))
-        Text(nilai, color = SLATE900, fontSize = 12.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(
+            nilai, color = WarnaIos.Label, fontSize = 14.sp, fontWeight = FontWeight.Bold,
+            maxLines = 1, overflow = TextOverflow.Ellipsis,
+        )
     }
 }
