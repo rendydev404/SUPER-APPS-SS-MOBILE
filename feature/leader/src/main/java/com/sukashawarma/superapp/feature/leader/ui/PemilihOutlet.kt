@@ -1,17 +1,15 @@
 package com.sukashawarma.superapp.feature.leader.ui
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Storefront
+import androidx.compose.foundation.shape.CircleShape
 import com.sukashawarma.superapp.core.ui.SukaDropdownHeader
 import com.sukashawarma.superapp.core.ui.SukaDropdownMenu
 import com.sukashawarma.superapp.core.ui.SukaDropdownMenuItem
@@ -24,14 +22,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.sukashawarma.superapp.core.ui.ios.KartuIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
 import com.sukashawarma.superapp.feature.leader.data.OutletLeader
-import com.sukashawarma.superapp.presentation.theme.SukaBrown
-import com.sukashawarma.superapp.presentation.theme.SukaGray400
-import com.sukashawarma.superapp.presentation.theme.SukaOrange
 
 /**
  * Pemilih cabang untuk layar Penjualan dan Stok.
@@ -50,32 +48,20 @@ fun PemilihOutlet(
     var terbuka by remember { mutableStateOf(false) }
     val nama = daftar.find { it.id == terpilih }?.nama ?: "Pilih cabang"
 
-    KartuPanel {
-        Row(
-            Modifier.fillMaxWidth().clickable { terbuka = true },
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(Icons.Default.Storefront, null, tint = SukaGray400, modifier = Modifier.size(20.dp))
+    KartuIos(onKlik = { terbuka = true }, padding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.size(34.dp).clip(CircleShape).background(WarnaIos.Aksen.copy(alpha = 0.14f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(IkonIos.Storefront, null, tint = WarnaIos.Aksen, modifier = Modifier.size(18.dp))
+            }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(
-                    "PILIH CABANG",
-                    color = SukaGray400,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 0.7.sp,
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    nama,
-                    color = SukaBrown,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Black,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Text("Pilih cabang", style = TipeIos.Catatan)
+                Text(nama, style = TipeIos.Utama, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            Icon(Icons.Default.ArrowDropDown, null, tint = SukaOrange)
+            Icon(IkonIos.ArrowDropDown, "Ganti cabang", tint = WarnaIos.Aksen, modifier = Modifier.size(18.dp))
         }
         Box {
             SukaDropdownMenu(expanded = terbuka, onDismissRequest = { terbuka = false }) {
