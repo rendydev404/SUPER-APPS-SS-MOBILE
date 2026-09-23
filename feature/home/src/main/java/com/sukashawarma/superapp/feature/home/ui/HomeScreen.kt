@@ -91,6 +91,18 @@ import com.sukashawarma.superapp.data.local.AuthPrefs
 import com.sukashawarma.superapp.presentation.theme.*
 import com.sukashawarma.superapp.core.ui.RealtimeRefresh
 import com.sukashawarma.superapp.core.ui.RealtimeTables
+import com.sukashawarma.superapp.core.ui.ios.JudulSeksiIos
+import com.sukashawarma.superapp.core.ui.ios.KartuIos
+import com.sukashawarma.superapp.core.ui.ios.LencanaIos
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.PetakStatIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.TombolUtamaIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.ios.permukaanIos
+import com.sukashawarma.superapp.core.ui.ios.tekanIos
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
 
 // Token warna beranda — cermin koleksi "iOS Tokens" di file Figma
 // "Superapp SS — Home iOS Style". Nama lama dipertahankan supaya seluruh
@@ -353,7 +365,7 @@ fun HomeScreen(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(WarnaIos.Latar)
     ) {
         val screenHeight = maxHeight
 
@@ -426,7 +438,9 @@ fun HomeScreen(
                         shadowElevation = (6f + extraElevation).dp.toPx()
                     },
                 shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
-                color = Color.White,
+                // Lembar abu grouped-background iOS: kartu putih di atasnya baru
+                // terbaca sebagai kartu tanpa perlu garis tepi.
+                color = WarnaIos.Latar,
                 shadowElevation = 6.dp
             ) {
                 Column(
@@ -435,8 +449,8 @@ fun HomeScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp)
-                            .padding(top = 16.dp)
+                            .padding(horizontal = UkuranIos.TepiLayar)
+                            .padding(top = 18.dp)
                     ) {
                         // Interactive Spotlight Banner (bila dialog ditutup tetapi sidik jari belum diaktifkan)
                         if (showBanner && userId != null) {
@@ -450,7 +464,7 @@ fun HomeScreen(
                                     isBannerDismissed = true
                                 }
                             )
-                            Spacer(Modifier.height(10.dp))
+                            Spacer(Modifier.height(UkuranIos.JarakKartu))
                         }
 
                         // 3. Apple ID / Staff Profile Widget Card
@@ -459,7 +473,7 @@ fun HomeScreen(
                             onOpenProfil = onOpenProfil
                         )
 
-                        Spacer(Modifier.height(10.dp))
+                        Spacer(Modifier.height(UkuranIos.JarakKartu))
 
                         // 4. iOS Live Activity Attendance Widget
                         IosAttendanceWidget(
@@ -467,30 +481,21 @@ fun HomeScreen(
                             onOpenAbsensi = onOpenAbsensi
                         )
 
-                        Spacer(Modifier.height(10.dp))
+                        Spacer(Modifier.height(UkuranIos.JarakKartu))
 
                         // 4b. Kartu estimasi insentif bulan ini — hanya role yang punya skema bonus
                         if (state.adaSkemaBonus) {
                             KartuBonusBulanan(state = state)
-                            Spacer(Modifier.height(10.dp))
+                            Spacer(Modifier.height(UkuranIos.JarakKartu))
                         }
 
                         // 5. Strip angka sorotan
                         StripSorotan(state = state, staff = staff)
 
-                        Spacer(Modifier.height(14.dp))
+                        Spacer(Modifier.height(4.dp))
 
                         // 6. Judul bagian Aplikasi
-                        Text(
-                            text = "Aplikasi",
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 4.dp),
-                            fontSize = 17.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = (-0.4).sp,
-                            color = IosTextPrimary
-                        )
+                        JudulSeksiIos("Aplikasi")
 
                         Spacer(Modifier.height(10.dp))
 
@@ -611,31 +616,6 @@ private fun BoxScope.BolaCahaya(
                 ),
                 CircleShape
             )
-    )
-}
-
-/**
- * Kartu beranda: putih hangat pekat, separator tipis, bayangan sangat rendah.
- * Satu tempat supaya radius dan ketebalan tepi tidak menyimpang antar kartu.
- *
- * Warna isian WAJIB pekat. Lihat catatan di token warna di atas: isian tembus
- * pandang membuat bayangan Compose terlihat menembus sebagai kotak di dalam
- * kartu, dan itu tampak persis seperti bug render.
- */
-@Composable
-private fun KartuKaca(
-    modifier: Modifier = Modifier,
-    radius: Dp = 24.dp,
-    warnaIsi: Color = IosCardBg,
-    isi: @Composable () -> Unit,
-) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(radius),
-        color = warnaIsi,
-        border = BorderStroke(0.5.dp, IosHairline),
-        shadowElevation = 2.dp,
-        content = { isi() }
     )
 }
 
@@ -1073,56 +1053,30 @@ private fun formatOutletTitle(name: String?): String {
 }
 
 /**
- * iOS Settings / Apple ID Profile Card Widget.
+ * Kartu profil ala baris Apple ID di Pengaturan iOS: avatar bercincin, nama,
+ * lencana peran, outlet, chevron.
  */
 @Composable
 private fun IosProfileWidget(
     staff: com.sukashawarma.superapp.domain.model.StaffProfile?,
     onOpenProfil: () -> Unit
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.98f else 1.0f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMediumLow
-        ),
-        label = "profile_widget_scale"
-    )
-
     val roleLabel = formatRoleTitle(staff?.role, staff?.roleRaw)
     val formattedOutlet = formatOutletTitle(staff?.outletName)
 
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = onOpenProfil
-            ),
-        shape = RoundedCornerShape(22.dp),
-        color = Color(0xFFFAFAFA),
-        border = BorderStroke(1.dp, Color(0x12000000)),
-        shadowElevation = 1.dp
+    KartuIos(
+        onKlik = onOpenProfil,
+        padding = PaddingValues(horizontal = UkuranIos.PaddingKartu, vertical = 14.dp),
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 13.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Apple-grade Avatar with Suka Sunset Ring
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            // Avatar dengan cincin Suka Sunset
             Box(
-                modifier = Modifier.size(52.dp),
+                modifier = Modifier.size(56.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Box(
                     modifier = Modifier
-                        .size(52.dp)
+                        .size(56.dp)
                         .clip(CircleShape)
                         .background(
                             Brush.linearGradient(
@@ -1142,67 +1096,49 @@ private fun IosProfileWidget(
                     )
                 }
 
-                // Live Indicator
+                // Indikator aktif
                 Box(
                     modifier = Modifier
-                        .size(12.dp)
+                        .size(13.dp)
                         .align(Alignment.BottomEnd)
                         .offset(x = 1.dp, y = 1.dp)
-                        .background(Color(0xFF10B981), CircleShape)
-                        .border(2.dp, Color.White, CircleShape)
+                        .background(WarnaIos.Hijau, CircleShape)
+                        .border(2.dp, WarnaIos.Kartu, CircleShape)
                 )
             }
 
-            Spacer(Modifier.width(13.dp))
+            Spacer(Modifier.width(14.dp))
 
-            // User Info Column
             Column(Modifier.weight(1f)) {
                 Text(
                     text = staff?.namaTampil ?: "Pengguna",
-                    color = IosTextPrimary,
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = (-0.3).sp,
+                    style = TipeIos.Utama.copy(fontSize = 19.sp),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
 
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(5.dp))
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Role Capsule
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = SukaOrange.copy(alpha = 0.12f),
-                        border = BorderStroke(0.5.dp, SukaOrange.copy(alpha = 0.35f))
-                    ) {
-                        Text(
-                            text = roleLabel,
-                            color = Color(0xFFEA580C),
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            letterSpacing = 0.5.sp,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
+                    LencanaIos(roleLabel, NadaIos.AKSEN, titik = false)
 
-                    // Outlet Pin
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        modifier = Modifier.weight(1f, fill = false),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Icon(
-                            imageVector = Icons.Default.LocationOn,
+                            imageVector = IkonIos.LocationOn,
                             contentDescription = null,
-                            tint = IosTextSecondary,
-                            modifier = Modifier.size(11.dp)
+                            tint = WarnaIos.LabelKedua,
+                            modifier = Modifier.size(13.dp)
                         )
-                        Spacer(Modifier.width(2.dp))
+                        Spacer(Modifier.width(3.dp))
                         Text(
                             text = formattedOutlet,
-                            color = IosTextSecondary,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
+                            style = TipeIos.Catatan,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -1210,19 +1146,21 @@ private fun IosProfileWidget(
                 }
             }
 
-            // iOS Disclosure Indicator
+            Spacer(Modifier.width(8.dp))
+
             Icon(
-                imageVector = Icons.Default.ChevronRight,
+                imageVector = IkonIos.ChevronRight,
                 contentDescription = "Buka Profil",
-                tint = IosChevronColor,
-                modifier = Modifier.size(18.dp)
+                tint = WarnaIos.LabelKetiga,
+                modifier = Modifier.size(16.dp)
             )
         }
     }
 }
 
 /**
- * iOS Live Activity / Smart Stack Widget for Attendance.
+ * Kartu kehadiran hari ini: label, lencana status, status besar, jam absen,
+ * dan tombol aksi utama. Seluruh kartu tetap bisa ditekan seperti sebelumnya.
  */
 @Composable
 private fun IosAttendanceWidget(
@@ -1231,95 +1169,51 @@ private fun IosAttendanceWidget(
 ) {
     val att = state.todayAttendance
     val status = when {
-        state.loadingAttendance -> Triple(Icons.Default.WatchLater, Color(0xFF64748B), "Memuat status")
-        att == null -> Triple(Icons.Default.ErrorOutline, Color(0xFFDC2626), "Belum absen masuk")
-        att.type == "in" -> Triple(Icons.Default.CheckCircle, Color(0xFF10B981), "Absen masuk")
-        else -> Triple(Icons.Default.CheckCircle, Color(0xFFC27A12), "Absen pulang")
+        state.loadingAttendance -> Triple(IkonIos.Schedule, WarnaIos.Abu, "Memuat status")
+        att == null -> Triple(IkonIos.ErrorOutline, WarnaIos.Merah, "Belum absen masuk")
+        att.type == "in" -> Triple(IkonIos.CheckCircle, WarnaIos.Hijau, "Absen masuk")
+        else -> Triple(IkonIos.CheckCircle, WarnaIos.Oranye, "Absen pulang")
     }
 
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.98f else 1.0f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMediumLow
-        ),
-        label = "att_widget_scale"
-    )
-
-    // Pil status: warnanya mengikuti keadaan, bukan selalu oranye — "sudah
+    // Lencana status: nadanya mengikuti keadaan, bukan selalu oranye — "sudah
     // tercatat" tidak boleh terlihat sama mendesaknya dengan "belum absen".
-    val (warnaPil, teksPil) = when {
-        state.loadingAttendance -> GarisPemisah to "Memuat"
-        att == null -> AksenTerang to "Belum absen"
-        att.type == "in" -> WarnaHijau to "Tercatat"
-        else -> WarnaAmbar to "Pulang"
+    val (nadaPil, teksPil) = when {
+        state.loadingAttendance -> NadaIos.NETRAL to "Memuat"
+        att == null -> NadaIos.AKSEN to "Belum absen"
+        att.type == "in" -> NadaIos.SUKSES to "Tercatat"
+        else -> NadaIos.PERINGATAN to "Pulang"
     }
-    val teksPilGelap = att == null && !state.loadingAttendance
 
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = onOpenAbsensi
-            ),
-        shape = RoundedCornerShape(24.dp),
-        color = PermukaanGelap,
-        shadowElevation = 3.dp
-    ) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 14.dp)
+    KartuIos(onKlik = onOpenAbsensi) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "KEHADIRAN HARI INI",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.7.sp,
-                        color = Color(0xFFFBBF77),
-                        modifier = Modifier.weight(1f)
-                    )
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = warnaPil
-                    ) {
-                        Text(
-                            text = teksPil,
-                            color = if (teksPilGelap) PermukaanGelap else Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
-                        )
-                    }
-                }
+            Text(
+                text = "Kehadiran hari ini",
+                style = TipeIos.Catatan.copy(fontWeight = FontWeight.SemiBold),
+                modifier = Modifier.weight(1f)
+            )
+            LencanaIos(teksPil, nadaPil)
+        }
 
-                Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(10.dp))
 
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.size(44.dp).clip(CircleShape).background(status.second.copy(alpha = 0.14f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(status.first, null, tint = status.second, modifier = Modifier.size(24.dp))
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
                 Text(
                     text = status.third,
-                    color = Color.White,
-                    fontSize = 22.sp,
-                    lineHeight = 27.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = (-0.6).sp,
+                    style = TipeIos.Judul2,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-
-                Spacer(Modifier.height(3.dp))
-
                 // Jam absen nyata bila ada. Jadwal shift TIDAK ditampilkan karena
                 // beranda memang tidak memuatnya — angka jam kerja yang dikarang
                 // lebih berbahaya daripada tidak ada angka sama sekali.
@@ -1330,70 +1224,44 @@ private fun IosAttendanceWidget(
                         state.jamAbsen != null -> "Tercatat pukul ${state.jamAbsen} WIB"
                         else -> "Kehadiran sudah tercatat"
                     },
-                    color = Color(0xFFADA49A),
-                    fontSize = 13.sp,
-                    lineHeight = 17.sp,
-                    letterSpacing = (-0.1).sp,
+                    style = TipeIos.Catatan,
                 )
+            }
+        }
 
-                Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(14.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Surface(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp)
-                            .clickable(onClick = onOpenAbsensi),
-                        shape = RoundedCornerShape(18.dp),
-                        color = Color.White,
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxSize(),
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = FaceRecognitionIcon,
-                                contentDescription = null,
-                                tint = PermukaanGelap,
-                                modifier = Modifier.size(19.dp)
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                text = if (att == null) "Absen sekarang" else "Lihat kehadiran",
-                                color = PermukaanGelap,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = (-0.3).sp
-                            )
-                        }
-                    }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TombolUtamaIos(
+                teks = if (att == null) "Absen sekarang" else "Lihat kehadiran",
+                onKlik = onOpenAbsensi,
+                modifier = Modifier.weight(1f),
+                ikon = FaceRecognitionIcon,
+            )
 
-                    Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(10.dp))
 
-                    Surface(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clickable(onClick = onOpenAbsensi),
-                        shape = RoundedCornerShape(18.dp),
-                        color = Color.White.copy(alpha = 0.16f),
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Default.WatchLater,
-                                contentDescription = "Riwayat kehadiran",
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    }
-                }
+            Box(
+                modifier = Modifier
+                    .size(UkuranIos.TinggiTombol)
+                    .clip(UkuranIos.SudutBlok)
+                    .background(WarnaIos.Isian)
+                    .tekanIos(onOpenAbsensi),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = IkonIos.History,
+                    contentDescription = "Riwayat kehadiran",
+                    tint = WarnaIos.Aksen,
+                    modifier = Modifier.size(21.dp)
+                )
             }
         }
     }
+}
 
 /**
  * Tiga kartu angka di bawah kartu kehadiran.
@@ -1411,7 +1279,9 @@ private fun StripSorotan(
     state: HomeUiState,
     staff: com.sukashawarma.superapp.domain.model.StaffProfile?,
 ) {
-    data class Sorotan(val label: String, val angka: Int?, val warna: Color)
+    // [warna] mengisi lingkaran ikon: angka yang butuh tindakan diberi merah supaya
+    // menonjol, angka nol tetap berwarna modul agar tidak tertukar dengan peringatan.
+    data class Sorotan(val label: String, val angka: Int?, val ikon: ImageVector, val warna: Color)
 
     val isAllAccess = staff?.role in setOf(
         com.sukashawarma.superapp.domain.model.Role.DEVELOPER,
@@ -1423,19 +1293,19 @@ private fun StripSorotan(
     val sorotan = buildList {
         if (isAllAccess || (staff?.role in STOK_ROLES && staff?.role !in STOK_ROLES_PUSAT)) {
             val kritis = state.stokKritis ?: 40
-            add(Sorotan("Stok kritis", kritis, if (kritis > 0) IosBadgeRed else IosTextPrimary))
+            add(Sorotan("Stok kritis", kritis, IkonIos.Inventory2, if (kritis > 0) WarnaIos.Merah else WarnaIos.Biru))
         }
         if (isAllAccess || staff?.role in DISTRIBUSI_ROLES) {
-            add(Sorotan("Kiriman", state.kirimanMenunggu ?: 0, IosTextPrimary))
+            add(Sorotan("Kiriman", state.kirimanMenunggu ?: 0, IkonIos.LocalShipping, WarnaIos.Ungu))
         }
         if (isAllAccess || staff?.role in MANAGER_ROLES) {
-            add(Sorotan("Waste antre", state.wasteMenunggu ?: 2, IosTextPrimary))
+            add(Sorotan("Waste antre", state.wasteMenunggu ?: 2, IkonIos.Delete, WarnaIos.Oranye))
         }
         if (staff?.role in LEADER_ROLES && !isAllAccess) {
-            add(Sorotan("Petty cash", state.pettyCashButuhAksi, IosTextPrimary))
+            add(Sorotan("Petty cash", state.pettyCashButuhAksi, IkonIos.AccountBalanceWallet, WarnaIos.Mint))
         }
         if (!isAllAccess) {
-            add(Sorotan("Chat baru", state.chatBelumDibaca, if (state.chatBelumDibaca > 0) IosBadgeRed else IosTextPrimary))
+            add(Sorotan("Chat baru", state.chatBelumDibaca, Icons.Default.Forum, if (state.chatBelumDibaca > 0) WarnaIos.Merah else WarnaIos.Biru))
         }
     }.take(3)
 
@@ -1444,28 +1314,13 @@ private fun StripSorotan(
     Row(modifier = Modifier.fillMaxWidth()) {
         sorotan.forEachIndexed { index, item ->
             if (index > 0) Spacer(Modifier.width(10.dp))
-            KartuKaca(modifier = Modifier.weight(1f), radius = 20.dp) {
-                Column(Modifier.padding(horizontal = 12.dp, vertical = 11.dp)) {
-                    Text(
-                        text = item.label,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        letterSpacing = 0.1.sp,
-                        color = IosTextSecondary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Spacer(Modifier.height(3.dp))
-                    Text(
-                        text = item.angka?.toString() ?: "—",
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = (-0.4).sp,
-                        color = item.warna,
-                        maxLines = 1,
-                    )
-                }
-            }
+            PetakStatIos(
+                label = item.label,
+                nilai = item.angka?.toString() ?: "—",
+                ikon = item.ikon,
+                warna = item.warna,
+                modifier = Modifier.weight(1f),
+            )
         }
     }
 }
@@ -1479,90 +1334,55 @@ private fun StripSorotan(
 @Composable
 private fun KartuBonusBulanan(state: HomeUiState) {
     val bonus = state.bonus
-    val warnaTeks = Color(0xFF78350F)
-    val warnaSekunder = Color(0xFF92400E)
 
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        color = Color(0xFFFFF9E5),
-        border = BorderStroke(1.dp, Color(0xFFFCD34D)),
-        shadowElevation = 2.dp,
-    ) {
-        Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 14.dp)) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Surface(shape = RoundedCornerShape(6.dp), color = Color(0xFFD97706)) {
-                    Text(
-                        "BONUS",
-                        Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
-                        color = Color.White,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = 1.sp,
-                    )
-                }
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    text = "ESTIMASI INSENTIF",
-                    modifier = Modifier.weight(1f),
-                    color = warnaTeks,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.7.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+    KartuIos {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.size(34.dp).clip(CircleShape).background(WarnaIos.Oranye),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Default.WorkspacePremium,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(19.dp),
                 )
-                Box(
-                    Modifier.size(38.dp).background(Color(0xFFF59E0B), RoundedCornerShape(14.dp)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Icons.Default.WorkspacePremium,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.width(10.dp))
             Text(
-                text = when {
-                    state.memuatBonus -> "Memuat…"
-                    bonus?.nominal != null -> rupiah(bonus.nominal)
-                    else -> "—"
-                },
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Black,
-                letterSpacing = (-0.8).sp,
-                color = IosTextPrimary,
+                text = "Estimasi insentif",
+                modifier = Modifier.weight(1f),
+                style = TipeIos.Utama,
                 maxLines = 1,
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = when {
-                    state.memuatBonus -> "Menghitung porsi terjual bulan ini"
-                    bonus == null -> "Gagal memuat estimasi bonus"
-                    !bonus.terdaftar -> "Belum terdaftar sebagai penerima bonus bulan ini"
-                    else -> "${bonus.rumus} · ${bonus.cakupan}"
-                },
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                color = warnaSekunder,
-                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (bonus != null) {
-                Spacer(Modifier.height(8.dp))
-                Surface(shape = RoundedCornerShape(10.dp), color = Color(0xFFFDE68A)) {
-                    Text(
-                        text = bonus.labelBulan,
-                        color = warnaTeks,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
-                    )
-                }
-            }
+            LencanaIos("Bonus", NadaIos.PERINGATAN, titik = false)
+        }
+        Spacer(Modifier.height(10.dp))
+        Text(
+            text = when {
+                state.memuatBonus -> "Memuat…"
+                bonus?.nominal != null -> rupiah(bonus.nominal)
+                else -> "—"
+            },
+            style = TipeIos.AngkaBesar.copy(fontSize = 30.sp),
+            maxLines = 1,
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(
+            text = when {
+                state.memuatBonus -> "Menghitung porsi terjual bulan ini"
+                bonus == null -> "Gagal memuat estimasi bonus"
+                !bonus.terdaftar -> "Belum terdaftar sebagai penerima bonus bulan ini"
+                else -> "${bonus.rumus} · ${bonus.cakupan}"
+            },
+            style = TipeIos.Catatan,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (bonus != null) {
+            Spacer(Modifier.height(10.dp))
+            LencanaIos(bonus.labelBulan, NadaIos.PERINGATAN, ikon = IkonIos.CalendarMonth)
         }
     }
 }
@@ -1793,109 +1613,85 @@ private fun DaftarAplikasiCard(
 }
 
 /**
- * Ubin kaca satu modul: kotak ikon bernuansa warna modul di atas, nama dan
- * baris status di bawah, lencana angka di sudut kanan atas.
+ * Ubin satu modul: kartu putih membulat, lingkaran ikon berwarna modul di atas,
+ * nama dan baris status di bawah, lencana angka di sudut kanan atas.
  */
 @Composable
 private fun AppTileButton(item: AppTileItem, modifier: Modifier = Modifier) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        targetValue = if (isPressed && !item.isLocked) 0.94f else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
-        ),
-        label = "ios_app_icon_scale"
-    )
-
-    // Ujung gelap gradien lama dipakai ulang sebagai warna aksen ubin, jadi
+    // Ujung gelap gradien lama dipakai ulang sebagai warna modul, jadi
     // identitas warna tiap modul tidak berubah dari versi sebelumnya.
     val warnaModul = item.gradientColors.second
 
-    KartuKaca(
+    Box(
         modifier = modifier
-            .heightIn(min = 96.dp)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-                alpha = if (item.isLocked) 0.62f else 1f
-            }
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                enabled = !item.isLocked,
-                onClick = item.onClick
-            ),
-        radius = 22.dp,
+            .heightIn(min = 104.dp)
+            .graphicsLayer { alpha = if (item.isLocked) 0.62f else 1f }
+            .permukaanIos(UkuranIos.SudutKartu)
+            .tekanIos(item.onClick, aktif = !item.isLocked, skalaTekan = 0.95f)
     ) {
-        Box(Modifier.fillMaxWidth()) {
-            Column(Modifier.fillMaxWidth().padding(11.dp)) {
-                Box(
-                    modifier = Modifier
-                        .size(34.dp)
-                        .background(warnaModul.copy(alpha = 0.14f), RoundedCornerShape(12.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (item.isLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(17.dp),
-                            color = warnaModul,
-                            strokeWidth = 2.dp
-                        )
-                    } else {
-                        Icon(
-                            imageVector = if (item.isLocked) Icons.Default.Lock else item.icon,
-                            contentDescription = item.label,
-                            tint = warnaModul,
-                            modifier = Modifier.size(19.dp)
-                        )
-                    }
-                }
-
-                Spacer(Modifier.height(10.dp))
-
-                Text(
-                    text = item.label,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = IosTextPrimary,
-                    letterSpacing = (-0.3).sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(Modifier.height(1.dp))
-                Text(
-                    text = item.statusText,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = item.statusTextColor,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            if (!item.isLocked && item.badge > 0) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(10.dp)
-                        .defaultMinSize(minWidth = 20.dp, minHeight = 20.dp)
-                        .background(IosBadgeRed, RoundedCornerShape(10.dp))
-                        .padding(horizontal = 5.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = buildString {
-                            if (item.badgeSebutan) append("@")
-                            append(if (item.badge > 99) "99+" else item.badge.toString())
-                        },
+        Column(Modifier.fillMaxWidth().padding(12.dp)) {
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .background(warnaModul),
+                contentAlignment = Alignment.Center
+            ) {
+                if (item.isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
                         color = Color.White,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Icon(
+                        imageVector = if (item.isLocked) IkonIos.Lock else item.icon,
+                        contentDescription = item.label,
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            Text(
+                text = item.label,
+                style = TipeIos.Utama.copy(fontSize = 15.sp),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(Modifier.height(1.dp))
+            Text(
+                text = item.statusText,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                color = item.statusTextColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        if (!item.isLocked && item.badge > 0) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(10.dp)
+                    .defaultMinSize(minWidth = 20.dp, minHeight = 20.dp)
+                    .background(WarnaIos.Merah, UkuranIos.SudutKapsul)
+                    .padding(horizontal = 6.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = buildString {
+                        if (item.badgeSebutan) append("@")
+                        append(if (item.badge > 99) "99+" else item.badge.toString())
+                    },
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                )
             }
         }
     }
@@ -1914,10 +1710,7 @@ private fun HomeScreenFooter(
         modifier = modifier
             .fillMaxWidth()
             .padding(vertical = 12.dp),
-        fontSize = 12.sp,
-        fontWeight = FontWeight.Normal,
-        color = Color(0xFF94A3B8),
-        letterSpacing = 0.4.sp,
+        style = TipeIos.Kecil.copy(color = WarnaIos.Abu, letterSpacing = 0.4.sp),
         textAlign = TextAlign.Center
     )
 }
