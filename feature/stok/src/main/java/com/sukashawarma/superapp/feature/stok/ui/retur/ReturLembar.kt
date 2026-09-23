@@ -1,6 +1,19 @@
 package com.sukashawarma.superapp.feature.stok.ui.retur
 
-import androidx.compose.foundation.BorderStroke
+import com.sukashawarma.superapp.core.ui.ios.KartuIos
+import com.sukashawarma.superapp.core.ui.ios.LabelSeksiIos
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.TombolKeduaIos
+import com.sukashawarma.superapp.core.ui.ios.TombolUtamaIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.ios.tekanIos
+import com.sukashawarma.superapp.core.ui.ios.warnaKolomIos
+import com.sukashawarma.superapp.feature.stok.ui.BannerIos
+import androidx.compose.ui.draw.clip
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
+import com.sukashawarma.superapp.core.ui.kaca.navigationBarsPaddingKaca
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,11 +29,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material3.CircularProgressIndicator
 import com.sukashawarma.superapp.core.ui.SukaDropdownHeader
 import com.sukashawarma.superapp.core.ui.SukaDropdownMenu
@@ -29,7 +37,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -43,7 +50,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.text.KeyboardOptions
@@ -56,7 +62,7 @@ import com.sukashawarma.superapp.feature.stok.domain.formatSatuan
 import com.sukashawarma.superapp.feature.stok.ui.HeaderStok
 import com.sukashawarma.superapp.feature.stok.ui.PitaPesan
 
-// ============================================================ formulir klaim
+/// ============================================================ formulir klaim
 
 /**
  * Formulir pengajuan retur — cermin `components/refund/FormPengajuanRefund.tsx`.
@@ -79,8 +85,8 @@ fun FormReturScreen(state: ReturUiState, viewModel: ReturViewModel) {
 
         LazyColumn(
             Modifier.weight(1f),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            contentPadding = PaddingValues(horizontal = UkuranIos.TepiLayar, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item {
                 KartuForm("Pilih Bahan Baku", wajib = true) {
@@ -95,7 +101,7 @@ fun FormReturScreen(state: ReturUiState, viewModel: ReturViewModel) {
                     if (state.katalogRefundable.isEmpty()) {
                         Text(
                             "Katalog bahan core belum termuat. Tarik ulang halaman sebelumnya.",
-                            color = MerahTua, fontSize = 10.sp,
+                            style = TipeIos.Catatan.copy(color = MerahTua),
                         )
                     }
                 }
@@ -120,11 +126,11 @@ fun FormReturScreen(state: ReturUiState, viewModel: ReturViewModel) {
                         }
                         Text(
                             "Total: ${qtyTeks(state.totalKlaimBesar, bahan.satuan)}",
-                            color = AmberTua, fontSize = 12.sp, fontWeight = FontWeight.Black,
+                            color = AmberTua, fontSize = 16.sp, fontWeight = FontWeight.Bold,
                         )
                         Text(
                             "Stok outlet akan dipotong sebesar angka ini saat formulir diajukan.",
-                            color = Abu500, fontSize = 10.sp, lineHeight = 14.sp,
+                            style = TipeIos.Catatan.copy(lineHeight = 18.sp),
                         )
                     }
                 }
@@ -141,10 +147,11 @@ fun FormReturScreen(state: ReturUiState, viewModel: ReturViewModel) {
                         OutlinedTextField(
                             value = state.formAlasanLainnya,
                             onValueChange = viewModel::ubahAlasanLainnya,
-                            placeholder = {
-                                Text("Tuliskan alasan retur…", fontSize = 12.sp, color = Abu500)
-                            },
+                            placeholder = { Text("Tuliskan alasan retur…", fontSize = 15.sp) },
                             singleLine = true,
+                            textStyle = TipeIos.Keterangan,
+                            shape = UkuranIos.SudutKontrol,
+                            colors = warnaKolomIos(),
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
@@ -167,30 +174,35 @@ fun FormReturScreen(state: ReturUiState, viewModel: ReturViewModel) {
                     OutlinedTextField(
                         value = state.formCatatan,
                         onValueChange = viewModel::ubahCatatanForm,
-                        placeholder = {
-                            Text("Keterangan untuk Area Manager & Central Kitchen…", fontSize = 12.sp, color = Abu500)
-                        },
+                        placeholder = { Text("Keterangan untuk Area Manager & Central Kitchen…", fontSize = 15.sp) },
                         minLines = 2,
+                        textStyle = TipeIos.Keterangan,
+                        shape = UkuranIos.SudutKontrol,
+                        colors = warnaKolomIos(),
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
             }
 
             item {
-                Surface(
-                    Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp),
-                    color = AmberMuda,
-                    border = BorderStroke(1.dp, AmberGaris),
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(UkuranIos.SudutBlok)
+                        .background(WarnaIos.Aksen.copy(alpha = 0.10f))
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(3.dp),
                 ) {
-                    Column(Modifier.padding(12.dp)) {
-                        Text("Prosedur Pengembalian", color = AmberTua, fontSize = 11.sp, fontWeight = FontWeight.Black)
-                        Text(
-                            "Setelah dikirim, pengajuan direview Area Manager / Regional Manager. " +
-                                "Jangan menyerahkan daging atau kulit ke kurir sebelum tiket berstatus \"Disetujui AM/RM\".",
-                            color = AmberTua, fontSize = 10.sp, lineHeight = 14.sp,
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(IkonIos.ErrorOutline, null, tint = WarnaIos.Aksen, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Prosedur Pengembalian", style = TipeIos.Catatan.copy(color = AmberTua, fontWeight = FontWeight.SemiBold))
                     }
+                    Text(
+                        "Setelah dikirim, pengajuan direview Area Manager / Regional Manager. " +
+                            "Jangan menyerahkan daging atau kulit ke kurir sebelum tiket berstatus \"Disetujui AM/RM\".",
+                        style = TipeIos.Catatan.copy(color = AmberTua, lineHeight = 18.sp),
+                    )
                 }
             }
         }
@@ -204,31 +216,19 @@ fun FormReturScreen(state: ReturUiState, viewModel: ReturViewModel) {
 @Composable
 private fun BilahKirimForm(state: ReturUiState, viewModel: ReturViewModel) {
     val halangan = state.halanganForm
-    Surface(Modifier.fillMaxWidth(), color = Color.White, shadowElevation = 8.dp) {
-        Column(Modifier.padding(16.dp)) {
+    Column(Modifier.fillMaxWidth().background(WarnaIos.Kartu)) {
+        Box(Modifier.fillMaxWidth().height(0.5.dp).background(WarnaIos.Pemisah))
+        Column(Modifier.navigationBarsPaddingKaca().padding(horizontal = UkuranIos.TepiLayar, vertical = 12.dp)) {
             if (halangan != null) {
-                Text(halangan, color = Abu500, fontSize = 10.5.sp, lineHeight = 14.sp)
+                Text(halangan, style = TipeIos.Catatan.copy(lineHeight = 18.sp))
                 Spacer(Modifier.height(8.dp))
             }
-            Surface(
-                onClick = viewModel::kirimKlaim,
-                enabled = halangan == null && !state.memproses && !state.mengunggahFoto,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                color = if (halangan == null && !state.memproses) AmberTua else Abu200,
-            ) {
-                Box(Modifier.padding(vertical = 13.dp), contentAlignment = Alignment.Center) {
-                    if (state.memproses) {
-                        CircularProgressIndicator(Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
-                    } else {
-                        Text(
-                            "Kirim Pengajuan Retur",
-                            color = if (halangan == null) Color.White else Abu500,
-                            fontSize = 13.sp, fontWeight = FontWeight.Bold,
-                        )
-                    }
-                }
-            }
+            TombolUtamaIos(
+                "Kirim Pengajuan Retur",
+                viewModel::kirimKlaim,
+                aktif = halangan == null && !state.memproses && !state.mengunggahFoto,
+                memuat = state.memproses,
+            )
         }
     }
 }
@@ -242,47 +242,43 @@ fun LembarKeputusanManager(state: ReturUiState, viewModel: ReturViewModel) {
     ModalBottomSheet(
         onDismissRequest = viewModel::tutupLembar,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = Color.White,
+        containerColor = WarnaIos.Kartu,
     ) {
         Column(
-            Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp).heightIn(max = 620.dp),
+            Modifier.padding(horizontal = UkuranIos.TepiLayar).padding(bottom = 24.dp).heightIn(max = 620.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             JudulLembar("Persetujuan AM / RM", "Validasi Klaim ${tiket.nomorRetur} · ${tiket.outletName ?: "Outlet"}")
 
             tiket.items.forEach { item ->
-                Surface(
-                    Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp),
-                    color = LatarRetur,
-                    border = BorderStroke(1.dp, AmberGaris.copy(alpha = 0.6f)),
+                Column(
+                    Modifier.fillMaxWidth().clip(UkuranIos.SudutBlok).background(WarnaIos.Latar).padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(5.dp),
                 ) {
-                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(
-                            "${item.namaBahan ?: "Bahan Baku"} — ${qtyTeks(item.qtyKlaim, item.satuan)}",
-                            color = Abu900, fontSize = 13.sp, fontWeight = FontWeight.Black,
-                        )
-                        Text("Alasan: ${item.alasan}", color = AmberTua, fontSize = 11.sp)
-                        if (!item.catatan.isNullOrBlank()) {
-                            Text("\"${item.catatan}\"", color = Abu500, fontSize = 10.sp)
-                        }
-                        if (!item.fotoFisikUrl.isNullOrBlank()) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Thumbnail(item.fotoFisikUrl, "Timbangan") {
+                    Text(
+                        "${item.namaBahan ?: "Bahan Baku"} — ${qtyTeks(item.qtyKlaim, item.satuan)}",
+                        style = TipeIos.Keterangan.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
+                    )
+                    Text("Alasan: ${item.alasan}", style = TipeIos.Catatan.copy(color = AmberTua))
+                    if (!item.catatan.isNullOrBlank()) {
+                        Text("\"${item.catatan}\"", style = TipeIos.Kecil)
+                    }
+                    if (!item.fotoFisikUrl.isNullOrBlank()) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Thumbnail(item.fotoFisikUrl, "Timbangan") {
+                                viewModel.lihatFoto(
+                                    "Bukti Timbangan: ${item.namaBahan ?: "Bahan"}",
+                                    item.fotoFisikUrl,
+                                )
+                            }
+                            // Dua kolom foto hanya dirender kalau berkasnya memang
+                            // berbeda — web mengisi keduanya dengan foto yang sama.
+                            if (item.fotoTerpisah) {
+                                Thumbnail(item.fotoTimbanganUrl!!, "Fisik") {
                                     viewModel.lihatFoto(
-                                        "Bukti Timbangan: ${item.namaBahan ?: "Bahan"}",
-                                        item.fotoFisikUrl,
+                                        "Bukti Fisik: ${item.namaBahan ?: "Bahan"}",
+                                        item.fotoTimbanganUrl,
                                     )
-                                }
-                                // Dua kolom foto hanya dirender kalau berkasnya memang
-                                // berbeda — web mengisi keduanya dengan foto yang sama.
-                                if (item.fotoTerpisah) {
-                                    Thumbnail(item.fotoTimbanganUrl!!, "Fisik") {
-                                        viewModel.lihatFoto(
-                                            "Bukti Fisik: ${item.namaBahan ?: "Bahan"}",
-                                            item.fotoTimbanganUrl,
-                                        )
-                                    }
                                 }
                             }
                         }
@@ -293,28 +289,31 @@ fun LembarKeputusanManager(state: ReturUiState, viewModel: ReturViewModel) {
             OutlinedTextField(
                 value = state.catatanManager,
                 onValueChange = viewModel::ubahCatatanManager,
-                label = { Text("Catatan (wajib bila menolak)", fontSize = 11.sp) },
+                label = { Text("Catatan (wajib bila menolak)", fontSize = 13.sp) },
                 minLines = 2,
+                textStyle = TipeIos.Keterangan,
+                shape = UkuranIos.SudutKontrol,
+                colors = warnaKolomIos(),
                 modifier = Modifier.fillMaxWidth(),
             )
 
             Text(
                 "Menolak tidak mengembalikan stok: potongan yang sudah tercatat dialihkan resmi " +
                     "menjadi beban waste outlet, dengan alasan di atas sebagai keterangannya.",
-                color = Abu500, fontSize = 10.sp, lineHeight = 14.sp,
+                style = TipeIos.Catatan.copy(lineHeight = 18.sp),
             )
 
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 TombolLembar(
                     teks = "Tolak Klaim",
-                    warna = MerahTua,
+                    warna = WarnaIos.Merah,
                     isian = false,
                     sibuk = state.memproses,
                     modifier = Modifier.weight(1f),
                 ) { viewModel.putuskanManager(false) }
                 TombolLembar(
                     teks = "Setujui",
-                    warna = HijauTua,
+                    warna = WarnaIos.Hijau,
                     isian = true,
                     sibuk = state.memproses,
                     modifier = Modifier.weight(1f),
@@ -335,10 +334,10 @@ fun LembarSerahKurir(state: ReturUiState, viewModel: ReturViewModel) {
     ModalBottomSheet(
         onDismissRequest = viewModel::tutupLembar,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = Color.White,
+        containerColor = WarnaIos.Kartu,
     ) {
         Column(
-            Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp),
+            Modifier.padding(horizontal = UkuranIos.TepiLayar).padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             JudulLembar("Serahkan Fisik ke Kurir", "Tiket ${tiket.nomorRetur}")
@@ -353,8 +352,11 @@ fun LembarSerahKurir(state: ReturUiState, viewModel: ReturViewModel) {
                 OutlinedTextField(
                     value = state.kurirResi,
                     onValueChange = viewModel::ubahKurirResi,
-                    label = { Text("Nomor Order / Resi ${state.kurirJenis.label} *", fontSize = 11.sp) },
+                    label = { Text("Nomor Order / Resi ${state.kurirJenis.label} *", fontSize = 13.sp) },
                     singleLine = true,
+                    textStyle = TipeIos.Keterangan,
+                    shape = UkuranIos.SudutKontrol,
+                    colors = warnaKolomIos(),
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -362,24 +364,33 @@ fun LembarSerahKurir(state: ReturUiState, viewModel: ReturViewModel) {
             OutlinedTextField(
                 value = state.kurirNama,
                 onValueChange = viewModel::ubahKurirNama,
-                label = { Text("Nama Supir / Kurir *", fontSize = 11.sp) },
+                label = { Text("Nama Supir / Kurir *", fontSize = 13.sp) },
                 singleLine = true,
+                textStyle = TipeIos.Keterangan,
+                shape = UkuranIos.SudutKontrol,
+                colors = warnaKolomIos(),
                 modifier = Modifier.fillMaxWidth(),
             )
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(
                     value = state.kurirKontak,
                     onValueChange = viewModel::ubahKurirKontak,
-                    label = { Text("No. HP", fontSize = 11.sp) },
+                    label = { Text("No. HP", fontSize = 13.sp) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    textStyle = TipeIos.Keterangan,
+                    shape = UkuranIos.SudutKontrol,
+                    colors = warnaKolomIos(),
                     modifier = Modifier.weight(1f),
                 )
                 OutlinedTextField(
                     value = state.kurirPlat,
                     onValueChange = viewModel::ubahKurirPlat,
-                    label = { Text("Plat Nomor", fontSize = 11.sp) },
+                    label = { Text("Plat Nomor", fontSize = 13.sp) },
                     singleLine = true,
+                    textStyle = TipeIos.Keterangan,
+                    shape = UkuranIos.SudutKontrol,
+                    colors = warnaKolomIos(),
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -393,7 +404,7 @@ fun LembarSerahKurir(state: ReturUiState, viewModel: ReturViewModel) {
 
             TombolLembar(
                 teks = "Catat Serah Terima",
-                warna = BiruTua,
+                warna = WarnaIos.Biru,
                 isian = true,
                 sibuk = state.memproses || state.mengunggahFoto,
                 modifier = Modifier.fillMaxWidth(),
@@ -415,10 +426,10 @@ fun LembarVerifikasiKitchen(state: ReturUiState, viewModel: ReturViewModel) {
     ModalBottomSheet(
         onDismissRequest = viewModel::tutupLembar,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = Color.White,
+        containerColor = WarnaIos.Kartu,
     ) {
         Column(
-            Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp),
+            Modifier.padding(horizontal = UkuranIos.TepiLayar).padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             JudulLembar(
@@ -427,34 +438,30 @@ fun LembarVerifikasiKitchen(state: ReturUiState, viewModel: ReturViewModel) {
             )
 
             if (sudahDiterima) {
-                Surface(
-                    Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    color = AmberMuda,
-                    border = BorderStroke(1.dp, AmberGaris),
-                ) {
-                    Text(
-                        "Fisik sudah diterima dan ditimbang sebelumnya. Langkah berikutnya hanya menerbitkan Surat Jalan Pengganti.",
-                        Modifier.padding(11.dp),
-                        color = AmberTua, fontSize = 10.5.sp, lineHeight = 14.sp,
-                    )
-                }
+                BannerIos(
+                    "Fisik sudah diterima dan ditimbang sebelumnya. Langkah berikutnya hanya menerbitkan Surat Jalan Pengganti.",
+                    NadaIos.AKSEN,
+                    ikon = IkonIos.CheckCircle,
+                )
             }
 
             tiket.items.forEach { item ->
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         "${item.namaBahan ?: "Bahan"} — klaim outlet ${qtyTeks(item.qtyKlaim, item.satuan)}",
-                        color = Abu900, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                        style = TipeIos.Keterangan.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
                     )
                     OutlinedTextField(
                         value = state.timbangKitchen[item.id].orEmpty(),
                         onValueChange = { viewModel.ubahTimbang(item.id, it) },
                         label = {
-                            Text("Timbang ulang gudang (${formatSatuan(item.satuan)})", fontSize = 11.sp)
+                            Text("Timbang ulang gudang (${formatSatuan(item.satuan)})", fontSize = 13.sp)
                         },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        textStyle = TipeIos.Keterangan,
+                        shape = UkuranIos.SudutKontrol,
+                        colors = warnaKolomIos(),
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
@@ -463,13 +470,16 @@ fun LembarVerifikasiKitchen(state: ReturUiState, viewModel: ReturViewModel) {
             OutlinedTextField(
                 value = state.catatanKitchen,
                 onValueChange = viewModel::ubahCatatanKitchen,
-                label = { Text("Catatan Gudang Pusat", fontSize = 11.sp) },
+                label = { Text("Catatan Gudang Pusat", fontSize = 13.sp) },
                 minLines = 2,
+                textStyle = TipeIos.Keterangan,
+                shape = UkuranIos.SudutKontrol,
+                colors = warnaKolomIos(),
                 modifier = Modifier.fillMaxWidth(),
             )
 
             if (!sudahDiterima) {
-                Text("Kapan barang pengganti dikirim?", color = Abu900, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text("Kapan barang pengganti dikirim?", style = TipeIos.Keterangan.copy(fontWeight = FontWeight.SemiBold))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     PilihanWaktu(
                         judul = "Kirim Sekarang",
@@ -488,7 +498,7 @@ fun LembarVerifikasiKitchen(state: ReturUiState, viewModel: ReturViewModel) {
 
             TombolLembar(
                 teks = if (sudahDiterima || state.kirimSekarang) "Terbitkan SJ Pengganti" else "Simpan Hasil Timbang",
-                warna = if (sudahDiterima || state.kirimSekarang) BiruTua else UnguTua,
+                warna = if (sudahDiterima || state.kirimSekarang) WarnaIos.Biru else WarnaIos.Ungu,
                 isian = true,
                 sibuk = state.memproses,
                 modifier = Modifier.fillMaxWidth(),
@@ -502,25 +512,17 @@ fun LembarVerifikasiKitchen(state: ReturUiState, viewModel: ReturViewModel) {
 @Composable
 private fun JudulLembar(judul: String, sub: String) {
     Column {
-        Text(judul, color = Abu900, fontSize = 15.sp, fontWeight = FontWeight.Black)
-        Text(sub, color = Abu500, fontSize = 11.sp)
+        Text(judul, style = TipeIos.Judul3.copy(fontWeight = FontWeight.Bold))
+        Text(sub, style = TipeIos.Catatan)
     }
 }
 
 @Composable
 private fun KartuForm(judul: String, wajib: Boolean, isi: @Composable () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            if (wajib) "$judul *" else judul,
-            color = Abu500, fontSize = 10.5.sp, fontWeight = FontWeight.Black,
-        )
-        Surface(
-            Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            color = Color.White,
-            border = BorderStroke(1.dp, Abu200),
-        ) {
-            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) { isi() }
+    Column {
+        LabelSeksiIos(if (wajib) "$judul *" else judul, Modifier.padding(start = 16.dp, bottom = 7.dp))
+        KartuIos(padding = PaddingValues(14.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) { isi() }
         }
     }
 }
@@ -529,17 +531,18 @@ private fun KartuForm(judul: String, wajib: Boolean, isi: @Composable () -> Unit
 private fun PilihanTurun(nilai: String, pilihan: List<Pair<String, String>>, onPilih: (String) -> Unit) {
     var terbuka by remember { mutableStateOf(false) }
     Box(Modifier.fillMaxWidth()) {
-        Surface(
-            onClick = { terbuka = true },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            color = Color.White,
-            border = BorderStroke(1.dp, Abu200),
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = UkuranIos.TinggiKontrol + 4.dp)
+                .clip(UkuranIos.SudutKontrol)
+                .background(WarnaIos.Isian)
+                .tekanIos({ terbuka = true })
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(Modifier.padding(horizontal = 12.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(nilai, Modifier.weight(1f), color = Abu900, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                Icon(Icons.Default.ArrowDropDown, null, tint = Abu500, modifier = Modifier.size(18.dp))
-            }
+            Text(nilai, Modifier.weight(1f), style = TipeIos.Keterangan.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold))
+            Icon(IkonIos.ArrowDropDown, null, tint = WarnaIos.Aksen, modifier = Modifier.size(16.dp))
         }
         SukaDropdownMenu(expanded = terbuka, onDismissRequest = { terbuka = false }) {
             SukaDropdownHeader(title = "PILIH OPSI", onClose = { terbuka = false })
@@ -559,9 +562,12 @@ private fun KolomAngka(label: String, nilai: String, onUbah: (String) -> Unit, m
     OutlinedTextField(
         value = nilai,
         onValueChange = onUbah,
-        label = { Text(label, fontSize = 10.sp) },
+        label = { Text(label, fontSize = 12.sp) },
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+        textStyle = TipeIos.Isi,
+        shape = UkuranIos.SudutKontrol,
+        colors = warnaKolomIos(),
         modifier = modifier,
     )
 }
@@ -572,51 +578,43 @@ private fun BagianFotoRetur(url: String?, mengunggah: Boolean, keterangan: Strin
         Modifier
             .fillMaxWidth()
             .height(150.dp)
-            .background(LatarRetur, RoundedCornerShape(14.dp)),
+            .clip(UkuranIos.SudutBlok)
+            .background(WarnaIos.Latar),
         contentAlignment = Alignment.Center,
     ) {
         when {
-            mengunggah -> CircularProgressIndicator(color = AmberTua)
+            mengunggah -> CircularProgressIndicator(Modifier.size(26.dp), color = WarnaIos.Abu, strokeWidth = 2.5.dp)
             url != null -> AsyncImage(
                 model = url,
                 contentDescription = "Bukti foto retur",
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize().background(LatarRetur, RoundedCornerShape(14.dp)),
+                modifier = Modifier.fillMaxSize(),
             )
             else -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Default.PhotoCamera, null, tint = Abu500, modifier = Modifier.size(26.dp))
+                Icon(IkonIos.PhotoCamera, null, tint = WarnaIos.Abu, modifier = Modifier.size(28.dp))
                 Spacer(Modifier.height(6.dp))
-                Text("Belum ada foto", color = Abu500, fontSize = 11.sp)
+                Text("Belum ada foto", style = TipeIos.Catatan)
             }
         }
     }
-    Text(keterangan, color = Abu500, fontSize = 10.sp, lineHeight = 14.sp)
-    Surface(
-        onClick = onAmbil,
-        enabled = !mengunggah,
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        color = if (url != null) HijauTua.copy(alpha = 0.1f) else AmberTua,
-        border = if (url != null) BorderStroke(1.dp, HijauTua.copy(alpha = 0.4f)) else null,
-    ) {
-        Row(
-            Modifier.padding(vertical = 11.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                if (url != null) Icons.Default.CheckCircle else Icons.Default.PhotoCamera,
-                null,
-                tint = if (url != null) HijauTua else Color.White,
-                modifier = Modifier.size(17.dp),
-            )
-            Spacer(Modifier.width(7.dp))
-            Text(
-                if (url != null) "Foto tersimpan — ambil ulang" else "Ambil foto sekarang",
-                color = if (url != null) HijauTua else Color.White,
-                fontSize = 12.sp, fontWeight = FontWeight.Bold,
-            )
-        }
+    Text(keterangan, style = TipeIos.Catatan.copy(lineHeight = 18.sp))
+    if (url != null) {
+        TombolKeduaIos(
+            "Foto tersimpan — ambil ulang",
+            onAmbil,
+            Modifier.height(44.dp),
+            aktif = !mengunggah,
+            ikon = IkonIos.CheckCircle,
+            warna = WarnaIos.Hijau,
+        )
+    } else {
+        TombolUtamaIos(
+            "Ambil foto sekarang",
+            onAmbil,
+            Modifier.height(44.dp),
+            aktif = !mengunggah,
+            ikon = IkonIos.PhotoCamera,
+        )
     }
 }
 
@@ -628,17 +626,27 @@ private fun PilihanWaktu(
     modifier: Modifier = Modifier,
     onKlik: () -> Unit,
 ) {
-    Surface(
-        onClick = onKlik,
-        modifier = modifier,
-        shape = RoundedCornerShape(14.dp),
-        color = if (terpilih) AmberMuda else Color.White,
-        border = BorderStroke(if (terpilih) 2.dp else 1.dp, if (terpilih) AmberTua else Abu200),
+    Column(
+        modifier
+            .clip(UkuranIos.SudutBlok)
+            .background(if (terpilih) WarnaIos.Aksen.copy(alpha = 0.12f) else WarnaIos.Latar)
+            .tekanIos(onKlik)
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
-        Column(Modifier.padding(11.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(judul, color = Abu900, fontSize = 12.sp, fontWeight = FontWeight.Black)
-            Text(keterangan, color = Abu500, fontSize = 9.5.sp, lineHeight = 13.sp)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                judul,
+                Modifier.weight(1f),
+                style = TipeIos.Keterangan.copy(
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (terpilih) AmberTua else WarnaIos.Label,
+                ),
+            )
+            if (terpilih) Icon(IkonIos.CheckCircle, "Terpilih", tint = WarnaIos.Aksen, modifier = Modifier.size(18.dp))
         }
+        Text(keterangan, style = TipeIos.Kecil.copy(lineHeight = 15.sp))
     }
 }
 
@@ -651,29 +659,10 @@ private fun TombolLembar(
     modifier: Modifier = Modifier,
     onKlik: () -> Unit,
 ) {
-    Surface(
-        onClick = onKlik,
-        enabled = !sibuk,
-        modifier = modifier,
-        shape = RoundedCornerShape(14.dp),
-        color = if (isian) warna else warna.copy(alpha = 0.08f),
-        border = if (isian) null else BorderStroke(1.dp, warna.copy(alpha = 0.4f)),
-    ) {
-        Box(Modifier.padding(vertical = 13.dp), contentAlignment = Alignment.Center) {
-            if (sibuk) {
-                CircularProgressIndicator(
-                    Modifier.size(18.dp),
-                    color = if (isian) Color.White else warna,
-                    strokeWidth = 2.dp,
-                )
-            } else {
-                Text(
-                    teks,
-                    color = if (isian) Color.White else warna,
-                    fontSize = 13.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center,
-                )
-            }
-        }
+    if (isian) {
+        TombolUtamaIos(teks, onKlik, modifier, aktif = !sibuk, memuat = sibuk, warna = warna)
+    } else {
+        TombolKeduaIos(teks, onKlik, modifier, aktif = !sibuk, warna = warna)
     }
 }
 
@@ -684,10 +673,10 @@ private fun LembarKamera(state: ReturUiState, viewModel: ReturViewModel, judul: 
     ModalBottomSheet(
         onDismissRequest = viewModel::tutupKamera,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = Color.White,
+        containerColor = WarnaIos.Kartu,
     ) {
-        Column(Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp)) {
-            Text(judul, color = Abu900, fontSize = 14.sp, fontWeight = FontWeight.Black)
+        Column(Modifier.padding(horizontal = UkuranIos.TepiLayar).padding(bottom = 24.dp)) {
+            Text(judul, style = TipeIos.Utama)
             Spacer(Modifier.height(10.dp))
             KameraFotoSheet(
                 onDiambil = viewModel::simpanFoto,
