@@ -1,5 +1,13 @@
 package com.sukashawarma.superapp.feature.chat.ui.developer
 
+import com.sukashawarma.superapp.core.ui.ios.KeadaanIos
+import com.sukashawarma.superapp.core.ui.ios.KolomCariIos
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.TombolBundarIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -81,9 +89,9 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 private val WarnaWallpaper = Color(0xFFEFE7DE)
-private val WarnaTeksUtama = Color(0xFF1C1C1E)
-private val WarnaTeksKedua = Color(0xFF8E8E93)
-private val WarnaBiru = Color(0xFF007AFF)
+private val WarnaTeksUtama = WarnaIos.Label
+private val WarnaTeksKedua = WarnaIos.Abu
+private val WarnaBiru = WarnaIos.Biru
 
 /** Satu baris pada daftar: pemisah tanggal atau bubble pesan. */
 private sealed interface ItemPantau {
@@ -144,48 +152,42 @@ fun LayarDetailPantauDev(
                         Column {
                             Text(
                                 text = "$userAName & $userBName",
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = WarnaTeksUtama,
+                                style = TipeIos.Utama,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
                             Text(
                                 text = "🕵️ Mode Pantau Siluman (Read-Only)",
-                                fontSize = 11.sp,
-                                color = Color(0xFFFF9500),
+                                style = TipeIos.Kecil,
+                                color = NadaIos.PERINGATAN.teks,
                                 fontWeight = FontWeight.Medium
                             )
                         }
                     },
                     navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Kembali",
-                                tint = WarnaBiru
-                            )
-                        }
+                        TombolBundarIos(
+                            IkonIos.ArrowBack,
+                            "Kembali",
+                            onBack,
+                            Modifier.padding(start = 10.dp, end = 6.dp),
+                        )
                     },
                     actions = {
-                        IconButton(
-                            onClick = {
+                        TombolBundarIos(
+                            if (cariAktif) IkonIos.Close else IkonIos.Search,
+                            if (cariAktif) "Tutup pencarian" else "Cari pesan",
+                            {
                                 cariAktif = !cariAktif
                                 if (!cariAktif) kueri = ""
-                            }
-                        ) {
-                            Icon(
-                                imageVector = if (cariAktif) Icons.Default.Cancel else Icons.Default.Search,
-                                contentDescription = if (cariAktif) "Tutup pencarian" else "Cari pesan",
-                                tint = WarnaBiru
-                            )
-                        }
+                            },
+                            Modifier.padding(end = 12.dp),
+                        )
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = WarnaIos.Kartu)
                 )
 
                 AnimatedVisibility(visible = cariAktif) {
-                    Column(modifier = Modifier.background(Color.White)) {
+                    Column(modifier = Modifier.background(WarnaIos.Kartu)) {
                         KolomPencarianPesan(
                             kueri = kueri,
                             onKueriBerubah = { kueri = it },
@@ -194,15 +196,14 @@ fun LayarDetailPantauDev(
                         if (kueri.isNotBlank()) {
                             Text(
                                 text = "${hasilFilter.size} pesan cocok dari ${state.pesanList.size}",
-                                fontSize = 11.sp,
-                                color = WarnaTeksKedua,
+                                style = TipeIos.Kecil,
                                 modifier = Modifier.padding(start = 18.dp, bottom = 8.dp)
                             )
                         }
                     }
                 }
 
-                HorizontalDivider(color = Color(0xFFE5E5EA), thickness = 0.7.dp)
+                HorizontalDivider(color = WarnaIos.Pemisah, thickness = 0.5.dp)
             }
         }
     ) { padding ->
@@ -221,11 +222,19 @@ fun LayarDetailPantauDev(
                     }
 
                     state.pesanList.isEmpty() -> KotakTengah {
-                        TeksKosongDetail("Tidak ada pesan aktif antara kedua user.")
+                        KeadaanIos(
+                            ikon = IkonIos.Inbox,
+                            judul = "Belum ada pesan",
+                            pesan = "Tidak ada pesan aktif antara kedua user.",
+                        )
                     }
 
                     hasilFilter.isEmpty() -> KotakTengah {
-                        TeksKosongDetail("Tidak ada pesan yang memuat \"${kueri.trim()}\".")
+                        KeadaanIos(
+                            ikon = IkonIos.Search,
+                            judul = "Tidak ditemukan",
+                            pesan = "Tidak ada pesan yang memuat \"${kueri.trim()}\".",
+                        )
                     }
 
                     else -> LazyColumn(
@@ -270,7 +279,7 @@ fun LayarDetailPantauDev(
                         Icon(
                             imageVector = Icons.Default.Headphones,
                             contentDescription = null,
-                            tint = Color(0xFFFF9500)
+                            tint = WarnaIos.Oranye
                         )
                     },
                     title = { Text("Putar pesan suara?") },
@@ -288,11 +297,11 @@ fun LayarDetailPantauDev(
                             izinDengar = true
                             tanyaDengar = false
                         }) {
-                            Text("Saya pakai earphone", fontWeight = FontWeight.SemiBold)
+                            Text("Saya pakai earphone", color = WarnaIos.Aksen, fontWeight = FontWeight.SemiBold)
                         }
                     },
                     dismissButton = {
-                        TextButton(onClick = { tanyaDengar = false }) { Text("Batal") }
+                        TextButton(onClick = { tanyaDengar = false }) { Text("Batal", color = WarnaIos.Aksen) }
                     }
                 )
             }
@@ -337,20 +346,20 @@ private fun SpandukSiluman() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFF1C1C1E))
+            .background(WarnaIos.Label)
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
-            imageVector = Icons.Default.Visibility,
+            imageVector = IkonIos.Visibility,
             contentDescription = null,
-            tint = Color(0xFFFFD60A),
+            tint = WarnaIos.Kuning,
             modifier = Modifier.size(16.dp)
         )
         Spacer(modifier = Modifier.width(10.dp))
         Text(
             text = "Akses siluman — centang biru user tidak berubah.",
-            fontSize = 11.sp,
+            style = TipeIos.Kecil,
             color = Color(0xFFAEAEB2)
         )
     }
@@ -364,57 +373,14 @@ private fun KolomPencarianPesan(
 ) {
     val keyboard = LocalSoftwareKeyboardController.current
 
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(38.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(Color(0xFFE3E3E8))
-            .padding(horizontal = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = Icons.Default.Search,
-            contentDescription = null,
-            tint = WarnaTeksKedua,
-            modifier = Modifier.size(18.dp)
-        )
-        Spacer(modifier = Modifier.width(6.dp))
-
-        Box(modifier = Modifier.weight(1f)) {
-            if (kueri.isEmpty()) {
-                Text(
-                    text = "Cari isi pesan atau kutipan balasan",
-                    fontSize = 14.sp,
-                    color = WarnaTeksKedua,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            BasicTextField(
-                value = kueri,
-                onValueChange = onKueriBerubah,
-                singleLine = true,
-                textStyle = TextStyle(fontSize = 14.sp, color = WarnaTeksUtama),
-                cursorBrush = SolidColor(WarnaBiru),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-
-        if (kueri.isNotEmpty()) {
-            Icon(
-                imageVector = Icons.Default.Cancel,
-                contentDescription = "Hapus pencarian",
-                tint = WarnaTeksKedua,
-                modifier = Modifier
-                    .size(18.dp)
-                    .clip(CircleShape)
-                    .clickable { onKueriBerubah("") }
-            )
-        }
-    }
+    KolomCariIos(
+        nilai = kueri,
+        onUbah = onKueriBerubah,
+        placeholder = "Cari isi pesan atau kutipan balasan",
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
+        modifier = modifier.fillMaxWidth()
+    )
 }
 
 @Composable
@@ -427,11 +393,11 @@ private fun PemisahTanggal(label: String) {
     ) {
         Text(
             text = label,
-            fontSize = 11.sp,
+            style = TipeIos.Kecil,
             fontWeight = FontWeight.Medium,
-            color = Color(0xFF636366),
+            color = NadaIos.NETRAL.teks,
             modifier = Modifier
-                .clip(RoundedCornerShape(10.dp))
+                .clip(UkuranIos.SudutKapsul)
                 .background(Color(0xCCFFFFFF))
                 .padding(horizontal = 10.dp, vertical = 4.dp)
         )
@@ -442,20 +408,9 @@ private fun PemisahTanggal(label: String) {
 private fun KotakTengah(isi: @Composable () -> Unit) {
     Box(
         modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 32.dp),
+            .fillMaxSize(),
         contentAlignment = Alignment.Center
     ) { isi() }
-}
-
-@Composable
-private fun TeksKosongDetail(teks: String) {
-    Text(
-        text = teks,
-        fontSize = 13.sp,
-        color = Color(0xFF6C6C70),
-        textAlign = TextAlign.Center
-    )
 }
 
 @Composable
