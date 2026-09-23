@@ -1,8 +1,21 @@
 package com.sukashawarma.superapp.feature.stok.ui.opname
 
-import androidx.compose.foundation.BorderStroke
+import com.sukashawarma.superapp.core.ui.kaca.navigationBarsPaddingKaca
+import com.sukashawarma.superapp.core.ui.ios.AngkaIos
+import com.sukashawarma.superapp.core.ui.ios.BlokAngkaIos
+import com.sukashawarma.superapp.core.ui.ios.KartuIos
+import com.sukashawarma.superapp.core.ui.ios.LencanaIos
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.PemisahIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.ios.bayanganIos
+import com.sukashawarma.superapp.core.ui.ios.tekanIos
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,13 +25,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -54,9 +64,6 @@ import com.sukashawarma.superapp.feature.stok.ui.HeaderStok
 import com.sukashawarma.superapp.feature.stok.ui.KeadaanGagal
 import com.sukashawarma.superapp.feature.stok.ui.KeadaanKosong
 import com.sukashawarma.superapp.feature.stok.ui.MemuatPenuh
-import com.sukashawarma.superapp.presentation.theme.SukaOnSurface
-import com.sukashawarma.superapp.presentation.theme.SukaOnSurfaceVariant
-import com.sukashawarma.superapp.presentation.theme.SukaSurface
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -65,17 +72,6 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.abs
-
-private val AMBER_BG = Color(0xFFFFFBEB)
-private val AMBER_LINE = Color(0xFFFDE68A)
-private val AMBER_TEKS = Color(0xFF92400E)
-private val MERAH = Color(0xFFDC2626)
-private val MERAH_BG = Color(0xFFFEF2F2)
-private val MERAH_LINE = Color(0xFFFECACA)
-private val HIJAU = Color(0xFF168451)
-private val SLATE400 = Color(0xFF94A3B8)
-private val SLATE500 = Color(0xFF64748B)
-private val GARIS = Color(0xFFF1F5F9)
 
 data class DetailOpnameUiState(
     val memuat: Boolean = true,
@@ -181,13 +177,13 @@ fun DetailOpnameScreen(
     LaunchedEffect(opnameId) { viewModel.muat(opnameId) }
     RealtimeRefresh(RealtimeTables.OPNAME, RealtimeTables.OPNAME_ITEM) { viewModel.muatUlang() }
 
-    Column(Modifier.fillMaxSize().background(SukaSurface)) {
+    Column(Modifier.fillMaxSize().background(WarnaIos.Latar)) {
         HeaderStok(
             judul = "Detail Opname Stok",
             subjudul = tanggalPanjang(state.tanggal),
             onKembali = onKembali,
         )
-        Box(Modifier.fillMaxSize().navigationBarsPadding()) {
+        Box(Modifier.fillMaxSize().navigationBarsPaddingKaca()) {
             when {
                 state.memuat && state.item.isEmpty() -> MemuatPenuh()
                 state.error != null -> KeadaanGagal(state.error!!, viewModel::muatUlang)
@@ -205,20 +201,20 @@ private fun Isi(
 ) {
     LazyColumn(
         Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        contentPadding = PaddingValues(start = UkuranIos.TepiLayar, end = UkuranIos.TepiLayar, top = 12.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(UkuranIos.JarakKartu),
     ) {
         item(key = "kepala") { KartuKepala(state) }
 
         if (state.status == StatusOpname.PENDING_APPROVAL) {
             item(key = "pita-pending") {
-                Pita(AMBER_BG, AMBER_LINE, AMBER_TEKS, "Menunggu Persetujuan Leader")
+                Pita(NadaIos.PERINGATAN, "Menunggu Persetujuan Leader")
             }
         }
         if (state.status == StatusOpname.REJECTED) {
             item(key = "pita-tolak") {
                 Pita(
-                    MERAH_BG, MERAH_LINE, MERAH,
+                    NadaIos.BAHAYA,
                     "Ditolak" + (state.catatanPersetujuan?.let { " — $it" } ?: ""),
                 )
             }
@@ -247,115 +243,94 @@ private fun Isi(
     }
 }
 
+private fun StatusOpname.nadaIos(): NadaIos = when (this) {
+    StatusOpname.FINALIZED, StatusOpname.APPROVED -> NadaIos.SUKSES
+    StatusOpname.PENDING_APPROVAL -> NadaIos.PERINGATAN
+    StatusOpname.REJECTED -> NadaIos.BAHAYA
+    StatusOpname.DRAFT -> NadaIos.NETRAL
+}
+
 @Composable
 private fun KartuKepala(state: DetailOpnameUiState) {
-    val warna = when (state.status) {
-        StatusOpname.FINALIZED, StatusOpname.APPROVED -> HIJAU
-        StatusOpname.PENDING_APPROVAL -> Color(0xFFC27A12)
-        StatusOpname.REJECTED -> MERAH
-        StatusOpname.DRAFT -> SLATE500
-    }
-    Surface(
-        Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = Color.White,
-        border = BorderStroke(1.dp, GARIS),
-    ) {
-        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+    KartuIos {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(
-                    labelTipe(state.tipe),
-                    color = SukaOnSurface, fontSize = 13.sp, fontWeight = FontWeight.Bold,
-                )
+                Text(labelTipe(state.tipe), style = TipeIos.Utama)
                 Text(
                     state.pembuat?.let { "Dibuat oleh $it" } ?: "Pembuat tidak tercatat",
-                    color = SukaOnSurfaceVariant, fontSize = 10.sp,
+                    style = TipeIos.Catatan,
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
                 if (state.catatanOpname != null) {
                     Spacer(Modifier.height(4.dp))
-                    Text(state.catatanOpname, color = SLATE500, fontSize = 10.sp)
+                    Text(state.catatanOpname, style = TipeIos.Catatan)
                 }
             }
-            Surface(
-                shape = RoundedCornerShape(50),
-                color = warna.copy(alpha = 0.10f),
-                border = BorderStroke(1.dp, warna.copy(alpha = 0.28f)),
-            ) {
-                Text(
-                    state.status.label,
-                    Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
-                    color = warna, fontSize = 10.sp, fontWeight = FontWeight.Black,
-                )
-            }
+            Spacer(Modifier.width(8.dp))
+            LencanaIos(state.status.label, state.status.nadaIos())
         }
     }
 }
 
 @Composable
 private fun KartuStatistik(state: DetailOpnameUiState) {
-    Surface(
-        Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = Color.White,
-        border = BorderStroke(1.dp, GARIS),
-    ) {
-        Row(Modifier.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            SelStat("Pas", state.jumlahPas.toString(), HIJAU, Modifier.weight(1f))
-            SelStat("Dalam toleransi", state.jumlahToleransi.toString(), SLATE500, Modifier.weight(1f))
-            SelStat("Di luar toleransi", state.jumlahFlagged.toString(), Color(0xFFC2410C), Modifier.weight(1f))
-        }
-    }
-}
-
-@Composable
-private fun SelStat(judul: String, nilai: String, warna: Color, modifier: Modifier = Modifier) {
-    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(nilai, color = warna, fontSize = 17.sp, fontWeight = FontWeight.Black)
-        Text(judul, color = SLATE400, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+    KartuIos(padding = PaddingValues(12.dp)) {
+        BlokAngkaIos(
+            listOf(
+                AngkaIos("Pas", state.jumlahPas.toString()),
+                AngkaIos("Dalam toleransi", state.jumlahToleransi.toString()),
+                AngkaIos("Di luar toleransi", state.jumlahFlagged.toString(), negatif = state.jumlahFlagged > 0),
+            ),
+        )
     }
 }
 
 @Composable
 private fun BarisTab(state: DetailOpnameUiState, viewModel: DetailOpnameViewModel) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Tab("Dihitung (${state.item.size})", !state.tabBelumDihitung) { viewModel.pilihTab(false) }
-        Tab("Belum Dihitung (${state.belumDihitung.size})", state.tabBelumDihitung) { viewModel.pilihTab(true) }
+    // Segmented control ala iOS: satu wadah abu, segmen aktif terangkat putih.
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(WarnaIos.Isian, UkuranIos.SudutKontrol)
+            .padding(2.dp),
+    ) {
+        Tab("Dihitung (${state.item.size})", !state.tabBelumDihitung, Modifier.weight(1f)) { viewModel.pilihTab(false) }
+        Tab("Belum Dihitung (${state.belumDihitung.size})", state.tabBelumDihitung, Modifier.weight(1f)) { viewModel.pilihTab(true) }
     }
 }
 
 @Composable
-private fun Tab(teks: String, aktif: Boolean, onKlik: () -> Unit) {
-    Surface(
-        Modifier.clickable(onClick = onKlik),
-        shape = RoundedCornerShape(50),
-        color = if (aktif) Color(0xFFEA580C).copy(alpha = 0.12f) else Color.White,
-        border = BorderStroke(1.dp, if (aktif) Color(0xFFEA580C).copy(alpha = 0.35f) else GARIS),
+private fun Tab(teks: String, aktif: Boolean, modifier: Modifier = Modifier, onKlik: () -> Unit) {
+    val bentuk = RoundedCornerShape(10.dp)
+    Box(
+        modifier
+            .then(if (aktif) Modifier.bayanganIos(bentuk, 2.dp).background(WarnaIos.Kartu, bentuk) else Modifier)
+            .tekanIos(onKlik)
+            .padding(vertical = 8.dp),
+        contentAlignment = Alignment.Center,
     ) {
         Text(
             teks,
-            Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-            color = if (aktif) Color(0xFFC2410C) else SLATE500,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
+            style = TipeIos.Catatan.copy(
+                color = WarnaIos.Label,
+                fontWeight = if (aktif) FontWeight.SemiBold else FontWeight.Normal,
+            ),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
 
 @Composable
-private fun Pita(latar: Color, garis: Color, teksWarna: Color, teks: String) {
-    Surface(
-        Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        color = latar,
-        border = BorderStroke(1.dp, garis),
-    ) {
-        Text(
-            teks,
-            Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
-            color = teksWarna, fontSize = 11.sp, fontWeight = FontWeight.Bold,
-        )
-    }
+private fun Pita(nada: NadaIos, teks: String) {
+    Text(
+        teks,
+        Modifier
+            .fillMaxWidth()
+            .background(nada.warna.copy(alpha = 0.12f), UkuranIos.SudutKontrol)
+            .padding(horizontal = 14.dp, vertical = 11.dp),
+        style = TipeIos.Catatan.copy(color = nada.teks, fontWeight = FontWeight.SemiBold),
+    )
 }
 
 @Composable
@@ -364,102 +339,99 @@ private fun BarisItem(it: OpnameItemDetail, pemakaian: Double?, bolehAnalisis: B
     val persen = Selisih.persen(it.selisih, it.qtySystem)
     val ambang = Selisih.ambangPersen(it.meta.satuan, it.meta.satuanKecil)
 
-    Surface(
-        Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
-        color = Color.White,
-        border = BorderStroke(1.dp, if (it.flagged) MERAH_LINE else GARIS),
-    ) {
-        Column(Modifier.padding(13.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    it.namaTampil,
-                    Modifier.weight(1f),
-                    color = SukaOnSurface, fontSize = 12.sp, fontWeight = FontWeight.Bold,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis,
-                )
-                if (bolehAnalisis && it.terhitung) {
-                    Text(
-                        persen.teks,
-                        color = when {
-                            persen.nol -> HIJAU
-                            it.flagged -> MERAH
-                            else -> SLATE500
-                        },
-                        fontSize = 11.sp, fontWeight = FontWeight.Black,
-                    )
-                }
-            }
-            Spacer(Modifier.height(8.dp))
-            BarisAngka("Sistem", labelGram(it.qtySystem, it.meta), SLATE500)
-            BarisAngka(
-                "Fisik",
-                if (it.terhitung) labelGram(it.qtyFisik!!, it.meta) else "Belum terhitung",
-                if (it.terhitung) SukaOnSurface else SLATE400,
+    // Garis merah dipertahankan hanya untuk baris di luar toleransi — penanda
+    // semantik, bukan garis tepi dekoratif kartu.
+    val tepi = if (it.flagged) {
+        Modifier.border(1.dp, WarnaIos.Merah.copy(alpha = 0.4f), UkuranIos.SudutKartu)
+    } else {
+        Modifier
+    }
+
+    KartuIos(tepi) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                it.namaTampil,
+                Modifier.weight(1f),
+                style = TipeIos.Utama,
+                maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
-            if (it.terhitung) {
-                BarisAngka(
-                    "Selisih",
-                    labelGram(it.selisih, it.meta),
-                    when {
-                        it.selisih == 0.0 -> HIJAU
-                        it.selisih < 0 -> MERAH
-                        else -> Color(0xFFC2410C)
-                    },
-                )
-            }
-            if (pemakaian != null && pemakaian > 0.0) {
-                BarisAngka("Pemakaian resep", labelGram(pemakaian, it.meta), SLATE500)
-            }
             if (bolehAnalisis && it.terhitung) {
-                Spacer(Modifier.height(6.dp))
-                HorizontalDivider(color = GARIS)
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    "Toleransi $ambang%" + if (it.flagged) " · di luar toleransi" else "",
-                    color = if (it.flagged) Color(0xFFC2410C) else SLATE400,
-                    fontSize = 9.sp, fontWeight = FontWeight.Bold,
+                Spacer(Modifier.width(8.dp))
+                LencanaIos(
+                    persen.teks,
+                    when {
+                        persen.nol -> NadaIos.SUKSES
+                        it.flagged -> NadaIos.BAHAYA
+                        else -> NadaIos.NETRAL
+                    },
+                    titik = false,
                 )
             }
-            if (catatan.targetKitchen != null) {
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    "Target Kitchen: ${catatan.targetKitchen}",
-                    color = SLATE500, fontSize = 9.sp,
-                )
-            }
-            if (catatan.catatanBebas != null) {
-                Spacer(Modifier.height(6.dp))
-                Text(catatan.catatanBebas, color = SLATE500, fontSize = 9.sp)
-            }
+        }
+        Spacer(Modifier.height(8.dp))
+        BarisAngka("Sistem", labelGram(it.qtySystem, it.meta), WarnaIos.LabelKedua)
+        BarisAngka(
+            "Fisik",
+            if (it.terhitung) labelGram(it.qtyFisik!!, it.meta) else "Belum terhitung",
+            if (it.terhitung) WarnaIos.Label else WarnaIos.LabelKetiga,
+        )
+        if (it.terhitung) {
+            BarisAngka(
+                "Selisih",
+                labelGram(it.selisih, it.meta),
+                when {
+                    it.selisih == 0.0 -> NadaIos.SUKSES.teks
+                    it.selisih < 0 -> NadaIos.BAHAYA.teks
+                    else -> NadaIos.PERINGATAN.teks
+                },
+            )
+        }
+        if (pemakaian != null && pemakaian > 0.0) {
+            BarisAngka("Pemakaian resep", labelGram(pemakaian, it.meta), WarnaIos.LabelKedua)
+        }
+        if (bolehAnalisis && it.terhitung) {
+            Spacer(Modifier.height(8.dp))
+            PemisahIos(inset = 0.dp)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Toleransi $ambang%" + if (it.flagged) " · di luar toleransi" else "",
+                style = TipeIos.Kecil.copy(
+                    color = if (it.flagged) NadaIos.PERINGATAN.teks else WarnaIos.LabelKedua,
+                    fontWeight = FontWeight.Medium,
+                ),
+            )
+        }
+        if (catatan.targetKitchen != null) {
+            Spacer(Modifier.height(6.dp))
+            Text("Target Kitchen: ${catatan.targetKitchen}", style = TipeIos.Kecil)
+        }
+        if (catatan.catatanBebas != null) {
+            Spacer(Modifier.height(6.dp))
+            Text(catatan.catatanBebas, style = TipeIos.Kecil)
         }
     }
 }
 
 @Composable
 private fun BarisAngka(label: String, nilai: String, warna: Color) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 1.dp)) {
-        Text(label, Modifier.weight(1f), color = SLATE400, fontSize = 10.sp)
-        Text(nilai, color = warna, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+        Text(label, Modifier.weight(1f), style = TipeIos.Catatan)
+        Text(nilai, style = TipeIos.Catatan.copy(color = warna, fontWeight = FontWeight.SemiBold))
     }
 }
 
 @Composable
 private fun BarisBelumDihitung(b: BahanAktifRingkas) {
-    Surface(
-        Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        color = Color.White,
-        border = BorderStroke(1.dp, GARIS),
-    ) {
-        Row(Modifier.padding(horizontal = 13.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+    KartuIos(padding = PaddingValues(horizontal = UkuranIos.PaddingKartu, vertical = 12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 b.nama,
                 Modifier.weight(1f),
-                color = SukaOnSurface, fontSize = 11.sp, fontWeight = FontWeight.Medium,
+                style = TipeIos.Keterangan,
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
-            Text(b.kategori, color = SLATE400, fontSize = 9.sp)
+            Spacer(Modifier.width(8.dp))
+            Text(b.kategori, style = TipeIos.Catatan)
         }
     }
 }
