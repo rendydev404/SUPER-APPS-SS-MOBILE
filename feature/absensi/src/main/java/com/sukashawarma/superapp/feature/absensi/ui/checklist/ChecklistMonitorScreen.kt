@@ -3,36 +3,21 @@ package com.sukashawarma.superapp.presentation.absensi.checklist
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.NightsStay
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PriorityHigh
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Store
-import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.WbSunny
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -46,6 +31,20 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.sukashawarma.superapp.core.ui.ios.BilahJudulIos
+import com.sukashawarma.superapp.core.ui.ios.KartuIos
+import com.sukashawarma.superapp.core.ui.ios.KeadaanIos
+import com.sukashawarma.superapp.core.ui.ios.KolomCariIos
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.PemisahIos
+import com.sukashawarma.superapp.core.ui.ios.SegmenIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WadahSegmenIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.ios.permukaanIos
+import com.sukashawarma.superapp.core.ui.ios.tekanIos
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
 import com.sukashawarma.superapp.domain.util.JakartaTime
 import java.time.Instant
 import java.time.LocalDate
@@ -54,30 +53,15 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import com.sukashawarma.superapp.core.ui.RealtimeRefresh
 import com.sukashawarma.superapp.core.ui.RealtimeTables
+import com.sukashawarma.superapp.core.ui.kaca.denganRuangNav
 import com.sukashawarma.superapp.core.ui.SukaDropdownHeader
 import com.sukashawarma.superapp.core.ui.SukaDropdownMenu
 import com.sukashawarma.superapp.core.ui.SukaDropdownMenuItem
 
-// Stitch Suka Culinary Design Tokens (samakan dengan ChecklistManageScreen)
-private val StitchPrimary = Color(0xFF450700)
-private val StitchSecondaryContainer = Color(0xFFFE8438)
-private val StitchSurface = Color(0xFFF8F9FF)
-private val StitchSurfaceContainerLowest = Color(0xFFFFFFFF)
-private val StitchSurfaceContainerLow = Color(0xFFEFF4FF)
-private val StitchSurfaceContainer = Color(0xFFE5EEFF)
-private val StitchSurfaceContainerHigh = Color(0xFFDCE9FF)
-private val StitchOnSurface = Color(0xFF0B1C30)
-private val StitchOnSurfaceVariant = Color(0xFF57423D)
-private val StitchOutlineVariant = Color(0xFFDEC0B9)
-private val StitchError = Color(0xFFBA1A1A)
-private val StitchErrorContainer = Color(0xFFFFDAD6)
-
-// Status accents
-private val StatusGreen = Color(0xFF059669)
-private val StatusGreenSoft = Color(0xFFE7F7F0)
-private val StatusAmber = Color(0xFFD97706)
-private val StatusRed = Color(0xFFDC2626)
-private val StatusRedSoft = Color(0xFFFEE2E2)
+// Warna status — palet sistem iOS.
+private val StatusGreen = NadaIos.SUKSES.teks
+private val StatusAmber = NadaIos.PERINGATAN.teks
+private val StatusRed = NadaIos.BAHAYA.teks
 
 private val LongDateFormatter: DateTimeFormatter =
     DateTimeFormatter.ofPattern("EEEE, d MMMM yyyy", Locale("id", "ID"))
@@ -88,7 +72,7 @@ private val ChecklistPhase.monitorLabel: String
     get() = if (this == ChecklistPhase.BUKA) "Buka Outlet" else "Tutup Outlet"
 
 private val ChecklistPhase.accent: Color
-    get() = if (this == ChecklistPhase.BUKA) StitchSecondaryContainer else StitchPrimary
+    get() = if (this == ChecklistPhase.BUKA) WarnaIos.Aksen else WarnaIos.Indigo
 
 /** "Hari Ini" / "Kemarin" / tanggal pendek — label yang paling cepat dibaca manager. */
 private fun relativeDateLabel(date: LocalDate): String {
@@ -118,35 +102,13 @@ fun ChecklistMonitorScreen(
     LaunchedEffect(state.selectedOutletId, state.date) { collapsed.clear() }
 
     Scaffold(
-        containerColor = StitchSurface,
-        topBar = {
-            TopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = StitchSurface,
-                    titleContentColor = StitchPrimary,
-                    navigationIconContentColor = StitchOnSurface,
-                    actionIconContentColor = StitchOnSurface,
-                ),
-                navigationIcon = {
-                    IconButton(onClick = onExit) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali")
-                    }
-                },
-                title = {
-                    Text(
-                        "Monitor Checklist",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = StitchPrimary,
-                    )
-                },
-            )
-        },
+        containerColor = WarnaIos.Latar,
+        topBar = { BilahJudulIos(judul = "Monitor Checklist", onKembali = onExit, garisBawah = false) },
     ) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            contentPadding = PaddingValues(start = UkuranIos.TepiLayar, end = UkuranIos.TepiLayar, top = 4.dp, bottom = 32.dp).denganRuangNav(),
+            verticalArrangement = Arrangement.spacedBy(UkuranIos.JarakKartu),
         ) {
             item(key = "header") {
                 MonitorHeader(
@@ -172,10 +134,11 @@ fun ChecklistMonitorScreen(
 
             if (state.awaitingOutletChoice) {
                 item(key = "choose_outlet") {
-                    EmptyCard(
-                        icon = { Icon(Icons.Filled.Storefront, null, tint = StitchPrimary, modifier = Modifier.size(26.dp)) },
-                        title = "Pilih Outlet Dulu",
-                        message = "Anda memantau seluruh outlet. Pilih salah satu di atas untuk melihat progres checklistnya.",
+                    KeadaanIos(
+                        ikon = IkonIos.Storefront,
+                        judul = "Pilih Outlet Dulu",
+                        pesan = "Anda memantau seluruh outlet. Pilih salah satu di atas untuk melihat progres checklistnya.",
+                        nada = NadaIos.AKSEN,
                     )
                 }
                 return@LazyColumn
@@ -197,7 +160,7 @@ fun ChecklistMonitorScreen(
                         Modifier.fillMaxWidth().padding(vertical = 48.dp),
                         contentAlignment = Alignment.Center,
                     ) {
-                        CircularProgressIndicator(color = StitchPrimary, strokeWidth = 3.dp)
+                        CircularProgressIndicator(color = WarnaIos.Aksen, strokeWidth = 2.5.dp, modifier = Modifier.size(28.dp))
                     }
                 }
 
@@ -216,10 +179,11 @@ fun ChecklistMonitorScreen(
 
                     when {
                         state.categories.isEmpty() -> item(key = "empty_all") {
-                            EmptyCard(
-                                icon = { Icon(Icons.Filled.Checklist, null, tint = StitchPrimary, modifier = Modifier.size(26.dp)) },
-                                title = "Belum Ada Template Checklist",
-                                message = "Buat dulu daftar tugasnya di menu Manajemen Checklist.",
+                            KeadaanIos(
+                                ikon = IkonIos.Checklist,
+                                judul = "Belum Ada Template Checklist",
+                                pesan = "Buat dulu daftar tugasnya di menu Manajemen Checklist.",
+                                nada = NadaIos.AKSEN,
                             )
                         }
 
@@ -268,54 +232,43 @@ private fun MonitorHeader(
     onRefresh: () -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, top = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Surface(shape = RoundedCornerShape(14.dp), color = StitchSurfaceContainer, modifier = Modifier.size(42.dp)) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(Icons.Filled.Checklist, contentDescription = null, tint = StitchPrimary, modifier = Modifier.size(21.dp))
-            }
-        }
-        Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(
                 text = date.format(LongDateFormatter),
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-                color = StitchOnSurface,
+                style = TipeIos.Judul3.copy(fontWeight = FontWeight.Bold),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = outletName ?: "Progres checklist operasional",
-                fontSize = 12.5.sp,
-                color = StitchOnSurfaceVariant,
+                style = TipeIos.SubJudul,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
         if (showRefresh) {
             Spacer(Modifier.width(8.dp))
-            Surface(
-                onClick = onRefresh,
-                enabled = !refreshing,
-                shape = RoundedCornerShape(12.dp),
-                color = StitchSurfaceContainerLowest,
-                border = BorderStroke(1.dp, StitchOutlineVariant.copy(alpha = 0.5f)),
+            // Kapsul abu ala tombol toolbar iOS: ikon segarkan + jam muat terakhir.
+            Row(
+                modifier = Modifier
+                    .height(34.dp)
+                    .clip(UkuranIos.SudutKapsul)
+                    .background(WarnaIos.Isian)
+                    .tekanIos(onRefresh, aktif = !refreshing)
+                    .padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    if (refreshing) {
-                        CircularProgressIndicator(color = StitchPrimary, strokeWidth = 2.dp, modifier = Modifier.size(14.dp))
-                    } else {
-                        Icon(Icons.Filled.Refresh, contentDescription = "Muat ulang", tint = StitchOnSurfaceVariant, modifier = Modifier.size(15.dp))
-                    }
-                    if (lastRefresh.isNotBlank()) {
-                        Text(lastRefresh, fontSize = 11.5.sp, color = StitchOnSurfaceVariant, fontWeight = FontWeight.Medium)
-                    }
+                if (refreshing) {
+                    CircularProgressIndicator(color = WarnaIos.Aksen, strokeWidth = 2.dp, modifier = Modifier.size(14.dp))
+                } else {
+                    Icon(IkonIos.Refresh, contentDescription = "Muat ulang", tint = WarnaIos.Aksen, modifier = Modifier.size(15.dp))
+                }
+                if (lastRefresh.isNotBlank()) {
+                    Text(lastRefresh, color = WarnaIos.Aksen, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -339,47 +292,49 @@ private fun OutletPickerCard(
     LaunchedEffect(expanded) { if (!expanded) query = "" }
 
     Box {
-        Surface(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(enabled = !loading && outlets.isNotEmpty()) { expanded = true },
-            shape = RoundedCornerShape(14.dp),
-            color = StitchSurfaceContainerLowest,
-            border = BorderStroke(1.dp, if (selected == null) StitchSecondaryContainer.copy(alpha = 0.55f) else StitchSurfaceContainerHigh),
-            shadowElevation = 0.5.dp,
+                .permukaanIos(UkuranIos.SudutGrup)
+                .then(
+                    // Belum ada outlet terpilih: garis aksen tipis sebagai ajakan memilih.
+                    if (selected == null) Modifier.border(1.dp, WarnaIos.Aksen.copy(alpha = 0.45f), UkuranIos.SudutGrup)
+                    else Modifier
+                )
+                .clickable(enabled = !loading && outlets.isNotEmpty()) { expanded = true }
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            Box(
+                Modifier.size(30.dp).clip(CircleShape).background(WarnaIos.Aksen.copy(alpha = 0.14f)),
+                contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Filled.Storefront, contentDescription = null, tint = StitchSecondaryContainer, modifier = Modifier.size(21.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        text = when {
-                            loading -> "Memuat outlet..."
-                            selected != null -> selected.name
-                            else -> "Pilih outlet"
-                        },
-                        color = StitchOnSurface,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text = if (outlets.isEmpty() && !loading) "Tidak ada outlet yang bisa dipantau" else "Ketuk untuk ganti outlet",
-                        color = StitchOnSurfaceVariant,
-                        fontSize = 11.5.sp,
-                        maxLines = 1,
-                    )
-                }
-                Icon(
-                    if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                    contentDescription = "Pilih outlet",
-                    tint = StitchOnSurfaceVariant,
+                Icon(IkonIos.Storefront, contentDescription = null, tint = WarnaIos.Aksen, modifier = Modifier.size(17.dp))
+            }
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = when {
+                        loading -> "Memuat outlet..."
+                        selected != null -> selected.name
+                        else -> "Pilih outlet"
+                    },
+                    style = TipeIos.Isi.copy(fontWeight = FontWeight.SemiBold),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = if (outlets.isEmpty() && !loading) "Tidak ada outlet yang bisa dipantau" else "Ketuk untuk ganti outlet",
+                    style = TipeIos.Catatan,
+                    maxLines = 1,
                 )
             }
+            Icon(
+                if (expanded) IkonIos.ExpandLess else IkonIos.ExpandMore,
+                contentDescription = "Pilih outlet",
+                tint = WarnaIos.LabelKetiga,
+                modifier = Modifier.size(16.dp),
+            )
         }
 
         SukaDropdownMenu(
@@ -392,35 +347,11 @@ private fun OutletPickerCard(
                 onClose = { expanded = false },
             )
             Column(Modifier.padding(horizontal = 10.dp, vertical = 4.dp)) {
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = { query = it },
+                KolomCariIos(
+                    nilai = query,
+                    onUbah = { query = it },
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    placeholder = { Text("Cari outlet...", fontSize = 13.sp) },
-                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                    trailingIcon = {
-                        if (query.isNotEmpty()) {
-                            IconButton(onClick = { query = "" }) {
-                                Icon(Icons.Filled.Clear, contentDescription = "Hapus pencarian")
-                            }
-                        }
-                    },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color(0xFF1D1D1F),
-                        unfocusedTextColor = Color(0xFF1D1D1F),
-                        focusedBorderColor = StitchSecondaryContainer,
-                        unfocusedBorderColor = Color(0xFFE5E5EA),
-                        focusedContainerColor = Color(0xFFF2F2F7),
-                        unfocusedContainerColor = Color(0xFFF2F2F7),
-                        focusedPlaceholderColor = Color(0xFF8E8E93),
-                        unfocusedPlaceholderColor = Color(0xFF8E8E93),
-                        focusedLeadingIconColor = StitchSecondaryContainer,
-                        unfocusedLeadingIconColor = Color(0xFF8E8E93),
-                        focusedTrailingIconColor = Color(0xFF8E8E93),
-                        unfocusedTrailingIconColor = Color(0xFF8E8E93),
-                    ),
+                    placeholder = "Cari outlet...",
                 )
                 Spacer(Modifier.height(6.dp))
                 Column(
@@ -432,15 +363,14 @@ private fun OutletPickerCard(
                     if (filtered.isEmpty()) {
                         Text(
                             "Outlet tidak ditemukan",
-                            color = Color(0xFF8E8E93),
-                            fontSize = 13.sp,
+                            style = TipeIos.Catatan,
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 18.dp),
                         )
                     } else filtered.forEach { outlet ->
                         SukaDropdownMenuItem(
                             title = outlet.name,
                             selected = outlet.id == selectedId,
-                            leadingIcon = Icons.Filled.Storefront,
+                            leadingIcon = IkonIos.Storefront,
                             onClick = {
                                 onSelect(outlet.id)
                                 expanded = false
@@ -466,71 +396,61 @@ private fun DateFilterCard(
     val today = LocalDate.now(JakartaTime.ZONE)
     val isToday = date == today
 
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
-        color = StitchSurfaceContainerLowest,
-        border = BorderStroke(1.dp, StitchSurfaceContainerHigh),
-        shadowElevation = 0.5.dp,
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .permukaanIos(UkuranIos.SudutGrup)
+            .padding(horizontal = 6.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
+        DateStepButton(icon = Icons.Filled.ChevronLeft, description = "Hari sebelumnya", enabled = true, onClick = onPrev)
+
         Row(
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
+            modifier = Modifier
+                .weight(1f)
+                .clip(UkuranIos.SudutKontrol)
+                .clickable(onClick = onOpenPicker)
+                .padding(horizontal = 8.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
         ) {
-            DateStepButton(icon = Icons.Filled.ChevronLeft, description = "Hari sebelumnya", enabled = true, onClick = onPrev)
-
-            Row(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(10.dp))
-                    .clickable(onClick = onOpenPicker)
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
-            ) {
-                Icon(Icons.Filled.CalendarMonth, contentDescription = null, tint = StitchPrimary, modifier = Modifier.size(17.dp))
-                Spacer(Modifier.width(8.dp))
-                Column {
-                    Text(
-                        relativeDateLabel(date),
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = StitchOnSurface,
-                        maxLines = 1,
-                    )
-                    Text(
-                        if (isToday) date.format(ShortDateFormatter) else "Ketuk untuk pilih tanggal",
-                        fontSize = 11.sp,
-                        color = StitchOnSurfaceVariant,
-                        maxLines = 1,
-                    )
-                }
+            Icon(IkonIos.CalendarMonth, contentDescription = null, tint = WarnaIos.Aksen, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Column {
+                Text(
+                    relativeDateLabel(date),
+                    style = TipeIos.Keterangan.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
+                    maxLines = 1,
+                )
+                Text(
+                    if (isToday) date.format(ShortDateFormatter) else "Ketuk untuk pilih tanggal",
+                    style = TipeIos.Kecil,
+                    maxLines = 1,
+                )
             }
-
-            if (!isToday) {
-                Surface(
-                    onClick = onToday,
-                    shape = RoundedCornerShape(9.dp),
-                    color = StitchSecondaryContainer.copy(alpha = 0.14f),
-                ) {
-                    Text(
-                        "Hari Ini",
-                        fontSize = 11.5.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = StitchSecondaryContainer,
-                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
-                    )
-                }
-                Spacer(Modifier.width(2.dp))
-            }
-
-            DateStepButton(
-                icon = Icons.Filled.ChevronRight,
-                description = "Hari berikutnya",
-                enabled = !isToday,
-                onClick = onNext,
-            )
         }
+
+        if (!isToday) {
+            Text(
+                "Hari Ini",
+                color = WarnaIos.Aksen,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier
+                    .clip(UkuranIos.SudutKapsul)
+                    .background(WarnaIos.Aksen.copy(alpha = 0.12f))
+                    .tekanIos(onToday)
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+            )
+            Spacer(Modifier.width(2.dp))
+        }
+
+        DateStepButton(
+            icon = IkonIos.ChevronRight,
+            description = "Hari berikutnya",
+            enabled = !isToday,
+            onClick = onNext,
+        )
     }
 }
 
@@ -545,8 +465,8 @@ private fun DateStepButton(
         Icon(
             icon,
             contentDescription = description,
-            tint = if (enabled) StitchOnSurface else StitchOutlineVariant.copy(alpha = 0.6f),
-            modifier = Modifier.size(22.dp),
+            tint = if (enabled) WarnaIos.Aksen else WarnaIos.LabelKetiga,
+            modifier = Modifier.size(20.dp),
         )
     }
 }
@@ -570,46 +490,42 @@ private fun MonitorDatePickerDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
             TextButton(onClick = { picked?.let(onConfirm) }, enabled = valid) {
-                Text("Tampilkan", color = if (valid) StitchPrimary else StitchOnSurfaceVariant, fontWeight = FontWeight.Bold)
+                Text("Tampilkan", color = if (valid) WarnaIos.Aksen else WarnaIos.LabelKetiga, fontWeight = FontWeight.SemiBold)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Batal", color = StitchOnSurfaceVariant) }
+            TextButton(onClick = onDismiss) { Text("Batal", color = WarnaIos.LabelKedua) }
         },
-        colors = DatePickerDefaults.colors(containerColor = StitchSurfaceContainerLowest),
+        colors = DatePickerDefaults.colors(containerColor = WarnaIos.Kartu),
     ) {
         DatePicker(
             state = pickerState,
             title = {
                 Text(
                     "Pilih tanggal",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = StitchOnSurfaceVariant,
+                    style = TipeIos.Catatan.copy(fontWeight = FontWeight.SemiBold),
                     modifier = Modifier.padding(start = 24.dp, top = 16.dp),
                 )
             },
             headline = {
                 Text(
                     picked?.format(LongDateFormatter) ?: "-",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = StitchOnSurface,
+                    style = TipeIos.Judul3,
                     modifier = Modifier.padding(start = 24.dp, bottom = 8.dp),
                 )
             },
             showModeToggle = false,
             colors = DatePickerDefaults.colors(
-                containerColor = StitchSurfaceContainerLowest,
-                selectedDayContainerColor = StitchPrimary,
-                todayDateBorderColor = StitchSecondaryContainer,
+                containerColor = WarnaIos.Kartu,
+                selectedDayContainerColor = WarnaIos.Aksen,
+                todayDateBorderColor = WarnaIos.Aksen,
+                todayContentColor = WarnaIos.Aksen,
             ),
         )
         if (!valid && picked != null) {
             Text(
                 "Tanggal belum lewat — pilih hari ini atau sebelumnya.",
-                fontSize = 12.sp,
-                color = StatusAmber,
+                style = TipeIos.Kecil.copy(color = StatusAmber),
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
             )
         }
@@ -626,105 +542,99 @@ private fun SummaryCard(phase: ChecklistPhase, summary: PhaseSummary) {
         animationSpec = tween(durationMillis = 700),
         label = "checklist-progress",
     )
-    val barColor = if (progress == 100) StatusGreen else phase.accent
+    val barColor = if (progress == 100) WarnaIos.Hijau else phase.accent
 
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        color = StitchSurfaceContainerLowest,
-        border = BorderStroke(1.dp, StitchSurfaceContainerHigh.copy(alpha = 0.7f)),
-        shadowElevation = 0.5.dp,
-    ) {
-        Column(Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Bottom,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text("Progress ${phase.monitorLabel}", fontSize = 13.sp, color = StitchOnSurfaceVariant)
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text("$progress", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = StitchOnSurface)
-                    Text("%", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = StitchOnSurfaceVariant, modifier = Modifier.padding(bottom = 4.dp))
-                }
+    KartuIos {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Bottom,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text("Progress ${phase.monitorLabel}", style = TipeIos.Utama, modifier = Modifier.padding(bottom = 4.dp))
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text("$progress", style = TipeIos.JudulBesar.copy(fontSize = 30.sp))
+                Text("%", style = TipeIos.SubJudul.copy(fontWeight = FontWeight.SemiBold), modifier = Modifier.padding(bottom = 5.dp))
             }
+        }
 
-            Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(10.dp))
 
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(10.dp)
+                .clip(CircleShape)
+                .background(WarnaIos.Isian),
+        ) {
             Box(
                 Modifier
-                    .fillMaxWidth()
-                    .height(10.dp)
+                    .fillMaxWidth(animated.coerceIn(0f, 1f))
+                    .fillMaxHeight()
                     .clip(CircleShape)
-                    .background(StitchSurfaceContainerLow),
-            ) {
-                Box(
-                    Modifier
-                        .fillMaxWidth(animated.coerceIn(0f, 1f))
-                        .fillMaxHeight()
-                        .clip(CircleShape)
-                        .background(barColor),
+                    .background(barColor),
+            )
+        }
+
+        Spacer(Modifier.height(14.dp))
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            StatTile(modifier = Modifier.weight(1f), label = "Tugas selesai") {
+                FractionText(summary.tickedItems, summary.totalItems, WarnaIos.Label)
+            }
+            StatTile(modifier = Modifier.weight(1f), label = "Wajib selesai") {
+                FractionText(
+                    summary.tickedRequired,
+                    summary.totalRequired,
+                    if (summary.allRequiredDone) StatusGreen else StatusRed,
                 )
             }
-
-            Spacer(Modifier.height(14.dp))
-
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                StatTile(modifier = Modifier.weight(1f), label = "Tugas selesai") {
-                    FractionText(summary.tickedItems, summary.totalItems, StitchOnSurface)
-                }
-                StatTile(modifier = Modifier.weight(1f), label = "Wajib selesai") {
-                    FractionText(
-                        summary.tickedRequired,
-                        summary.totalRequired,
-                        if (summary.allRequiredDone) StatusGreen else StatusRed,
+            StatTile(modifier = Modifier.weight(1f), label = "Status") {
+                val ok = summary.allRequiredDone
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Icon(
+                        if (ok) IkonIos.CheckCircle else IkonIos.WarningAmber,
+                        contentDescription = null,
+                        tint = if (ok) WarnaIos.Hijau else WarnaIos.Oranye,
+                        modifier = Modifier.size(15.dp),
                     )
-                }
-                StatTile(modifier = Modifier.weight(1f), label = "Status") {
-                    val ok = summary.allRequiredDone
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        Icon(
-                            if (ok) Icons.Filled.CheckCircle else Icons.Filled.Warning,
-                            contentDescription = null,
-                            tint = if (ok) StatusGreen else StatusAmber,
-                            modifier = Modifier.size(15.dp),
-                        )
-                        Text(
-                            text = if (ok) "Siap ${if (phase == ChecklistPhase.BUKA) "Buka" else "Tutup"}" else "Belum Siap",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (ok) StatusGreen else StatusAmber,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                    Text(
+                        text = if (ok) "Siap ${if (phase == ChecklistPhase.BUKA) "Buka" else "Tutup"}" else "Belum Siap",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (ok) StatusGreen else StatusAmber,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
         }
     }
 }
 
+/** Petak abu ala blok angka iOS. */
 @Composable
 private fun StatTile(modifier: Modifier = Modifier, label: String, value: @Composable () -> Unit) {
-    Surface(modifier = modifier, shape = RoundedCornerShape(14.dp), color = StitchSurfaceContainerLow) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp, horizontal = 6.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Box(modifier = Modifier.height(22.dp), contentAlignment = Alignment.Center) { value() }
-            Spacer(Modifier.height(2.dp))
-            Text(label, fontSize = 11.sp, color = StitchOnSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
+    Column(
+        modifier = modifier
+            .clip(UkuranIos.SudutBlok)
+            .background(WarnaIos.Latar)
+            .padding(vertical = 10.dp, horizontal = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(modifier = Modifier.height(24.dp), contentAlignment = Alignment.Center) { value() }
+        Spacer(Modifier.height(2.dp))
+        Text(label, style = TipeIos.Kecil.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
 @Composable
 private fun FractionText(done: Int, total: Int, color: Color) {
     Row(verticalAlignment = Alignment.Bottom) {
-        Text("$done", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = color)
-        Text("/$total", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = StitchOnSurfaceVariant, modifier = Modifier.padding(bottom = 1.dp))
+        Text("$done", style = TipeIos.Angka.copy(fontSize = 18.sp, color = color))
+        Text("/$total", style = TipeIos.Kecil.copy(fontWeight = FontWeight.Medium), modifier = Modifier.padding(bottom = 2.dp))
     }
 }
 
@@ -732,46 +642,15 @@ private fun FractionText(done: Int, total: Int, color: Color) {
 
 @Composable
 private fun PhaseTabs(selected: ChecklistPhase, onSelect: (ChecklistPhase) -> Unit) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
-        color = StitchSurfaceContainer.copy(alpha = 0.65f),
-        border = BorderStroke(1.dp, StitchSurfaceContainerHigh),
-    ) {
-        Row(
-            modifier = Modifier.padding(4.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            ChecklistPhase.entries.forEach { phase ->
-                val active = phase == selected
-                Surface(
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(10.dp),
-                    color = if (active) StitchSurfaceContainerLowest else Color.Transparent,
-                    shadowElevation = if (active) 1.dp else 0.dp,
-                    onClick = { onSelect(phase) },
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            if (phase == ChecklistPhase.BUKA) Icons.Filled.WbSunny else Icons.Filled.NightsStay,
-                            contentDescription = null,
-                            tint = if (active) phase.accent else StitchOnSurfaceVariant,
-                            modifier = Modifier.size(17.dp),
-                        )
-                        Spacer(Modifier.width(7.dp))
-                        Text(
-                            phase.monitorLabel,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (active) phase.accent else StitchOnSurfaceVariant,
-                        )
-                    }
-                }
-            }
+    WadahSegmenIos {
+        ChecklistPhase.entries.forEach { phase ->
+            SegmenIos(
+                label = phase.monitorLabel,
+                aktif = phase == selected,
+                onKlik = { onSelect(phase) },
+                modifier = Modifier.weight(1f),
+                ikon = if (phase == ChecklistPhase.BUKA) Icons.Filled.WbSunny else Icons.Filled.NightsStay,
+            )
         }
     }
 }
@@ -783,85 +662,70 @@ private fun CategoryCard(category: MonitorCategory, expanded: Boolean, onToggle:
     val done = category.allDone
     val requiredComplete = category.requiredDone == category.requiredTotal
 
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        color = StitchSurfaceContainerLowest,
-        border = BorderStroke(1.dp, if (done) StatusGreen.copy(alpha = 0.4f) else StitchSurfaceContainerHigh.copy(alpha = 0.7f)),
-        shadowElevation = 0.5.dp,
-    ) {
-        Column {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(if (done) StatusGreenSoft else StitchSurfaceContainerLow.copy(alpha = 0.6f))
-                    .clickable(onClick = onToggle)
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(
-                    Modifier
-                        .size(9.dp)
-                        .clip(CircleShape)
-                        .background(
-                            when {
-                                done -> StatusGreen
-                                requiredComplete -> StatusAmber
-                                else -> StitchSecondaryContainer
-                            }
-                        )
-                )
-                Spacer(Modifier.width(10.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        category.name,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (done) StatusGreen else StitchOnSurface,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Spacer(Modifier.height(5.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Pill(
-                            text = "${category.tickedCount}/${category.items.size} selesai",
-                            fg = if (done) StatusGreen else StitchSecondaryContainer,
-                            bg = if (done) StatusGreenSoft else StitchSecondaryContainer.copy(alpha = 0.14f),
-                        )
-                        if (category.requiredTotal > 0) {
-                            Pill(
-                                text = "${category.requiredDone}/${category.requiredTotal} wajib",
-                                fg = if (requiredComplete) StatusGreen else StatusRed,
-                                bg = if (requiredComplete) StatusGreenSoft else StatusRedSoft,
-                            )
+    Column(Modifier.fillMaxWidth().permukaanIos(UkuranIos.SudutKartu)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onToggle)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                Modifier
+                    .size(9.dp)
+                    .clip(CircleShape)
+                    .background(
+                        when {
+                            done -> WarnaIos.Hijau
+                            requiredComplete -> WarnaIos.Oranye
+                            else -> WarnaIos.Aksen
                         }
+                    )
+            )
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    category.name,
+                    style = TipeIos.Utama.copy(color = if (done) StatusGreen else WarnaIos.Label),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(5.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Pill(
+                        text = "${category.tickedCount}/${category.items.size} selesai",
+                        nada = if (done) NadaIos.SUKSES else NadaIos.AKSEN,
+                    )
+                    if (category.requiredTotal > 0) {
+                        Pill(
+                            text = "${category.requiredDone}/${category.requiredTotal} wajib",
+                            nada = if (requiredComplete) NadaIos.SUKSES else NadaIos.BAHAYA,
+                        )
                     }
                 }
-                Spacer(Modifier.width(8.dp))
-                Icon(
-                    if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                    contentDescription = if (expanded) "Tutup" else "Buka",
-                    tint = StitchOnSurfaceVariant,
-                    modifier = Modifier.size(20.dp),
-                )
             }
+            Spacer(Modifier.width(8.dp))
+            Icon(
+                if (expanded) IkonIos.ExpandLess else IkonIos.ExpandMore,
+                contentDescription = if (expanded) "Tutup" else "Buka",
+                tint = WarnaIos.LabelKetiga,
+                modifier = Modifier.size(16.dp),
+            )
+        }
 
-            AnimatedVisibility(visible = expanded) {
-                Column {
-                    category.items.forEachIndexed { index, item ->
-                        if (index > 0) {
-                            HorizontalDivider(color = StitchOutlineVariant.copy(alpha = 0.25f), thickness = 1.dp)
-                        }
-                        ItemRow(item)
-                    }
-                    if (category.items.isEmpty()) {
-                        Text(
-                            "Kategori ini belum punya tugas.",
-                            fontSize = 12.5.sp,
-                            color = StitchOnSurfaceVariant,
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 14.dp),
-                        )
-                    }
+        AnimatedVisibility(visible = expanded) {
+            Column {
+                PemisahIos(inset = 0.dp)
+                category.items.forEachIndexed { index, item ->
+                    if (index > 0) PemisahIos(inset = 49.dp)
+                    ItemRow(item)
+                }
+                if (category.items.isEmpty()) {
+                    Text(
+                        "Kategori ini belum punya tugas.",
+                        style = TipeIos.Catatan,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                    )
                 }
             }
         }
@@ -874,130 +738,98 @@ private fun ItemRow(item: MonitorItem) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(if (ticked) StatusGreenSoft.copy(alpha = 0.45f) else Color.Transparent)
-            .padding(horizontal = 14.dp, vertical = 11.dp),
+            .padding(horizontal = 16.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
-            if (ticked) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked,
+            if (ticked) IkonIos.CheckCircle else Icons.Filled.RadioButtonUnchecked,
             contentDescription = null,
-            tint = if (ticked) StatusGreen else StitchOutlineVariant.copy(alpha = 0.7f),
+            tint = if (ticked) WarnaIos.Hijau else WarnaIos.LabelKetiga,
             modifier = Modifier.size(21.dp),
         )
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(
                 item.name,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
-                color = if (ticked) StitchOnSurfaceVariant else StitchOnSurface,
-                textDecoration = if (ticked) TextDecoration.LineThrough else null,
+                style = TipeIos.Keterangan.copy(
+                    fontSize = 15.sp,
+                    color = if (ticked) WarnaIos.LabelKedua else WarnaIos.Label,
+                    textDecoration = if (ticked) TextDecoration.LineThrough else null,
+                ),
             )
             Spacer(Modifier.height(2.dp))
             if (ticked) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.Person, contentDescription = null, tint = StitchOnSurfaceVariant, modifier = Modifier.size(12.dp))
+                    Icon(Icons.Filled.Person, contentDescription = null, tint = WarnaIos.Abu, modifier = Modifier.size(12.dp))
                     Spacer(Modifier.width(4.dp))
                     Text(
                         item.tickedBy.orEmpty(),
-                        fontSize = 11.5.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = StitchPrimary,
+                        style = TipeIos.Kecil.copy(color = NadaIos.AKSEN.teks, fontWeight = FontWeight.SemiBold),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    Text(" · ${item.tickedAt}", fontSize = 11.5.sp, color = StitchOnSurfaceVariant)
+                    Text(" · ${item.tickedAt}", style = TipeIos.Kecil)
                 }
             } else {
-                Text("Belum dikerjakan", fontSize = 11.5.sp, color = StitchOnSurfaceVariant.copy(alpha = 0.75f))
+                Text("Belum dikerjakan", style = TipeIos.Kecil)
             }
         }
         Spacer(Modifier.width(8.dp))
         when {
-            ticked -> Pill(text = "✓ Done", fg = StatusGreen, bg = StatusGreenSoft)
-            item.isRequired -> Pill(text = "Wajib", fg = StatusRed, bg = StatusRedSoft)
+            ticked -> Pill(text = "✓ Done", nada = NadaIos.SUKSES)
+            item.isRequired -> Pill(text = "Wajib", nada = NadaIos.BAHAYA)
         }
     }
 }
 
+/** Kapsul kecil bernada — versi ringkas LencanaIos untuk baris padat. */
 @Composable
-private fun Pill(text: String, fg: Color, bg: Color) {
-    Surface(shape = RoundedCornerShape(8.dp), color = bg) {
-        Text(
-            text,
-            fontSize = 10.5.sp,
-            fontWeight = FontWeight.Medium,
-            color = fg,
-            maxLines = 1,
-            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
-        )
-    }
+private fun Pill(text: String, nada: NadaIos) {
+    Text(
+        text,
+        color = nada.teks,
+        fontSize = 12.sp,
+        fontWeight = FontWeight.SemiBold,
+        maxLines = 1,
+        modifier = Modifier
+            .clip(UkuranIos.SudutKapsul)
+            .background(nada.warna.copy(alpha = 0.14f))
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+    )
 }
 
 /* ------------------------------------------------------- Banner & states */
 
 @Composable
 private fun AllDoneBanner(phase: ChecklistPhase) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        color = StatusGreen,
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .permukaanIos(UkuranIos.SudutKartu, WarnaIos.Hijau)
+            .padding(20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = Color.White, modifier = Modifier.size(36.dp))
-            Spacer(Modifier.height(8.dp))
-            Text("Tugas ${phase.monitorLabel} Selesai!", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            Spacer(Modifier.height(4.dp))
-            Text(
-                if (phase == ChecklistPhase.BUKA) "Outlet siap beroperasi penuh."
-                else "Outlet siap ditutup dan kru bisa pulang.",
-                fontSize = 13.sp,
-                color = Color.White.copy(alpha = 0.85f),
-                textAlign = TextAlign.Center,
-            )
-        }
-    }
-}
-
-@Composable
-private fun EmptyCard(icon: @Composable () -> Unit, title: String, message: String) {
-    Surface(
-        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-        shape = RoundedCornerShape(18.dp),
-        color = StitchSurfaceContainerLow,
-        border = BorderStroke(1.dp, StitchSurfaceContainerHigh),
-    ) {
-        Column(
-            modifier = Modifier.padding(28.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Surface(shape = CircleShape, color = StitchSurfaceContainer, modifier = Modifier.size(48.dp)) {
-                Box(contentAlignment = Alignment.Center) { icon() }
-            }
-            Text(title, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = StitchOnSurface, textAlign = TextAlign.Center)
-            Text(message, fontSize = 13.sp, color = StitchOnSurfaceVariant, textAlign = TextAlign.Center)
-        }
+        Icon(IkonIos.CheckCircle, contentDescription = null, tint = Color.White, modifier = Modifier.size(36.dp))
+        Spacer(Modifier.height(8.dp))
+        Text("Tugas ${phase.monitorLabel} Selesai!", style = TipeIos.Utama.copy(color = Color.White))
+        Spacer(Modifier.height(4.dp))
+        Text(
+            if (phase == ChecklistPhase.BUKA) "Outlet siap beroperasi penuh."
+            else "Outlet siap ditutup dan kru bisa pulang.",
+            style = TipeIos.Catatan.copy(color = Color.White.copy(alpha = 0.9f)),
+            textAlign = TextAlign.Center,
+        )
     }
 }
 
 @Composable
 private fun DashedEmptyCard(message: String) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        color = StitchSurfaceContainerLow.copy(alpha = 0.6f),
-        border = BorderStroke(1.dp, StitchOutlineVariant.copy(alpha = 0.45f)),
-    ) {
+    KartuIos {
         Text(
             message,
-            fontSize = 13.sp,
-            color = StitchOnSurfaceVariant,
+            style = TipeIos.SubJudul,
             textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth().padding(vertical = 34.dp, horizontal = 20.dp),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 18.dp, horizontal = 4.dp),
         )
     }
 }
@@ -1005,47 +837,21 @@ private fun DashedEmptyCard(message: String) {
 @Composable
 private fun MonitorErrorCard(message: String, onRetry: () -> Unit) {
     val noOutlet = message.contains("cabang", ignoreCase = true)
-    Surface(
-        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-        shape = RoundedCornerShape(18.dp),
-        color = StitchSurfaceContainerLow,
-        border = BorderStroke(1.dp, StitchSurfaceContainerHigh),
-    ) {
-        Column(
-            modifier = Modifier.padding(28.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Surface(
-                shape = CircleShape,
-                color = if (noOutlet) StitchSurfaceContainer else StitchErrorContainer,
-                modifier = Modifier.size(52.dp),
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        if (noOutlet) Icons.Filled.Store else Icons.Filled.PriorityHigh,
-                        contentDescription = null,
-                        tint = if (noOutlet) StitchPrimary else StitchError,
-                        modifier = Modifier.size(26.dp),
-                    )
-                }
-            }
-            if (noOutlet) {
-                Text("Cabang Belum Ditentukan", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = StitchOnSurface)
-            }
-            Text(message, color = StitchOnSurfaceVariant, fontSize = 13.sp, textAlign = TextAlign.Center)
-            if (!noOutlet) {
-                Spacer(Modifier.height(4.dp))
-                Button(
-                    onClick = onRetry,
-                    colors = ButtonDefaults.buttonColors(containerColor = StitchPrimary),
-                    shape = RoundedCornerShape(10.dp),
-                ) {
-                    Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Coba Lagi")
-                }
-            }
-        }
+    if (noOutlet) {
+        KeadaanIos(
+            ikon = IkonIos.Storefront,
+            judul = "Cabang Belum Ditentukan",
+            pesan = message,
+            nada = NadaIos.AKSEN,
+        )
+    } else {
+        KeadaanIos(
+            ikon = IkonIos.ErrorOutline,
+            judul = "Gagal memuat",
+            pesan = message,
+            nada = NadaIos.BAHAYA,
+            teksAksi = "Coba Lagi",
+            onAksi = onRetry,
+        )
     }
 }
