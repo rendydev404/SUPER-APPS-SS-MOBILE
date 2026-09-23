@@ -13,9 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -33,6 +30,8 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
+import com.sukashawarma.superapp.core.ui.ios.TombolKeduaIos
+import com.sukashawarma.superapp.core.ui.ios.TombolUtamaIos
 import java.io.ByteArrayOutputStream
 
 /** Batas panjang data URL tanda tangan — cermin `MAX_SIGNATURE_SIZE` di web. */
@@ -105,23 +104,23 @@ fun TandaTanganCanvas(onSelesai: (String) -> Unit, onBatal: () -> Unit) {
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(
-                onClick = {
+            TombolKeduaIos(
+                "Hapus",
+                {
                     jalur.clear()
                     garis.clear()
                     adaGoresan = false
                     versi.intValue++
                 },
-                modifier = Modifier.weight(1f),
-            ) {
-                Text("Hapus")
-            }
-            OutlinedButton(onClick = onBatal, modifier = Modifier.weight(1f)) { Text("Batal") }
-            Button(
-                onClick = { onSelesai(bitmapKeDataUrlPng(renderJalur(jalur, 600, 240))) },
-                enabled = adaGoresan,
-                modifier = Modifier.weight(1f),
-            ) { Text("Simpan") }
+                Modifier.weight(1f),
+            )
+            TombolKeduaIos("Batal", onBatal, Modifier.weight(1f))
+            TombolUtamaIos(
+                "Simpan",
+                { onSelesai(bitmapKeDataUrlPng(renderJalur(jalur, 600, 240))) },
+                Modifier.weight(1f),
+                aktif = adaGoresan,
+            )
         }
     }
 }
