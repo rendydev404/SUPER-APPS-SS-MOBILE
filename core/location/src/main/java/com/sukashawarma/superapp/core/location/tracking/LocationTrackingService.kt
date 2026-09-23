@@ -24,6 +24,7 @@ import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.sukashawarma.superapp.data.remote.AuthSessionManager
+import com.sukashawarma.superapp.data.remote.JedaCobaUlang
 import com.sukashawarma.superapp.data.remote.SessionTokenHolder
 import com.sukashawarma.superapp.domain.session.AppSession
 import kotlinx.coroutines.CoroutineScope
@@ -89,6 +90,14 @@ class LocationTrackingService : Service() {
 
         private const val HEALTH_CHECK_MS = 60_000L
 
+        /** Saat bergerak fix datang tiap ~3 detik. Dikirim per fix berarti dua request per
+         *  3 detik per staff; kini titiknya digabung dan dikirim paling sering sekali per
+         *  jendela ini. Jejak tetap lengkap — hanya datangnya per batch. */
+        private const val INTERVAL_KIRIM_BERGERAK_MS = 15_000L
+
+        /** Batas antrean di memori, sama dengan batas yang dipersist di prefs. */
+        private const val MAKS_ANTREAN = 500
+
         /** Tiga kali interval diam. Lewat ini langganan dianggap mati diam-diam — kondisi
          *  yang benar-benar terjadi setelah Doze dalam atau saat Play services di-update. */
         private const val FIX_STALE_MS = 3 * INTERVAL_IDLE_MS
@@ -109,6 +118,11 @@ class LocationTrackingService : Service() {
     private var healthJob: Job? = null
     private var sessionJob: Job? = null
     private var wakeLock: PowerManager.WakeLock? = null
+
+    /** Dibaca dan ditulis di bawah [queueLock]. */
+    private var terakhirKirimAt = 0L
+    private var gagalBeruntun = 0
+    private var jedaSampai = 0L
 
     private val callback = object : LocationCallback() {
         override fun onLocationResult(result: LocationResult) {
@@ -275,36 +289,35 @@ class LocationTrackingService : Service() {
         wakeLock = null
     }
 
-    /** Service memulihkan sesi dari memori atau dari prefs tersimpan saat proses dibangun ulang oleh sistem. */
+    /**
+     * Service memulihkan sesi dari prefs tersimpan saat proses dibangun ulang oleh sistem.
+     *
+     * Salinan disk hanya dipakai bila memori benar-benar KOSONG. Token di memori selalu
+     * lebih baru (salinan disk mengikutinya lewat SessionTokenHolder.onRefreshTokenBerubah),
+     * dan menimpanya dengan salinan lama berarti memakai ulang refresh token yang sudah
+     * hangus — GoTrue lalu mencabut seluruh sesi staff tersebut.
+     */
     private fun ensureSession() {
         if (sessionJob?.isActive == true) return
         sessionJob = scope.launch {
-            if (AppSession.staff.value == null) {
-                val savedStaffId = LocationTrackingPrefs.getStaffId(this@LocationTrackingService)
-                val savedRefreshToken = LocationTrackingPrefs.getRefreshToken(this@LocationTrackingService)
-                if (savedStaffId != null && savedRefreshToken != null) {
-                    if (SessionTokenHolder.refreshToken == null) {
-                        SessionTokenHolder.refreshToken = savedRefreshToken
-                    }
-                    if (SessionTokenHolder.accessToken == null) {
-                        SessionTokenHolder.accessToken = LocationTrackingPrefs.getAccessToken(this@LocationTrackingService)
-                    }
-                    val ok = AuthSessionManager.ensureAuthenticated()
-                    if (ok) {
-                        SessionTokenHolder.accessToken?.let {
-                            LocationTrackingPrefs.updateTokens(
-                                this@LocationTrackingService,
-                                it,
-                                SessionTokenHolder.refreshToken
-                            )
-                        }
-                        flushQueue()
-                        return@launch
-                    }
+            if (SessionTokenHolder.refreshToken == null && SessionTokenHolder.accessToken == null) {
+                val simpanan = LocationTrackingPrefs.getRefreshToken(this@LocationTrackingService)
+                if (simpanan == null || LocationTrackingPrefs.getStaffId(this@LocationTrackingService) == null) {
+                    Log.w(TAG, "Sesi staff tidak aktif; titik tetap diantrekan")
+                    return@launch
                 }
-                Log.w(TAG, "Sesi staff tidak aktif; titik tetap diantrekan")
-            } else {
-                flushQueue()
+                // Access token lebih dulu: setter refreshToken meneruskan pasangan keduanya.
+                SessionTokenHolder.accessToken = LocationTrackingPrefs.getAccessToken(this@LocationTrackingService)
+                SessionTokenHolder.refreshToken = simpanan
+            }
+            when (AuthSessionManager.ensureAuthenticatedRinci()) {
+                AuthSessionManager.HasilSesi.BERHASIL -> flushQueue(abaikanJeda = true)
+                // Health check mencoba lagi; jeda gagal upload mencegahnya jadi banjir.
+                AuthSessionManager.HasilSesi.TIDAK_ADA_JARINGAN -> Unit
+                // Token sudah dibuang oleh AuthSessionManager. Titik tetap diantrekan dan
+                // ikut terkirim setelah staff login ulang di app.
+                AuthSessionManager.HasilSesi.DITOLAK ->
+                    Log.w(TAG, "Sesi ditolak server; menunggu staff login ulang")
             }
         }
     }
@@ -367,18 +380,31 @@ class LocationTrackingService : Service() {
 
     private fun enqueueAndFlush(point: TrackPoint) {
         scope.launch {
-            queueLock.withLock {
+            val kirimSekarang = queueLock.withLock {
                 pending.addLast(point)
+                while (pending.size > MAKS_ANTREAN) pending.removeFirst()
                 persistQueue()
+                // Diam: fix hanya tiap menit, jadi dikirim langsung. Bergerak: ditampung
+                // sampai jendela kirim lewat (lihat INTERVAL_KIRIM_BERGERAK_MS).
+                !point.isMoving ||
+                    SystemClock.elapsedRealtime() - terakhirKirimAt >= INTERVAL_KIRIM_BERGERAK_MS
             }
-            flushQueue()
+            if (kirimSekarang) flushQueue()
         }
     }
 
-    private fun flushQueue() {
+    /**
+     * [abaikanJeda] hanya untuk saat sesi baru saja pulih: jeda kegagalan dibuat untuk
+     * menahan ketukan ke server yang pasti ditolak, bukan untuk menunda antrean yang
+     * sekarang sudah bisa dikirim.
+     */
+    private fun flushQueue(abaikanJeda: Boolean = false) {
         scope.launch {
             queueLock.withLock {
                 if (pending.isEmpty()) return@withLock
+                val sekarang = SystemClock.elapsedRealtime()
+                if (!abaikanJeda && sekarang < jedaSampai) return@withLock
+                terakhirKirimAt = sekarang
                 val batch = pending.toList()
                 try {
                     LocationTrackingRepository.push(batch, DeviceInfo.name(this@LocationTrackingService), this@LocationTrackingService)
@@ -386,14 +412,20 @@ class LocationTrackingService : Service() {
                     // selama upload berjalan tidak ikut hilang.
                     repeat(batch.size.coerceAtMost(pending.size)) { pending.removeFirst() }
                     persistQueue()
+                    gagalBeruntun = 0
+                    jedaSampai = 0L
                 } catch (e: LocationTrackingRepository.NoStaffSessionException) {
                     // Sesi belum pulih. Titik ditahan di antrean (bukan dibuang, dan service
                     // TIDAK dimatikan) lalu auto-login dicoba di latar belakang.
                     ensureSession()
                 } catch (e: Exception) {
-                    // Jaringan mati / server error: titik tetap di antrean dan ikut terkirim
-                    // pada percobaan berikutnya. Satu kegagalan tidak boleh mematikan service.
-                    Log.w(TAG, "Upload posisi gagal, ${pending.size} titik menunggu", e)
+                    // Jaringan mati / server error / sesi ditolak: titik tetap di antrean dan
+                    // ikut terkirim nanti. Satu kegagalan tidak boleh mematikan service, tapi
+                    // percobaan berikutnya ditunda makin lama — dulu setiap fix GPS mengulang
+                    // request yang pasti gagal, sepanjang hari, dari setiap HP bermasalah.
+                    gagalBeruntun++
+                    jedaSampai = sekarang + JedaCobaUlang.untuk(gagalBeruntun)
+                    Log.w(TAG, "Upload posisi gagal ($gagalBeruntun×), ${pending.size} titik menunggu", e)
                 }
             }
         }
