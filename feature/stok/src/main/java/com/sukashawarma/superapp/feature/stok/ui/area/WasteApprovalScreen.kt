@@ -1,24 +1,30 @@
 package com.sukashawarma.superapp.feature.stok.ui.area
 
-import androidx.compose.foundation.BorderStroke
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
+import com.sukashawarma.superapp.core.ui.kaca.denganRuangNav
+import com.sukashawarma.superapp.core.ui.ios.KartuIos
+import com.sukashawarma.superapp.core.ui.ios.KeadaanIos
+import com.sukashawarma.superapp.core.ui.ios.LencanaIos
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.SegmenIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.TombolBundarIos
+import com.sukashawarma.superapp.core.ui.ios.TombolKeduaIos
+import com.sukashawarma.superapp.core.ui.ios.TombolUtamaIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WadahSegmenIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.ios.permukaanIos
+import com.sukashawarma.superapp.core.ui.ios.tekanIos
+import com.sukashawarma.superapp.core.ui.ios.warnaKolomIos
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.*
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -44,15 +50,15 @@ import com.sukashawarma.superapp.feature.stok.domain.formatAngkaStok
 import com.sukashawarma.superapp.feature.stok.ui.*
 
 /**
- * Rona kartu menjawab satu pertanyaan yang menentukan keputusan approver: apakah
+ * Nada kartu menjawab satu pertanyaan yang menentukan keputusan approver: apakah
  * menyetujui laporan ini membuat stok outlet menjadi negatif.
  */
-private data class WasteTone(val strip: Color, val chip: Color, val border: Color, val text: Color, val dot: Color, val label: String)
+private data class WasteTone(val nada: NadaIos, val label: String)
 
 private fun tone(report: WasteReview): WasteTone = when {
-    report.balance == null -> WasteTone(Amber50, Amber100, Amber300, Amber800, Amber500, "Skala Tidak Pasti")
-    report.deficit -> WasteTone(Rose50, Rose100, Rose200, Rose700, Rose500, "Stok Akan Negatif")
-    else -> WasteTone(Emerald50, Emerald100, Emerald200, Emerald700, Emerald500, "Saldo Mencukupi")
+    report.balance == null -> WasteTone(NadaIos.PERINGATAN, "Skala Tidak Pasti")
+    report.deficit -> WasteTone(NadaIos.BAHAYA, "Stok Akan Negatif")
+    else -> WasteTone(NadaIos.SUKSES, "Saldo Mencukupi")
 }
 
 private data class FotoBuktiPreview(
@@ -71,35 +77,41 @@ fun WasteApprovalScreen(onBack: () -> Unit, vm: WasteApprovalViewModel = viewMod
 
     val namaOutletTerpilih = state.outlets.find { it.id == state.selectedOutletId }?.name ?: "Semua Outlet Binaan"
 
-    Column(Modifier.fillMaxSize().background(Slate50)) {
+    Column(Modifier.fillMaxSize().background(WarnaIos.Latar)) {
         HeaderStok("Persetujuan Waste", "Kelola dan tinjau laporan waste dari outlet", onBack) {
-            IconButton(onClick = vm::refresh, enabled = !state.loading && !state.busy && !state.historyLoading) {
-                Icon(Icons.Default.Refresh, "Perbarui data", tint = Color(0xFF1E293B))
-            }
+            TombolBundarIos(
+                IkonIos.Refresh, "Perbarui data", vm::refresh,
+                aktif = !state.loading && !state.busy && !state.historyLoading,
+            )
         }
 
-        // Outlet Selector (filter outlet binaan untuk AM/RM)
+        // Pemilih outlet binaan untuk AM/RM
         if (state.outlets.isNotEmpty()) {
-            Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
-                Surface(
-                    onClick = { menuOutletTerbuka = true },
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color.White,
-                    border = BorderStroke(1.dp, Slate200),
-                    modifier = Modifier.fillMaxWidth()
+            Box(Modifier.fillMaxWidth().padding(start = UkuranIos.TepiLayar, end = UkuranIos.TepiLayar, top = 10.dp)) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .permukaanIos(UkuranIos.SudutGrup)
+                        .tekanIos({ menuOutletTerbuka = true })
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Row(
-                        Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Box(
+                        Modifier.size(30.dp).clip(CircleShape).background(WarnaIos.Aksen.copy(alpha = 0.14f)),
+                        contentAlignment = Alignment.Center,
                     ) {
-                        Icon(Icons.Default.Storefront, null, tint = Orange500, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text("OUTLET BINAAN", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = Slate400, letterSpacing = 0.5.sp)
-                            Text(namaOutletTerpilih, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = Slate900, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-                        Icon(Icons.Default.ArrowDropDown, "Pilih outlet", tint = Slate500)
+                        Icon(IkonIos.Storefront, null, tint = WarnaIos.Aksen, modifier = Modifier.size(17.dp))
                     }
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("Outlet binaan", style = TipeIos.Kecil)
+                        Text(
+                            namaOutletTerpilih,
+                            style = TipeIos.Keterangan.copy(fontWeight = FontWeight.SemiBold),
+                            maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Icon(IkonIos.ArrowDropDown, "Pilih outlet", tint = WarnaIos.Aksen, modifier = Modifier.size(16.dp))
                 }
 
                 SukaDropdownMenu(
@@ -129,81 +141,32 @@ fun WasteApprovalScreen(onBack: () -> Unit, vm: WasteApprovalViewModel = viewMod
             }
         }
 
-        // Tab Row: Menunggu vs Riwayat
-        TabRow(
-            selectedTabIndex = if (state.tab == WasteApprovalTab.MENUNGGU) 0 else 1,
-            containerColor = Color.White,
-            contentColor = Orange500,
-            indicator = { tabPositions ->
-                TabRowDefaults.SecondaryIndicator(
-                    Modifier.tabIndicatorOffset(tabPositions[if (state.tab == WasteApprovalTab.MENUNGGU) 0 else 1]),
-                    color = Orange500
-                )
-            }
-        ) {
-            Tab(
-                selected = state.tab == WasteApprovalTab.MENUNGGU,
-                onClick = { vm.selectTab(WasteApprovalTab.MENUNGGU) },
-                text = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            "Menunggu",
-                            fontWeight = if (state.tab == WasteApprovalTab.MENUNGGU) FontWeight.Bold else FontWeight.Medium,
-                            fontSize = 13.sp,
-                            color = if (state.tab == WasteApprovalTab.MENUNGGU) Orange600 else Slate500
-                        )
-                        if (state.reports.isNotEmpty()) {
-                            Spacer(Modifier.width(6.dp))
-                            Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = if (state.tab == WasteApprovalTab.MENUNGGU) Orange500 else Slate200,
-                            ) {
-                                Text(
-                                    "${state.reports.size}",
-                                    color = if (state.tab == WasteApprovalTab.MENUNGGU) Color.White else Slate700,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
-                        }
-                    }
-                }
+        // Segmen: Menunggu vs Riwayat
+        WadahSegmenIos(Modifier.padding(start = UkuranIos.TepiLayar, end = UkuranIos.TepiLayar, top = 10.dp, bottom = 2.dp)) {
+            val menunggu = state.tab == WasteApprovalTab.MENUNGGU
+            SegmenIos(
+                label = "Menunggu",
+                aktif = menunggu,
+                onKlik = { vm.selectTab(WasteApprovalTab.MENUNGGU) },
+                modifier = Modifier.weight(1f),
+                lencana = state.reports.size.takeIf { it > 0 }?.toString(),
+                warnaLencana = if (menunggu) WarnaIos.Aksen else WarnaIos.Abu.copy(alpha = 0.35f),
+                jarakSisi = 6.dp,
             )
-            Tab(
-                selected = state.tab == WasteApprovalTab.RIWAYAT,
-                onClick = { vm.selectTab(WasteApprovalTab.RIWAYAT) },
-                text = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            "Riwayat",
-                            fontWeight = if (state.tab == WasteApprovalTab.RIWAYAT) FontWeight.Bold else FontWeight.Medium,
-                            fontSize = 13.sp,
-                            color = if (state.tab == WasteApprovalTab.RIWAYAT) Orange600 else Slate500
-                        )
-                        if (state.history.isNotEmpty()) {
-                            Spacer(Modifier.width(6.dp))
-                            Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = if (state.tab == WasteApprovalTab.RIWAYAT) Slate700 else Slate200,
-                            ) {
-                                Text(
-                                    "${state.history.size}",
-                                    color = if (state.tab == WasteApprovalTab.RIWAYAT) Color.White else Slate700,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
-                        }
-                    }
-                }
+            SegmenIos(
+                label = "Riwayat",
+                aktif = !menunggu,
+                onKlik = { vm.selectTab(WasteApprovalTab.RIWAYAT) },
+                modifier = Modifier.weight(1f),
+                lencana = state.history.size.takeIf { it > 0 }?.toString(),
+                warnaLencana = if (!menunggu) WarnaIos.Aksen else WarnaIos.Abu.copy(alpha = 0.35f),
+                jarakSisi = 6.dp,
             )
         }
 
         state.message?.let { PitaPesan(it, false, vm::clearMessage) }
         state.error?.let { PitaPesan(it, true, vm::clearMessage) }
-        if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Orange500, trackColor = Orange50)
+        if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth(), color = WarnaIos.Aksen, trackColor = WarnaIos.Isian)
 
         when (state.tab) {
             WasteApprovalTab.MENUNGGU -> {
@@ -211,98 +174,61 @@ fun WasteApprovalScreen(onBack: () -> Unit, vm: WasteApprovalViewModel = viewMod
                     state.loading -> MemuatPenuh()
                     state.error != null && state.reports.isEmpty() -> KeadaanGagal(state.error!!, vm::refresh)
                     state.reports.isEmpty() -> KeadaanKosong("Semua Bersih!\nTidak ada laporan waste yang menunggu persetujuan saat ini.")
-                    else -> LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    else -> LazyColumn(
+                        contentPadding = PaddingValues(horizontal = UkuranIos.TepiLayar, vertical = 12.dp).denganRuangNav(),
+                        verticalArrangement = Arrangement.spacedBy(UkuranIos.JarakKartu),
+                    ) {
                         item {
                             val berisiko = state.reports.count { it.deficit }
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Row(
                                     Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
                                     WasteSummaryFilterCard(
                                         title = "Menunggu",
                                         value = "${state.reports.size}",
                                         caption = "Perlu ditinjau",
-                                        titleColor = Color(0xFF7C2D12),
-                                        valueColor = Slate900,
-                                        captionColor = Slate400,
+                                        warna = WarnaIos.Aksen,
                                         isSelected = state.pendingFilter == WastePendingFilter.SEMUA,
-                                        activeBgColor = Orange50,
-                                        activeBorderColor = Orange500,
                                         onClick = { vm.setPendingFilter(WastePendingFilter.SEMUA) }
                                     )
                                     WasteSummaryFilterCard(
                                         title = "Berisiko",
                                         value = "$berisiko",
                                         caption = "Stok defisit",
-                                        titleColor = Color(0xFF881337),
-                                        valueColor = if (berisiko > 0) Rose600 else Slate900,
-                                        captionColor = Rose500,
+                                        warna = WarnaIos.Merah,
+                                        valueColor = if (berisiko > 0) NadaIos.BAHAYA.teks else WarnaIos.Label,
                                         isSelected = state.pendingFilter == WastePendingFilter.BERISIKO,
-                                        activeBgColor = Rose50,
-                                        activeBorderColor = Rose600,
                                         onClick = { vm.setPendingFilter(WastePendingFilter.BERISIKO) }
                                     )
                                     WasteSummaryFilterCard(
                                         title = "Outlet",
                                         value = "${state.reports.map { it.outletId }.distinct().size}",
                                         caption = "Melapor waste",
-                                        titleColor = Slate700,
-                                        valueColor = Slate900,
-                                        captionColor = Slate400,
+                                        warna = WarnaIos.AbuGelap,
                                         isSelected = false,
-                                        activeBgColor = Slate100,
-                                        activeBorderColor = Slate400,
-                                        onClick = {}
+                                        onClick = null
                                     )
                                 }
                                 if (state.pendingFilter == WastePendingFilter.BERISIKO) {
-                                    Row(
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 4.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = "Menampilkan $berisiko laporan berisiko stok negatif",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            color = Rose700
-                                        )
-                                        TextButton(
-                                            onClick = { vm.setPendingFilter(WastePendingFilter.SEMUA) },
-                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
-                                        ) {
-                                            Text("Tampilkan Semua", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Orange600)
-                                        }
-                                    }
+                                    BarisFilterAktif(
+                                        "Menampilkan $berisiko laporan berisiko stok negatif",
+                                        NadaIos.BAHAYA.teks,
+                                    ) { vm.setPendingFilter(WastePendingFilter.SEMUA) }
                                 }
                             }
                         }
                         if (state.filteredReports.isEmpty()) {
                             item {
-                                Column(
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 32.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Text(
-                                        "Tidak ada laporan yang berisiko stok negatif.",
-                                        color = Slate500,
-                                        fontSize = 13.sp,
-                                        textAlign = TextAlign.Center
-                                    )
-                                    Spacer(Modifier.height(8.dp))
-                                    OutlinedButton(
-                                        onClick = { vm.setPendingFilter(WastePendingFilter.SEMUA) },
-                                        shape = RoundedCornerShape(10.dp),
-                                        border = BorderStroke(1.dp, Orange500)
-                                    ) {
-                                        Text("Tampilkan Semua Laporan", color = Orange600, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                                    }
-                                }
+                                KeadaanIos(
+                                    IkonIos.CheckCircle,
+                                    "Tidak ada laporan yang berisiko stok negatif.",
+                                    "",
+                                    nada = NadaIos.SUKSES,
+                                    teksAksi = "Tampilkan Semua Laporan",
+                                    onAksi = { vm.setPendingFilter(WastePendingFilter.SEMUA) },
+                                )
                             }
                         } else {
                             items(state.filteredReports, key = { it.id }) { report ->
@@ -325,103 +251,66 @@ fun WasteApprovalScreen(onBack: () -> Unit, vm: WasteApprovalViewModel = viewMod
                     state.historyLoading -> MemuatPenuh()
                     state.historyError != null && state.history.isEmpty() -> KeadaanGagal(state.historyError!!, vm::loadHistory)
                     state.history.isEmpty() -> KeadaanKosong("Belum ada riwayat waste untuk outlet yang dipilih.")
-                    else -> LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    else -> LazyColumn(
+                        contentPadding = PaddingValues(horizontal = UkuranIos.TepiLayar, vertical = 12.dp).denganRuangNav(),
+                        verticalArrangement = Arrangement.spacedBy(UkuranIos.JarakKartu),
+                    ) {
                         item {
                             val disetujui = state.history.count { it.isApproved }
                             val ditolak = state.history.count { it.isRejected }
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Row(
                                     Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
                                     WasteSummaryFilterCard(
                                         title = "Semua",
                                         value = "${state.history.size}",
                                         caption = "Total riwayat",
-                                        titleColor = Slate700,
-                                        valueColor = Slate900,
-                                        captionColor = Slate400,
+                                        warna = WarnaIos.AbuGelap,
                                         isSelected = state.historyFilter == WasteHistoryStatusFilter.SEMUA,
-                                        activeBgColor = Slate100,
-                                        activeBorderColor = Slate700,
                                         onClick = { vm.setHistoryFilter(WasteHistoryStatusFilter.SEMUA) }
                                     )
                                     WasteSummaryFilterCard(
                                         title = "Disetujui",
                                         value = "$disetujui",
                                         caption = "Stok dipotong",
-                                        titleColor = Emerald700,
-                                        valueColor = Emerald600,
-                                        captionColor = Slate400,
+                                        warna = WarnaIos.Hijau,
+                                        valueColor = NadaIos.SUKSES.teks,
                                         isSelected = state.historyFilter == WasteHistoryStatusFilter.DISETUJUI,
-                                        activeBgColor = Emerald50,
-                                        activeBorderColor = Emerald600,
                                         onClick = { vm.setHistoryFilter(WasteHistoryStatusFilter.DISETUJUI) }
                                     )
                                     WasteSummaryFilterCard(
                                         title = "Ditolak",
                                         value = "$ditolak",
                                         caption = "Tidak disetujui",
-                                        titleColor = Rose700,
-                                        valueColor = Rose600,
-                                        captionColor = Slate400,
+                                        warna = WarnaIos.Merah,
+                                        valueColor = NadaIos.BAHAYA.teks,
                                         isSelected = state.historyFilter == WasteHistoryStatusFilter.DITOLAK,
-                                        activeBgColor = Rose50,
-                                        activeBorderColor = Rose600,
                                         onClick = { vm.setHistoryFilter(WasteHistoryStatusFilter.DITOLAK) }
                                     )
                                 }
                                 if (state.historyFilter != WasteHistoryStatusFilter.SEMUA) {
-                                    Row(
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 4.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = when (state.historyFilter) {
-                                                WasteHistoryStatusFilter.DISETUJUI -> "Menampilkan $disetujui laporan disetujui"
-                                                WasteHistoryStatusFilter.DITOLAK -> "Menampilkan $ditolak laporan ditolak"
-                                                else -> ""
-                                            },
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            color = Slate600
-                                        )
-                                        TextButton(
-                                            onClick = { vm.setHistoryFilter(WasteHistoryStatusFilter.SEMUA) },
-                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
-                                        ) {
-                                            Text("Tampilkan Semua", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Orange600)
-                                        }
-                                    }
+                                    BarisFilterAktif(
+                                        when (state.historyFilter) {
+                                            WasteHistoryStatusFilter.DISETUJUI -> "Menampilkan $disetujui laporan disetujui"
+                                            WasteHistoryStatusFilter.DITOLAK -> "Menampilkan $ditolak laporan ditolak"
+                                            else -> ""
+                                        },
+                                        WarnaIos.LabelKedua,
+                                    ) { vm.setHistoryFilter(WasteHistoryStatusFilter.SEMUA) }
                                 }
                             }
                         }
                         if (state.filteredHistory.isEmpty()) {
                             item {
-                                Column(
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 32.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Text(
-                                        "Tidak ada laporan waste dengan status ${state.historyFilter.label}.",
-                                        color = Slate500,
-                                        fontSize = 13.sp,
-                                        textAlign = TextAlign.Center
-                                    )
-                                    Spacer(Modifier.height(8.dp))
-                                    OutlinedButton(
-                                        onClick = { vm.setHistoryFilter(WasteHistoryStatusFilter.SEMUA) },
-                                        shape = RoundedCornerShape(10.dp),
-                                        border = BorderStroke(1.dp, Orange500)
-                                    ) {
-                                        Text("Tampilkan Semua Riwayat", color = Orange600, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                                    }
-                                }
+                                KeadaanIos(
+                                    IkonIos.Inbox,
+                                    "Tidak ada laporan waste dengan status ${state.historyFilter.label}.",
+                                    "",
+                                    teksAksi = "Tampilkan Semua Riwayat",
+                                    onAksi = { vm.setHistoryFilter(WasteHistoryStatusFilter.SEMUA) },
+                                )
                             }
                         } else {
                             items(state.filteredHistory, key = { it.id }) { item ->
@@ -444,159 +333,183 @@ fun WasteApprovalScreen(onBack: () -> Unit, vm: WasteApprovalViewModel = viewMod
     state.confirmation?.let { report ->
         AlertDialog(
             onDismissRequest = vm::dismiss,
-            shape = RoundedCornerShape(20.dp),
-            containerColor = Color.White,
-            title = { Text("Tetap setujui waste?", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp, color = Slate900) },
+            shape = UkuranIos.SudutKartu,
+            containerColor = WarnaIos.Kartu,
+            title = { Text("Tetap setujui waste?", style = TipeIos.Utama) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), color = Rose50, border = BorderStroke(1.dp, Rose200)) {
-                        Text(
-                            if (report.balance == null) "Saldo tidak dapat dikonversi ke satuan bahan. Pastikan jumlah waste ${report.quantityLabel} sudah benar."
-                            else "Qty waste ${report.quantityLabel} lebih besar dari saldo ${formatAngkaStok(report.balance)} ${report.meta.satuan.orEmpty()}. Saldo akan menjadi negatif.",
-                            Modifier.padding(12.dp), color = Rose700, fontSize = 12.sp, lineHeight = 17.sp,
-                        )
-                    }
-                    state.error?.let { Text(it, color = Rose600, fontSize = 12.sp) }
+                    BannerIos(
+                        if (report.balance == null) "Saldo tidak dapat dikonversi ke satuan bahan. Pastikan jumlah waste ${report.quantityLabel} sudah benar."
+                        else "Qty waste ${report.quantityLabel} lebih besar dari saldo ${formatAngkaStok(report.balance)} ${report.meta.satuan.orEmpty()}. Saldo akan menjadi negatif.",
+                        NadaIos.BAHAYA,
+                        ikon = IkonIos.WarningAmber,
+                    )
+                    state.error?.let { Text(it, style = TipeIos.Catatan.copy(color = NadaIos.BAHAYA.teks)) }
                 }
             },
             confirmButton = {
                 TextButton(onClick = { vm.decide(report) }, enabled = !state.busy) {
-                    Text("Tetap Setujui", color = Rose600, fontWeight = FontWeight.Bold)
+                    Text("Tetap Setujui", color = WarnaIos.Merah, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
                 }
             },
-            dismissButton = { TextButton(onClick = vm::dismiss, enabled = !state.busy) { Text("Batal", color = Slate500) } },
+            dismissButton = {
+                TextButton(onClick = vm::dismiss, enabled = !state.busy) {
+                    Text("Batal", color = WarnaIos.Aksen, fontSize = 16.sp)
+                }
+            },
         )
     }
     state.rejecting?.let { report ->
         var reason by rememberSaveable(report.id) { mutableStateOf("") }
         AlertDialog(
             onDismissRequest = vm::dismiss,
-            shape = RoundedCornerShape(20.dp),
-            containerColor = Color.White,
-            title = { Text("Tolak Laporan", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp, color = Slate900) },
+            shape = UkuranIos.SudutKartu,
+            containerColor = WarnaIos.Kartu,
+            title = { Text("Tolak Laporan", style = TipeIos.Utama) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Berikan alasan penolakan waste ${report.name}.", color = Slate500, fontSize = 12.sp)
+                    Text("Berikan alasan penolakan waste ${report.name}.", style = TipeIos.SubJudul)
                     OutlinedTextField(
                         reason, { reason = it },
                         Modifier.fillMaxWidth(),
-                        placeholder = { Text("Alasan penolakan", fontSize = 12.sp, color = Slate400) },
+                        placeholder = { Text("Alasan penolakan", fontSize = 15.sp) },
                         minLines = 3, enabled = !state.busy,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = Slate50, unfocusedContainerColor = Slate50,
-                            focusedBorderColor = Orange500, unfocusedBorderColor = Slate200,
-                        ),
+                        shape = UkuranIos.SudutKontrol,
+                        colors = warnaKolomIos(),
                     )
-                    state.error?.let { Text(it, color = Rose600, fontSize = 12.sp) }
+                    state.error?.let { Text(it, style = TipeIos.Catatan.copy(color = NadaIos.BAHAYA.teks)) }
                 }
             },
             confirmButton = {
                 TextButton(onClick = { vm.decide(report, reason) }, enabled = reason.isNotBlank() && !state.busy) {
-                    Text("Tolak Laporan", color = if (reason.isBlank()) Slate400 else Rose600, fontWeight = FontWeight.Bold)
+                    Text(
+                        "Tolak Laporan",
+                        color = if (reason.isBlank()) WarnaIos.LabelKetiga else WarnaIos.Merah,
+                        fontWeight = FontWeight.SemiBold, fontSize = 16.sp,
+                    )
                 }
             },
-            dismissButton = { TextButton(onClick = vm::dismiss, enabled = !state.busy) { Text("Batal", color = Slate500) } },
+            dismissButton = {
+                TextButton(onClick = vm::dismiss, enabled = !state.busy) {
+                    Text("Batal", color = WarnaIos.Aksen, fontSize = 16.sp)
+                }
+            },
         )
+    }
+}
+
+/** Keterangan filter yang sedang aktif + tautan untuk kembali ke semua data. */
+@Composable
+private fun BarisFilterAktif(teks: String, warna: Color, onSemua: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(teks, Modifier.weight(1f), style = TipeIos.Catatan.copy(color = warna))
+        Text(
+            "Tampilkan Semua",
+            Modifier
+                .clip(UkuranIos.SudutKapsul)
+                .tekanIos(onSemua)
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+            color = WarnaIos.Aksen, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
+
+/** Dua angka berdampingan dalam blok abu — kiri rata kiri, kanan rata kanan. */
+@Composable
+private fun BlokDuaAngka(
+    labelKiri: String,
+    kiri: @Composable () -> Unit,
+    labelKanan: String,
+    kanan: @Composable () -> Unit,
+    kananRataKanan: Boolean = true,
+) {
+    Row(
+        Modifier.fillMaxWidth().clip(UkuranIos.SudutBlok).background(WarnaIos.Latar).padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(labelKiri, style = TipeIos.Kecil.copy(fontWeight = FontWeight.Medium))
+            Spacer(Modifier.height(2.dp))
+            kiri()
+        }
+        Box(Modifier.height(34.dp).width(0.5.dp).background(WarnaIos.Pemisah))
+        Column(
+            Modifier.weight(1f).padding(start = 12.dp),
+            horizontalAlignment = if (kananRataKanan) Alignment.End else Alignment.Start,
+        ) {
+            Text(labelKanan, style = TipeIos.Kecil.copy(fontWeight = FontWeight.Medium))
+            Spacer(Modifier.height(2.dp))
+            kanan()
+        }
     }
 }
 
 @Composable
 private fun WasteCard(report: WasteReview, busy: Boolean, onPhoto: () -> Unit, onApprove: () -> Unit, onReject: () -> Unit) {
     val tone = tone(report)
-    Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), color = Color.White, border = BorderStroke(1.dp, Slate200)) {
-        Column {
-            Row(
-                Modifier.fillMaxWidth().background(tone.strip).padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                StatusChip(tone.label, tone.chip, tone.border, tone.text, tone.dot)
-                Spacer(Modifier.weight(1f))
-                Text(waktuSingkat(report.date), color = Slate400, fontSize = 10.sp, fontWeight = FontWeight.Medium)
-            }
-            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Column {
-                    Text(report.name, color = Slate900, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 19.sp)
+    KartuIos {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            LencanaIos(tone.label, tone.nada)
+            Spacer(Modifier.weight(1f))
+            Text(waktuSingkat(report.date), style = TipeIos.Catatan)
+        }
+        Spacer(Modifier.height(10.dp))
+        Text(report.name, style = TipeIos.Utama)
+        Text(
+            report.outlet.ifBlank { "Outlet tidak tercatat" },
+            style = TipeIos.Catatan,
+            maxLines = 1, overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.height(12.dp))
+        BlokDuaAngka(
+            "Jumlah waste",
+            { Text(report.quantityLabel, style = TipeIos.Angka.copy(fontSize = 17.sp, color = NadaIos.BAHAYA.teks)) },
+            "Saldo saat ini",
+            {
+                if (report.balance == null) {
+                    Text("Tidak diketahui", color = NadaIos.PERINGATAN.teks, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.End)
+                } else {
                     Text(
-                        report.outlet.ifBlank { "Outlet tidak tercatat" },
-                        color = Slate500, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        "${formatAngkaStok(report.balance)} ${report.meta.satuan.orEmpty()}",
+                        color = if (report.deficit) NadaIos.BAHAYA.teks else WarnaIos.Label,
+                        fontSize = 15.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.End,
                     )
                 }
-                Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), color = Slate50, border = BorderStroke(1.dp, Slate100)) {
-                    Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text("JUMLAH WASTE", color = Slate400, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
-                            Spacer(Modifier.height(2.dp))
-                            Text(report.quantityLabel, color = Rose600, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 20.sp)
-                        }
-                        Box(Modifier.height(38.dp).width(1.dp).background(Slate200))
-                        Column(Modifier.weight(1f).padding(start = 10.dp), horizontalAlignment = Alignment.End) {
-                            Text("SALDO SAAT INI", color = Slate400, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
-                            Spacer(Modifier.height(2.dp))
-                            if (report.balance == null) {
-                                Text("Tidak diketahui", color = Amber800, fontSize = 12.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.End)
-                            } else {
-                                Text(
-                                    "${formatAngkaStok(report.balance)} ${report.meta.satuan.orEmpty()}",
-                                    color = if (report.deficit) Rose600 else Slate900,
-                                    fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.End,
-                                )
-                            }
-                        }
-                    }
-                }
-                if (report.deficit) Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), color = tone.strip, border = BorderStroke(1.dp, tone.border)) {
-                    Text(
-                        if (report.balance == null) "Saldo tidak dapat dikonversi. Periksa stok sebelum menyetujui."
-                        else "Menyetujui laporan ini membuat stok outlet menjadi negatif.",
-                        Modifier.padding(10.dp), color = tone.text, fontSize = 11.sp, lineHeight = 16.sp, fontWeight = FontWeight.SemiBold,
-                    )
-                }
-                Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), color = Slate50, border = BorderStroke(1.dp, Slate100)) {
-                    Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                        MetaRow("Pelapor", report.reporter.ifBlank { "—" })
-                        Box(Modifier.fillMaxWidth().height(1.dp).background(Slate200))
-                        MetaRow("Alasan waste", report.reason.ifBlank { "—" })
-                    }
-                }
-                if (!report.photo.isNullOrBlank()) Surface(
-                    onClick = onPhoto,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color.White,
-                    border = BorderStroke(1.dp, Slate200),
-                ) {
-                    Row(Modifier.padding(vertical = 10.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Image, null, tint = Slate500, modifier = Modifier.size(15.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Lihat Foto Bukti", color = Slate700, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                    }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(
-                        onClick = onApprove, enabled = !busy, modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Emerald600, disabledContainerColor = Slate200),
-                        contentPadding = PaddingValues(vertical = 11.dp),
-                    ) {
-                        Icon(Icons.Default.Check, null, Modifier.size(16.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Setujui", fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    }
-                    OutlinedButton(
-                        onClick = onReject, enabled = !busy, modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, Rose200),
-                        colors = ButtonDefaults.outlinedButtonColors(containerColor = Rose50, contentColor = Rose600),
-                        contentPadding = PaddingValues(vertical = 11.dp),
-                    ) {
-                        Icon(Icons.Default.Close, null, Modifier.size(16.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Tolak", fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
+            },
+        )
+        if (report.deficit) {
+            Spacer(Modifier.height(8.dp))
+            BannerIos(
+                if (report.balance == null) "Saldo tidak dapat dikonversi. Periksa stok sebelum menyetujui."
+                else "Menyetujui laporan ini membuat stok outlet menjadi negatif.",
+                tone.nada,
+                ikon = IkonIos.WarningAmber,
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        BlokAbuIos {
+            MetaRow("Pelapor", report.reporter.ifBlank { "—" })
+            Box(Modifier.fillMaxWidth().height(0.5.dp).background(WarnaIos.Pemisah))
+            MetaRow("Alasan waste", report.reason.ifBlank { "—" })
+        }
+        if (!report.photo.isNullOrBlank()) {
+            Spacer(Modifier.height(8.dp))
+            TombolKeduaIos("Lihat Foto Bukti", onPhoto, Modifier.height(42.dp), ikon = IkonIos.Image, warna = WarnaIos.AbuGelap)
+        }
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            TombolUtamaIos(
+                "Setujui", onApprove, Modifier.weight(1f).height(46.dp),
+                aktif = !busy, ikon = IkonIos.Check, warna = WarnaIos.Hijau,
+            )
+            TombolKeduaIos(
+                "Tolak", onReject, Modifier.weight(1f).height(46.dp),
+                aktif = !busy, ikon = IkonIos.Close, warna = WarnaIos.Merah,
+            )
         }
     }
 }
@@ -607,168 +520,79 @@ private fun WasteHistoryCard(
     onPhoto: () -> Unit
 ) {
     val isApproved = item.isApproved
-    val stripColor = if (isApproved) Emerald50 else Rose50
-    val borderChipColor = if (isApproved) Emerald200 else Rose200
-    val bgChipColor = if (isApproved) Emerald100 else Rose100
-    val textChipColor = if (isApproved) Emerald700 else Rose700
-    val dotChipColor = if (isApproved) Emerald500 else Rose500
-    val statusLabel = if (isApproved) "DISETUJUI" else "DITOLAK"
+    val nada = if (isApproved) NadaIos.SUKSES else NadaIos.BAHAYA
+    val statusLabel = if (isApproved) "Disetujui" else "Ditolak"
 
-    Surface(
-        Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = Color.White,
-        border = BorderStroke(1.dp, Slate200)
-    ) {
-        Column {
-            Row(
-                Modifier.fillMaxWidth().background(stripColor).padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                StatusChip(statusLabel, bgChipColor, borderChipColor, textChipColor, dotChipColor)
-                Spacer(Modifier.weight(1f))
+    KartuIos {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            LencanaIos(statusLabel, nada)
+            Spacer(Modifier.weight(1f))
+            Text(waktuSingkat(item.updatedAt ?: item.createdAt), style = TipeIos.Catatan)
+        }
+        Spacer(Modifier.height(10.dp))
+        Text(item.bahanName, style = TipeIos.Utama)
+        Text(
+            item.outletName.ifBlank { "Outlet tidak tercatat" },
+            style = TipeIos.Catatan,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.height(12.dp))
+        BlokDuaAngka(
+            "Jumlah waste",
+            { Text(item.quantityLabel, style = TipeIos.Angka.copy(fontSize = 17.sp, color = nada.teks)) },
+            "Alasan laporan",
+            {
                 Text(
-                    waktuSingkat(item.updatedAt ?: item.createdAt),
-                    color = Slate400,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Medium
+                    item.reason.ifBlank { "—" }, color = WarnaIos.Label, fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                )
+            },
+            kananRataKanan = false,
+        )
+        Spacer(Modifier.height(8.dp))
+        BlokAbuIos {
+            MetaRow("Pelapor", item.reporterName.ifBlank { "—" })
+        }
+        Spacer(Modifier.height(8.dp))
+
+        // Siapa yang menyetujui atau menolak
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .clip(UkuranIos.SudutKontrol)
+                .background(nada.warna.copy(alpha = 0.12f))
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier.size(24.dp).clip(CircleShape).background(nada.warna),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(if (isApproved) IkonIos.Check else IkonIos.Close, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                }
+                Spacer(Modifier.width(10.dp))
+                Column {
+                    Text(if (isApproved) "Disetujui oleh" else "Ditolak oleh", style = TipeIos.Kecil.copy(color = nada.teks))
+                    Text(
+                        item.deciderName?.takeIf { it.isNotBlank() } ?: "Approver",
+                        style = TipeIos.Keterangan.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
+                    )
+                }
+            }
+            if (!isApproved && !item.rejectionReason.isNullOrBlank()) {
+                Box(Modifier.fillMaxWidth().height(0.5.dp).background(nada.warna.copy(alpha = 0.3f)))
+                Text(
+                    "Alasan penolakan: ${item.rejectionReason}",
+                    style = TipeIos.Catatan.copy(color = nada.teks, lineHeight = 18.sp),
                 )
             }
-            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Column {
-                    Text(
-                        item.bahanName,
-                        color = Slate900,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        lineHeight = 19.sp
-                    )
-                    Text(
-                        item.outletName.ifBlank { "Outlet tidak tercatat" },
-                        color = Slate500,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+        }
 
-                Surface(
-                    Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    color = Slate50,
-                    border = BorderStroke(1.dp, Slate100)
-                ) {
-                    Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text("JUMLAH WASTE", color = Slate400, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
-                            Spacer(Modifier.height(2.dp))
-                            Text(item.quantityLabel, color = if (isApproved) Emerald700 else Rose600, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 19.sp)
-                        }
-                        Box(Modifier.height(34.dp).width(1.dp).background(Slate200))
-                        Column(Modifier.weight(1f).padding(start = 10.dp)) {
-                            Text("ALASAN LAPORAN", color = Slate400, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
-                            Spacer(Modifier.height(2.dp))
-                            Text(item.reason.ifBlank { "—" }, color = Slate700, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        }
-                    }
-                }
-
-                // Pelapor info
-                Surface(
-                    Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    color = Slate50,
-                    border = BorderStroke(1.dp, Slate100)
-                ) {
-                    Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                        MetaRow("Pelapor", item.reporterName.ifBlank { "—" })
-                    }
-                }
-
-                // Decider Info (Who approved or rejected)
-                if (isApproved) {
-                    Surface(
-                        Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        color = Emerald50,
-                        border = BorderStroke(1.dp, Emerald200)
-                    ) {
-                        Row(
-                            Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Default.CheckCircle, null, tint = Emerald600, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Column {
-                                Text("DISETUJUI OLEH", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Emerald700, letterSpacing = 0.5.sp)
-                                Text(
-                                    item.deciderName?.takeIf { it.isNotBlank() } ?: "Approver",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = Slate900
-                                )
-                            }
-                        }
-                    }
-                } else {
-                    Surface(
-                        Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        color = Rose50,
-                        border = BorderStroke(1.dp, Rose200)
-                    ) {
-                        Column(
-                            Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Close, null, tint = Rose600, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Column {
-                                    Text("DITOLAK OLEH", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Rose700, letterSpacing = 0.5.sp)
-                                    Text(
-                                        item.deciderName?.takeIf { it.isNotBlank() } ?: "Approver",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = Slate900
-                                    )
-                                }
-                            }
-                            if (!item.rejectionReason.isNullOrBlank()) {
-                                Box(Modifier.fillMaxWidth().height(1.dp).background(Rose200))
-                                Text(
-                                    "Alasan penolakan: ${item.rejectionReason}",
-                                    color = Rose700,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    lineHeight = 15.sp
-                                )
-                            }
-                        }
-                    }
-                }
-
-                if (!item.photoUrl.isNullOrBlank()) {
-                    Surface(
-                        onClick = onPhoto,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color.White,
-                        border = BorderStroke(1.dp, Slate200),
-                    ) {
-                        Row(
-                            Modifier.padding(vertical = 10.dp),
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Default.Image, null, tint = Slate500, modifier = Modifier.size(15.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text("Lihat Foto Bukti", color = Slate700, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                        }
-                    }
-                }
-            }
+        if (!item.photoUrl.isNullOrBlank()) {
+            Spacer(Modifier.height(8.dp))
+            TombolKeduaIos("Lihat Foto Bukti", onPhoto, Modifier.height(42.dp), ikon = IkonIos.Image, warna = WarnaIos.AbuGelap)
         }
     }
 }
@@ -780,102 +604,88 @@ private fun WasteHistoryCard(
 @Composable
 private fun DialogFotoBukti(preview: FotoBuktiPreview, onTutup: () -> Unit) {
     Dialog(onDismissRequest = onTutup) {
-        Surface(shape = RoundedCornerShape(20.dp), color = Color.White) {
-            Column {
-                Row(Modifier.padding(start = 16.dp, end = 6.dp, top = 10.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(preview.name, color = Slate900, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Column(Modifier.clip(UkuranIos.SudutKartu).background(WarnaIos.Kartu)) {
+            Row(Modifier.padding(start = 16.dp, end = 10.dp, top = 12.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(preview.name, style = TipeIos.Utama, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        preview.outlet.ifBlank { "Outlet tidak tercatat" },
+                        style = TipeIos.Catatan,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                TombolBundarIos(IkonIos.Close, "Tutup foto bukti", onTutup, warnaIkon = WarnaIos.LabelKedua)
+            }
+            SubcomposeAsyncImage(
+                model = preview.photo,
+                contentDescription = "Foto bukti waste ${preview.name}",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxWidth().height(340.dp).background(Color.Black),
+                loading = {
+                    Box(Modifier.fillMaxSize(), Alignment.Center) {
+                        CircularProgressIndicator(Modifier.size(28.dp), color = Color.White, strokeWidth = 2.5.dp)
+                    }
+                },
+                error = {
+                    Box(Modifier.fillMaxSize().padding(24.dp), Alignment.Center) {
                         Text(
-                            preview.outlet.ifBlank { "Outlet tidak tercatat" },
-                            color = Slate500, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
-                            maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            "Foto bukti tidak dapat dimuat.",
+                            color = WarnaIos.Abu, fontSize = 13.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center,
                         )
                     }
-                    IconButton(onClick = onTutup) { Icon(Icons.Default.Close, "Tutup foto bukti", tint = Slate500) }
-                }
-                SubcomposeAsyncImage(
-                    model = preview.photo,
-                    contentDescription = "Foto bukti waste ${preview.name}",
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.fillMaxWidth().height(340.dp).background(Slate900),
-                    loading = {
-                        Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator(color = Orange500) }
-                    },
-                    error = {
-                        Box(Modifier.fillMaxSize().padding(24.dp), Alignment.Center) {
-                            Text(
-                                "Foto bukti tidak dapat dimuat.",
-                                color = Slate400, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center,
-                            )
-                        }
-                    },
-                )
-                Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Jumlah waste", Modifier.weight(1f), color = Slate500, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                    Text(preview.quantityLabel, color = Rose600, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
-                }
+                },
+            )
+            Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Jumlah waste", Modifier.weight(1f), style = TipeIos.SubJudul)
+                Text(preview.quantityLabel, color = NadaIos.BAHAYA.teks, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
 }
 
+/**
+ * Petak ringkasan-sekaligus-filter, bentuknya mengikuti petak "smart list" iOS
+ * ([com.sukashawarma.superapp.core.ui.ios.PetakStatIos]) tapi tetap memuat keterangan
+ * di bawah angka. [onClick] null berarti petak hanya informasi.
+ */
 @Composable
 private fun RowScope.WasteSummaryFilterCard(
     title: String,
     value: String,
     caption: String,
-    titleColor: Color,
-    valueColor: Color,
-    captionColor: Color,
+    warna: Color,
     isSelected: Boolean,
-    activeBgColor: Color,
-    activeBorderColor: Color,
-    onClick: () -> Unit,
+    onClick: (() -> Unit)?,
+    valueColor: Color = WarnaIos.Label,
 ) {
-    Surface(
-        modifier = Modifier
+    val latar by animateColorAsState(if (isSelected) warna else WarnaIos.Kartu, label = "latarRingkasWaste")
+    Column(
+        Modifier
             .weight(1f)
-            .clip(RoundedCornerShape(14.dp))
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(14.dp),
-        color = if (isSelected) activeBgColor else Color.White,
-        border = BorderStroke(
-            width = if (isSelected) 1.5.dp else 1.dp,
-            color = if (isSelected) activeBorderColor else Slate200
-        ),
+            .permukaanIos(UkuranIos.SudutPetak, latar)
+            .then(if (onClick != null) Modifier.tekanIos(onClick) else Modifier)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
-        Column(
-            Modifier.padding(vertical = 10.dp, horizontal = 4.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (isSelected) {
-                    Box(
-                        Modifier
-                            .size(6.dp)
-                            .background(activeBorderColor, CircleShape)
-                    )
-                    Spacer(Modifier.width(4.dp))
-                }
-                Text(
-                    title,
-                    color = if (isSelected) activeBorderColor else titleColor,
-                    fontSize = 11.sp,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
-                    maxLines = 1
-                )
-            }
-            Spacer(Modifier.height(4.dp))
-            Text(value, color = valueColor, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
-            Spacer(Modifier.height(2.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(8.dp).clip(CircleShape).background(if (isSelected) Color.White else warna))
+            Spacer(Modifier.width(6.dp))
             Text(
-                caption,
-                color = if (isSelected) activeBorderColor.copy(alpha = 0.85f) else captionColor,
-                fontSize = 9.sp,
-                textAlign = TextAlign.Center,
-                lineHeight = 11.sp,
-                maxLines = 2
+                title,
+                color = if (isSelected) Color.White else WarnaIos.LabelKedua,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
+        Spacer(Modifier.height(4.dp))
+        Text(value, style = TipeIos.AngkaBesar.copy(fontSize = 22.sp, color = if (isSelected) Color.White else valueColor), maxLines = 1)
+        Text(
+            caption,
+            color = if (isSelected) Color.White.copy(alpha = 0.85f) else WarnaIos.LabelKedua,
+            fontSize = 11.sp,
+            lineHeight = 13.sp,
+            maxLines = 2,
+        )
     }
 }
