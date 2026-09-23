@@ -1,6 +1,13 @@
 package com.sukashawarma.superapp.feature.stok.ui.entri
 
-import androidx.compose.foundation.BorderStroke
+import com.sukashawarma.superapp.core.ui.kaca.navigationBarsPaddingKaca
+import com.sukashawarma.superapp.core.ui.ios.KartuIos
+import com.sukashawarma.superapp.core.ui.ios.LencanaIos
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.feature.stok.ui.BannerIos
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,21 +20,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -42,9 +45,6 @@ import com.sukashawarma.superapp.feature.stok.ui.KeadaanGagal
 import com.sukashawarma.superapp.feature.stok.ui.KeadaanKosong
 import com.sukashawarma.superapp.feature.stok.ui.MemuatPenuh
 import com.sukashawarma.superapp.feature.stok.ui.waktuSingkat
-import com.sukashawarma.superapp.presentation.theme.SukaOnSurface
-import com.sukashawarma.superapp.presentation.theme.SukaOnSurfaceVariant
-import com.sukashawarma.superapp.presentation.theme.SukaSurface
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -97,13 +97,13 @@ fun RiwayatWasteScreen(onBack: () -> Unit, viewModel: RiwayatWasteViewModel = vi
     // di sini kartunya yang langsung berganti status.
     RealtimeRefresh(RealtimeTables.WASTE_REPORTS) { viewModel.muatAwal() }
 
-    Column(Modifier.fillMaxSize().background(SukaSurface)) {
+    Column(Modifier.fillMaxSize().background(WarnaIos.Latar)) {
         HeaderStok(
             judul = "Riwayat Waste Saya",
             subjudul = "Status laporan bahan terbuang",
             onKembali = onBack,
         )
-        Box(Modifier.fillMaxSize().navigationBarsPadding()) {
+        Box(Modifier.fillMaxSize().navigationBarsPaddingKaca()) {
             when {
                 state.memuat && state.riwayat.isEmpty() -> MemuatPenuh()
                 state.error != null && state.riwayat.isEmpty() ->
@@ -112,8 +112,8 @@ fun RiwayatWasteScreen(onBack: () -> Unit, viewModel: RiwayatWasteViewModel = vi
                     KeadaanKosong("Belum ada laporan waste dari akun ini.")
                 else -> LazyColumn(
                     Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 20.dp),
-                    verticalArrangement = Arrangement.spacedBy(9.dp),
+                    contentPadding = PaddingValues(start = UkuranIos.TepiLayar, end = UkuranIos.TepiLayar, top = 12.dp, bottom = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     items(state.riwayat, key = { it.id }) { KartuWaste(it) }
                 }
@@ -124,69 +124,30 @@ fun RiwayatWasteScreen(onBack: () -> Unit, viewModel: RiwayatWasteViewModel = vi
 
 @Composable
 private fun KartuWaste(w: RiwayatWaste) {
-    val warna = when (w.status) {
-        StatusWaste.APPROVED -> Color(0xFF168451)
-        StatusWaste.PENDING -> Color(0xFFC27A12)
-        StatusWaste.REJECTED -> Color(0xFFDC2626)
+    val nada = when (w.status) {
+        StatusWaste.APPROVED -> NadaIos.SUKSES
+        StatusWaste.PENDING -> NadaIos.PERINGATAN
+        StatusWaste.REJECTED -> NadaIos.BAHAYA
     }
-    Surface(
-        Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = Color.White,
-        border = BorderStroke(1.dp, Color(0xFFF1F5F9)),
-    ) {
-        Column(Modifier.padding(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        w.namaBahan,
-                        color = SukaOnSurface,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        waktuSingkat(w.createdAt),
-                        color = SukaOnSurfaceVariant,
-                        fontSize = 10.sp,
-                    )
-                }
-                Surface(
-                    shape = RoundedCornerShape(50),
-                    color = warna.copy(alpha = 0.10f),
-                    border = BorderStroke(1.dp, warna.copy(alpha = 0.28f)),
-                ) {
-                    Text(
-                        w.status.label,
-                        Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
-                        color = warna, fontSize = 10.sp, fontWeight = FontWeight.Black,
-                    )
-                }
+    KartuIos(padding = PaddingValues(14.dp)) {
+        Row(verticalAlignment = Alignment.Top) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    w.namaBahan,
+                    style = TipeIos.Utama,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(waktuSingkat(w.createdAt), style = TipeIos.Catatan)
             }
+            Spacer(Modifier.width(8.dp))
+            LencanaIos(w.status.label, nada)
+        }
+        Spacer(Modifier.height(8.dp))
+        Text("${w.qtyLabel} — ${w.alasan}", style = TipeIos.SubJudul)
+        if (w.status == StatusWaste.REJECTED && w.alasanPenolakan != null) {
             Spacer(Modifier.height(8.dp))
-            Text(
-                "${w.qtyLabel} — ${w.alasan}",
-                color = SukaOnSurfaceVariant,
-                fontSize = 11.sp,
-            )
-            if (w.status == StatusWaste.REJECTED && w.alasanPenolakan != null) {
-                Spacer(Modifier.height(6.dp))
-                Surface(
-                    Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp),
-                    color = Color(0xFFFEF2F2),
-                    border = BorderStroke(1.dp, Color(0xFFFECACA)),
-                ) {
-                    Text(
-                        "Alasan ditolak: ${w.alasanPenolakan}",
-                        Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
-                        color = Color(0xFFB91C1C),
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Medium,
-                    )
-                }
-            }
+            BannerIos("Alasan ditolak: ${w.alasanPenolakan}", NadaIos.BAHAYA)
         }
     }
 }
