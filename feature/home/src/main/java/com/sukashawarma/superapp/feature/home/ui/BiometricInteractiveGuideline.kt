@@ -42,6 +42,13 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.sukashawarma.superapp.core.auth.BiometricAuth
 import com.sukashawarma.superapp.core.auth.findActivity
+import com.sukashawarma.superapp.core.ui.ios.LencanaIos
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.ios.bayanganIos
+import com.sukashawarma.superapp.core.ui.ios.tekanIos
 import com.sukashawarma.superapp.data.local.AuthPrefs
 import com.sukashawarma.superapp.data.remote.SessionTokenHolder
 import kotlinx.coroutines.delay
@@ -514,14 +521,15 @@ fun BiometricGuidelineBanner(
     val scope = rememberCoroutineScope()
     var isActivating by remember { mutableStateOf(false) }
 
+    // Banner duduk di antara kartu iOS beranda, jadi memakai permukaan yang sama:
+    // sudut 20, bayangan lembut, tanpa garis tepi.
     Surface(
-        shape = RoundedCornerShape(18.dp),
-        color = CardBg,
-        shadowElevation = 2.dp,
-        border = BorderStroke(0.6.dp, Color(0x18000000)),
+        shape = UkuranIos.SudutKartu,
+        color = WarnaIos.Kartu,
         modifier = modifier
             .fillMaxWidth()
-            .clickable { onShowCoachmark() }
+            .bayanganIos()
+            .tekanIos(onShowCoachmark)
     ) {
         Row(
             modifier = Modifier
@@ -556,31 +564,16 @@ fun BiometricGuidelineBanner(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = "Login Sidik Jari",
-                        fontSize = 14.5.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = TextPrimary
+                        style = TipeIos.Utama.copy(fontSize = 15.sp),
+                        maxLines = 1,
                     )
                     Spacer(Modifier.width(6.dp))
-                    Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = Color(0xFFFFF2E8),
-                        border = BorderStroke(0.5.dp, Color(0xFFFFD5C0))
-                    ) {
-                        Text(
-                            text = "Baru",
-                            color = OrangePrimary,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.5.dp)
-                        )
-                    }
+                    LencanaIos("Baru", NadaIos.AKSEN, titik = false)
                 }
                 Spacer(Modifier.height(2.dp))
                 Text(
                     text = "Akses kilat tanpa repot ketik ulang kata sandi.",
-                    fontSize = 11.5.sp,
-                    color = TextSecondary,
-                    lineHeight = 15.sp
+                    style = TipeIos.Catatan.copy(lineHeight = 16.sp),
                 )
             }
 
