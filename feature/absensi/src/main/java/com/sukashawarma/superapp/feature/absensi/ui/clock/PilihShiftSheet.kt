@@ -1,8 +1,6 @@
 package com.sukashawarma.superapp.presentation.absensi.clock
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -24,7 +22,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bedtime
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.filled.WbTwilight
 import androidx.compose.material3.Icon
@@ -37,18 +34,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.sukashawarma.superapp.feature.absensi.shift.ShiftOption
-import com.sukashawarma.superapp.presentation.theme.SukaOrange
-
-private val Ink = Color(0xFF11142D)
-private val Muted = Color(0xFF6B7280)
-private val Line = Color(0xFFE5E7EB)
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.ios.permukaanIos
+import com.sukashawarma.superapp.core.ui.ios.tekanIos
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
 
 private fun ikonShift(jamMasuk: String): ImageVector {
     val h = jamMasuk.take(2).toIntOrNull() ?: 0
@@ -82,55 +80,47 @@ internal fun PilihShiftSheet(
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.55f)),
+                .background(Color.Black.copy(alpha = 0.45f)),
             contentAlignment = Alignment.BottomCenter,
         ) {
+            // Lembar bawah iOS: latar abu grouped supaya kartu shift putih di atasnya
+            // terbaca sebagai pilihan terpisah, bukan kotak bergaris.
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
                     .widthIn(max = 448.dp)
                     .heightIn(max = maxHeight * 0.9f),
                 shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-                color = Color.White,
+                color = WarnaIos.Latar,
             ) {
                 Column(
                     modifier = Modifier
                         .verticalScroll(rememberScrollState())
                         .navigationBarsPadding()
-                        .padding(horizontal = 20.dp)
+                        .padding(horizontal = UkuranIos.TepiLayar + 4.dp)
                         .padding(bottom = 24.dp),
                 ) {
                     Box(
                         modifier = Modifier
-                            .padding(top = 10.dp, bottom = 18.dp)
-                            .size(width = 44.dp, height = 5.dp)
+                            .padding(top = 8.dp, bottom = 18.dp)
+                            .size(width = 36.dp, height = 5.dp)
                             .clip(CircleShape)
-                            .background(Line)
+                            .background(WarnaIos.LabelKetiga)
                             .align(Alignment.CenterHorizontally),
                     )
                     Text(
                         text = "Halo, ${staffName.orEmpty()} 👋",
-                        color = Muted,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold,
+                        style = TipeIos.SubJudul.copy(fontWeight = FontWeight.SemiBold),
                     )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = "Pilih shift kamu hari ini",
-                        color = Ink,
-                        fontSize = 22.sp,
-                        lineHeight = 28.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                    )
+                    Spacer(Modifier.height(2.dp))
+                    Text(text = "Pilih shift kamu hari ini", style = TipeIos.Judul2)
                     Spacer(Modifier.height(6.dp))
                     Text(
                         text = "Jam telat dan jam pulang dihitung dari shift yang kamu pilih.",
-                        color = Muted,
-                        fontSize = 14.sp,
-                        lineHeight = 20.sp,
+                        style = TipeIos.SubJudul,
                     )
                     Spacer(Modifier.height(20.dp))
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(UkuranIos.JarakKartu)) {
                         options.forEach { opsi ->
                             TombolShift(opsi = opsi, onClick = { onPick(opsi.ke) })
                         }
@@ -143,42 +133,31 @@ internal fun PilihShiftSheet(
 
 @Composable
 private fun TombolShift(opsi: ShiftOption, onClick: () -> Unit) {
-    Surface(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 96.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .clickable(role = Role.Button, onClick = onClick),
-        shape = RoundedCornerShape(20.dp),
-        color = Color(0xFFFFF7ED),
-        border = BorderStroke(1.5.dp, SukaOrange.copy(alpha = 0.35f)),
+            .permukaanIos()
+            .tekanIos(onClick)
+            .padding(horizontal = UkuranIos.PaddingKartu, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .background(WarnaIos.Aksen.copy(alpha = 0.14f)),
+            contentAlignment = Alignment.Center,
         ) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(SukaOrange.copy(alpha = 0.14f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(ikonShift(opsi.jamMasuk), contentDescription = null, tint = SukaOrange, modifier = Modifier.size(26.dp))
-            }
-            Spacer(Modifier.width(14.dp))
-            Column(Modifier.weight(1f)) {
-                Text(opsi.nama, color = SukaOrange, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                Text(opsi.rentang, color = Ink, fontSize = 26.sp, lineHeight = 32.sp, fontWeight = FontWeight.ExtraBold)
-                Text(
-                    "Masuk ${opsi.jamMasuk} · Pulang ${opsi.jamKeluar}",
-                    color = Muted,
-                    fontSize = 12.5.sp,
-                    fontWeight = FontWeight.Medium,
-                )
-            }
-            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = SukaOrange)
+            Icon(ikonShift(opsi.jamMasuk), contentDescription = null, tint = WarnaIos.Aksen, modifier = Modifier.size(26.dp))
         }
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(opsi.nama, style = TipeIos.Catatan.copy(color = NadaIos.AKSEN.teks, fontWeight = FontWeight.SemiBold))
+            Text(opsi.rentang, style = TipeIos.AngkaBesar)
+            Text("Masuk ${opsi.jamMasuk} · Pulang ${opsi.jamKeluar}", style = TipeIos.Catatan)
+        }
+        Icon(IkonIos.ChevronRight, contentDescription = null, tint = WarnaIos.LabelKetiga, modifier = Modifier.size(16.dp))
     }
 }
 
@@ -190,28 +169,32 @@ internal fun KartuShiftTerpilih(
     onUbah: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        color = Color.White,
-        border = BorderStroke(1.dp, SukaOrange.copy(alpha = 0.3f)),
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .permukaanIos(UkuranIos.SudutGrup)
+            .padding(start = 14.dp, end = 6.dp, top = 8.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            modifier = Modifier.padding(start = 14.dp, end = 6.dp, top = 10.dp, bottom = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        Box(
+            Modifier.size(30.dp).clip(CircleShape).background(WarnaIos.Aksen.copy(alpha = 0.14f)),
+            contentAlignment = Alignment.Center,
         ) {
-            Icon(ikonShift(opsi.jamMasuk), contentDescription = null, tint = SukaOrange, modifier = Modifier.size(22.dp))
-            Spacer(Modifier.width(10.dp))
+            Icon(ikonShift(opsi.jamMasuk), contentDescription = null, tint = WarnaIos.Aksen, modifier = Modifier.size(17.dp))
+        }
+        Spacer(Modifier.width(10.dp))
+        Text(
+            text = "${opsi.nama} · ${opsi.rentang}",
+            style = TipeIos.Utama.copy(fontSize = 15.sp),
+            modifier = Modifier.weight(1f),
+        )
+        TextButton(onClick = onUbah, enabled = ubahEnabled) {
             Text(
-                text = "${opsi.nama} · ${opsi.rentang}",
-                color = Ink,
+                "Ubah",
+                color = if (ubahEnabled) WarnaIos.Aksen else WarnaIos.LabelKetiga,
                 fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f),
+                fontWeight = FontWeight.SemiBold,
             )
-            TextButton(onClick = onUbah, enabled = ubahEnabled) {
-                Text("Ubah", color = if (ubahEnabled) SukaOrange else Muted, fontWeight = FontWeight.Bold)
-            }
         }
     }
 }
