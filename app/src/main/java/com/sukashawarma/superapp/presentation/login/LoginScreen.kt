@@ -66,6 +66,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sukashawarma.superapp.R
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.TombolUtamaIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.ios.permukaanIos
 import com.sukashawarma.superapp.presentation.theme.StatusRed
 import com.sukashawarma.superapp.presentation.theme.SukaOnSurface
 import com.sukashawarma.superapp.presentation.theme.SukaOnSurfaceVariant
@@ -129,7 +135,7 @@ fun LoginScreen(onLoggedIn: () -> Unit, viewModel: LoginViewModel = viewModel())
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(SukaSurface),
+            .background(WarnaIos.Latar),
     ) {
         LoginBackdrop(modifier = Modifier.fillMaxSize())
 
@@ -149,25 +155,21 @@ fun LoginScreen(onLoggedIn: () -> Unit, viewModel: LoginViewModel = viewModel())
 
             Text(
                 "Selamat Datang",
-                fontSize = 30.sp,
-                fontWeight = FontWeight.Bold,
-                color = SukaPrimary,
+                style = TipeIos.Judul1,
             )
 
             Spacer(Modifier.height(7.dp))
 
             Text(
                 "Masuk untuk melanjutkan ke sistem terpadu",
-                fontSize = 13.5.sp,
-                color = SukaOnSurfaceVariant,
+                style = TipeIos.SubJudul,
                 textAlign = TextAlign.Center,
-                lineHeight = 19.sp,
             )
 
             Spacer(Modifier.height(30.dp))
 
             LoginCard {
-                FieldLabel("EMAIL ATAU USERNAME")
+                FieldLabel("Email atau username")
                 Spacer(Modifier.height(9.dp))
                 LoginTextField(
                     value = state.identifier,
@@ -185,7 +187,7 @@ fun LoginScreen(onLoggedIn: () -> Unit, viewModel: LoginViewModel = viewModel())
 
                 Spacer(Modifier.height(18.dp))
 
-                FieldLabel("KATA SANDI")
+                FieldLabel("Kata sandi")
                 Spacer(Modifier.height(9.dp))
                 LoginTextField(
                     value = state.password,
@@ -203,7 +205,7 @@ fun LoginScreen(onLoggedIn: () -> Unit, viewModel: LoginViewModel = viewModel())
                             Icon(
                                 if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
                                 contentDescription = if (passwordVisible) "Sembunyikan sandi" else "Lihat sandi",
-                                tint = SukaOnSurfaceVariant,
+                                tint = WarnaIos.Abu,
                                 modifier = Modifier.size(20.dp),
                             )
                         }
@@ -236,7 +238,7 @@ fun LoginScreen(onLoggedIn: () -> Unit, viewModel: LoginViewModel = viewModel())
                 "PT SUKA PROFIT BERKAH",
                 fontSize = 9.5.sp,
                 fontWeight = FontWeight.Medium,
-                color = SukaOnSurfaceVariant.copy(alpha = 0.55f),
+                color = WarnaIos.LabelKetiga,
                 letterSpacing = 2.5.sp,
             )
         }
@@ -284,28 +286,22 @@ private fun BrandMark() {
 
 @Composable
 private fun LoginCard(content: @Composable ColumnScope.() -> Unit) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        color = SukaSurfaceContainerLowest,
-        border = BorderStroke(1.dp, SukaSurfaceContainerHigh),
-        shadowElevation = 3.dp,
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 24.dp),
-            content = content,
-        )
-    }
+    // Kartu iOS: putih, sudut 20, bayangan lembut, tanpa garis tepi.
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .permukaanIos()
+            .padding(horizontal = 20.dp, vertical = 24.dp),
+        content = content,
+    )
 }
 
 @Composable
 private fun FieldLabel(text: String) {
     Text(
         text,
-        fontSize = 10.sp,
-        fontWeight = FontWeight.Bold,
-        color = SukaOnSurfaceVariant,
-        letterSpacing = 1.5.sp,
+        modifier = Modifier.padding(start = 4.dp),
+        style = TipeIos.Catatan.copy(fontWeight = FontWeight.SemiBold),
     )
 }
 
@@ -324,28 +320,28 @@ private fun LoginTextField(
         value = value,
         onValueChange = onValueChange,
         singleLine = true,
-        placeholder = { Text(placeholder, color = SukaOnSurfaceVariant.copy(alpha = 0.55f), fontSize = 14.5.sp) },
+        placeholder = { Text(placeholder, style = TipeIos.Keterangan.copy(color = WarnaIos.LabelKetiga)) },
         leadingIcon = {
-            Icon(leadingIcon, contentDescription = null, tint = SukaPrimaryContainer, modifier = Modifier.size(19.dp))
+            Icon(leadingIcon, contentDescription = null, tint = WarnaIos.Aksen, modifier = Modifier.size(19.dp))
         },
         trailingIcon = trailingIcon,
         visualTransformation = visualTransformation,
         keyboardOptions = keyboardOptions,
         keyboardActions = keyboardActions,
-        textStyle = LocalTextStyle.current.copy(fontSize = 15.sp, color = SukaOnSurface),
-        modifier = Modifier.fillMaxWidth().height(58.dp),
-        shape = RoundedCornerShape(14.dp),
+        textStyle = TipeIos.Keterangan,
+        modifier = Modifier.fillMaxWidth().height(56.dp),
+        shape = UkuranIos.SudutKontrol,
         colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = SukaPrimaryContainer,
-            unfocusedBorderColor = SukaSurfaceContainerHighest,
-            focusedContainerColor = SukaSurfaceContainerLowest,
-            unfocusedContainerColor = SukaSurface,
-            cursorColor = SukaPrimaryContainer,
-            focusedTextColor = SukaOnSurface,
-            unfocusedTextColor = SukaOnSurface,
+            focusedBorderColor = WarnaIos.Aksen,
+            unfocusedBorderColor = WarnaIos.Pemisah,
+            focusedContainerColor = WarnaIos.Kartu,
+            unfocusedContainerColor = WarnaIos.Kartu,
+            cursorColor = WarnaIos.Aksen,
+            focusedTextColor = WarnaIos.Label,
+            unfocusedTextColor = WarnaIos.Label,
             selectionColors = TextSelectionColors(
-                handleColor = SukaPrimaryContainer,
-                backgroundColor = SukaOrange.copy(alpha = 0.3f),
+                handleColor = WarnaIos.Aksen,
+                backgroundColor = WarnaIos.Aksen.copy(alpha = 0.3f),
             ),
         ),
     )
@@ -353,87 +349,33 @@ private fun LoginTextField(
 
 @Composable
 private fun ErrorBanner(message: String) {
+    val nada = NadaIos.BAHAYA
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(StatusRed.copy(alpha = 0.07f))
-            .border(1.dp, StatusRed.copy(alpha = 0.22f), RoundedCornerShape(12.dp))
+            .clip(UkuranIos.SudutKontrol)
+            .background(nada.warna.copy(alpha = 0.10f))
             .padding(horizontal = 13.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Filled.ErrorOutline, contentDescription = null, tint = StatusRed, modifier = Modifier.size(17.dp))
+        Icon(Icons.Filled.ErrorOutline, contentDescription = null, tint = nada.teks, modifier = Modifier.size(17.dp))
         Spacer(Modifier.width(9.dp))
-        Text(message, color = StatusRed, fontSize = 12.5.sp, lineHeight = 17.sp)
+        Text(message, style = TipeIos.Catatan.copy(color = nada.teks, lineHeight = 17.sp))
     }
 }
 
 /* ---------------------------------------------------------- Submit button */
 
-/** Satu-satunya elemen bergerak di dalam kartu — kilau tipis yang menyapu pelan, supaya
- *  mata langsung tahu ke mana harus menuju tanpa perlu warna tambahan. */
+/** Tombol aksi utama iOS. Kilau bergerak versi lama dilepas: satu animasi tak berujung
+ *  lebih sedikit di layar yang dibuka setiap kali sesi habis, dan tombol terisi aksen
+ *  sudah cukup menunjukkan ke mana mata harus menuju. */
 @Composable
 private fun SubmitButton(loading: Boolean, onClick: () -> Unit) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val pressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) 0.985f else 1f, tween(120), label = "loginBtnScale")
-    val sheen by rememberInfiniteTransition(label = "loginBtnSheen").animateFloat(
-        initialValue = -0.4f,
-        targetValue = 1.4f,
-        animationSpec = infiniteRepeatable(tween(2800, easing = LinearEasing), RepeatMode.Restart),
-        label = "loginBtnSheenPos",
+    TombolUtamaIos(
+        teks = "Masuk ke sistem",
+        onKlik = onClick,
+        memuat = loading,
     )
-
-    Surface(
-        onClick = onClick,
-        enabled = !loading,
-        interactionSource = interactionSource,
-        shape = RoundedCornerShape(14.dp),
-        color = Color.Transparent,
-        shadowElevation = if (loading) 0.dp else 4.dp,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp)
-            .scale(scale)
-            .graphicsLayer { alpha = if (loading) 0.8f else 1f },
-    ) {
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Brush.verticalGradient(listOf(SukaOrange, SukaPrimaryContainer))),
-            contentAlignment = Alignment.Center,
-        ) {
-            val w = constraints.maxWidth.toFloat()
-            val h = constraints.maxHeight.toFloat()
-            Box(
-                Modifier
-                    .matchParentSize()
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.28f), Color.Transparent),
-                            start = Offset(w * sheen, 0f),
-                            end = Offset(w * sheen + w * 0.32f, h),
-                        )
-                    )
-            )
-
-            if (loading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(23.dp),
-                    color = Color.White,
-                    strokeWidth = 2.4.dp,
-                )
-            } else {
-                Text(
-                    "MASUK KE SISTEM",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    letterSpacing = 2.sp,
-                )
-            }
-        }
-    }
 }
 
 @Composable
@@ -444,7 +386,7 @@ private fun HairlineDivider() {
             .height(1.dp)
             .background(
                 Brush.horizontalGradient(
-                    listOf(Color.Transparent, SukaSurfaceContainerHighest, Color.Transparent)
+                    listOf(Color.Transparent, WarnaIos.Pemisah, Color.Transparent)
                 )
             )
     )
@@ -537,8 +479,8 @@ private fun LoginSystemBars() {
             val prevLightStatus = controller.isAppearanceLightStatusBars
             val prevLightNav = controller.isAppearanceLightNavigationBars
 
-            window.statusBarColor = SukaSurface.toArgb()
-            window.navigationBarColor = SukaSurface.toArgb()
+            window.statusBarColor = WarnaIos.Latar.toArgb()
+            window.navigationBarColor = WarnaIos.Latar.toArgb()
             controller.isAppearanceLightStatusBars = true
             controller.isAppearanceLightNavigationBars = true
 
