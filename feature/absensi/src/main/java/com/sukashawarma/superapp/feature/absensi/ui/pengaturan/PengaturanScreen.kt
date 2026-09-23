@@ -1,8 +1,7 @@
 package com.sukashawarma.superapp.presentation.absensi.pengaturan
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,41 +11,31 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Nightlight
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.ShareLocation
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.WbTwilight
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TimePickerDefaults
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -56,19 +45,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -76,19 +57,21 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.sukashawarma.superapp.core.ui.ios.BilahJudulIos
+import com.sukashawarma.superapp.core.ui.ios.IkonBulatIos
+import com.sukashawarma.superapp.core.ui.ios.JudulSeksiIos
+import com.sukashawarma.superapp.core.ui.ios.KartuIos
+import com.sukashawarma.superapp.core.ui.ios.KeadaanIos
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.TombolUtamaIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.ios.permukaanIos
+import com.sukashawarma.superapp.core.ui.ios.tekanIos
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
 import com.sukashawarma.superapp.core.ui.RealtimeRefresh
 import com.sukashawarma.superapp.core.ui.RealtimeTables
-
-internal val StitchBackground = Color(0xFFF9F9FC)
-internal val StitchSurfaceLow = Color(0xFFF3F3F6)
-internal val StitchSurfaceVariant = Color(0xFFE2E2E5)
-internal val StitchOnSurface = Color(0xFF1A1C1E)
-internal val StitchSecondary = Color(0xFF635D59)
-internal val StitchTertiary = Color(0xFF5E5E5E)
-internal val StitchPrimary = Color(0xFFA23F00)
-internal val StitchPrimaryContainer = Color(0xFFF27A3D)
-internal val StitchDanger = Color(0xFFB3261E)
-internal val StitchSuccess = Color(0xFF16803C)
 
 private enum class WorkTimeTarget(val title: String) {
     MASUK("Pilih jam masuk"),
@@ -118,45 +101,8 @@ fun PengaturanScreen(onExit: () -> Unit, viewModel: PengaturanViewModel = viewMo
     var konfirmasiResetSemua by remember { mutableStateOf(false) }
 
     Scaffold(
-        containerColor = StitchBackground,
-        topBar = {
-            Column {
-                TopAppBar(
-                    modifier = Modifier.height(80.dp),
-                    title = {
-                        Text(
-                            text = "Pengaturan",
-                            color = StitchOnSurface,
-                            fontSize = 28.sp,
-                            lineHeight = 36.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            letterSpacing = (-0.5).sp,
-                        )
-                    },
-                    navigationIcon = {
-                        IconButton(
-                            onClick = onExit,
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(StitchSurfaceLow),
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Kembali",
-                                tint = StitchOnSurface,
-                                modifier = Modifier.size(24.dp),
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = StitchBackground,
-                        scrolledContainerColor = StitchBackground,
-                    ),
-                )
-                HorizontalDivider(color = StitchSurfaceVariant)
-            }
-        },
+        containerColor = WarnaIos.Latar,
+        topBar = { BilahJudulIos(judul = "Pengaturan", onKembali = onExit) },
     ) { paddingValues ->
         Box(
             modifier = Modifier
@@ -165,54 +111,43 @@ fun PengaturanScreen(onExit: () -> Unit, viewModel: PengaturanViewModel = viewMo
         ) {
             when {
                 state.loading -> CircularProgressIndicator(
-                    modifier = Modifier.align(Alignment.Center),
-                    color = StitchPrimary,
+                    modifier = Modifier.align(Alignment.Center).size(28.dp),
+                    color = WarnaIos.Aksen,
+                    strokeWidth = 2.5.dp,
                 )
 
-                state.loadError != null -> Column(
-                    modifier = Modifier.align(Alignment.Center).padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Text(
-                        text = state.loadError.orEmpty(),
-                        color = MaterialTheme.colorScheme.error,
-                        fontSize = 15.sp,
-                        textAlign = TextAlign.Center,
-                    )
-                    Button(
-                        onClick = viewModel::load,
-                        colors = ButtonDefaults.buttonColors(containerColor = StitchPrimary),
-                    ) {
-                        Text("Coba lagi")
-                    }
-                }
+                state.loadError != null -> KeadaanIos(
+                    ikon = IkonIos.ErrorOutline,
+                    judul = "Gagal memuat",
+                    pesan = state.loadError.orEmpty(),
+                    nada = NadaIos.BAHAYA,
+                    teksAksi = "Coba lagi",
+                    onAksi = viewModel::load,
+                    modifier = Modifier.align(Alignment.Center),
+                )
 
                 else -> Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
                         .imePadding()
-                        .padding(horizontal = 24.dp, vertical = 24.dp),
-                    verticalArrangement = Arrangement.spacedBy(24.dp),
+                        .padding(horizontal = UkuranIos.TepiLayar, vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(UkuranIos.JarakKartu),
                 ) {
                     Text(
                         text = "Aturan pusat ini berlaku untuk seluruh outlet aktif.",
-                        color = StitchSecondary,
-                        fontSize = 16.sp,
-                        lineHeight = 24.sp,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.padding(top = 4.dp),
+                        style = TipeIos.SubJudul,
+                        modifier = Modifier.padding(horizontal = 4.dp),
                     )
 
-                    StitchSection(title = "Jam Kerja", progress = 0.33f) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    SeksiPengaturan(title = "Jam Kerja") {
+                        Row(horizontalArrangement = Arrangement.spacedBy(UkuranIos.JarakKartu)) {
                             StitchTimeCard(
                                 value = jamMasuk,
                                 onClick = { timePickerTarget = WorkTimeTarget.MASUK },
                                 label = "Masuk",
                                 icon = Icons.Default.WbTwilight,
-                                iconBackground = StitchPrimary.copy(alpha = 0.15f),
+                                nada = NadaIos.AKSEN,
                                 modifier = Modifier.weight(1f),
                             )
                             StitchTimeCard(
@@ -220,51 +155,24 @@ fun PengaturanScreen(onExit: () -> Unit, viewModel: PengaturanViewModel = viewMo
                                 onClick = { timePickerTarget = WorkTimeTarget.KELUAR },
                                 label = "Keluar",
                                 icon = Icons.Default.Nightlight,
-                                iconBackground = StitchSecondary.copy(alpha = 0.10f),
-                                iconTint = StitchSecondary,
+                                nada = NadaIos.INFO,
                                 modifier = Modifier.weight(1f),
                             )
                         }
                     }
 
-                    StitchSection(title = "Toleransi", progress = 0.50f) {
+                    SeksiPengaturan(title = "Toleransi") {
                         StitchMetricCard(
                             label = "Keterlambatan",
                             value = toleransi,
                             onValueChange = { toleransi = it.filter(Char::isDigit) },
                             suffix = "menit",
                             icon = Icons.Default.Timer,
+                            catatan = "Waktu tambahan sebelum karyawan dianggap terlambat.",
                         )
-                        Spacer(Modifier.height(12.dp))
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            color = StitchSurfaceLow,
-                            shape = RoundedCornerShape(12.dp),
-                            border = BorderStroke(1.dp, StitchSurfaceVariant),
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(12.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.Top,
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Info,
-                                    contentDescription = null,
-                                    tint = StitchPrimary,
-                                    modifier = Modifier.size(20.dp),
-                                )
-                                Text(
-                                    text = "Waktu tambahan sebelum karyawan dianggap terlambat.",
-                                    color = StitchTertiary,
-                                    fontSize = 14.sp,
-                                    lineHeight = 18.sp,
-                                    fontWeight = FontWeight.Medium,
-                                )
-                            }
-                        }
                     }
 
-                    StitchSection(title = "Lokasi", progress = 0.25f) {
+                    SeksiPengaturan(title = "Lokasi") {
                         StitchMetricCard(
                             label = "Radius Geofence",
                             value = radius,
@@ -274,7 +182,7 @@ fun PengaturanScreen(onExit: () -> Unit, viewModel: PengaturanViewModel = viewMo
                         )
                     }
 
-                    StitchSection(title = "Jadwal Khusus Outlet", progress = 0.75f) {
+                    SeksiPengaturan(title = "Jadwal Khusus Outlet") {
                         JadwalKhususList(
                             state = state,
                             onAdd = {
@@ -299,20 +207,19 @@ fun PengaturanScreen(onExit: () -> Unit, viewModel: PengaturanViewModel = viewMo
                     if (state.saveError != null) {
                         Text(
                             text = state.saveError.orEmpty(),
-                            color = MaterialTheme.colorScheme.error,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium,
+                            style = TipeIos.Catatan.copy(color = NadaIos.BAHAYA.teks, fontWeight = FontWeight.Medium),
+                            modifier = Modifier.padding(horizontal = 4.dp),
                         )
                     }
                     if (state.saved) {
                         Text(
                             text = "Pengaturan tersimpan.",
-                            color = Color(0xFF16803C),
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
+                            style = TipeIos.Catatan.copy(color = NadaIos.SUKSES.teks, fontWeight = FontWeight.SemiBold),
+                            modifier = Modifier.padding(horizontal = 4.dp),
                         )
                     }
 
+                    Spacer(Modifier.height(4.dp))
                     SaveSettingsButton(
                         saving = state.saving,
                         onClick = {
@@ -324,6 +231,7 @@ fun PengaturanScreen(onExit: () -> Unit, viewModel: PengaturanViewModel = viewMo
                             )
                         },
                     )
+                    Spacer(Modifier.height(12.dp))
                 }
             }
         }
@@ -416,49 +324,19 @@ fun PengaturanScreen(onExit: () -> Unit, viewModel: PengaturanViewModel = viewMo
     }
 }
 
+/** Judul seksi iOS + isinya; rel progres dekoratif lama dilepas supaya seragam dengan modul lain. */
 @Composable
-private fun StitchSection(
+private fun SeksiPengaturan(
     title: String,
-    progress: Float,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 12.dp)
-            .stitchProgressRail(progress),
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Column(
-            modifier = Modifier.padding(start = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            content = {
-                Text(
-                    text = title,
-                    color = StitchOnSurface,
-                    fontSize = 22.sp,
-                    lineHeight = 30.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = (-0.2).sp,
-                )
-                content()
-            },
-        )
+        JudulSeksiIos(title)
+        content()
     }
-}
-
-private fun Modifier.stitchProgressRail(progress: Float): Modifier = drawBehind {
-    val railWidth = 4.dp.toPx()
-    val radius = railWidth / 2f
-    drawRoundRect(
-        color = StitchSurfaceLow,
-        size = androidx.compose.ui.geometry.Size(railWidth, size.height),
-        cornerRadius = androidx.compose.ui.geometry.CornerRadius(radius, radius),
-    )
-    drawRoundRect(
-        color = StitchPrimary.copy(alpha = if (progress < 0.4f) 0.30f else 0.60f),
-        size = androidx.compose.ui.geometry.Size(railWidth, size.height * progress.coerceIn(0f, 1f)),
-        cornerRadius = androidx.compose.ui.geometry.CornerRadius(radius, radius),
-    )
 }
 
 @Composable
@@ -467,48 +345,19 @@ private fun StitchTimeCard(
     onClick: () -> Unit,
     label: String,
     icon: ImageVector,
-    iconBackground: Color,
+    nada: NadaIos,
     modifier: Modifier = Modifier,
-    iconTint: Color = StitchPrimary,
 ) {
-    val shape = RoundedCornerShape(16.dp)
-
-    Surface(
+    Column(
         modifier = modifier
-            .clickable(role = Role.Button, onClick = onClick)
-            .shadow(6.dp, shape),
-        shape = shape,
-        color = Color.White,
-        border = BorderStroke(1.dp, StitchSurfaceVariant),
+            .permukaanIos(UkuranIos.SudutPetak)
+            .tekanIos(onClick)
+            .padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = 12.dp),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            StitchIconTile(
-                icon = icon,
-                background = iconBackground,
-                tint = iconTint,
-                size = 40.dp,
-            )
-            Spacer(Modifier.height(12.dp))
-            Text(
-                text = label,
-                color = StitchSecondary,
-                fontSize = 13.sp,
-                lineHeight = 18.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                text = value,
-                color = StitchOnSurface,
-                style = TextStyle(
-                    color = StitchOnSurface,
-                    fontSize = 22.sp,
-                    lineHeight = 30.sp,
-                    fontWeight = FontWeight.Bold,
-                ),
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
+        IkonBulatIos(icon, nada.warna, ukuran = 34.dp, padat = false)
+        Spacer(Modifier.height(10.dp))
+        Text(text = label, style = TipeIos.Catatan.copy(fontWeight = FontWeight.SemiBold))
+        Text(text = value, style = TipeIos.AngkaBesar, modifier = Modifier.fillMaxWidth())
     }
 }
 
@@ -531,38 +380,27 @@ private fun WorkTimePickerDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(24.dp),
-        containerColor = Color.White,
+        shape = UkuranIos.SudutKartu,
+        containerColor = WarnaIos.Kartu,
         title = {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = title,
-                    color = StitchOnSurface,
-                    fontSize = 22.sp,
-                    lineHeight = 30.sp,
-                    fontWeight = FontWeight.Bold,
-                )
-                Text(
-                    text = "Gunakan format 24 jam",
-                    color = StitchSecondary,
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp,
-                    fontWeight = FontWeight.Medium,
-                )
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(text = title, style = TipeIos.Judul3)
+                Text(text = "Gunakan format 24 jam", style = TipeIos.Catatan)
             }
         },
         text = {
             TimePicker(
                 state = timeState,
                 modifier = Modifier.fillMaxWidth(),
+                colors = warnaPemilihJamIos(),
             )
         },
         dismissButton = {
             TextButton(
                 onClick = onDismiss,
-                colors = ButtonDefaults.textButtonColors(contentColor = StitchSecondary),
+                colors = ButtonDefaults.textButtonColors(contentColor = WarnaIos.LabelKedua),
             ) {
-                Text("Batal")
+                Text("Batal", fontSize = 16.sp)
             }
         },
         confirmButton = {
@@ -570,13 +408,26 @@ private fun WorkTimePickerDialog(
                 onClick = {
                     onConfirm("%02d:%02d".format(timeState.hour, timeState.minute))
                 },
-                colors = ButtonDefaults.textButtonColors(contentColor = StitchPrimary),
+                colors = ButtonDefaults.textButtonColors(contentColor = WarnaIos.Aksen),
             ) {
-                Text("Pilih", fontWeight = FontWeight.Bold)
+                Text("Pilih", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
             }
         },
     )
 }
+
+/** Warna TimePicker beraksen iOS — dipakai juga oleh dialog jam jadwal khusus. */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+internal fun warnaPemilihJamIos() = TimePickerDefaults.colors(
+    clockDialColor = WarnaIos.Latar,
+    selectorColor = WarnaIos.Aksen,
+    periodSelectorSelectedContainerColor = WarnaIos.Aksen.copy(alpha = 0.16f),
+    timeSelectorSelectedContainerColor = WarnaIos.Aksen.copy(alpha = 0.16f),
+    timeSelectorSelectedContentColor = NadaIos.AKSEN.teks,
+    timeSelectorUnselectedContainerColor = WarnaIos.Latar,
+    timeSelectorUnselectedContentColor = WarnaIos.Label,
+)
 
 @Composable
 private fun StitchMetricCard(
@@ -585,147 +436,62 @@ private fun StitchMetricCard(
     onValueChange: (String) -> Unit,
     suffix: String,
     icon: ImageVector,
+    catatan: String? = null,
 ) {
     var focused by remember { mutableStateOf(false) }
-    val shape = RoundedCornerShape(16.dp)
 
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .onFocusChanged { focused = it.isFocused }
-            .shadow(6.dp, shape),
-        shape = shape,
-        color = Color.White,
-        border = BorderStroke(2.dp, if (focused) StitchPrimary else Color.Transparent),
-    ) {
-        Box(modifier = Modifier.fillMaxWidth()) {
-            Box(
+    KartuIos(modifier = Modifier.onFocusChanged { focused = it.hasFocus }) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IkonBulatIos(icon, NadaIos.AKSEN.warna, ukuran = 34.dp, padat = false)
+            Text(text = label, style = TipeIos.Utama, modifier = Modifier.weight(1f))
+            // Isian angka ala iOS: kotak abu; garis aksen tipis saat sedang diketik.
+            BasicTextField(
+                value = value,
+                onValueChange = onValueChange,
+                singleLine = true,
+                textStyle = TipeIos.Angka.copy(textAlign = TextAlign.Center),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                cursorBrush = SolidColor(WarnaIos.Aksen),
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .offset(x = 24.dp, y = (-24).dp)
-                    .size(96.dp)
-                    .background(StitchPrimary.copy(alpha = 0.05f), CircleShape),
+                    .width(if (suffix == "meter") 80.dp else 64.dp)
+                    .clip(UkuranIos.SudutKontrol)
+                    .background(WarnaIos.Isian)
+                    .border(
+                        width = 1.5.dp,
+                        color = if (focused) WarnaIos.Aksen else Color.Transparent,
+                        shape = UkuranIos.SudutKontrol,
+                    )
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
             )
+            Text(text = suffix, style = TipeIos.Catatan.copy(fontWeight = FontWeight.SemiBold))
+        }
+        if (catatan != null) {
+            Spacer(Modifier.height(12.dp))
             Row(
-                modifier = Modifier.padding(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.Top,
             ) {
-                StitchIconTile(
-                    icon = icon,
-                    background = StitchPrimary.copy(alpha = 0.15f),
-                    tint = StitchPrimary,
-                    size = 48.dp,
-                    iconSize = 28.dp,
+                Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = null,
+                    tint = WarnaIos.Abu,
+                    modifier = Modifier.size(16.dp),
                 )
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = label,
-                        color = StitchOnSurface,
-                        fontSize = 15.sp,
-                        lineHeight = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Surface(
-                            color = StitchSurfaceLow,
-                            shape = RoundedCornerShape(8.dp),
-                        ) {
-                            BasicTextField(
-                                value = value,
-                                onValueChange = onValueChange,
-                                singleLine = true,
-                                textStyle = TextStyle(
-                                    color = StitchOnSurface,
-                                    fontSize = 22.sp,
-                                    lineHeight = 30.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    textAlign = TextAlign.Center,
-                                ),
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                cursorBrush = SolidColor(StitchPrimary),
-                                modifier = Modifier
-                                    .width(if (suffix == "meter") 80.dp else 64.dp)
-                                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                            )
-                        }
-                        Text(
-                            text = suffix,
-                            color = StitchSecondary,
-                            fontSize = 13.sp,
-                            lineHeight = 18.sp,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
-                }
+                Text(text = catatan, style = TipeIos.Catatan)
             }
         }
     }
 }
 
 @Composable
-private fun StitchIconTile(
-    icon: ImageVector,
-    background: Color,
-    tint: Color,
-    size: Dp,
-    iconSize: Dp = 24.dp,
-) {
-    Box(
-        modifier = Modifier
-            .size(size)
-            .clip(RoundedCornerShape(12.dp))
-            .background(background),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = tint,
-            modifier = Modifier.size(iconSize),
-        )
-    }
-}
-
-@Composable
 private fun SaveSettingsButton(saving: Boolean, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 60.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(Brush.linearGradient(listOf(StitchPrimary, StitchPrimaryContainer)))
-            .alpha(if (saving) 0.72f else 1f)
-            .clickable(enabled = !saving, role = Role.Button, onClick = onClick)
-            .semantics { role = Role.Button },
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (saving) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(24.dp),
-                color = Color.White,
-                strokeWidth = 2.5.dp,
-            )
-        } else {
-            Icon(
-                imageVector = Icons.Default.Save,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(24.dp),
-            )
-        }
-        Spacer(Modifier.width(8.dp))
-        Text(
-            text = "Simpan Pengaturan",
-            color = Color.White,
-            fontSize = 18.sp,
-            lineHeight = 28.sp,
-            fontWeight = FontWeight.Bold,
-        )
-    }
+    TombolUtamaIos(
+        teks = "Simpan Pengaturan",
+        onKlik = onClick,
+        memuat = saving,
+        ikon = Icons.Default.Save,
+    )
 }
