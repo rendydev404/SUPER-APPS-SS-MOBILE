@@ -1,5 +1,11 @@
 package com.sukashawarma.superapp.feature.chat.ui
 
+import com.sukashawarma.superapp.core.ui.ios.LabelSeksiIos
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.ios.bayanganIos
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
@@ -74,12 +80,14 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-private val BiruPrimer = Color(0xFF0284C7)
-private val EmasEnterprise = Color(0xFFD97706)
-private val LatarAbu = Color(0xFFF8FAFC)
-private val GarisBatas = Color(0xFFE2E8F0)
-private val TeksGelap = Color(0xFF0F172A)
-private val TeksPudar = Color(0xFF64748B)
+// Dipetakan ke token iOS bersama agar lembar ini serasi dengan layar terkunci
+// dan modul lain; nama lamanya dipertahankan supaya isi berkas tidak berubah.
+private val BiruPrimer = WarnaIos.Aksen
+private val EmasEnterprise = WarnaIos.Oranye
+private val LatarAbu = WarnaIos.Latar
+private val GarisBatas = WarnaIos.Pemisah
+private val TeksGelap = WarnaIos.Label
+private val TeksPudar = WarnaIos.LabelKedua
 
 private enum class SaluranPembayaran(val label: String) {
     VIRTUAL_ACCOUNT("Virtual Account"),
@@ -149,11 +157,11 @@ fun SheetSimulasiPembayaran(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = Color.White,
+        containerColor = WarnaIos.Latar,
         dragHandle = {
             Surface(
                 modifier = Modifier.padding(top = 10.dp, bottom = 4.dp),
-                color = Color(0xFFCBD5E1),
+                color = WarnaIos.LabelKetiga,
                 shape = RoundedCornerShape(2.dp),
             ) {
                 Spacer(Modifier.size(width = 38.dp, height = 4.dp))
@@ -164,7 +172,7 @@ fun SheetSimulasiPembayaran(
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 12.dp),
+                .padding(horizontal = UkuranIos.TepiLayar, vertical = 12.dp),
         ) {
             // Header Payment Gateway
             Row(
@@ -188,42 +196,35 @@ fun SheetSimulasiPembayaran(
                     }
                     Spacer(Modifier.width(10.dp))
                     Column {
-                        Text(
-                            text = "SUKA PAYMENT GATEWAY",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = TeksPudar,
-                            letterSpacing = 1.sp,
-                        )
+                        LabelSeksiIos("Suka Payment Gateway")
                         Text(
                             text = "Secure Checkout 256-bit SSL",
-                            fontSize = 10.sp,
-                            color = Color(0xFF059669),
+                            style = TipeIos.Kecil,
+                            color = NadaIos.SUKSES.teks,
                             fontWeight = FontWeight.Medium,
                         )
                     }
                 }
                 Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = Color(0xFFFEF3C7),
-                    border = BorderStroke(0.8.dp, Color(0xFFFDE68A)),
+                    shape = UkuranIos.SudutKapsul,
+                    color = WarnaIos.Oranye.copy(alpha = 0.14f),
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(
                             imageVector = Icons.Default.Schedule,
                             contentDescription = null,
-                            tint = Color(0xFF92400E),
+                            tint = NadaIos.PERINGATAN.teks,
                             modifier = Modifier.size(12.dp),
                         )
                         Spacer(Modifier.width(4.dp))
                         Text(
                             text = formatTimer,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF92400E),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = NadaIos.PERINGATAN.teks,
                             fontFamily = FontFamily.Monospace,
                         )
                     }
@@ -234,10 +235,9 @@ fun SheetSimulasiPembayaran(
 
             // Kartu Ringkasan Tagihan
             Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
-                color = LatarAbu,
-                border = BorderStroke(1.dp, GarisBatas),
+                modifier = Modifier.fillMaxWidth().bayanganIos(UkuranIos.SudutKartu),
+                shape = UkuranIos.SudutKartu,
+                color = WarnaIos.Kartu,
             ) {
                 Column(Modifier.padding(16.dp)) {
                     Row(
@@ -280,7 +280,7 @@ fun SheetSimulasiPembayaran(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(0.8.dp)
+                            .height(0.5.dp)
                             .background(GarisBatas),
                     )
                     Spacer(Modifier.height(10.dp))
@@ -291,14 +291,12 @@ fun SheetSimulasiPembayaran(
                     ) {
                         Text(
                             text = "Total Pembayaran",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = TeksGelap,
+                            style = TipeIos.Utama,
+                            fontSize = 15.sp,
                         )
                         Text(
                             text = "Rp 50.000.000",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.ExtraBold,
+                            style = TipeIos.Angka,
                             color = BiruPrimer,
                         )
                     }
@@ -308,18 +306,15 @@ fun SheetSimulasiPembayaran(
             Spacer(Modifier.height(16.dp))
 
             // Tab Pilihan Metode Pembayaran
-            Text(
-                text = "PILIH METODE PEMBAYARAN",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                color = TeksPudar,
-                letterSpacing = 0.8.sp,
+            LabelSeksiIos(
+                "Pilih metode pembayaran",
+                Modifier.padding(start = 16.dp),
             )
             Spacer(Modifier.height(8.dp))
 
             TabRow(
                 selectedTabIndex = tabAktif.ordinal,
-                containerColor = Color.White,
+                containerColor = WarnaIos.Latar,
                 contentColor = BiruPrimer,
                 indicator = { tabPositions ->
                     TabRowDefaults.SecondaryIndicator(
@@ -473,14 +468,13 @@ fun SheetSimulasiPembayaran(
                 Box(
                     modifier = Modifier
                         .size(54.dp)
-                        .background(Color(0xFFFEF2F2), CircleShape)
-                        .border(1.5.dp, Color(0xFFFCA5A5), CircleShape),
+                        .background(WarnaIos.Merah.copy(alpha = 0.12f), CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         imageVector = Icons.Default.ErrorOutline,
                         contentDescription = null,
-                        tint = Color(0xFFDC2626),
+                        tint = WarnaIos.Merah,
                         modifier = Modifier.size(30.dp),
                     )
                 }
@@ -506,9 +500,8 @@ fun SheetSimulasiPembayaran(
                     Spacer(Modifier.height(12.dp))
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp),
+                        shape = UkuranIos.SudutKontrol,
                         color = LatarAbu,
-                        border = BorderStroke(0.8.dp, GarisBatas),
                     ) {
                         Column(Modifier.padding(10.dp)) {
                             Text(
@@ -576,7 +569,7 @@ private fun KontenVirtualAccount(
                         .clip(RoundedCornerShape(10.dp))
                         .clickable { onPilihBank(bank) },
                     shape = RoundedCornerShape(10.dp),
-                    color = if (terpilih) bank.warnaAksen.copy(alpha = 0.08f) else Color.White,
+                    color = if (terpilih) bank.warnaAksen.copy(alpha = 0.08f) else WarnaIos.Kartu,
                     border = BorderStroke(
                         if (terpilih) 1.5.dp else 1.dp,
                         if (terpilih) bank.warnaAksen else GarisBatas,
@@ -609,7 +602,7 @@ private fun KontenVirtualAccount(
                         .clip(RoundedCornerShape(10.dp))
                         .clickable { onPilihBank(bank) },
                     shape = RoundedCornerShape(10.dp),
-                    color = if (terpilih) bank.warnaAksen.copy(alpha = 0.08f) else Color.White,
+                    color = if (terpilih) bank.warnaAksen.copy(alpha = 0.08f) else WarnaIos.Kartu,
                     border = BorderStroke(
                         if (terpilih) 1.5.dp else 1.dp,
                         if (terpilih) bank.warnaAksen else GarisBatas,
@@ -634,10 +627,9 @@ private fun KontenVirtualAccount(
 
         // Nomor Virtual Account Card
         Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp),
-            color = Color.White,
-            border = BorderStroke(1.dp, GarisBatas),
+            modifier = Modifier.fillMaxWidth().bayanganIos(UkuranIos.SudutGrup),
+            shape = UkuranIos.SudutGrup,
+            color = WarnaIos.Kartu,
         ) {
             Column(Modifier.padding(14.dp)) {
                 Text(
@@ -771,9 +763,8 @@ private fun KontenVirtualAccount(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(12.dp))
                 .clickable { onTogglePetunjuk() },
-            shape = RoundedCornerShape(12.dp),
-            color = LatarAbu,
-            border = BorderStroke(0.8.dp, GarisBatas),
+            shape = UkuranIos.SudutKontrol,
+            color = WarnaIos.Kartu,
         ) {
             Column(Modifier.padding(12.dp)) {
                 Row(
@@ -823,10 +814,9 @@ private fun KontenQris(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = Color.White,
-            border = BorderStroke(1.dp, GarisBatas),
-            shadowElevation = 1.dp,
+            modifier = Modifier.bayanganIos(UkuranIos.SudutKartu),
+            shape = UkuranIos.SudutKartu,
+            color = WarnaIos.Kartu,
         ) {
             Column(
                 modifier = Modifier.padding(18.dp),
@@ -998,6 +988,8 @@ private fun KontenKartuKredit(
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = BiruPrimer,
                 unfocusedBorderColor = GarisBatas,
+                focusedContainerColor = WarnaIos.Kartu,
+                unfocusedContainerColor = WarnaIos.Kartu,
             ),
             singleLine = true,
         )
@@ -1019,6 +1011,8 @@ private fun KontenKartuKredit(
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = BiruPrimer,
                     unfocusedBorderColor = GarisBatas,
+                    focusedContainerColor = WarnaIos.Kartu,
+                    unfocusedContainerColor = WarnaIos.Kartu,
                 ),
                 singleLine = true,
             )
@@ -1042,6 +1036,8 @@ private fun KontenKartuKredit(
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = BiruPrimer,
                     unfocusedBorderColor = GarisBatas,
+                    focusedContainerColor = WarnaIos.Kartu,
+                    unfocusedContainerColor = WarnaIos.Kartu,
                 ),
                 singleLine = true,
             )
@@ -1059,6 +1055,8 @@ private fun KontenKartuKredit(
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = BiruPrimer,
                 unfocusedBorderColor = GarisBatas,
+                focusedContainerColor = WarnaIos.Kartu,
+                unfocusedContainerColor = WarnaIos.Kartu,
             ),
             singleLine = true,
         )
