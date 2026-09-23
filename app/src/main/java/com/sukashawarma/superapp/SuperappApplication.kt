@@ -31,7 +31,19 @@ class SuperappApplication : Application() {
         super.onCreate()
         AuthPrefs.init(this)
         VerifikasiDraftStore.init(this)
-        SupabaseClient.onRefreshNeeded = { AuthSessionManager.refresh() }
+        SupabaseClient.onRefreshNeeded = { tokenGagal ->
+            AuthSessionManager.refreshSetelah401(tokenGagal) == AuthSessionManager.HasilSesi.BERHASIL
+        }
+        // Salinan token milik service lokasi mengikuti setiap rotasi, dan dibuang begitu
+        // server menolaknya. Salinan yang tertinggal satu rotasi saja membuat service
+        // memakai ulang token hangus setelah proses dibangun ulang, dan GoTrue lalu
+        // mencabut seluruh sesi staff ("Possible abuse attempt").
+        SessionTokenHolder.onRefreshTokenBerubah = { access, refresh ->
+            if (LocationTrackingPrefs.getStaffId(this) != null) {
+                LocationTrackingPrefs.updateTokens(this, access, refresh)
+            }
+        }
+        AuthSessionManager.onSesiDitolak = { LocationTrackingPrefs.clearTokens(this) }
         NetworkMonitor.init(this)
         // Setelah NetworkMonitor: pengurasan antrean offline mengamati isOnline, jadi
         // sumbernya harus sudah hidup lebih dulu.
@@ -65,14 +77,17 @@ class SuperappApplication : Application() {
      * sengaja tidak mengenal Firebase maupun modul lain yang bergantung padanya —
      * pola yang sama dipakai `onSignOut`.
      *
-     * `distinctUntilChangedBy { it.id }` menahan pendaftaran ulang saat profil
-     * staf yang sama dimuat ulang; yang perlu dikirim hanya pergantian akun.
+     * `distinctUntilChangedBy { it?.id }` menahan pendaftaran ulang saat profil
+     * staf yang sama dimuat ulang; yang perlu dikirim hanya pergantian sesi. Nilai
+     * null (logout) sengaja ikut dibandingkan sebelum disaring: tanpa itu staf yang
+     * logout lalu login lagi dengan akun yang sama tidak pernah didaftarkan ulang,
+     * padahal logout sudah menghapus sesi service lokasi.
      */
     private fun ikatDeviceKeSesi() {
         lingkup.launch {
             AppSession.staff
+                .distinctUntilChangedBy { it?.id }
                 .filterNotNull()
-                .distinctUntilChangedBy { it.id }
                 .collect { staf ->
                     FcmTokenRegistrar.daftarkan(applicationContext, staf.id, staf.outletId)
                     LocationTrackingPrefs.saveSession(
