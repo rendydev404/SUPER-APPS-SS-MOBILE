@@ -3,40 +3,37 @@ package com.sukashawarma.superapp.presentation.absensi.kasbon
 import androidx.compose.ui.platform.LocalContext
 import android.widget.Toast
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.sukashawarma.superapp.presentation.absensi.AbsensiBottomNav
-import com.sukashawarma.superapp.presentation.theme.StatusAmber
-import com.sukashawarma.superapp.presentation.theme.StatusEmerald
-import com.sukashawarma.superapp.presentation.theme.StatusRed
-import com.sukashawarma.superapp.presentation.theme.SukaOnSurface
-import com.sukashawarma.superapp.presentation.theme.SukaOnSurfaceVariant
-import com.sukashawarma.superapp.presentation.theme.SukaPrimary
-import com.sukashawarma.superapp.presentation.theme.SukaSurface
-import com.sukashawarma.superapp.presentation.theme.SukaSurfaceContainer
-import com.sukashawarma.superapp.presentation.theme.SukaSurfaceContainerLowest
+import com.sukashawarma.superapp.core.ui.ios.BilahJudulIos
+import com.sukashawarma.superapp.core.ui.ios.JudulSeksiIos
+import com.sukashawarma.superapp.core.ui.ios.KartuIos
+import com.sukashawarma.superapp.core.ui.ios.KeadaanIos
+import com.sukashawarma.superapp.core.ui.ios.LencanaIos
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.SegmenIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.TombolUtamaIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WadahSegmenIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.ios.bayanganIos
+import com.sukashawarma.superapp.core.ui.ios.permukaanIos
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
+import com.sukashawarma.superapp.presentation.absensi.AbsensiShell
+import com.sukashawarma.superapp.presentation.absensi.nadaStatusPengajuan
+import com.sukashawarma.superapp.core.ui.kaca.denganRuangNav
 import java.text.NumberFormat
 import java.util.Locale
 import com.sukashawarma.superapp.core.ui.RealtimeRefresh
@@ -97,60 +94,51 @@ private fun KasbonListScreen(
     onNavigateTab: (Int) -> Unit,
     onAddClick: () -> Unit,
 ) {
-    Scaffold(
-        containerColor = SukaSurface,
-        topBar = {
-            TopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White),
-                title = { Text("Kasbon", fontWeight = FontWeight.Bold, color = SukaOnSurface) },
-                navigationIcon = {
-                    IconButton(onClick = onExit) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali") }
-                }
-            )
-        },
-        // Sama seperti Cuti & Izin — Kasbon diakses dari tab "More" (index 3), bottom nav
-        // tetap tampil di sini supaya user bisa lompat tab tanpa balik dulu.
-        bottomBar = { AbsensiBottomNav(selectedIndex = 3, onSelect = onNavigateTab) },
-    ) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize().background(SukaSurface)) {
-            Column(Modifier.padding(16.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(SukaSurfaceContainer), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = SukaPrimary)
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Text("Kasbon", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = SukaOnSurface)
+    // Sama seperti Cuti & Izin — Kasbon diakses dari tab "More" (index 3), bilah tab
+    // tetap tampil di sini supaya user bisa lompat tab tanpa balik dulu. Halaman formulir
+    // "Request Kasbon" sengaja di luar kerangka ini: tombol kirimnya dipatok di dasar layar.
+    AbsensiShell(selectedIndex = 3, onSelect = onNavigateTab) {
+        Scaffold(
+            containerColor = WarnaIos.Latar,
+            topBar = { BilahJudulIos(judul = "Kasbon", onKembali = onExit, garisBawah = false) },
+        ) { padding ->
+            Column(Modifier.padding(padding).fillMaxSize().background(WarnaIos.Latar)) {
+                Column(Modifier.padding(horizontal = UkuranIos.TepiLayar).padding(top = 4.dp, bottom = 4.dp)) {
+                    Text("Kasbon", style = TipeIos.Judul1, modifier = Modifier.padding(horizontal = 4.dp))
+
+                    Spacer(Modifier.height(16.dp))
+
+                    TombolUtamaIos(teks = "Ajukan Kasbon", onKlik = onAddClick, ikon = IkonIos.Add)
+
+                    JudulSeksiIos("Riwayat Kasbon", modifier = Modifier.padding(top = 6.dp, bottom = 8.dp))
                 }
 
-                Spacer(Modifier.height(24.dp))
-
-                Button(
-                    onClick = onAddClick,
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = SukaPrimary)
-                ) {
-                    Icon(Icons.Filled.Add, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Ajukan Kasbon", fontWeight = FontWeight.Bold)
-                }
-
-                Spacer(Modifier.height(24.dp))
-                Text("Riwayat Kasbon", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = SukaOnSurface)
-                Spacer(Modifier.height(16.dp))
-            }
-
-            Box(Modifier.fillMaxSize()) {
-                when {
-                    state.loading -> CircularProgressIndicator(Modifier.align(Alignment.Center))
-                    state.error != null -> Text(
-                        state.error ?: "",
-                        modifier = Modifier.align(Alignment.Center).padding(24.dp),
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                    state.rows.isEmpty() -> Text("Belum ada pengajuan kasbon.", modifier = Modifier.align(Alignment.Center), color = SukaOnSurfaceVariant)
-                    else -> LazyColumn(contentPadding = PaddingValues(bottom = 24.dp, start = 16.dp, end = 16.dp)) {
-                        items(state.rows, key = { it.id }) { row -> KasbonItem(row) }
+                Box(Modifier.fillMaxSize()) {
+                    when {
+                        state.loading -> CircularProgressIndicator(
+                            Modifier.align(Alignment.Center).size(28.dp),
+                            color = WarnaIos.Aksen,
+                            strokeWidth = 2.5.dp,
+                        )
+                        state.error != null -> KeadaanIos(
+                            ikon = IkonIos.ErrorOutline,
+                            judul = "Gagal memuat",
+                            pesan = state.error ?: "",
+                            nada = NadaIos.BAHAYA,
+                            modifier = Modifier.align(Alignment.TopCenter),
+                        )
+                        state.rows.isEmpty() -> KeadaanIos(
+                            ikon = IkonIos.AccountBalanceWallet,
+                            judul = "Belum ada pengajuan",
+                            pesan = "Belum ada pengajuan kasbon.",
+                            modifier = Modifier.align(Alignment.TopCenter),
+                        )
+                        else -> LazyColumn(
+                            contentPadding = PaddingValues(bottom = 24.dp, start = UkuranIos.TepiLayar, end = UkuranIos.TepiLayar, top = 4.dp).denganRuangNav(),
+                            verticalArrangement = Arrangement.spacedBy(UkuranIos.JarakKartu),
+                        ) {
+                            items(state.rows, key = { it.id }) { row -> KasbonItem(row) }
+                        }
                     }
                 }
             }
@@ -160,35 +148,28 @@ private fun KasbonListScreen(
 
 @Composable
 private fun KasbonItem(row: KasbonRow) {
-    val (color, label) = when (row.status) {
-        "approved" -> StatusEmerald to "Disetujui"
-        "rejected" -> StatusRed to "Ditolak"
-        else -> StatusAmber to "Menunggu"
+    val label = when (row.status) {
+        "approved" -> "Disetujui"
+        "rejected" -> "Ditolak"
+        else -> "Menunggu"
     }
-    Card(
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        shape = RoundedCornerShape(12.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
-    ) {
+    KartuIos {
         Row(
-            Modifier.padding(16.dp).fillMaxWidth(),
+            Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.Top,
         ) {
             Column(Modifier.weight(1f)) {
-                Text(fmtRupiah(row.amount), fontWeight = FontWeight.Bold, fontSize = 16.sp, color = SukaOnSurface)
-                Spacer(Modifier.height(4.dp))
-                Text("Sisa ${fmtRupiah(row.remaining)} · ${row.installmentMonths} bulan gaji", color = SukaOnSurfaceVariant, fontSize = 13.sp)
+                Text(fmtRupiah(row.amount), style = TipeIos.Angka)
+                Spacer(Modifier.height(3.dp))
+                Text("Sisa ${fmtRupiah(row.remaining)} · ${row.installmentMonths} bulan gaji", style = TipeIos.Catatan)
                 if (row.reason.isNotBlank()) {
                     Spacer(Modifier.height(6.dp))
-                    Text(row.reason, color = SukaOnSurfaceVariant, fontSize = 13.sp)
+                    Text(row.reason, style = TipeIos.SubJudul)
                 }
             }
             Spacer(Modifier.width(12.dp))
-            Box(Modifier.clip(RoundedCornerShape(50)).background(color.copy(alpha = 0.12f)).padding(horizontal = 10.dp, vertical = 4.dp)) {
-                Text(label, color = color, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-            }
+            LencanaIos(label, nadaStatusPengajuan(row.status))
         }
     }
 }
@@ -213,39 +194,16 @@ private fun KasbonFormScreen(
     var reason by remember { mutableStateOf("") }
 
     Scaffold(
-        containerColor = SukaSurface,
-        topBar = {
-            TopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = SukaSurface),
-                title = {
-                    Text(
-                        "Request Kasbon",
-                        color = SukaPrimary,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali", tint = SukaPrimary)
-                    }
-                },
-            )
-        },
+        containerColor = WarnaIos.Latar,
+        topBar = { BilahJudulIos(judul = "Request Kasbon", onKembali = onBack) },
         bottomBar = {
-            Surface(color = SukaSurface, shadowElevation = 0.dp) {
-                Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-                    Button(
-                        onClick = { amountText.toDoubleOrNull()?.let { onSubmit(it, months, reason) } },
-                        enabled = !submitting && amountText.toDoubleOrNull() != null && amountText.toDoubleOrNull()!! > 0,
-                        modifier = Modifier.fillMaxWidth().height(56.dp),
-                        shape = RoundedCornerShape(50),
-                        colors = ButtonDefaults.buttonColors(containerColor = SukaPrimary),
-                    ) {
-                        Text(if (submitting) "Mengirim..." else "Ajukan Kasbon", fontWeight = FontWeight.Bold)
-                    }
+            Surface(color = WarnaIos.Latar, shadowElevation = 0.dp) {
+                Column(Modifier.padding(horizontal = UkuranIos.TepiLayar, vertical = 12.dp)) {
+                    TombolUtamaIos(
+                        teks = if (submitting) "Mengirim..." else "Ajukan Kasbon",
+                        onKlik = { amountText.toDoubleOrNull()?.let { onSubmit(it, months, reason) } },
+                        aktif = !submitting && amountText.toDoubleOrNull() != null && amountText.toDoubleOrNull()!! > 0,
+                    )
                 }
             }
         },
@@ -254,23 +212,21 @@ private fun KasbonFormScreen(
             Modifier
                 .padding(padding)
                 .fillMaxSize()
-                .background(SukaSurface)
-                .padding(horizontal = 16.dp, vertical = 16.dp)
+                .background(WarnaIos.Latar)
+                .padding(horizontal = UkuranIos.TepiLayar, vertical = 16.dp)
         ) {
             // Jumlah
-            Text("Jumlah (Rp)", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = SukaOnSurface)
-            Spacer(Modifier.height(8.dp))
+            LabelBidang("Jumlah (Rp)")
+            Spacer(Modifier.height(7.dp))
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(SukaSurfaceContainerLowest)
-                    .border(1.dp, SukaOnSurfaceVariant.copy(alpha = 0.25f), RoundedCornerShape(12.dp))
+                    .height(UkuranIos.TinggiTombol + 6.dp)
+                    .permukaanIos(UkuranIos.SudutGrup)
                     .padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Rp", color = SukaOnSurfaceVariant, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                Text("Rp", style = TipeIos.Isi.copy(color = WarnaIos.LabelKedua, fontWeight = FontWeight.Medium))
                 Spacer(Modifier.width(8.dp))
                 BasicAmountField(
                     value = amountText,
@@ -278,55 +234,65 @@ private fun KasbonFormScreen(
                 )
             }
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(22.dp))
 
             // Tenor
-            Text("Pilih Tenor", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = SukaOnSurface)
-            Spacer(Modifier.height(8.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            LabelBidang("Pilih Tenor")
+            Spacer(Modifier.height(7.dp))
+            WadahSegmenIos {
                 KASBON_TENORS.forEach { (m, label) ->
-                    TenorPill(
+                    SegmenIos(
                         label = label,
-                        selected = months == m,
-                        onClick = { months = m },
+                        aktif = months == m,
+                        onKlik = { months = m },
                         modifier = Modifier.weight(1f),
+                        jarakSisi = 6.dp,
                     )
                 }
             }
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(22.dp))
 
             // Alasan
-            Text("Alasan Pengajuan", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = SukaOnSurface)
-            Spacer(Modifier.height(8.dp))
+            LabelBidang("Alasan Pengajuan")
+            Spacer(Modifier.height(7.dp))
             TextField(
                 value = reason,
                 onValueChange = { reason = it },
-                placeholder = { Text("Tulis alasan Anda di sini...", color = SukaOnSurfaceVariant.copy(alpha = 0.6f)) },
+                placeholder = { Text("Tulis alasan Anda di sini...", color = WarnaIos.Abu) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = 120.dp)
-                    .border(1.dp, SukaOnSurfaceVariant.copy(alpha = 0.25f), RoundedCornerShape(12.dp)),
-                shape = RoundedCornerShape(12.dp),
+                    .bayanganIos(UkuranIos.SudutGrup),
+                shape = UkuranIos.SudutGrup,
                 colors = TextFieldDefaults.colors(
-                    focusedContainerColor = SukaSurfaceContainerLowest,
-                    unfocusedContainerColor = SukaSurfaceContainerLowest,
-                    disabledContainerColor = SukaSurfaceContainerLowest,
+                    focusedContainerColor = WarnaIos.Kartu,
+                    unfocusedContainerColor = WarnaIos.Kartu,
+                    disabledContainerColor = WarnaIos.Kartu,
                     focusedIndicatorColor = Color.Transparent,
                     unfocusedIndicatorColor = Color.Transparent,
                     disabledIndicatorColor = Color.Transparent,
-                    cursorColor = SukaPrimary,
-                    focusedTextColor = SukaOnSurface,
-                    unfocusedTextColor = SukaOnSurface,
+                    cursorColor = WarnaIos.Aksen,
+                    focusedTextColor = WarnaIos.Label,
+                    unfocusedTextColor = WarnaIos.Label,
                 ),
             )
 
             if (error != null) {
                 Spacer(Modifier.height(12.dp))
-                Text(error, color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
+                Text(error, style = TipeIos.Catatan.copy(color = NadaIos.BAHAYA.teks))
             }
         }
     }
+}
+
+@Composable
+private fun LabelBidang(teks: String) {
+    Text(
+        teks,
+        style = TipeIos.Catatan.copy(color = WarnaIos.Label, fontWeight = FontWeight.SemiBold),
+        modifier = Modifier.padding(horizontal = 4.dp),
+    )
 }
 
 @Composable
@@ -336,37 +302,12 @@ private fun BasicAmountField(value: String, onValueChange: (String) -> Unit) {
         onValueChange = onValueChange,
         modifier = Modifier.fillMaxWidth(),
         singleLine = true,
-        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 18.sp, color = SukaOnSurface),
+        textStyle = TipeIos.Angka,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        cursorBrush = androidx.compose.ui.graphics.SolidColor(SukaPrimary),
+        cursorBrush = androidx.compose.ui.graphics.SolidColor(WarnaIos.Aksen),
         decorationBox = { inner ->
-            if (value.isEmpty()) Text("0", color = SukaOnSurfaceVariant.copy(alpha = 0.4f), fontSize = 18.sp)
+            if (value.isEmpty()) Text("0", style = TipeIos.Angka.copy(color = WarnaIos.LabelKetiga))
             inner()
         },
     )
-}
-
-@Composable
-private fun TenorPill(label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .then(
-                if (selected) Modifier.background(SukaPrimary)
-                else Modifier
-                    .background(SukaSurfaceContainerLowest)
-                    .border(1.dp, SukaOnSurfaceVariant.copy(alpha = 0.25f), RoundedCornerShape(12.dp))
-            )
-            .clickable(onClick = onClick)
-            .padding(vertical = 10.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            label,
-            color = if (selected) Color.White else SukaOnSurfaceVariant,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.SemiBold,
-            textAlign = TextAlign.Center,
-        )
-    }
 }
