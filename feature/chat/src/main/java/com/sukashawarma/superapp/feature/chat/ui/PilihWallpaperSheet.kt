@@ -1,5 +1,13 @@
 package com.sukashawarma.superapp.feature.chat.ui
 
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.TombolBundarIos
+import com.sukashawarma.superapp.core.ui.ios.TombolKeduaIos
+import com.sukashawarma.superapp.core.ui.ios.TombolUtamaIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.ios.bayanganIos
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -84,10 +92,11 @@ import com.sukashawarma.superapp.feature.chat.data.WallpaperLatarChat
 import com.sukashawarma.superapp.feature.chat.data.WarnaWallpaper
 import java.io.File
 
-private val BiruIos = Color(0xFF007AFF)
-private val LatarGrup = Color(0xFFF2F2F7)
-private val GarisTipis = Color(0x2E3C3C43)
-private val AbuKeterangan = Color(0xFF8E8E93)
+// Lembar pengaturan: memakai aksen aplikasi agar serasi dengan Info Grup.
+private val BiruIos = WarnaIos.Aksen
+private val LatarGrup = WarnaIos.Latar
+private val GarisTipis = WarnaIos.Pemisah
+private val AbuKeterangan = WarnaIos.LabelKedua
 
 /**
  * Lembar pemilihan dan kustomisasi wallpaper obrolan lengkap.
@@ -167,21 +176,16 @@ fun PilihWallpaperSheet(
                     .padding(horizontal = 16.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(onClick = onTutup) {
-                    Icon(Icons.Filled.Close, contentDescription = "Tutup", tint = Color.Black)
-                }
-                Spacer(Modifier.width(6.dp))
+                TombolBundarIos(IkonIos.Close, "Tutup", onTutup, warnaIkon = WarnaIos.LabelKedua)
+                Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
                         judul,
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Black,
+                        style = TipeIos.Utama,
                     )
                     Text(
                         "Kustomisasi foto galeri, warna, atau ilustrasi",
-                        fontSize = 11.5.sp,
-                        color = AbuKeterangan,
+                        style = TipeIos.Kecil,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -195,10 +199,10 @@ fun PilihWallpaperSheet(
                         containerColor = BiruIos,
                         disabledContainerColor = BiruIos.copy(alpha = 0.4f),
                     ),
-                    shape = RoundedCornerShape(10.dp),
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                    shape = UkuranIos.SudutKapsul,
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                 ) {
-                    Text("Terapkan", fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                    Text("Terapkan", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
                 }
             }
 
@@ -228,7 +232,7 @@ fun PilihWallpaperSheet(
                 item {
                     TabRow(
                         selectedTabIndex = tabAktif,
-                        containerColor = Color.White,
+                        containerColor = WarnaIos.Kartu,
                         contentColor = BiruIos,
                         indicator = { tabPositions ->
                             TabRowDefaults.SecondaryIndicator(
@@ -239,8 +243,7 @@ fun PilihWallpaperSheet(
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                            .border(0.5.dp, GarisTipis, RoundedCornerShape(10.dp)),
+                            .clip(UkuranIos.SudutGrup),
                     ) {
                         Tab(
                             selected = tabAktif == 0,
@@ -315,11 +318,9 @@ fun PilihWallpaperSheet(
                 item {
                     Spacer(Modifier.height(18.dp))
                     Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color.White,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .border(0.5.dp, GarisTipis, RoundedCornerShape(12.dp)),
+                        shape = UkuranIos.SudutGrup,
+                        color = WarnaIos.Kartu,
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
                         Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                             Row(
@@ -329,21 +330,18 @@ fun PilihWallpaperSheet(
                             ) {
                                 Text(
                                     "Peredup Wallpaper",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = Color.Black,
+                                    style = TipeIos.Isi,
                                 )
                                 Text(
                                     "${(dimmingTerpilih * 100).toInt()}%",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold,
+                                    style = TipeIos.Keterangan,
+                                    fontWeight = FontWeight.SemiBold,
                                     color = BiruIos,
                                 )
                             }
                             Text(
                                 "Gelapkan wallpaper agar tulisan pesan tetap nyaman dan mudah dibaca.",
-                                fontSize = 11.5.sp,
-                                color = AbuKeterangan,
+                                style = TipeIos.Catatan,
                                 modifier = Modifier.padding(top = 2.dp, bottom = 4.dp),
                             )
                             Slider(
@@ -353,7 +351,7 @@ fun PilihWallpaperSheet(
                                 colors = SliderDefaults.colors(
                                     thumbColor = BiruIos,
                                     activeTrackColor = BiruIos,
-                                    inactiveTrackColor = Color(0xFFE5E5EA),
+                                    inactiveTrackColor = WarnaIos.Isian,
                                 ),
                             )
                         }
@@ -365,11 +363,9 @@ fun PilihWallpaperSheet(
                     item {
                         Spacer(Modifier.height(12.dp))
                         Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = Color.White,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .border(0.5.dp, GarisTipis, RoundedCornerShape(12.dp)),
+                            shape = UkuranIos.SudutGrup,
+                            color = WarnaIos.Kartu,
+                            modifier = Modifier.fillMaxWidth(),
                         ) {
                             Row(
                                 Modifier
@@ -381,22 +377,19 @@ fun PilihWallpaperSheet(
                                 Column(Modifier.weight(1f)) {
                                     Text(
                                         "Terapkan untuk Seluruh Tim",
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = Color.Black,
+                                        style = TipeIos.Isi,
                                     )
                                     Text(
                                         if (terapkanUntukSemua) "Akan mengubah wallpaper bawaan grup untuk semua staf."
                                         else "Hanya diterapkan untuk tampilan Anda di ponsel ini.",
-                                        fontSize = 11.5.sp,
-                                        color = AbuKeterangan,
+                                        style = TipeIos.Catatan,
                                     )
                                 }
                                 Spacer(Modifier.width(12.dp))
                                 Switch(
                                     checked = terapkanUntukSemua,
                                     onCheckedChange = { terapkanUntukSemua = it },
-                                    colors = SwitchDefaults.colors(checkedTrackColor = Color(0xFF34C759)),
+                                    colors = SwitchDefaults.colors(checkedTrackColor = WarnaIos.Hijau),
                                 )
                             }
                         }
@@ -406,22 +399,17 @@ fun PilihWallpaperSheet(
                 // 6. Tombol Kembalikan ke Bawaan
                 item {
                     Spacer(Modifier.height(14.dp))
-                    OutlinedButton(
-                        onClick = {
+                    TombolKeduaIos(
+                        teks = "Kembalikan ke Default Putih",
+                        onKlik = {
                             wallpaperTerpilih = "default"
                             dimmingTerpilih = 0f
                             onResetBawaan?.invoke()
                             onTutup()
                         },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF3B30)),
-                        border = ButtonDefaults.outlinedButtonBorder.copy(brush = androidx.compose.ui.graphics.SolidColor(Color(0xFFFF3B30).copy(alpha = 0.3f))),
-                    ) {
-                        Icon(Icons.Filled.RestartAlt, contentDescription = null, Modifier.size(16.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Kembalikan ke Default Putih", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                    }
+                        ikon = Icons.Filled.RestartAlt,
+                        warna = WarnaIos.Merah,
+                    )
                 }
             }
         }
@@ -455,12 +443,12 @@ private fun PratinjauObrolanMini(
     dimming: Float,
 ) {
     Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = Color.White,
+        shape = UkuranIos.SudutGrup,
+        color = WarnaIos.Kartu,
         modifier = Modifier
             .fillMaxWidth()
             .height(130.dp)
-            .border(1.dp, GarisTipis, RoundedCornerShape(14.dp)),
+            .bayanganIos(UkuranIos.SudutGrup),
     ) {
         Box(Modifier.fillMaxSize()) {
             // Latar wallpaper dengan peredup aktif
@@ -530,9 +518,8 @@ private fun KontenTabGaleri(
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(Color.White)
-            .border(0.5.dp, GarisTipis, RoundedCornerShape(14.dp))
+            .clip(UkuranIos.SudutGrup)
+            .background(WarnaIos.Kartu)
             .padding(14.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -543,7 +530,7 @@ private fun KontenTabGaleri(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
                     .clickable(onClick = onPilihFotoTersimpan)
-                    .background(if (terpilih) BiruIos.copy(alpha = 0.08f) else Color(0xFFF9F9FB))
+                    .background(if (terpilih) BiruIos.copy(alpha = 0.08f) else WarnaIos.Latar)
                     .border(
                         width = if (terpilih) 2.dp else 1.dp,
                         color = if (terpilih) BiruIos else GarisTipis,
@@ -566,9 +553,8 @@ private fun KontenTabGaleri(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             "Foto Galeri Anda",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.Black,
+                            style = TipeIos.Isi,
+                            fontWeight = FontWeight.SemiBold,
                         )
                         if (terpilih) {
                             Spacer(Modifier.width(6.dp))
@@ -585,12 +571,11 @@ private fun KontenTabGaleri(
                     }
                     Text(
                         "Foto tersimpan di memori aman aplikasi",
-                        fontSize = 11.5.sp,
-                        color = AbuKeterangan,
+                        style = TipeIos.Catatan,
                     )
                 }
                 IconButton(onClick = onHapusFotoKustom) {
-                    Icon(Icons.Filled.DeleteOutline, "Hapus Foto", tint = Color(0xFFFF3B30), modifier = Modifier.size(20.dp))
+                    Icon(Icons.Filled.DeleteOutline, "Hapus Foto", tint = WarnaIos.Merah, modifier = Modifier.size(20.dp))
                 }
             }
 
@@ -598,21 +583,12 @@ private fun KontenTabGaleri(
         }
 
         // Tombol Buka Galeri
-        Button(
-            onClick = onBukaGaleri,
-            colors = ButtonDefaults.buttonColors(containerColor = BiruIos),
-            shape = RoundedCornerShape(10.dp),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Icon(Icons.Filled.AddPhotoAlternate, contentDescription = null, Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text(
-                if (fotoTersimpan != null) "Ganti dengan Foto Lain" else "Pilih Foto dari Galeri HP",
-                fontSize = 13.5.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Color.White,
-            )
-        }
+        TombolUtamaIos(
+            teks = if (fotoTersimpan != null) "Ganti dengan Foto Lain" else "Pilih Foto dari Galeri HP",
+            onKlik = onBukaGaleri,
+            ikon = Icons.Filled.AddPhotoAlternate,
+            warna = BiruIos,
+        )
     }
 }
 
@@ -625,11 +601,9 @@ private fun KontenTabWarnaSolid(
     onPilihWarna: (String) -> Unit,
 ) {
     Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = Color.White,
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(0.5.dp, GarisTipis, RoundedCornerShape(14.dp)),
+        shape = UkuranIos.SudutGrup,
+        color = WarnaIos.Kartu,
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Column(Modifier.padding(12.dp)) {
             val daftar = ChatWallpapers.DAFTAR_WARNA
@@ -677,7 +651,7 @@ private fun KontenTabWarnaSolid(
                                     item.nama,
                                     fontSize = 11.sp,
                                     fontWeight = if (aktif) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (aktif) BiruIos else Color(0xFF3C3C43),
+                                    color = if (aktif) BiruIos else WarnaIos.LabelKedua,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                     textAlign = TextAlign.Center,
@@ -754,7 +728,7 @@ private fun KartuOpsiWallpaper(
                 .fillMaxWidth()
                 .aspectRatio(9f / 13f)
                 .clip(RoundedCornerShape(12.dp))
-                .background(Color.White)
+                .background(WarnaIos.Kartu)
                 .then(
                     if (terpilih) Modifier.border(3.dp, BiruIos, RoundedCornerShape(12.dp))
                     else Modifier.border(1.dp, GarisTipis, RoundedCornerShape(12.dp))
@@ -781,13 +755,13 @@ private fun KartuOpsiWallpaper(
                         Modifier
                             .size(38.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFFE5E5EA)),
+                            .background(WarnaIos.Isian),
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
                             Icons.Filled.FormatColorReset,
                             contentDescription = null,
-                            tint = Color(0xFF8E8E93),
+                            tint = WarnaIos.Abu,
                             modifier = Modifier.size(20.dp),
                         )
                     }
@@ -796,7 +770,7 @@ private fun KartuOpsiWallpaper(
                         "Putih Bersih",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
-                        color = Color(0xFF6C6C70),
+                        color = WarnaIos.LabelKedua,
                         textAlign = TextAlign.Center,
                     )
                 }
@@ -826,17 +800,16 @@ private fun KartuOpsiWallpaper(
         Spacer(Modifier.height(5.dp))
         Text(
             text = item.nama,
-            fontSize = 12.5.sp,
-            fontWeight = if (terpilih) FontWeight.Bold else FontWeight.SemiBold,
-            color = if (terpilih) BiruIos else Color.Black,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = if (terpilih) BiruIos else WarnaIos.Label,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
         )
         Text(
             text = item.deskripsi,
-            fontSize = 10.5.sp,
-            color = AbuKeterangan,
+            style = TipeIos.Kecil,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
