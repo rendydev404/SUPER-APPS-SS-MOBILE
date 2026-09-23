@@ -1,5 +1,14 @@
 package com.sukashawarma.superapp.feature.chat.ui.developer
 
+import com.sukashawarma.superapp.core.ui.ios.KeadaanIos
+import com.sukashawarma.superapp.core.ui.ios.KolomCariIos
+import com.sukashawarma.superapp.core.ui.ios.LabelSeksiIos
+import com.sukashawarma.superapp.core.ui.ios.PemisahIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.ios.permukaanIos
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -59,12 +68,11 @@ import java.time.Instant
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-private val WarnaLatar = Color(0xFFF2F2F7)
-private val WarnaKartu = Color.White
-private val WarnaPemisah = Color(0xFFE5E5EA)
-private val WarnaTeksUtama = Color(0xFF1C1C1E)
-private val WarnaTeksKedua = Color(0xFF8E8E93)
-private val WarnaBiru = Color(0xFF007AFF)
+private val WarnaLatar = WarnaIos.Latar
+private val WarnaKartu = WarnaIos.Kartu
+private val WarnaTeksUtama = WarnaIos.Label
+private val WarnaTeksKedua = WarnaIos.Abu
+private val WarnaBiru = WarnaIos.Biru
 
 @Composable
 fun LayarPantauChatDev(
@@ -99,24 +107,29 @@ fun LayarPantauChatDev(
             }
 
             pengawasanList.isEmpty() -> KotakPesan {
-                TeksKosong("Belum ada obrolan pribadi antar staf pada siklus aktif hari ini.")
+                KeadaanIos(
+                    ikon = IkonIos.Inbox,
+                    judul = "Belum ada obrolan",
+                    pesan = "Belum ada obrolan pribadi antar staf pada siklus aktif hari ini.",
+                )
             }
 
             hasilFilter.isEmpty() -> KotakPesan {
-                TeksKosong("Tidak ada percakapan yang cocok dengan \"${kueri.trim()}\".")
+                KeadaanIos(
+                    ikon = IkonIos.Search,
+                    judul = "Tidak ditemukan",
+                    pesan = "Tidak ada percakapan yang cocok dengan \"${kueri.trim()}\".",
+                )
             }
 
             else -> {
-                Text(
-                    text = if (kueri.isBlank()) {
-                        "${hasilFilter.size} PERCAKAPAN"
+                LabelSeksiIos(
+                    if (kueri.isBlank()) {
+                        "${hasilFilter.size} percakapan"
                     } else {
-                        "${hasilFilter.size} DARI ${pengawasanList.size} PERCAKAPAN"
+                        "${hasilFilter.size} dari ${pengawasanList.size} percakapan"
                     },
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = WarnaTeksKedua,
-                    modifier = Modifier.padding(start = 20.dp, bottom = 6.dp)
+                    Modifier.padding(start = 32.dp, bottom = 7.dp)
                 )
 
                 LazyColumn(
@@ -177,30 +190,41 @@ private fun PercakapanPengawasanItem.cocokDengan(q: String): Boolean {
 
 @Composable
 private fun SpandukPengawasan() {
+    // Kartu gelap sengaja dipertahankan: mode siluman harus terlihat berbeda
+    // dari daftar biasa sekilas mata, supaya developer tidak lupa sedang mengintip.
     Row(
         modifier = Modifier
+            .padding(start = UkuranIos.TepiLayar, end = UkuranIos.TepiLayar, top = 12.dp)
             .fillMaxWidth()
-            .background(Color(0xFF1C1C1E))
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .permukaanIos(UkuranIos.SudutGrup, WarnaIos.Label)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = Icons.Default.Visibility,
-            contentDescription = null,
-            tint = Color(0xFFFFD60A),
-            modifier = Modifier.size(18.dp)
-        )
-        Spacer(modifier = Modifier.width(10.dp))
+        Box(
+            modifier = Modifier
+                .size(30.dp)
+                .clip(CircleShape)
+                .background(WarnaIos.Kuning.copy(alpha = 0.18f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = IkonIos.Visibility,
+                contentDescription = null,
+                tint = WarnaIos.Kuning,
+                modifier = Modifier.size(17.dp)
+            )
+        }
+        Spacer(modifier = Modifier.width(12.dp))
         Column {
             Text(
-                text = "MODE PENGAWASAN DEVELOPER",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFFFFD60A)
+                text = "Mode Pengawasan Developer",
+                style = TipeIos.Utama,
+                fontSize = 15.sp,
+                color = WarnaIos.Kuning
             )
             Text(
                 text = "Siluman — centang biru staf tidak berubah.",
-                fontSize = 11.sp,
+                style = TipeIos.Catatan,
                 color = Color(0xFFAEAEB2)
             )
         }
@@ -215,77 +239,23 @@ private fun KolomPencarian(
 ) {
     val keyboard = LocalSoftwareKeyboardController.current
 
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(38.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(Color(0xFFE3E3E8))
-            .padding(horizontal = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = Icons.Default.Search,
-            contentDescription = null,
-            tint = WarnaTeksKedua,
-            modifier = Modifier.size(18.dp)
-        )
-        Spacer(modifier = Modifier.width(6.dp))
-
-        Box(modifier = Modifier.weight(1f)) {
-            if (kueri.isEmpty()) {
-                Text(
-                    text = "Cari nama, jabatan, cabang, atau isi pesan",
-                    fontSize = 14.sp,
-                    color = WarnaTeksKedua,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            BasicTextField(
-                value = kueri,
-                onValueChange = onKueriBerubah,
-                singleLine = true,
-                textStyle = TextStyle(fontSize = 14.sp, color = WarnaTeksUtama),
-                cursorBrush = SolidColor(WarnaBiru),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-
-        if (kueri.isNotEmpty()) {
-            Icon(
-                imageVector = Icons.Default.Cancel,
-                contentDescription = "Hapus pencarian",
-                tint = WarnaTeksKedua,
-                modifier = Modifier
-                    .size(18.dp)
-                    .clip(CircleShape)
-                    .clickable { onKueriBerubah("") }
-            )
-        }
-    }
+    KolomCariIos(
+        nilai = kueri,
+        onUbah = onKueriBerubah,
+        placeholder = "Cari nama, jabatan, cabang, atau isi pesan",
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
+        modifier = modifier.fillMaxWidth()
+    )
 }
 
 @Composable
 private fun KotakPesan(isi: @Composable () -> Unit) {
     Box(
         modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 32.dp),
+            .fillMaxSize(),
         contentAlignment = Alignment.Center
     ) { isi() }
-}
-
-@Composable
-private fun TeksKosong(teks: String) {
-    Text(
-        text = teks,
-        fontSize = 13.sp,
-        color = WarnaTeksKedua,
-        textAlign = TextAlign.Center
-    )
 }
 
 @Composable
@@ -336,9 +306,8 @@ private fun BarisPengawasanDev(
                 ) {
                     Text(
                         text = "${item.userAName} ↔ ${item.userBName}",
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 15.sp,
-                        color = WarnaTeksUtama,
+                        style = TipeIos.Utama,
+                        fontSize = 16.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false)
@@ -346,7 +315,7 @@ private fun BarisPengawasanDev(
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = jamFormatted,
-                        fontSize = 12.sp,
+                        style = TipeIos.Catatan,
                         color = WarnaTeksKedua
                     )
                 }
@@ -356,8 +325,7 @@ private fun BarisPengawasanDev(
                 Text(
                     text = "${labelRole(item.userARole)} · ${item.userAOutlet ?: "Pusat"}" +
                         "  ↔  ${labelRole(item.userBRole)} · ${item.userBOutlet ?: "Pusat"}",
-                    fontSize = 11.sp,
-                    color = WarnaTeksKedua,
+                    style = TipeIos.Kecil,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -373,8 +341,8 @@ private fun BarisPengawasanDev(
                     }
                     Text(
                         text = "${item.lastSenderName}: $snippet",
-                        fontSize = 13.sp,
-                        color = Color(0xFF636366),
+                        style = TipeIos.SubJudul,
+                        fontSize = 14.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f)
@@ -382,7 +350,7 @@ private fun BarisPengawasanDev(
                     Spacer(modifier = Modifier.width(8.dp))
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(9.dp))
+                            .clip(UkuranIos.SudutKapsul)
                             .background(WarnaBiru)
                             .padding(horizontal = 7.dp, vertical = 2.dp)
                     ) {
@@ -397,19 +365,15 @@ private fun BarisPengawasanDev(
             }
 
             Icon(
-                imageVector = Icons.Default.ChevronRight,
+                imageVector = IkonIos.ChevronRight,
                 contentDescription = null,
-                tint = Color(0xFFC7C7CC),
-                modifier = Modifier.size(20.dp)
+                tint = WarnaIos.LabelKetiga,
+                modifier = Modifier.padding(start = 6.dp).size(15.dp)
             )
         }
 
         if (tampilkanPemisah) {
-            HorizontalDivider(
-                color = WarnaPemisah,
-                thickness = 0.7.dp,
-                modifier = Modifier.padding(start = 72.dp)
-            )
+            PemisahIos(inset = 72.dp)
         }
     }
 }
