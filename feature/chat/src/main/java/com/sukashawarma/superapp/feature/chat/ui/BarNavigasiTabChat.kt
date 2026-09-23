@@ -17,11 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,6 +32,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.TombolBundarIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
 import com.sukashawarma.superapp.feature.chat.ui.pribadi.TabChatUtama
 
 /**
@@ -55,7 +55,7 @@ fun BarNavigasiTabChat(
     tampilkanArea: Boolean = true,
 ) {
     Surface(
-        color = Color.White,
+        color = WarnaIos.Kartu,
         modifier = modifier.fillMaxWidth()
     ) {
         Column(
@@ -67,33 +67,20 @@ fun BarNavigasiTabChat(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(50.dp)
-                    .padding(horizontal = 8.dp),
+                    .height(54.dp)
+                    .padding(horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(
-                    onClick = onBack,
-                    modifier = Modifier.size(44.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Kembali ke Beranda",
-                        tint = Color(0xFF1C1C1E),
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
+                TombolBundarIos(IkonIos.ArrowBack, "Kembali ke Beranda", onBack)
 
-                Spacer(modifier = Modifier.width(4.dp))
+                Spacer(modifier = Modifier.width(10.dp))
 
                 Column(
                     modifier = Modifier.weight(1f)
                 ) {
                     Text(
                         text = "Ruang Obrolan",
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = (-0.3).sp,
-                        color = Color(0xFF1C1C1E),
+                        style = TipeIos.Utama,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -104,8 +91,7 @@ fun BarNavigasiTabChat(
                             TabChatUtama.PRIBADI -> "Percakapan Langsung 1-on-1"
                             TabChatUtama.PANTAU_DEV -> "Mode Audit Pengawasan Sistem"
                         },
-                        fontSize = 11.5.sp,
-                        color = Color(0xFF8E8E93),
+                        style = TipeIos.Kecil,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -122,7 +108,7 @@ fun BarNavigasiTabChat(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFFEFEFF4))
+                        .background(WarnaIos.Isian)
                         .padding(3.dp),
                     horizontalArrangement = Arrangement.spacedBy(3.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -141,7 +127,7 @@ fun BarNavigasiTabChat(
                             judul = "📍 Area",
                             aktif = tabAktif == TabChatUtama.AREA,
                             badge = "NEW",
-                            warnaBadge = Color(0xFF007AFF),
+                            warnaBadge = WarnaIos.Biru,
                             onClick = { onPilihTab(TabChatUtama.AREA) },
                             modifier = Modifier.weight(1f)
                         )
@@ -151,7 +137,7 @@ fun BarNavigasiTabChat(
                     PillTab(
                         judul = "💬 Pribadi",
                         badge = if (unreadPribadi > 0) unreadPribadi.toString() else null,
-                        warnaBadge = Color(0xFF34C759),
+                        warnaBadge = WarnaIos.Hijau,
                         aktif = tabAktif == TabChatUtama.PRIBADI,
                         onClick = { onPilihTab(TabChatUtama.PRIBADI) },
                         modifier = Modifier.weight(1f)
@@ -163,7 +149,7 @@ fun BarNavigasiTabChat(
                             judul = "🕵️ Pantau",
                             aktif = tabAktif == TabChatUtama.PANTAU_DEV,
                             badge = "DEV",
-                            warnaBadge = Color(0xFFFF9500),
+                            warnaBadge = WarnaIos.Oranye,
                             onClick = { onPilihTab(TabChatUtama.PANTAU_DEV) },
                             modifier = Modifier.weight(1f)
                         )
@@ -174,7 +160,7 @@ fun BarNavigasiTabChat(
             // Garis tipis pemisah bawah
             HorizontalDivider(
                 thickness = 0.5.dp,
-                color = Color(0x1F000000)
+                color = WarnaIos.Pemisah
             )
         }
     }
@@ -187,15 +173,15 @@ private fun PillTab(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     badge: String? = null,
-    warnaBadge: Color = Color(0xFF34C759),
+    warnaBadge: Color = WarnaIos.Hijau,
 ) {
     val bgColor by animateColorAsState(
-        targetValue = if (aktif) Color.White else Color.Transparent,
+        targetValue = if (aktif) WarnaIos.Kartu else Color.Transparent,
         animationSpec = tween(150),
         label = "tabBg"
     )
     val textColor by animateColorAsState(
-        targetValue = if (aktif) Color(0xFF1C1C1E) else Color(0xFF636366),
+        targetValue = if (aktif) WarnaIos.Label else WarnaIos.LabelKedua,
         animationSpec = tween(150),
         label = "tabText"
     )
@@ -224,8 +210,9 @@ private fun PillTab(
         ) {
             Text(
                 text = judul,
-                fontSize = 12.5.sp,
-                fontWeight = if (aktif) FontWeight.Bold else FontWeight.SemiBold,
+                fontSize = 13.sp,
+                fontWeight = if (aktif) FontWeight.SemiBold else FontWeight.Medium,
+                letterSpacing = (-0.1).sp,
                 color = textColor,
                 maxLines = 1,
                 softWrap = false
@@ -235,7 +222,7 @@ private fun PillTab(
                 Spacer(modifier = Modifier.width(4.dp))
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
+                        .clip(RoundedCornerShape(50))
                         .background(warnaBadge)
                         .padding(horizontal = 4.5.dp, vertical = 1.dp),
                     contentAlignment = Alignment.Center
@@ -243,7 +230,7 @@ private fun PillTab(
                     Text(
                         text = badge,
                         fontSize = 9.sp,
-                        fontWeight = FontWeight.ExtraBold,
+                        fontWeight = FontWeight.Bold,
                         color = Color.White,
                         maxLines = 1,
                         softWrap = false
