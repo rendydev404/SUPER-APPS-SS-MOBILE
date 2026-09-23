@@ -53,25 +53,34 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sukashawarma.superapp.core.camera.KameraFotoSheet
 import com.sukashawarma.superapp.core.camera.keJpeg
 import com.sukashawarma.superapp.core.ui.AvatarStaf
+import com.sukashawarma.superapp.core.ui.ios.LabelSeksiIos
+import com.sukashawarma.superapp.core.ui.ios.LencanaIos
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.PemisahIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.TombolBundarIos
+import com.sukashawarma.superapp.core.ui.ios.TombolUtamaIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.ios.permukaanIos
+import com.sukashawarma.superapp.core.ui.ios.tekanIos
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
 import com.sukashawarma.superapp.domain.model.Role
 import com.sukashawarma.superapp.domain.model.StaffProfile
 import com.sukashawarma.superapp.presentation.theme.*
 
 private const val SISI_AVATAR = 512
 
-// iOS Human Interface Design Tokens
-private val IosBackground = Color(0xFFF2F2F7) // Apple System Grouped Background
-private val IosCardBackground = Color(0xFFFFFFFF)
-private val IosSeparator = Color(0xFFE5E5EA) // 0.5dp Hairline separator
-private val IosLabel = Color(0xFF1C1C1E) // Primary label
-private val IosSecondaryLabel = Color(0xFF8E8E93) // Secondary label
-private val IosSectionHeader = Color(0xFF6C6C70) // Section header
-private val IosBorder = Color(0x14000000) // Subtle hairline border
+// Token lokal kini menunjuk ke design system iOS bersama (`core.ui.ios`) supaya
+// halaman profil satu bahasa dengan modul lain tanpa menyentuh setiap pemakaian.
+private val IosBackground = WarnaIos.Latar
+private val IosCardBackground = WarnaIos.Kartu
+private val IosSeparator = WarnaIos.Pemisah
+private val IosLabel = WarnaIos.Label
+private val IosSecondaryLabel = WarnaIos.LabelKedua
 
 // Suka Brand Accents
-private val SukaOrange = Color(0xFFEA580C)
-private val SukaOrangeLight = Color(0xFFF29744)
-private val SukaOrangeBg = Color(0xFFFFF4EC)
+private val SukaOrange = WarnaIos.Aksen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -131,7 +140,7 @@ fun ProfilScreen(
             Spacer(Modifier.height(8.dp))
 
             // 3. Section: USERNAME (iOS Inset Grouped)
-            IosSectionHeader(title = "USERNAME")
+            IosSectionHeader(title = "Username")
             IosGroupedCard {
                 IosInputRow(
                     iconText = "@",
@@ -150,7 +159,7 @@ fun ProfilScreen(
 
             Spacer(Modifier.height(4.dp))
 
-            // Apple Capsule Action Button for Identity
+            // Tombol aksi utama identitas
             IosCapsuleButton(
                 text = "Simpan Username",
                 icon = Icons.Default.Save,
@@ -163,32 +172,9 @@ fun ProfilScreen(
 
             // 4. Section: DATA KEPEGAWAIAN (iOS Inset Grouped List)
             IosSectionHeader(
-                title = "DATA KEPEGAWAIAN",
+                title = "Data kepegawaian",
                 trailingContent = {
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = Color(0xFFEBFBF2),
-                        border = BorderStroke(0.5.dp, Color(0xFF34C759).copy(alpha = 0.35f))
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.5.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                Icons.Default.Verified,
-                                contentDescription = null,
-                                tint = Color(0xFF34C759),
-                                modifier = Modifier.size(11.dp)
-                            )
-                            Spacer(Modifier.width(3.dp))
-                            Text(
-                                text = "Resmi HR",
-                                color = Color(0xFF248A3D),
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
+                    LencanaIos("Resmi HR", NadaIos.SUKSES, ikon = Icons.Default.Verified)
                 }
             )
 
@@ -209,11 +195,7 @@ fun ProfilScreen(
                     trailingCaption = "Sesuai KTP"
                 )
 
-                HorizontalDivider(
-                    modifier = Modifier.padding(start = 58.dp),
-                    color = IosSeparator,
-                    thickness = 0.5.dp
-                )
+                PemisahIos(inset = 58.dp)
 
                 // Tile 2: Jabatan
                 IosInfoRow(
@@ -222,15 +204,10 @@ fun ProfilScreen(
                     label = "Jabatan",
                     value = state.staff?.roleRaw?.replace('_', ' ')?.uppercase() ?: "STAFF",
                     trailingTag = tierText,
-                    trailingTagColor = Color(0xFFB45309),
-                    trailingTagBg = Color(0xFFFFFBEB)
+                    trailingTagNada = NadaIos.PERINGATAN
                 )
 
-                HorizontalDivider(
-                    modifier = Modifier.padding(start = 58.dp),
-                    color = IosSeparator,
-                    thickness = 0.5.dp
-                )
+                PemisahIos(inset = 58.dp)
 
                 // Tile 3: Unit Kerja
                 IosInfoRow(
@@ -251,7 +228,7 @@ fun ProfilScreen(
             var lihatBaru by rememberSaveable { mutableStateOf(false) }
             var lihatKonfirmasi by rememberSaveable { mutableStateOf(false) }
 
-            IosSectionHeader(title = "KEAMANAN & KATA SANDI")
+            IosSectionHeader(title = "Keamanan & kata sandi")
             IosGroupedCard {
                 // Row 1: Password Baru
                 IosPasswordRow(
@@ -265,11 +242,7 @@ fun ProfilScreen(
                     imeAction = ImeAction.Next
                 )
 
-                HorizontalDivider(
-                    modifier = Modifier.padding(start = 58.dp),
-                    color = IosSeparator,
-                    thickness = 0.5.dp
-                )
+                PemisahIos(inset = 58.dp)
 
                 // Row 2: Konfirmasi Password
                 IosPasswordRow(
@@ -327,20 +300,12 @@ fun ProfilScreen(
             ) {
                 Text(
                     text = "SUKA SuperApp • v$appVersion",
-                    style = TextStyle(
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = IosSecondaryLabel,
-                        letterSpacing = 0.3.sp
-                    )
+                    style = TipeIos.Catatan.copy(fontWeight = FontWeight.SemiBold)
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
                     text = "Sistem Kepegawaian Terintegrasi",
-                    style = TextStyle(
-                        fontSize = 11.sp,
-                        color = IosSecondaryLabel.copy(alpha = 0.8f)
-                    )
+                    style = TipeIos.Kecil.copy(color = WarnaIos.Abu)
                 )
             }
         }
@@ -357,7 +322,7 @@ fun ProfilScreen(
                     modifier = Modifier
                         .padding(vertical = 10.dp)
                         .size(width = 36.dp, height = 5.dp)
-                        .background(Color(0xFFD1D1D6), RoundedCornerShape(2.5.dp))
+                        .background(WarnaIos.LabelKetiga, RoundedCornerShape(2.5.dp))
                 )
             }
         ) {
@@ -367,22 +332,12 @@ fun ProfilScreen(
                     .padding(horizontal = 16.dp)
                     .padding(bottom = 32.dp)
             ) {
-                Text(
-                    text = "FOTO PROFIL",
-                    style = TextStyle(
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = IosSectionHeader,
-                        letterSpacing = 0.6.sp
-                    ),
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
-                )
+                LabelSeksiIos("Foto profil", Modifier.padding(horizontal = 16.dp, vertical = 7.dp))
 
-                // Actions Group
+                // Kelompok aksi: grup abu ala action sheet iOS, tanpa garis tepi
                 Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = Color(0xFFF9F9FB),
-                    border = BorderStroke(0.5.dp, IosBorder),
+                    shape = UkuranIos.SudutGrup,
+                    color = IosBackground,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column {
@@ -398,11 +353,7 @@ fun ProfilScreen(
                                 else izinKamera.launch(Manifest.permission.CAMERA)
                             }
                         )
-                        HorizontalDivider(
-                            modifier = Modifier.padding(start = 50.dp),
-                            color = IosSeparator,
-                            thickness = 0.5.dp
-                        )
+                        PemisahIos(inset = 50.dp)
                         IosSheetActionRow(
                             icon = Icons.Default.PhotoLibrary,
                             text = "Pilih dari Galeri",
@@ -414,15 +365,11 @@ fun ProfilScreen(
                             }
                         )
                         if (!state.staff?.avatarUrl.isNullOrBlank()) {
-                            HorizontalDivider(
-                                modifier = Modifier.padding(start = 50.dp),
-                                color = IosSeparator,
-                                thickness = 0.5.dp
-                            )
+                            PemisahIos(inset = 50.dp)
                             IosSheetActionRow(
                                 icon = Icons.Default.DeleteOutline,
                                 text = "Hapus Foto Profil",
-                                textColor = Color(0xFFFF3B30),
+                                textColor = WarnaIos.Merah,
                                 onClick = {
                                     pilihanFotoTerbuka = false
                                     viewModel.hapusFoto()
@@ -434,14 +381,13 @@ fun ProfilScreen(
 
                 Spacer(Modifier.height(10.dp))
 
-                // Separate Apple Action Sheet "Batal" (Cancel) Pill
+                // Tombol "Batal" terpisah ala action sheet iOS
                 Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = Color(0xFFF9F9FB),
-                    border = BorderStroke(0.5.dp, IosBorder),
+                    shape = UkuranIos.SudutGrup,
+                    color = IosBackground,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { pilihanFotoTerbuka = false }
+                        .tekanIos({ pilihanFotoTerbuka = false })
                 ) {
                     Box(
                         modifier = Modifier
@@ -451,11 +397,7 @@ fun ProfilScreen(
                     ) {
                         Text(
                             text = "Batal",
-                            style = TextStyle(
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = SukaOrange
-                            )
+                            style = TipeIos.Utama.copy(color = SukaOrange)
                         )
                     }
                 }
@@ -489,7 +431,8 @@ fun ProfilScreen(
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Top iOS Navigation Bar with subtle back chevron and SUKA Online Status Pill
+ * Bilah navigasi iOS: tombol kembali bulat, judul di tengah, lencana status di kanan.
+ * Tidak memakai `BilahJudulIos` karena Scaffold sudah memberi padding status bar.
  */
 @Composable
 private fun IosNavigationBar(
@@ -499,75 +442,30 @@ private fun IosNavigationBar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        if (tampilkanKembali) {
-            Surface(
-                shape = CircleShape,
-                color = Color.White,
-                border = BorderStroke(0.5.dp, IosBorder),
-                shadowElevation = 0.5.dp,
-                modifier = Modifier.size(36.dp)
-            ) {
-                IconButton(onClick = onKembali) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Kembali",
-                        tint = IosLabel,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
+        Box(Modifier.width(84.dp), contentAlignment = Alignment.CenterStart) {
+            if (tampilkanKembali) {
+                TombolBundarIos(IkonIos.ArrowBack, "Kembali", onKembali)
             }
-        } else {
-            Spacer(Modifier.size(36.dp))
         }
 
         Text(
             text = "Profil",
-            style = TextStyle(
-                fontSize = 17.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = IosLabel,
-                letterSpacing = (-0.3).sp
-            ),
+            style = TipeIos.Utama,
             modifier = Modifier.weight(1f),
             textAlign = TextAlign.Center
         )
 
-        // Status Pill
-        Surface(
-            shape = RoundedCornerShape(50),
-            color = Color(0xFFEBFBF2),
-            border = BorderStroke(0.5.dp, Color(0xFF34C759).copy(alpha = 0.35f)),
-            modifier = Modifier.height(28.dp)
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 9.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(6.dp)
-                        .background(Color(0xFF34C759), CircleShape)
-                )
-                Spacer(Modifier.width(5.dp))
-                Text(
-                    text = "ONLINE",
-                    style = TextStyle(
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF248A3D),
-                        letterSpacing = 0.5.sp
-                    )
-                )
-            }
+        Box(Modifier.width(84.dp), contentAlignment = Alignment.CenterEnd) {
+            LencanaIos("Online", NadaIos.SUKSES)
         }
     }
 }
 
 /**
- * Centered Apple ID Hero with large avatar, camera badge, name, username, and role
+ * Hero profil di tengah ala Apple ID: avatar besar, lencana kamera, nama, username, peran.
  */
 @Composable
 private fun AppleIdHero(
@@ -581,14 +479,13 @@ private fun AppleIdHero(
             .padding(top = 8.dp, bottom = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Large Centered Avatar with Camera Badge
         Box(contentAlignment = Alignment.BottomEnd) {
             Surface(
                 shape = CircleShape,
                 color = Color.White,
                 shadowElevation = 3.dp,
                 border = BorderStroke(3.dp, Color.White),
-                modifier = Modifier.size(92.dp)
+                modifier = Modifier.size(96.dp)
             ) {
                 AvatarStaf(
                     path = staff?.avatarUrl,
@@ -600,7 +497,7 @@ private fun AppleIdHero(
                 )
             }
 
-            // Camera Badge Button
+            // Lencana kamera
             Surface(
                 shape = CircleShape,
                 color = SukaOrange,
@@ -624,7 +521,7 @@ private fun AppleIdHero(
                         )
                     } else {
                         Icon(
-                            Icons.Default.PhotoCamera,
+                            IkonIos.PhotoCamera,
                             contentDescription = "Ubah Foto",
                             tint = Color.White,
                             modifier = Modifier.size(15.dp)
@@ -639,12 +536,7 @@ private fun AppleIdHero(
         val hasCustomUsername = !staff?.displayUsername.isNullOrBlank()
         Text(
             text = staff?.namaTampil ?: "-",
-            style = TextStyle(
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                color = IosLabel,
-                letterSpacing = (-0.4).sp
-            ),
+            style = TipeIos.Judul2,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -656,49 +548,22 @@ private fun AppleIdHero(
         if (!subtitleText.isNullOrBlank()) {
             Text(
                 text = subtitleText,
-                style = TextStyle(
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Normal,
-                    color = IosSecondaryLabel
-                )
+                style = TipeIos.SubJudul
             )
         }
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(10.dp))
 
-        // Role Badge Pill
-        Surface(
-            shape = RoundedCornerShape(50),
-            color = SukaOrangeBg,
-            border = BorderStroke(0.8.dp, SukaOrangeLight.copy(alpha = 0.35f))
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    Icons.Default.Star,
-                    contentDescription = null,
-                    tint = SukaOrange,
-                    modifier = Modifier.size(12.dp)
-                )
-                Spacer(Modifier.width(4.dp))
-                Text(
-                    text = staff?.roleRaw?.replace('_', ' ')?.uppercase() ?: "STAFF",
-                    style = TextStyle(
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = SukaOrange,
-                        letterSpacing = 0.5.sp
-                    )
-                )
-            }
-        }
+        LencanaIos(
+            teks = staff?.roleRaw?.replace('_', ' ')?.uppercase() ?: "STAFF",
+            nada = NadaIos.AKSEN,
+            ikon = Icons.Default.Star,
+        )
     }
 }
 
 /**
- * Section Header (Uppercase, small, SF Pro style)
+ * Judul seksi kecil di atas grup, seperti di aplikasi Pengaturan iOS.
  */
 @Composable
 private fun IosSectionHeader(
@@ -709,25 +574,17 @@ private fun IosSectionHeader(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 6.dp),
+            .padding(start = 32.dp, end = 20.dp, top = 6.dp, bottom = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(
-            text = title,
-            style = TextStyle(
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = IosSectionHeader,
-                letterSpacing = 0.6.sp
-            )
-        )
+        LabelSeksiIos(title)
         trailingContent?.invoke()
     }
 }
 
 /**
- * Section Footnote (Muted grey, explanatory note)
+ * Catatan kaki abu di bawah grup.
  */
 @Composable
 private fun IosSectionFooter(
@@ -738,7 +595,7 @@ private fun IosSectionFooter(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 6.dp),
+            .padding(start = 32.dp, end = 32.dp, top = 7.dp, bottom = 6.dp),
         verticalAlignment = Alignment.Top
     ) {
         if (icon != null) {
@@ -748,48 +605,49 @@ private fun IosSectionFooter(
                 tint = IosSecondaryLabel,
                 modifier = Modifier
                     .size(13.dp)
-                    .offset(y = 1.dp)
+                    .offset(y = 2.dp)
             )
             Spacer(Modifier.width(5.dp))
         }
         Text(
             text = text,
-            style = TextStyle(
-                fontSize = 12.sp,
-                color = IosSecondaryLabel,
-                lineHeight = 16.sp
-            )
+            style = TipeIos.Catatan.copy(lineHeight = 18.sp)
         )
     }
 }
 
 /**
- * iOS Inset Grouped Card Container
+ * Wadah "inset grouped" iOS — permukaan yang sama dengan `GrupIos`, dipakai
+ * langsung karena judul seksinya di sini butuh lencana di kanan.
  */
 @Composable
 private fun IosGroupedCard(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    Surface(
+    Column(
         modifier = modifier
+            .padding(horizontal = UkuranIos.TepiLayar)
             .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        shape = RoundedCornerShape(16.dp),
-        color = IosCardBackground,
-        border = BorderStroke(0.5.dp, IosBorder),
-        shadowElevation = 0.8.dp,
-        content = {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                content = content
-            )
-        }
+            .permukaanIos(UkuranIos.SudutGrup, IosCardBackground),
+        content = content
+    )
+}
+
+/** Ikon baris ala Pengaturan iOS: kotak membulat berwarna, ikon/teks putih. */
+@Composable
+private fun IkonBaris(warna: Color, isi: @Composable BoxScope.() -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(30.dp)
+            .background(warna, RoundedCornerShape(8.dp)),
+        contentAlignment = Alignment.Center,
+        content = isi
     )
 }
 
 /**
- * iOS Grouped Input Row
+ * Baris isian dalam grup iOS.
  */
 @Composable
 private fun IosInputRow(
@@ -811,13 +669,7 @@ private fun IosInputRow(
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Squircle Icon
-        Box(
-            modifier = Modifier
-                .size(30.dp)
-                .background(iconBgColor, RoundedCornerShape(8.dp)),
-            contentAlignment = Alignment.Center
-        ) {
+        IkonBaris(iconBgColor) {
             if (icon != null) {
                 Icon(icon, contentDescription = null, tint = iconTintColor, modifier = Modifier.size(16.dp))
             } else if (iconText != null) {
@@ -830,27 +682,20 @@ private fun IosInputRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = label,
-                style = TextStyle(
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = IosSecondaryLabel
-                )
+                style = TipeIos.Kecil.copy(fontWeight = FontWeight.Medium)
             )
             Spacer(Modifier.height(2.dp))
             BasicTextField(
                 value = value,
                 onValueChange = onValueChange,
                 modifier = Modifier.fillMaxWidth(),
-                textStyle = TextStyle(
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = IosLabel
-                ),
+                textStyle = TipeIos.Isi,
+                cursorBrush = androidx.compose.ui.graphics.SolidColor(WarnaIos.Aksen),
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = imeAction),
                 decorationBox = { innerTextField ->
                     if (value.isEmpty()) {
-                        Text(placeholder, color = Color(0xFFC7C7CC), fontSize = 15.sp, fontWeight = FontWeight.Normal)
+                        Text(placeholder, style = TipeIos.Isi.copy(color = WarnaIos.LabelKetiga))
                     }
                     innerTextField()
                 }
@@ -858,43 +703,24 @@ private fun IosInputRow(
         }
 
         if (trailingTag != null) {
-            Surface(
-                shape = RoundedCornerShape(6.dp),
-                color = SukaOrangeBg,
-                border = BorderStroke(0.5.dp, SukaOrangeLight.copy(alpha = 0.35f))
-            ) {
-                Text(
-                    text = trailingTag,
-                    color = SukaOrange,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
-                )
-            }
+            LencanaIos(trailingTag, NadaIos.AKSEN, titik = false)
         } else if (showCheckmark) {
-            Box(
-                modifier = Modifier
-                    .size(22.dp)
-                    .background(Color(0xFFEBFBF2), CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    Icons.Default.Check,
-                    contentDescription = "Valid",
-                    tint = Color(0xFF34C759),
-                    modifier = Modifier.size(14.dp)
-                )
-            }
+            Icon(
+                IkonIos.CheckCircle,
+                contentDescription = "Valid",
+                tint = WarnaIos.Hijau,
+                modifier = Modifier.size(20.dp)
+            )
         }
     }
 }
 
 /**
- * iOS Grouped Password Row
+ * Baris kata sandi dalam grup iOS.
  */
 @Composable
 private fun IosPasswordRow(
-    iconBgColor: Color = Color(0xFF8E8E93),
+    iconBgColor: Color = WarnaIos.Abu,
     label: String,
     value: String,
     onValueChange: (String) -> Unit,
@@ -909,13 +735,8 @@ private fun IosPasswordRow(
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(30.dp)
-                .background(iconBgColor, RoundedCornerShape(8.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(Icons.Default.Lock, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+        IkonBaris(iconBgColor) {
+            Icon(IkonIos.Lock, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
         }
 
         Spacer(Modifier.width(12.dp))
@@ -923,28 +744,21 @@ private fun IosPasswordRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = label,
-                style = TextStyle(
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = IosSecondaryLabel
-                )
+                style = TipeIos.Kecil.copy(fontWeight = FontWeight.Medium)
             )
             Spacer(Modifier.height(2.dp))
             BasicTextField(
                 value = value,
                 onValueChange = onValueChange,
                 modifier = Modifier.fillMaxWidth(),
-                textStyle = TextStyle(
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = IosLabel
-                ),
+                textStyle = TipeIos.Isi,
+                cursorBrush = androidx.compose.ui.graphics.SolidColor(WarnaIos.Aksen),
                 visualTransformation = if (terlihat) VisualTransformation.None else PasswordVisualTransformation(),
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = imeAction),
                 decorationBox = { innerTextField ->
                     if (value.isEmpty()) {
-                        Text(placeholder, color = Color(0xFFC7C7CC), fontSize = 15.sp, fontWeight = FontWeight.Normal)
+                        Text(placeholder, style = TipeIos.Isi.copy(color = WarnaIos.LabelKetiga))
                     }
                     innerTextField()
                 }
@@ -955,7 +769,7 @@ private fun IosPasswordRow(
             Icon(
                 if (terlihat) Icons.Default.Visibility else Icons.Default.VisibilityOff,
                 contentDescription = "Toggle password",
-                tint = IosSecondaryLabel,
+                tint = WarnaIos.Abu,
                 modifier = Modifier.size(18.dp)
             )
         }
@@ -963,7 +777,9 @@ private fun IosPasswordRow(
 }
 
 /**
- * iOS Grouped Read-Only Info Row with single-line label & right-aligned truncated value
+ * Baris info baca-saja dalam grup iOS: label satu baris di kiri, nilai abu rata
+ * kanan yang terpotong rapi. Tidak memakai `BarisIos` karena di sana nilai tidak
+ * dibatasi lebarnya — outlet bernama panjang akan memaksa label turun baris.
  */
 @Composable
 private fun IosInfoRow(
@@ -972,41 +788,31 @@ private fun IosInfoRow(
     label: String,
     value: String,
     trailingTag: String? = null,
-    trailingTagColor: Color = SukaOrange,
-    trailingTagBg: Color = SukaOrangeBg,
+    trailingTagNada: NadaIos = NadaIos.AKSEN,
     trailingCaption: String? = null
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .heightIn(min = 48.dp)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(30.dp)
-                .background(iconBgColor, RoundedCornerShape(8.dp)),
-            contentAlignment = Alignment.Center
-        ) {
+        IkonBaris(iconBgColor) {
             Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
         }
 
         Spacer(Modifier.width(12.dp))
 
-        // Label: Fixed single-line so it NEVER wraps
+        // Label satu baris agar TIDAK pernah turun baris
         Text(
             text = label,
-            style = TextStyle(
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Normal,
-                color = IosLabel
-            ),
+            style = TipeIos.Isi,
             maxLines = 1
         )
 
         Spacer(Modifier.width(10.dp))
 
-        // Value & Trailing elements: Right aligned, neatly truncated
         Row(
             modifier = Modifier.weight(1f),
             horizontalArrangement = Arrangement.End,
@@ -1014,11 +820,7 @@ private fun IosInfoRow(
         ) {
             Text(
                 text = value,
-                style = TextStyle(
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Normal,
-                    color = IosSecondaryLabel
-                ),
+                style = TipeIos.Isi.copy(color = IosSecondaryLabel),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.End,
@@ -1029,34 +831,19 @@ private fun IosInfoRow(
                 Spacer(Modifier.width(6.dp))
                 Text(
                     text = trailingCaption,
-                    style = TextStyle(
-                        fontSize = 12.sp,
-                        color = IosSecondaryLabel.copy(alpha = 0.8f)
-                    ),
+                    style = TipeIos.Kecil.copy(color = WarnaIos.Abu),
                     maxLines = 1
                 )
             } else if (trailingTag != null) {
                 Spacer(Modifier.width(6.dp))
-                Surface(
-                    shape = RoundedCornerShape(6.dp),
-                    color = trailingTagBg,
-                    border = BorderStroke(0.5.dp, trailingTagColor.copy(alpha = 0.25f))
-                ) {
-                    Text(
-                        text = trailingTag,
-                        color = trailingTagColor,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
-                    )
-                }
+                LencanaIos(trailingTag, trailingTagNada, titik = false)
             }
         }
     }
 }
 
 /**
- * Apple Primary Capsule Action Button with Tactile Press Scale
+ * Tombol aksi utama iOS dengan jarak tepi layar.
  */
 @Composable
 private fun IosCapsuleButton(
@@ -1067,110 +854,48 @@ private fun IosCapsuleButton(
     enabled: Boolean = true,
     onClick: () -> Unit
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        targetValue = if (isPressed && enabled) 0.97f else 1f,
-        animationSpec = tween(100),
-        label = "buttonScale"
+    TombolUtamaIos(
+        teks = text,
+        onKlik = onClick,
+        modifier = modifier.padding(horizontal = UkuranIos.TepiLayar),
+        aktif = enabled,
+        memuat = loading,
+        ikon = icon,
     )
-
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .height(48.dp)
-            .graphicsLayer(scaleX = scale, scaleY = scale)
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                enabled = enabled && !loading,
-                onClick = onClick
-            ),
-        shape = RoundedCornerShape(14.dp),
-        color = if (enabled) SukaOrange else Color(0xFFE5E5EA),
-        shadowElevation = if (enabled) 2.dp else 0.dp
-    ) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            if (loading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp),
-                    color = Color.White,
-                    strokeWidth = 2.dp
-                )
-            } else {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (icon != null) {
-                        Icon(
-                            icon,
-                            contentDescription = null,
-                            tint = if (enabled) Color.White else Color(0xFF8E8E93),
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(Modifier.width(6.dp))
-                    }
-                    Text(
-                        text = text,
-                        style = TextStyle(
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (enabled) Color.White else Color(0xFF8E8E93),
-                            letterSpacing = (-0.2).sp
-                        )
-                    )
-                }
-            }
-        }
-    }
 }
 
 /**
- * iOS Status Toast / Alert Banner
+ * Banner status iOS: isian tipis bernada, tanpa garis tepi.
  */
 @Composable
 private fun IosStatusBanner(pesan: PesanProfil?) {
     val sukses = pesan is PesanProfil.Sukses
+    val nada = if (sukses) NadaIos.SUKSES else NadaIos.BAHAYA
     val teks = when (pesan) {
         is PesanProfil.Sukses -> pesan.teks
         is PesanProfil.Galat -> pesan.teks
         null -> ""
     }
-    Surface(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp),
-        color = if (sukses) Color(0xFFEBFBF2) else Color(0xFFFFECEB),
-        shape = RoundedCornerShape(14.dp),
-        border = BorderStroke(
-            0.5.dp,
-            if (sukses) Color(0xFF34C759).copy(alpha = 0.35f) else Color(0xFFFF3B30).copy(alpha = 0.35f)
-        ),
-        shadowElevation = 0.5.dp
+            .padding(horizontal = UkuranIos.TepiLayar, vertical = 6.dp)
+            .clip(UkuranIos.SudutBlok)
+            .background(nada.warna.copy(alpha = 0.12f))
+            .padding(horizontal = 14.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Icon(
-                if (sukses) Icons.Default.CheckCircle else Icons.Default.ErrorOutline,
-                contentDescription = null,
-                tint = if (sukses) Color(0xFF248A3D) else Color(0xFFD70015),
-                modifier = Modifier.size(18.dp)
-            )
-            Text(
-                text = teks,
-                style = TextStyle(
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = if (sukses) Color(0xFF248A3D) else Color(0xFFD70015),
-                    lineHeight = 18.sp
-                )
-            )
-        }
+        Icon(
+            if (sukses) IkonIos.CheckCircle else IkonIos.ErrorOutline,
+            contentDescription = null,
+            tint = nada.teks,
+            modifier = Modifier.size(18.dp)
+        )
+        Text(
+            text = teks,
+            style = TipeIos.Catatan.copy(color = nada.teks, fontWeight = FontWeight.Medium, lineHeight = 18.sp)
+        )
     }
 }
 
@@ -1188,6 +913,7 @@ private fun IosSheetActionRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
+            .heightIn(min = 50.dp)
             .padding(horizontal = 16.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -1200,11 +926,7 @@ private fun IosSheetActionRow(
         Spacer(Modifier.width(14.dp))
         Text(
             text = text,
-            style = TextStyle(
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Normal,
-                color = textColor
-            )
+            style = TipeIos.Isi.copy(color = textColor)
         )
     }
 }
