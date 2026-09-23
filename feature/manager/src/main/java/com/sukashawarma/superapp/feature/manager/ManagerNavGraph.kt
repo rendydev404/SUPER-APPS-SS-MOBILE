@@ -1,12 +1,7 @@
 package com.sukashawarma.superapp.feature.manager
 
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -17,7 +12,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -29,6 +23,8 @@ import com.sukashawarma.superapp.core.ui.keluarMundur
 import com.sukashawarma.superapp.core.ui.masukMaju
 import com.sukashawarma.superapp.core.ui.masukMundur
 import com.sukashawarma.superapp.core.ui.RealtimeTables
+import com.sukashawarma.superapp.core.ui.kaca.LembarMenuKaca
+import com.sukashawarma.superapp.core.ui.kaca.ShellKaca
 import com.sukashawarma.superapp.domain.session.AppSession
 import com.sukashawarma.superapp.feature.manager.domain.ManagerAkses
 import com.sukashawarma.superapp.feature.manager.ui.IsiMenuManager
@@ -83,7 +79,7 @@ fun ManagerNavGraph(onExit: () -> Unit, tujuanAwal: TujuanManager? = null) {
         .toSet()
 
     var menuTerbuka by remember { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
 
     RealtimeRefresh(
@@ -118,16 +114,20 @@ fun ManagerNavGraph(onExit: () -> Unit, tujuanAwal: TujuanManager? = null) {
         if (tujuanAwal != null && tujuanAwal in tujuanTerlihat) pindah(tujuanAwal)
     }
 
-    Scaffold(
-        bottomBar = {
+    // Tab bar kaca & lembar menu dari design system bersama (core.ui.kaca). NavHost
+    // digambar sampai dasar layar di balik kapsul, jadi tiap layar memberi ruang
+    // sendiri lewat `denganRuangNav()` / `navigationBarsPaddingKaca()`.
+    ShellKaca(
+        bilah = { latar ->
             NavBawahManager(
                 aktif = aktif,
                 jumlahPersetujuan = lencana.persetujuan,
+                latar = latar,
                 onPilih = { pindah(it) },
                 onBukaMenu = { menuTerbuka = true },
             )
         },
-    ) { padding ->
+    ) {
         NavHost(
             navController = navController,
             startDestination = TujuanManager.OVERVIEW.rute,
@@ -135,9 +135,7 @@ fun ManagerNavGraph(onExit: () -> Unit, tujuanAwal: TujuanManager? = null) {
             exitTransition = { keluarMaju() },
             popEnterTransition = { masukMundur() },
             popExitTransition = { keluarMundur() },
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(bottom = padding.calculateBottomPadding()),
+            modifier = Modifier.fillMaxSize(),
         ) {
             composable(TujuanManager.OVERVIEW.rute) {
                 OverviewScreen(
@@ -179,28 +177,30 @@ fun ManagerNavGraph(onExit: () -> Unit, tujuanAwal: TujuanManager? = null) {
                 }
             }
         }
-    }
 
-    if (menuTerbuka) {
-        ModalBottomSheet(
-            onDismissRequest = { menuTerbuka = false },
-            sheetState = sheetState,
-        ) {
-            IsiMenuManager(
-                aktif = aktif,
-                tujuanTerlihat = tujuanTerlihat,
-                jumlahPersetujuan = lencana.persetujuan,
-                jumlahWaste = lencana.waste,
-                onPilih = { tujuan ->
-                    // Lembar ditutup dengan animasinya sendiri lebih dulu; menutup
-                    // paksa bersamaan dengan navigasi membuat isinya berkedip.
-                    scope.launch { sheetState.hide() }.invokeOnCompletion {
-                        menuTerbuka = false
-                        pindah(tujuan)
-                    }
-                },
-            )
-            Spacer(Modifier.height(12.dp))
+        // Lembar dikomposisikan di dalam shell supaya ShellKaca memburamkan layar
+        // di belakangnya selama menu terbuka.
+        if (menuTerbuka) {
+            LembarMenuKaca(
+                onTutup = { menuTerbuka = false },
+                sheetState = sheetState,
+                judul = "Menu Manager",
+            ) {
+                IsiMenuManager(
+                    aktif = aktif,
+                    tujuanTerlihat = tujuanTerlihat,
+                    jumlahPersetujuan = lencana.persetujuan,
+                    jumlahWaste = lencana.waste,
+                    onPilih = { tujuan ->
+                        // Lembar ditutup dengan animasinya sendiri lebih dulu; menutup
+                        // paksa bersamaan dengan navigasi membuat isinya berkedip.
+                        scope.launch { sheetState.hide() }.invokeOnCompletion {
+                            menuTerbuka = false
+                            pindah(tujuan)
+                        }
+                    },
+                )
+            }
         }
     }
 }
