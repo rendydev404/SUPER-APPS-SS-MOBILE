@@ -2,7 +2,6 @@ package com.sukashawarma.superapp.presentation.absensi.papan
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -11,24 +10,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Login
 import androidx.compose.material.icons.automirrored.filled.Logout
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Group
-import androidx.compose.material.icons.filled.MoreHoriz
-import androidx.compose.material.icons.filled.PriorityHigh
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Storefront
-import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -38,15 +23,28 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import com.sukashawarma.superapp.core.ui.ios.BilahJudulIos
+import com.sukashawarma.superapp.core.ui.ios.KartuIos
+import com.sukashawarma.superapp.core.ui.ios.KeadaanIos
+import com.sukashawarma.superapp.core.ui.ios.KolomCariIos
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.PemisahIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.TombolKapsulIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.ios.permukaanIos
+import com.sukashawarma.superapp.core.ui.ios.tekanIos
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
 import com.sukashawarma.superapp.domain.util.JakartaTime
-import com.sukashawarma.superapp.presentation.absensi.AbsensiBottomNav
+import com.sukashawarma.superapp.presentation.absensi.AbsensiShell
+import com.sukashawarma.superapp.core.ui.kaca.denganRuangNav
 import com.sukashawarma.superapp.presentation.absensi.rekap.selfiePublicUrl
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -57,58 +55,27 @@ import com.sukashawarma.superapp.core.ui.SukaDropdownHeader
 import com.sukashawarma.superapp.core.ui.SukaDropdownMenu
 import com.sukashawarma.superapp.core.ui.SukaDropdownMenuItem
 
-// Stitch Suka Culinary Design Tokens (samakan dengan layar Absensi lainnya)
-private val StitchPrimary = Color(0xFF450700)
-private val StitchSecondaryContainer = Color(0xFFFE8438)
-private val StitchSurface = Color(0xFFF8F9FF)
-private val StitchSurfaceContainerLowest = Color(0xFFFFFFFF)
-private val StitchSurfaceContainerLow = Color(0xFFEFF4FF)
-private val StitchSurfaceContainer = Color(0xFFE5EEFF)
-private val StitchSurfaceContainerHigh = Color(0xFFDCE9FF)
-private val StitchOnSurface = Color(0xFF0B1C30)
-private val StitchOnSurfaceVariant = Color(0xFF57423D)
-private val StitchOutlineVariant = Color(0xFFDEC0B9)
-private val StitchError = Color(0xFFBA1A1A)
-private val StitchErrorContainer = Color(0xFFFFDAD6)
-
-// Warna status — dipetakan dari kelas Tailwind di halaman web.
-private val DotGreen = Color(0xFF059669)
-private val DotYellow = Color(0xFFFACC15)
-private val DotAmber = Color(0xFFF59E0B)
-private val DotGray = Color(0xFFD1D5DB)
-private val DotRed = Color(0xFFEF4444)
-private val DotIndigo = Color(0xFF6366F1)
-
-private val TextGreen = Color(0xFF15803D)
-private val BgGreen = Color(0xFFECFDF5)
-private val TextYellow = Color(0xFFA16207)
-private val BgYellow = Color(0xFFFEFCE8)
-private val TextAmber = Color(0xFFB45309)
-private val BgAmber = Color(0xFFFFFBEB)
-private val TextGray = Color(0xFF374151)
-private val BgGray = Color(0xFFF9FAFB)
-private val TextRed = Color(0xFFB91C1C)
-private val BgRed = Color(0xFFFEF2F2)
-private val TextIndigo = Color(0xFF4338CA)
-private val BgIndigo = Color(0xFFEEF2FF)
+// Warna status — palet sistem iOS; teks memakai varian gelap supaya terbaca di atas latar tipisnya.
+private val TeksKuning = Color(0xFF946200)
+private val TeksIndigo = Color(0xFF3634A3)
 
 private val ID_LOCALE = Locale("id", "ID")
 private val DateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMMM yyyy", ID_LOCALE)
 
-/** (titik, teks, latar) per status — dipakai bareng oleh pil, dot avatar, dan legenda. */
-private fun stateColors(state: BoardState): Triple<Color, Color, Color> = when (state) {
-    BoardState.MASUK, BoardState.KELUAR -> Triple(DotGreen, TextGreen, BgGreen)
-    BoardState.TELAT_TOLERANSI -> Triple(DotYellow, TextYellow, BgYellow)
-    BoardState.TELAT, BoardState.PULANG_TELAT, BoardState.LEBIH_AWAL -> Triple(DotAmber, TextAmber, BgAmber)
-    BoardState.ALPHA -> Triple(DotRed, TextRed, BgRed)
-    BoardState.BELUM -> Triple(DotGray, TextGray, BgGray)
+/** (titik, teks) per status — dipakai bareng oleh pil, dot avatar, dan legenda. */
+private fun stateColors(state: BoardState): Pair<Color, Color> = when (state) {
+    BoardState.MASUK, BoardState.KELUAR -> WarnaIos.Hijau to NadaIos.SUKSES.teks
+    BoardState.TELAT_TOLERANSI -> WarnaIos.Kuning to TeksKuning
+    BoardState.TELAT, BoardState.PULANG_TELAT, BoardState.LEBIH_AWAL -> WarnaIos.Oranye to NadaIos.PERINGATAN.teks
+    BoardState.ALPHA -> WarnaIos.Merah to NadaIos.BAHAYA.teks
+    BoardState.BELUM -> WarnaIos.Abu to NadaIos.NETRAL.teks
 }
 
 private fun stateIcon(state: BoardState): ImageVector = when (state) {
     BoardState.MASUK -> Icons.AutoMirrored.Filled.Login
-    BoardState.TELAT, BoardState.TELAT_TOLERANSI, BoardState.PULANG_TELAT -> Icons.Filled.Schedule
+    BoardState.TELAT, BoardState.TELAT_TOLERANSI, BoardState.PULANG_TELAT -> IkonIos.Schedule
     BoardState.KELUAR, BoardState.LEBIH_AWAL -> Icons.AutoMirrored.Filled.Logout
-    BoardState.BELUM, BoardState.ALPHA -> Icons.Filled.MoreHoriz
+    BoardState.BELUM, BoardState.ALPHA -> IkonIos.MoreHoriz
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -122,115 +89,100 @@ fun PapanKehadiranScreen(
     RealtimeRefresh(RealtimeTables.ATTENDANCE) { viewModel.refresh() }
     var previewUrl by remember { mutableStateOf<String?>(null) }
 
-    Scaffold(
-        containerColor = StitchSurface,
-        topBar = {
-            TopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = StitchSurface,
-                    titleContentColor = StitchPrimary,
-                    navigationIconContentColor = StitchOnSurface,
-                    actionIconContentColor = StitchOnSurface,
-                ),
-                navigationIcon = {
-                    IconButton(onClick = onExit) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali")
-                    }
-                },
-                title = {
-                    Text("Papan Kehadiran", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = StitchPrimary)
-                },
-            )
-        },
-        // Papan Kehadiran diakses dari tab "More" (index 3) — bottom nav tetap tampil supaya
-        // user bisa lompat tab tanpa balik dulu, sama seperti Cuti & Kasbon.
-        bottomBar = { AbsensiBottomNav(selectedIndex = 3, onSelect = onNavigateTab) },
-    ) { padding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            item(key = "header") {
-                PapanHeader(
-                    outletName = state.selectedOutletName,
-                    lastRefresh = state.lastRefresh,
-                    refreshing = state.refreshing,
-                    showRefresh = state.selectedOutletId != null,
-                    onRefresh = { viewModel.refresh() },
-                )
-            }
-
-            if (state.canChooseOutlet) {
-                item(key = "outlet_picker") {
-                    OutletPickerCard(
-                        outlets = state.outlets,
-                        loading = state.loadingOutlets,
-                        selectedId = state.selectedOutletId,
-                        onSelect = { viewModel.selectOutlet(it) },
+    // Papan Kehadiran diakses dari tab "More" (index 3) — bilah tab tetap tampil supaya
+    // user bisa lompat tab tanpa balik dulu, sama seperti Cuti & Kasbon.
+    AbsensiShell(selectedIndex = 3, onSelect = onNavigateTab) {
+        Scaffold(
+            containerColor = WarnaIos.Latar,
+            topBar = { BilahJudulIos(judul = "Papan Kehadiran", onKembali = onExit, garisBawah = false) },
+        ) { padding ->
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(padding),
+                contentPadding = PaddingValues(start = UkuranIos.TepiLayar, end = UkuranIos.TepiLayar, top = 4.dp, bottom = 32.dp).denganRuangNav(),
+                verticalArrangement = Arrangement.spacedBy(UkuranIos.JarakKartu),
+            ) {
+                item(key = "header") {
+                    PapanHeader(
+                        outletName = state.selectedOutletName,
+                        lastRefresh = state.lastRefresh,
+                        refreshing = state.refreshing,
+                        showRefresh = state.selectedOutletId != null,
+                        onRefresh = { viewModel.refresh() },
                     )
                 }
-            }
 
-            if (state.awaitingOutletChoice) {
-                item(key = "choose_outlet") {
-                    EmptyCard(
-                        icon = { Icon(Icons.Filled.Storefront, null, tint = StitchPrimary, modifier = Modifier.size(26.dp)) },
-                        title = "Pilih Outlet Dulu",
-                        message = "Anda memantau seluruh outlet. Pilih salah satu di atas untuk melihat papan kehadirannya.",
-                    )
-                }
-                return@LazyColumn
-            }
-
-            when {
-                state.loading -> item(key = "loading") {
-                    Column(
-                        Modifier.fillMaxWidth().padding(vertical = 60.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        CircularProgressIndicator(color = StitchPrimary, strokeWidth = 3.dp)
-                        Spacer(Modifier.height(14.dp))
-                        Text("Memuat data kehadiran...", fontSize = 13.sp, color = StitchOnSurfaceVariant)
-                    }
-                }
-
-                state.error != null -> item(key = "error") {
-                    PapanErrorCard(message = state.error.orEmpty(), onRetry = { viewModel.load() })
-                }
-
-                else -> {
-                    if (state.canSeeAlerts && state.alerts.isNotEmpty()) {
-                        item(key = "alerts") { SecurityAlertCard(state.alerts) }
-                    }
-
-                    item(key = "summary") { AttendanceRateCard(state.summary) }
-
-                    item(key = "list_header") {
-                        ListHeader(
-                            shown = state.filteredRows.size,
-                            total = state.summary.total,
-                            filter = state.filter,
-                            onFilter = { viewModel.setFilter(it) },
+                if (state.canChooseOutlet) {
+                    item(key = "outlet_picker") {
+                        OutletPickerCard(
+                            outlets = state.outlets,
+                            loading = state.loadingOutlets,
+                            selectedId = state.selectedOutletId,
+                            onSelect = { viewModel.selectOutlet(it) },
                         )
                     }
+                }
 
-                    item(key = "search") {
-                        StaffSearchField(query = state.query, onQueryChange = { viewModel.setQuery(it) })
+                if (state.awaitingOutletChoice) {
+                    item(key = "choose_outlet") {
+                        KeadaanIos(
+                            ikon = IkonIos.Storefront,
+                            judul = "Pilih Outlet Dulu",
+                            pesan = "Anda memantau seluruh outlet. Pilih salah satu di atas untuk melihat papan kehadirannya.",
+                            nada = NadaIos.AKSEN,
+                        )
+                    }
+                    return@LazyColumn
+                }
+
+                when {
+                    state.loading -> item(key = "loading") {
+                        Column(
+                            Modifier.fillMaxWidth().padding(vertical = 60.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            CircularProgressIndicator(color = WarnaIos.Aksen, strokeWidth = 2.5.dp, modifier = Modifier.size(28.dp))
+                            Spacer(Modifier.height(14.dp))
+                            Text("Memuat data kehadiran...", style = TipeIos.Catatan)
+                        }
                     }
 
-                    if (state.filteredRows.isEmpty()) {
-                        item(key = "empty") {
-                            EmptyCard(
-                                icon = { Icon(Icons.Filled.Group, null, tint = StitchPrimary, modifier = Modifier.size(26.dp)) },
-                                title = "Tidak Ada Data Staf",
-                                message = if (state.query.isBlank()) "Tidak ada staf yang sesuai dengan filter yang dipilih."
-                                else "Tidak ada staf bernama \"${state.query.trim()}\" pada filter ini.",
+                    state.error != null -> item(key = "error") {
+                        PapanErrorCard(message = state.error.orEmpty(), onRetry = { viewModel.load() })
+                    }
+
+                    else -> {
+                        if (state.canSeeAlerts && state.alerts.isNotEmpty()) {
+                            item(key = "alerts") { SecurityAlertCard(state.alerts) }
+                        }
+
+                        item(key = "summary") { AttendanceRateCard(state.summary) }
+
+                        item(key = "list_header") {
+                            ListHeader(
+                                shown = state.filteredRows.size,
+                                total = state.summary.total,
+                                filter = state.filter,
+                                onFilter = { viewModel.setFilter(it) },
                             )
                         }
-                    } else {
-                        items(state.filteredRows, key = { it.staffId }) { row ->
-                            StaffBoardCard(row = row, onPreview = { previewUrl = it })
+
+                        item(key = "search") {
+                            StaffSearchField(query = state.query, onQueryChange = { viewModel.setQuery(it) })
+                        }
+
+                        if (state.filteredRows.isEmpty()) {
+                            item(key = "empty") {
+                                KeadaanIos(
+                                    ikon = IkonIos.Groups,
+                                    judul = "Tidak Ada Data Staf",
+                                    pesan = if (state.query.isBlank()) "Tidak ada staf yang sesuai dengan filter yang dipilih."
+                                    else "Tidak ada staf bernama \"${state.query.trim()}\" pada filter ini.",
+                                )
+                            }
+                        } else {
+                            items(state.filteredRows, key = { it.staffId }) { row ->
+                                StaffBoardCard(row = row, onPreview = { previewUrl = it })
+                            }
                         }
                     }
                 }
@@ -254,54 +206,43 @@ private fun PapanHeader(
     onRefresh: () -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, top = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Surface(shape = RoundedCornerShape(14.dp), color = StitchSurfaceContainer, modifier = Modifier.size(42.dp)) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(Icons.Filled.Group, contentDescription = null, tint = StitchPrimary, modifier = Modifier.size(21.dp))
-            }
-        }
-        Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(
                 LocalDate.now(JakartaTime.ZONE).format(DateFormatter),
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-                color = StitchOnSurface,
+                style = TipeIos.Judul2,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
                 outletName ?: "Pantau kehadiran tim hari ini",
-                fontSize = 12.5.sp,
-                color = StitchOnSurfaceVariant,
+                style = TipeIos.SubJudul,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
         if (showRefresh) {
             Spacer(Modifier.width(8.dp))
-            Surface(
-                onClick = onRefresh,
-                enabled = !refreshing,
-                shape = RoundedCornerShape(12.dp),
-                color = StitchSurfaceContainerLowest,
-                border = BorderStroke(1.dp, StitchOutlineVariant.copy(alpha = 0.5f)),
+            // Kapsul abu ala tombol toolbar iOS: ikon segarkan + jam muat terakhir.
+            Row(
+                modifier = Modifier
+                    .height(34.dp)
+                    .clip(UkuranIos.SudutKapsul)
+                    .background(WarnaIos.Isian)
+                    .tekanIos(onRefresh, aktif = !refreshing)
+                    .padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    if (refreshing) {
-                        CircularProgressIndicator(color = StitchPrimary, strokeWidth = 2.dp, modifier = Modifier.size(14.dp))
-                    } else {
-                        Icon(Icons.Filled.Refresh, contentDescription = "Muat ulang", tint = StitchOnSurfaceVariant, modifier = Modifier.size(15.dp))
-                    }
-                    if (lastRefresh.isNotBlank()) {
-                        Text(lastRefresh, fontSize = 11.5.sp, color = StitchOnSurfaceVariant, fontWeight = FontWeight.Medium)
-                    }
+                if (refreshing) {
+                    CircularProgressIndicator(color = WarnaIos.Aksen, strokeWidth = 2.dp, modifier = Modifier.size(14.dp))
+                } else {
+                    Icon(IkonIos.Refresh, contentDescription = "Muat ulang", tint = WarnaIos.Aksen, modifier = Modifier.size(15.dp))
+                }
+                if (lastRefresh.isNotBlank()) {
+                    Text(lastRefresh, color = WarnaIos.Aksen, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -312,53 +253,45 @@ private fun PapanHeader(
 
 @Composable
 private fun SecurityAlertCard(alerts: List<SecurityAlert>) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        color = BgRed,
-        border = BorderStroke(1.dp, DotRed.copy(alpha = 0.35f)),
-    ) {
-        Column(Modifier.padding(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(Icons.Filled.Warning, contentDescription = null, tint = DotRed, modifier = Modifier.size(18.dp))
-                Text(
-                    "Peringatan Keamanan: ${alerts.size} percobaan manipulasi lokasi",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextRed,
-                )
+    Column(Modifier.fillMaxWidth().permukaanIos(UkuranIos.SudutKartu)) {
+        Row(
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Box(
+                Modifier.size(30.dp).clip(CircleShape).background(WarnaIos.Merah.copy(alpha = 0.14f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(IkonIos.WarningAmber, contentDescription = null, tint = WarnaIos.Merah, modifier = Modifier.size(17.dp))
             }
-            Spacer(Modifier.height(10.dp))
-            alerts.forEach { alert ->
-                Surface(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 7.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    color = StitchSurfaceContainerLowest,
-                    border = BorderStroke(1.dp, DotRed.copy(alpha = 0.18f)),
+            Text(
+                "Peringatan Keamanan: ${alerts.size} percobaan manipulasi lokasi",
+                style = TipeIos.Keterangan.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = NadaIos.BAHAYA.teks),
+            )
+        }
+        alerts.forEach { alert ->
+            PemisahIos()
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Column(Modifier.padding(horizontal = 11.dp, vertical = 9.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                        ) {
-                            Text(
-                                alert.staffName,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = StitchOnSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f),
-                            )
-                            Text(alert.time, fontSize = 10.5.sp, color = StitchOnSurfaceVariant)
-                        }
-                        Spacer(Modifier.height(4.dp))
-                        Text(alert.label, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = TextRed)
-                    }
+                    Text(
+                        alert.staffName,
+                        style = TipeIos.Keterangan.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(alert.time, style = TipeIos.Kecil)
                 }
+                Spacer(Modifier.height(2.dp))
+                Text(alert.label, style = TipeIos.Catatan.copy(color = NadaIos.BAHAYA.teks, fontWeight = FontWeight.Medium))
             }
         }
+        Spacer(Modifier.height(4.dp))
     }
 }
 
@@ -372,88 +305,84 @@ private fun AttendanceRateCard(summary: BoardSummary) {
         label = "papan-bar",
     )
 
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        color = StitchSurfaceContainerLowest,
-        border = BorderStroke(1.dp, StitchSurfaceContainerHigh.copy(alpha = 0.7f)),
-        shadowElevation = 0.5.dp,
-    ) {
-        Column(Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Bottom,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text("Tingkat Kehadiran", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = StitchOnSurface)
-                    Text("Persentase staf yang sudah hadir hari ini", fontSize = 12.sp, color = StitchOnSurfaceVariant)
+    KartuIos {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Bottom,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("Tingkat Kehadiran", style = TipeIos.Utama)
+                Text("Persentase staf yang sudah hadir hari ini", style = TipeIos.Catatan)
+            }
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text("${summary.percent}", style = TipeIos.JudulBesar.copy(fontSize = 32.sp))
+                Text("%", style = TipeIos.SubJudul.copy(fontWeight = FontWeight.SemiBold), modifier = Modifier.padding(bottom = 5.dp))
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // Bar bertumpuk: hadir → telat toleransi → telat → alpha, sisanya track kosong.
+        val segments = listOf(
+            summary.fraction(summary.hadir) * anim to WarnaIos.Hijau,
+            summary.fraction(summary.telatToleransi) * anim to WarnaIos.Kuning,
+            summary.fraction(summary.telat) * anim to WarnaIos.Oranye,
+            summary.fraction(summary.alpha) * anim to WarnaIos.Merah,
+        )
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .height(10.dp)
+                .clip(CircleShape)
+                .background(WarnaIos.Isian),
+        ) {
+            var used = 0f
+            segments.forEach { (fraction, color) ->
+                if (fraction > 0.001f) {
+                    used += fraction
+                    Box(Modifier.fillMaxHeight().weight(fraction).background(color))
                 }
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text("${summary.percent}", fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, color = StitchOnSurface)
-                    Text("%", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = StitchOnSurfaceVariant, modifier = Modifier.padding(bottom = 4.dp))
-                }
             }
+            val rest = 1f - used
+            if (rest > 0.001f) Spacer(Modifier.weight(rest))
+        }
 
-            Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(14.dp))
 
-            // Bar bertumpuk: hadir → telat toleransi → telat → alpha, sisanya track kosong.
-            val segments = listOf(
-                summary.fraction(summary.hadir) * anim to DotGreen,
-                summary.fraction(summary.telatToleransi) * anim to DotYellow,
-                summary.fraction(summary.telat) * anim to DotAmber,
-                summary.fraction(summary.alpha) * anim to DotRed,
-            )
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .height(12.dp)
-                    .clip(CircleShape)
-                    .background(StitchSurfaceContainerLow),
-            ) {
-                var used = 0f
-                segments.forEach { (fraction, color) ->
-                    if (fraction > 0.001f) {
-                        used += fraction
-                        Box(Modifier.fillMaxHeight().weight(fraction).background(color))
-                    }
-                }
-                val rest = 1f - used
-                if (rest > 0.001f) Spacer(Modifier.weight(rest))
-            }
-
-            Spacer(Modifier.height(16.dp))
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                LegendTile(Modifier.weight(1f), "Hadir", summary.hadir, DotGreen, TextGreen, BgGreen)
-                LegendTile(Modifier.weight(1f), "Telat (Tol)", summary.telatToleransi, DotYellow, TextYellow, BgYellow)
-                LegendTile(Modifier.weight(1f), "Telat", summary.telat, DotAmber, TextAmber, BgAmber)
-            }
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                LegendTile(Modifier.weight(1f), "Belum", summary.belum, DotGray, TextGray, BgGray)
-                LegendTile(Modifier.weight(1f), "Alpha", summary.alpha, DotRed, TextRed, BgRed)
-                LegendTile(Modifier.weight(1f), "Total Staf", summary.total, DotIndigo, TextIndigo, BgIndigo)
-            }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            LegendTile(Modifier.weight(1f), "Hadir", summary.hadir, WarnaIos.Hijau)
+            LegendTile(Modifier.weight(1f), "Telat (Tol)", summary.telatToleransi, WarnaIos.Kuning)
+            LegendTile(Modifier.weight(1f), "Telat", summary.telat, WarnaIos.Oranye)
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            LegendTile(Modifier.weight(1f), "Belum", summary.belum, WarnaIos.Abu)
+            LegendTile(Modifier.weight(1f), "Alpha", summary.alpha, WarnaIos.Merah)
+            LegendTile(Modifier.weight(1f), "Total Staf", summary.total, WarnaIos.Indigo)
         }
     }
 }
 
+/** Petak legenda abu ala blok angka iOS: titik warna, angka, label. */
 @Composable
-private fun LegendTile(modifier: Modifier, label: String, value: Int, dot: Color, fg: Color, bg: Color) {
-    Surface(modifier = modifier, shape = RoundedCornerShape(14.dp), color = bg, border = BorderStroke(1.dp, dot.copy(alpha = 0.25f))) {
-        Column(Modifier.padding(horizontal = 10.dp, vertical = 9.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Box(Modifier.size(8.dp).clip(CircleShape).background(dot))
-                Text("$value", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = StitchOnSurface)
-            }
-            Spacer(Modifier.height(4.dp))
-            Text(label, fontSize = 10.5.sp, fontWeight = FontWeight.SemiBold, color = fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
+private fun LegendTile(modifier: Modifier, label: String, value: Int, dot: Color) {
+    Column(
+        modifier
+            .clip(UkuranIos.SudutBlok)
+            .background(WarnaIos.Latar)
+            .padding(horizontal = 10.dp, vertical = 9.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Box(Modifier.size(8.dp).clip(CircleShape).background(dot))
+            Text("$value", style = TipeIos.Angka.copy(fontSize = 18.sp))
         }
+        Spacer(Modifier.height(2.dp))
+        Text(label, style = TipeIos.Kecil.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -462,18 +391,12 @@ private fun LegendTile(modifier: Modifier, label: String, value: Int, dot: Color
 @Composable
 private fun ListHeader(shown: Int, total: Int, filter: BoardState?, onFilter: (BoardState?) -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+        modifier = Modifier.fillMaxWidth().padding(start = 4.dp, top = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Surface(shape = RoundedCornerShape(11.dp), color = StitchSurfaceContainer, modifier = Modifier.size(36.dp)) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(Icons.Filled.Group, contentDescription = null, tint = StitchPrimary, modifier = Modifier.size(18.dp))
-            }
-        }
-        Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
-            Text("Daftar Staf", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = StitchOnSurface)
-            Text("$shown dari $total staf", fontSize = 11.5.sp, color = StitchOnSurfaceVariant)
+            Text("Daftar Staf", style = TipeIos.Judul3.copy(fontWeight = FontWeight.Bold))
+            Text("$shown dari $total staf", style = TipeIos.Catatan)
         }
         StatusFilterMenu(selected = filter, onSelect = onFilter)
     }
@@ -481,28 +404,11 @@ private fun ListHeader(shown: Int, total: Int, filter: BoardState?, onFilter: (B
 
 @Composable
 private fun StaffSearchField(query: String, onQueryChange: (String) -> Unit) {
-    OutlinedTextField(
-        value = query,
-        onValueChange = onQueryChange,
+    KolomCariIos(
+        nilai = query,
+        onUbah = onQueryChange,
         modifier = Modifier.fillMaxWidth(),
-        singleLine = true,
-        shape = RoundedCornerShape(14.dp),
-        textStyle = LocalTextStyle.current.copy(fontSize = 14.sp),
-        placeholder = { Text("Cari nama staf", fontSize = 14.sp, color = StitchOnSurfaceVariant) },
-        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, tint = StitchOnSurfaceVariant, modifier = Modifier.size(19.dp)) },
-        trailingIcon = {
-            if (query.isNotEmpty()) {
-                IconButton(onClick = { onQueryChange("") }) {
-                    Icon(Icons.Filled.Clear, contentDescription = "Hapus pencarian", tint = StitchOnSurfaceVariant)
-                }
-            }
-        },
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = StitchSecondaryContainer,
-            unfocusedBorderColor = StitchSurfaceContainerHigh,
-            focusedContainerColor = StitchSurfaceContainerLowest,
-            unfocusedContainerColor = StitchSurfaceContainerLowest,
-        ),
+        placeholder = "Cari nama staf",
     )
 }
 
@@ -511,28 +417,12 @@ private fun StatusFilterMenu(selected: BoardState?, onSelect: (BoardState?) -> U
     var expanded by remember { mutableStateOf(false) }
 
     Box {
-        Surface(
-            onClick = { expanded = true },
-            shape = RoundedCornerShape(11.dp),
-            color = StitchSurfaceContainerLowest,
-            border = BorderStroke(1.dp, StitchSurfaceContainerHigh),
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Icon(Icons.Filled.Tune, contentDescription = null, tint = StitchOnSurfaceVariant, modifier = Modifier.size(15.dp))
-                Text(
-                    selected?.filterLabel ?: "Semua Status",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = StitchOnSurface,
-                    maxLines = 1,
-                )
-                Icon(Icons.Filled.ExpandMore, contentDescription = null, tint = StitchOnSurfaceVariant, modifier = Modifier.size(16.dp))
-            }
-        }
+        TombolKapsulIos(
+            teks = selected?.filterLabel ?: "Semua Status",
+            onKlik = { expanded = true },
+            ikon = IkonIos.Tune,
+            chevron = true,
+        )
         SukaDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             SukaDropdownHeader(title = "STATUS KEHADIRAN", onClose = { expanded = false })
             SukaDropdownMenuItem(
@@ -541,7 +431,7 @@ private fun StatusFilterMenu(selected: BoardState?, onSelect: (BoardState?) -> U
                 onClick = { onSelect(null); expanded = false },
             )
             BoardState.entries.forEach { boardState ->
-                val (dot, _, _) = stateColors(boardState)
+                val (dot, _) = stateColors(boardState)
                 SukaDropdownMenuItem(
                     text = boardState.filterLabel,
                     selected = (boardState == selected),
@@ -557,26 +447,17 @@ private fun StatusFilterMenu(selected: BoardState?, onSelect: (BoardState?) -> U
 
 @Composable
 private fun StaffBoardCard(row: StaffBoardRow, onPreview: (String) -> Unit) {
-    val (dot, fg, bg) = stateColors(row.state)
+    val (dot, fg) = stateColors(row.state)
     val url = remember(row.selfiePath) { selfiePublicUrl(row.selfiePath) }
 
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = StitchSurfaceContainerLowest,
-        border = BorderStroke(1.dp, StitchSurfaceContainerHigh.copy(alpha = 0.7f)),
-        shadowElevation = 0.5.dp,
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 13.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+    KartuIos(padding = PaddingValues(horizontal = 14.dp, vertical = 12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Box {
                 Box(
                     modifier = Modifier
                         .size(46.dp)
-                        .clip(RoundedCornerShape(15.dp))
-                        .background(StitchSecondaryContainer.copy(alpha = 0.18f))
+                        .clip(CircleShape)
+                        .background(WarnaIos.Aksen.copy(alpha = 0.14f))
                         .then(if (url != null) Modifier.clickable { onPreview(url) } else Modifier),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -590,8 +471,8 @@ private fun StaffBoardCard(row: StaffBoardRow, onPreview: (String) -> Unit) {
                     } else {
                         Text(
                             row.name.trim().take(1).uppercase(ID_LOCALE).ifBlank { "?" },
-                            color = StitchPrimary,
-                            fontWeight = FontWeight.Bold,
+                            color = NadaIos.AKSEN.teks,
+                            fontWeight = FontWeight.SemiBold,
                             fontSize = 18.sp,
                         )
                     }
@@ -600,10 +481,10 @@ private fun StaffBoardCard(row: StaffBoardRow, onPreview: (String) -> Unit) {
                 Box(
                     Modifier
                         .align(Alignment.BottomEnd)
-                        .offset(x = 3.dp, y = 3.dp)
+                        .offset(x = 2.dp, y = 2.dp)
                         .size(14.dp)
                         .clip(CircleShape)
-                        .background(StitchSurfaceContainerLowest)
+                        .background(WarnaIos.Kartu)
                         .padding(2.dp)
                         .clip(CircleShape)
                         .background(dot)
@@ -616,43 +497,44 @@ private fun StaffBoardCard(row: StaffBoardRow, onPreview: (String) -> Unit) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         row.name,
-                        fontSize = 14.5.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = StitchOnSurface,
+                        style = TipeIos.Utama.copy(fontSize = 16.sp),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false),
                     )
                     if (row.isManual) {
-                        Surface(shape = RoundedCornerShape(6.dp), color = BgAmber, border = BorderStroke(1.dp, DotAmber.copy(alpha = 0.4f))) {
-                            Text(
-                                "Manual",
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = TextAmber,
-                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
-                            )
-                        }
-                    }
-                }
-                Spacer(Modifier.height(3.dp))
-                Text(row.roleLabel, fontSize = 11.5.sp, color = StitchOnSurfaceVariant, maxLines = 1)
-                Spacer(Modifier.height(7.dp))
-                Surface(shape = RoundedCornerShape(9.dp), color = bg, border = BorderStroke(1.dp, dot.copy(alpha = 0.3f))) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp),
-                    ) {
-                        Icon(stateIcon(row.state), contentDescription = null, tint = fg, modifier = Modifier.size(13.dp))
                         Text(
-                            boardPillLabel(row.state, row.time, row.delayMinutes),
-                            fontSize = 11.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = fg,
-                            maxLines = 1,
+                            "Manual",
+                            color = NadaIos.PERINGATAN.teks,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier
+                                .clip(UkuranIos.SudutKapsul)
+                                .background(WarnaIos.Oranye.copy(alpha = 0.14f))
+                                .padding(horizontal = 7.dp, vertical = 2.dp),
                         )
                     }
+                }
+                Text(row.roleLabel, style = TipeIos.Catatan, maxLines = 1)
+                Spacer(Modifier.height(7.dp))
+                // Lencana status gaya LencanaIos, tetapi berwarna per status (termasuk kuning
+                // "telat toleransi" yang tidak punya padanan NadaIos).
+                Row(
+                    modifier = Modifier
+                        .clip(UkuranIos.SudutKapsul)
+                        .background(dot.copy(alpha = 0.16f))
+                        .padding(horizontal = 10.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                ) {
+                    Icon(stateIcon(row.state), contentDescription = null, tint = fg, modifier = Modifier.size(13.dp))
+                    Text(
+                        boardPillLabel(row.state, row.time, row.delayMinutes),
+                        color = fg,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                    )
                 }
             }
         }
@@ -676,47 +558,49 @@ private fun OutletPickerCard(
     LaunchedEffect(expanded) { if (!expanded) query = "" }
 
     Box {
-        Surface(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(enabled = !loading && outlets.isNotEmpty()) { expanded = true },
-            shape = RoundedCornerShape(14.dp),
-            color = StitchSurfaceContainerLowest,
-            border = BorderStroke(1.dp, if (selected == null) StitchSecondaryContainer.copy(alpha = 0.55f) else StitchSurfaceContainerHigh),
-            shadowElevation = 0.5.dp,
+                .permukaanIos(UkuranIos.SudutGrup)
+                .then(
+                    // Belum ada outlet terpilih: garis aksen tipis sebagai ajakan memilih.
+                    if (selected == null) Modifier.border(1.dp, WarnaIos.Aksen.copy(alpha = 0.45f), UkuranIos.SudutGrup)
+                    else Modifier
+                )
+                .clickable(enabled = !loading && outlets.isNotEmpty()) { expanded = true }
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            Box(
+                Modifier.size(30.dp).clip(CircleShape).background(WarnaIos.Aksen.copy(alpha = 0.14f)),
+                contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Filled.Storefront, contentDescription = null, tint = StitchSecondaryContainer, modifier = Modifier.size(21.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        text = when {
-                            loading -> "Memuat outlet..."
-                            selected != null -> selected.name
-                            else -> "Pilih outlet"
-                        },
-                        color = StitchOnSurface,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text = if (outlets.isEmpty() && !loading) "Tidak ada outlet yang bisa dilihat" else "Ketuk untuk ganti outlet",
-                        color = StitchOnSurfaceVariant,
-                        fontSize = 11.5.sp,
-                        maxLines = 1,
-                    )
-                }
-                Icon(
-                    if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                    contentDescription = "Pilih outlet",
-                    tint = StitchOnSurfaceVariant,
+                Icon(IkonIos.Storefront, contentDescription = null, tint = WarnaIos.Aksen, modifier = Modifier.size(17.dp))
+            }
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = when {
+                        loading -> "Memuat outlet..."
+                        selected != null -> selected.name
+                        else -> "Pilih outlet"
+                    },
+                    style = TipeIos.Isi.copy(fontWeight = FontWeight.SemiBold),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = if (outlets.isEmpty() && !loading) "Tidak ada outlet yang bisa dilihat" else "Ketuk untuk ganti outlet",
+                    style = TipeIos.Catatan,
+                    maxLines = 1,
                 )
             }
+            Icon(
+                if (expanded) IkonIos.ExpandLess else IkonIos.ExpandMore,
+                contentDescription = "Pilih outlet",
+                tint = WarnaIos.LabelKetiga,
+                modifier = Modifier.size(16.dp),
+            )
         }
 
         SukaDropdownMenu(
@@ -729,35 +613,11 @@ private fun OutletPickerCard(
                 onClose = { expanded = false },
             )
             Column(Modifier.padding(horizontal = 10.dp, vertical = 4.dp)) {
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = { query = it },
+                KolomCariIos(
+                    nilai = query,
+                    onUbah = { query = it },
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    placeholder = { Text("Cari outlet...", fontSize = 13.sp) },
-                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                    trailingIcon = {
-                        if (query.isNotEmpty()) {
-                            IconButton(onClick = { query = "" }) {
-                                Icon(Icons.Filled.Clear, contentDescription = "Hapus pencarian")
-                            }
-                        }
-                    },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color(0xFF1D1D1F),
-                        unfocusedTextColor = Color(0xFF1D1D1F),
-                        focusedBorderColor = StitchSecondaryContainer,
-                        unfocusedBorderColor = Color(0xFFE5E5EA),
-                        focusedContainerColor = Color(0xFFF2F2F7),
-                        unfocusedContainerColor = Color(0xFFF2F2F7),
-                        focusedPlaceholderColor = Color(0xFF8E8E93),
-                        unfocusedPlaceholderColor = Color(0xFF8E8E93),
-                        focusedLeadingIconColor = StitchSecondaryContainer,
-                        unfocusedLeadingIconColor = Color(0xFF8E8E93),
-                        focusedTrailingIconColor = Color(0xFF8E8E93),
-                        unfocusedTrailingIconColor = Color(0xFF8E8E93),
-                    ),
+                    placeholder = "Cari outlet...",
                 )
                 Spacer(Modifier.height(6.dp))
                 Column(
@@ -769,15 +629,14 @@ private fun OutletPickerCard(
                     if (filtered.isEmpty()) {
                         Text(
                             "Outlet tidak ditemukan",
-                            color = Color(0xFF8E8E93),
-                            fontSize = 13.sp,
+                            style = TipeIos.Catatan,
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 18.dp),
                         )
                     } else filtered.forEach { outlet ->
                         SukaDropdownMenuItem(
                             title = outlet.name,
                             selected = outlet.id == selectedId,
-                            leadingIcon = Icons.Filled.Storefront,
+                            leadingIcon = IkonIos.Storefront,
                             onClick = {
                                 onSelect(outlet.id)
                                 expanded = false
@@ -798,7 +657,7 @@ private fun PhotoPreviewDialog(url: String, onDismiss: () -> Unit) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(24.dp))
+                .clip(UkuranIos.SudutKartu)
                 .background(Color.Black)
                 .clickable(onClick = onDismiss),
             contentAlignment = Alignment.Center,
@@ -814,71 +673,23 @@ private fun PhotoPreviewDialog(url: String, onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun EmptyCard(icon: @Composable () -> Unit, title: String, message: String) {
-    Surface(
-        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-        shape = RoundedCornerShape(18.dp),
-        color = StitchSurfaceContainerLow,
-        border = BorderStroke(1.dp, StitchSurfaceContainerHigh),
-    ) {
-        Column(
-            modifier = Modifier.padding(28.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Surface(shape = CircleShape, color = StitchSurfaceContainer, modifier = Modifier.size(48.dp)) {
-                Box(contentAlignment = Alignment.Center) { icon() }
-            }
-            Text(title, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = StitchOnSurface, textAlign = TextAlign.Center)
-            Text(message, fontSize = 13.sp, color = StitchOnSurfaceVariant, textAlign = TextAlign.Center)
-        }
-    }
-}
-
-@Composable
 private fun PapanErrorCard(message: String, onRetry: () -> Unit) {
     val noOutlet = message.contains("cabang", ignoreCase = true)
-    Surface(
-        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-        shape = RoundedCornerShape(18.dp),
-        color = StitchSurfaceContainerLow,
-        border = BorderStroke(1.dp, StitchSurfaceContainerHigh),
-    ) {
-        Column(
-            modifier = Modifier.padding(28.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Surface(
-                shape = CircleShape,
-                color = if (noOutlet) StitchSurfaceContainer else StitchErrorContainer,
-                modifier = Modifier.size(52.dp),
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        if (noOutlet) Icons.Filled.Storefront else Icons.Filled.PriorityHigh,
-                        contentDescription = null,
-                        tint = if (noOutlet) StitchPrimary else StitchError,
-                        modifier = Modifier.size(26.dp),
-                    )
-                }
-            }
-            if (noOutlet) {
-                Text("Cabang Belum Ditentukan", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = StitchOnSurface)
-            }
-            Text(message, color = StitchOnSurfaceVariant, fontSize = 13.sp, textAlign = TextAlign.Center)
-            if (!noOutlet) {
-                Spacer(Modifier.height(4.dp))
-                Button(
-                    onClick = onRetry,
-                    colors = ButtonDefaults.buttonColors(containerColor = StitchPrimary),
-                    shape = RoundedCornerShape(10.dp),
-                ) {
-                    Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Coba Lagi")
-                }
-            }
-        }
+    if (noOutlet) {
+        KeadaanIos(
+            ikon = IkonIos.Storefront,
+            judul = "Cabang Belum Ditentukan",
+            pesan = message,
+            nada = NadaIos.AKSEN,
+        )
+    } else {
+        KeadaanIos(
+            ikon = IkonIos.ErrorOutline,
+            judul = "Gagal memuat",
+            pesan = message,
+            nada = NadaIos.BAHAYA,
+            teksAksi = "Coba Lagi",
+            onAksi = onRetry,
+        )
     }
 }
