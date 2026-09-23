@@ -1,9 +1,6 @@
 package com.sukashawarma.superapp.feature.manager.ui.overview
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,42 +14,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.BarChart
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Checklist
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.LocalFireDepartment
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Storefront
-import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.WorkspacePremium
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePickerDefaults
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DateRangePicker
 import androidx.compose.material3.ExperimentalMaterial3Api
-import com.sukashawarma.superapp.core.ui.SukaDropdownHeader
-import com.sukashawarma.superapp.core.ui.SukaDropdownMenu
-import com.sukashawarma.superapp.core.ui.SukaDropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDateRangePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -62,14 +34,36 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sukashawarma.superapp.core.ui.RealtimeRefresh
 import com.sukashawarma.superapp.core.ui.RealtimeTables
+import com.sukashawarma.superapp.core.ui.SukaDropdownHeader
+import com.sukashawarma.superapp.core.ui.SukaDropdownMenu
+import com.sukashawarma.superapp.core.ui.SukaDropdownMenuItem
+import com.sukashawarma.superapp.core.ui.SukaFilterDropdown
+import com.sukashawarma.superapp.core.ui.ios.BilahJudulIos
+import com.sukashawarma.superapp.core.ui.ios.IkonBulatIos
+import com.sukashawarma.superapp.core.ui.ios.KolomCariIos
+import com.sukashawarma.superapp.core.ui.ios.LabelSeksiIos
+import com.sukashawarma.superapp.core.ui.ios.LencanaIos
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.PanelGalatIos
+import com.sukashawarma.superapp.core.ui.ios.PemisahIos
+import com.sukashawarma.superapp.core.ui.ios.SegmenIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.TombolBundarIos
+import com.sukashawarma.superapp.core.ui.ios.TombolKeduaIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WadahSegmenIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.ios.tekanIos
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
+import com.sukashawarma.superapp.core.ui.kaca.denganRuangNav
 import com.sukashawarma.superapp.feature.manager.domain.ManagerAkses
 import com.sukashawarma.superapp.feature.manager.domain.PerformaZona
 import com.sukashawarma.superapp.feature.manager.domain.PeringkatOutlet
@@ -81,24 +75,13 @@ import com.sukashawarma.superapp.feature.manager.domain.rupiah
 import com.sukashawarma.superapp.feature.manager.ui.BadgePerubahan
 import com.sukashawarma.superapp.feature.manager.ui.BarProgres
 import com.sukashawarma.superapp.feature.manager.ui.ChipJingga
-import com.sukashawarma.superapp.feature.manager.ui.GarisKartu
-import com.sukashawarma.superapp.feature.manager.ui.HijauGaris
-import com.sukashawarma.superapp.feature.manager.ui.HijauLatar
-import com.sukashawarma.superapp.feature.manager.ui.HijauTeks
 import com.sukashawarma.superapp.feature.manager.ui.JudulPanel
 import com.sukashawarma.superapp.feature.manager.ui.KartuKpi
 import com.sukashawarma.superapp.feature.manager.ui.KartuPanel
 import com.sukashawarma.superapp.feature.manager.ui.KartuRingkasZona
 import com.sukashawarma.superapp.feature.manager.ui.LencanaPeringkat
-import com.sukashawarma.superapp.feature.manager.ui.MerahGaris
-import com.sukashawarma.superapp.feature.manager.ui.MerahLatar
-import com.sukashawarma.superapp.feature.manager.ui.MerahTeks
 import com.sukashawarma.superapp.feature.manager.ui.PanelKosong
 import com.sukashawarma.superapp.feature.manager.ui.PilKeterangan
-import com.sukashawarma.superapp.presentation.theme.SukaBrown
-import com.sukashawarma.superapp.presentation.theme.SukaCream
-import com.sukashawarma.superapp.presentation.theme.SukaGray400
-import com.sukashawarma.superapp.presentation.theme.SukaOrange
 import java.time.Instant
 import java.time.ZoneOffset
 
@@ -110,6 +93,9 @@ private val FILTER = listOf(
     PresetPeriode.BULAN to "30 Hari",
 )
 
+/** Emas insentif — satu-satunya warna di luar palet sistem, supaya kartu bonus langsung dikenali. */
+private val Emas = Color(0xFFFFB300)
+
 /**
  * Ringkasan Area — layar utama modul Manager, cermin `app/page.tsx` web.
  *
@@ -117,7 +103,6 @@ private val FILTER = listOf(
  * salah satu tabel sumbernya berubah di server, jadi omzet bertambah saat kasir
  * menutup pesanan tanpa siapa pun menarik layar.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OverviewScreen(
     onExit: () -> Unit,
@@ -135,35 +120,24 @@ fun OverviewScreen(
     ) { viewModel.segarkanDariRealtime() }
 
     Scaffold(
-        containerColor = SukaCream,
+        containerColor = WarnaIos.Latar,
         topBar = {
-            TopAppBar(
-                title = {
-                    Text("Ringkasan Area", fontWeight = FontWeight.Black, fontSize = 17.sp, color = SukaBrown, maxLines = 1)
-                },
-                navigationIcon = {
-                    IconButton(onClick = onExit) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Kembali", tint = SukaBrown)
-                    }
-                },
-                actions = {
-                    IconButton(onClick = viewModel::muatUlang) {
-                        Icon(Icons.Default.Refresh, "Muat ulang", tint = SukaBrown)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White),
+            BilahJudulIos(
+                "Ringkasan Area",
+                onKembali = onExit,
+                aksi = { TombolBundarIos(IkonIos.Refresh, "Muat ulang", viewModel::muatUlang) },
             )
         },
     ) { padding ->
         LazyColumn(
             Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(horizontal = UkuranIos.TepiLayar, vertical = 12.dp).denganRuangNav(),
+            verticalArrangement = Arrangement.spacedBy(UkuranIos.JarakKartu),
         ) {
             item { PanelPeriode(state, viewModel) }
 
             if (state.galat != null) {
-                item { PanelGalat(state.galat!!, viewModel::muatUlang) }
+                item { PanelGalatIos(state.galat!!, viewModel::muatUlang) }
             }
 
             item { KartuBonus(state.ringkasan) }
@@ -193,46 +167,30 @@ private fun PanelPeriode(state: OverviewUiState, viewModel: OverviewViewModel) {
 
     KartuPanel {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                "Ringkasan Area",
-                color = SukaBrown,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Black,
-            )
+            Text("Ringkasan Area", Modifier.weight(1f, fill = false), style = TipeIos.Judul2, maxLines = 1)
             Spacer(Modifier.width(8.dp))
-            ChipJingga("USER: ${labelRole(state.role?.value)}")
-            Spacer(Modifier.weight(1f))
+            ChipJingga("User: ${labelRole(state.role?.value)}")
         }
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(4.dp))
         Text(
             "Pantau performa pendapatan, transaksi, dan aktivitas cabang secara real-time",
-            color = SukaGray400,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold,
-            lineHeight = 16.sp,
+            style = TipeIos.Catatan,
         )
         Spacer(Modifier.height(14.dp))
 
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .background(SukaBrown.copy(alpha = 0.04f), RoundedCornerShape(16.dp))
-                .padding(4.dp)
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
+        WadahSegmenIos(gulir = true) {
             FILTER.forEach { (preset, label) ->
-                TombolPeriode(
+                SegmenIos(
                     label = label,
                     aktif = !state.memakaiKustom && state.preset == preset,
-                    onClick = { viewModel.pilihPreset(preset) },
+                    onKlik = { viewModel.pilihPreset(preset) },
                 )
             }
-            TombolPeriode(
+            SegmenIos(
                 label = state.kustom?.let { "${it.dari} - ${it.sampai}" } ?: "Kustom",
                 aktif = state.memakaiKustom,
-                ikon = Icons.Default.CalendarMonth,
-                onClick = { dialogTanggal = true },
+                ikon = IkonIos.CalendarMonth,
+                onKlik = { dialogTanggal = true },
             )
         }
     }
@@ -248,42 +206,6 @@ private fun PanelPeriode(state: OverviewUiState, viewModel: OverviewViewModel) {
     }
 }
 
-@Composable
-private fun TombolPeriode(
-    label: String,
-    aktif: Boolean,
-    ikon: androidx.compose.ui.graphics.vector.ImageVector? = null,
-    onClick: () -> Unit,
-) {
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = if (aktif) SukaOrange else Color.Transparent,
-        modifier = Modifier.clickable(onClick = onClick),
-    ) {
-        Row(
-            Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (ikon != null) {
-                Icon(
-                    ikon,
-                    null,
-                    tint = if (aktif) Color.White else SukaBrown.copy(alpha = 0.7f),
-                    modifier = Modifier.size(14.dp),
-                )
-                Spacer(Modifier.width(5.dp))
-            }
-            Text(
-                label,
-                color = if (aktif) Color.White else SukaBrown.copy(alpha = 0.7f),
-                fontSize = 12.sp,
-                fontWeight = FontWeight.ExtraBold,
-                maxLines = 1,
-            )
-        }
-    }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DialogRentangTanggal(
@@ -293,6 +215,8 @@ private fun DialogRentangTanggal(
     val picker = rememberDateRangePickerState()
     DatePickerDialog(
         onDismissRequest = onTutup,
+        shape = UkuranIos.SudutKartu,
+        colors = DatePickerDefaults.colors(containerColor = WarnaIos.Kartu),
         confirmButton = {
             TextButton(
                 onClick = {
@@ -303,17 +227,17 @@ private fun DialogRentangTanggal(
                     if (dari != null) onPilih(dari, sampai ?: dari)
                 },
                 enabled = picker.selectedStartDateMillis != null,
-            ) { Text("Terapkan", fontWeight = FontWeight.ExtraBold) }
+            ) { Text("Terapkan", color = WarnaIos.Aksen, fontWeight = FontWeight.SemiBold) }
         },
         dismissButton = {
-            TextButton(onClick = onTutup) { Text("Batal") }
+            TextButton(onClick = onTutup) { Text("Batal", color = WarnaIos.Aksen) }
         },
     ) {
         DateRangePicker(state = picker, title = {
             Text(
                 "Pilih Rentang Tanggal",
                 Modifier.padding(start = 24.dp, top = 16.dp),
-                fontWeight = FontWeight.Black,
+                style = TipeIos.Utama,
             )
         })
     }
@@ -323,26 +247,11 @@ private fun DialogRentangTanggal(
 private fun tanggalDariMillis(millis: Long): java.time.LocalDate =
     Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
 
+/** "regional_manager" → "Regional Manager": lencana iOS tidak memakai huruf kapital semua. */
 private fun labelRole(role: String?): String =
-    (role ?: "regional_manager").replace('_', ' ').uppercase()
-
-@Composable
-private fun PanelGalat(pesan: String, onCoba: () -> Unit) {
-    Surface(
-        Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        color = MerahLatar,
-        border = BorderStroke(1.dp, MerahGaris),
-    ) {
-        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(pesan, Modifier.weight(1f), color = MerahTeks, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.width(8.dp))
-            TextButton(onClick = onCoba) {
-                Text("Coba Lagi", color = MerahTeks, fontWeight = FontWeight.Black, fontSize = 12.sp)
-            }
-        }
+    (role ?: "regional_manager").split('_').joinToString(" ") { kata ->
+        kata.replaceFirstChar { it.uppercaseChar() }
     }
-}
 
 /* ----------------------------------------------------------------------- */
 /* Lima kartu KPI                                                          */
@@ -352,8 +261,8 @@ private fun PanelGalat(pesan: String, onCoba: () -> Unit) {
 private fun KartuOmzet(r: RingkasanArea) = KartuKpi(
     judul = "Gross Revenue",
     nilai = rupiah(r.omzet),
-    ikon = Icons.Default.TrendingUp,
-    warnaIkon = SukaOrange,
+    ikon = IkonIos.TrendingUp,
+    warnaIkon = WarnaIos.Aksen,
 ) { BadgePerubahan(r.perubahanOmzet) }
 
 @Composable
@@ -361,8 +270,8 @@ private fun KartuTransaksi(r: RingkasanArea) = KartuKpi(
     judul = "Jumlah Transaksi",
     nilai = cacah(r.jumlahTransaksi),
     satuan = "order",
-    ikon = Icons.Default.Schedule,
-    warnaIkon = Color(0xFFD97706),
+    ikon = IkonIos.Schedule,
+    warnaIkon = WarnaIos.Oranye,
 ) { PilKeterangan("Selesai pada periode ini") }
 
 @Composable
@@ -370,105 +279,53 @@ private fun KartuPorsi(r: RingkasanArea) = KartuKpi(
     judul = "Jumlah Item Terjual",
     nilai = cacah(r.jumlahItem),
     satuan = "porsi",
-    ikon = Icons.Default.Checklist,
-    warnaIkon = Color(0xFF059669),
+    ikon = IkonIos.Checklist,
+    warnaIkon = WarnaIos.Hijau,
 ) { PilKeterangan("Total produk pada periode ini") }
 
 @Composable
 private fun KartuWaste(r: RingkasanArea, onBuka: () -> Unit) = KartuKpi(
     judul = "Kerugian Waste",
     nilai = rupiah(r.kerugianWaste),
-    ikon = Icons.Default.Delete,
-    warnaIkon = Color(0xFFDC2626),
-    warnaNilai = Color(0xFFDC2626),
+    ikon = IkonIos.Delete,
+    warnaIkon = WarnaIos.Merah,
+    warnaNilai = NadaIos.BAHAYA.teks,
 ) {
     if (r.wasteMenungguPersetujuan > 0) {
-        Surface(
-            shape = RoundedCornerShape(50),
-            color = Color(0xFFFEF3C7),
-            border = BorderStroke(1.dp, Color(0xFFFCD34D)),
-            modifier = Modifier.clickable(onClick = onBuka),
-        ) {
-            Text(
-                "${r.wasteMenungguPersetujuan} butuh approval",
-                Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                color = Color(0xFF78350F),
-                fontSize = 10.sp,
-                fontWeight = FontWeight.ExtraBold,
-            )
-        }
+        LencanaIos(
+            "${r.wasteMenungguPersetujuan} butuh approval",
+            NadaIos.PERINGATAN,
+            Modifier.tekanIos(onBuka),
+        )
     } else {
-        Surface(
-            shape = RoundedCornerShape(50),
-            color = SukaBrown.copy(alpha = 0.05f),
-            border = BorderStroke(1.dp, GarisKartu),
-            modifier = Modifier.clickable(onClick = onBuka),
-        ) {
-            Text(
-                "Lihat detail waste →",
-                Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                color = SukaBrown.copy(alpha = 0.7f),
-                fontSize = 10.sp,
-                fontWeight = FontWeight.ExtraBold,
-            )
-        }
+        LencanaIos(
+            "Lihat detail waste →",
+            NadaIos.NETRAL,
+            Modifier.tekanIos(onBuka),
+            titik = false,
+        )
     }
 }
 
 @Composable
 private fun KartuBonus(r: RingkasanArea) {
-    Surface(
-        Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        color = Color(0xFFFFF9E5),
-        border = BorderStroke(1.dp, Color(0xFFFCD34D)),
-        shadowElevation = 2.dp,
-    ) {
-        Column(Modifier.padding(20.dp)) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Surface(shape = RoundedCornerShape(6.dp), color = Color(0xFFD97706)) {
-                    Text(
-                        "BONUS",
-                        Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
-                        color = Color.White,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = 1.sp,
-                    )
-                }
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    "ESTIMASI INSENTIF",
-                    Modifier.weight(1f),
-                    color = Color(0xFF78350F),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 0.8.sp,
-                )
-                Box(
-                    Modifier.size(44.dp).background(Color(0xFFF59E0B), RoundedCornerShape(16.dp)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Icons.Default.WorkspacePremium,
-                        null,
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-            }
-            Spacer(Modifier.height(12.dp))
+    KartuPanel {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            IkonBulatIos(Icons.Default.WorkspacePremium, Emas)
+            Spacer(Modifier.width(10.dp))
             Text(
-                rupiah(r.estimasiBonus),
-                color = Color(0xFF78350F),
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Black,
+                "Estimasi Insentif",
+                Modifier.weight(1f),
+                style = TipeIos.SubJudul.copy(fontWeight = FontWeight.SemiBold),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-            Spacer(Modifier.height(12.dp))
-            HorizontalDivider(color = Color(0xFF78350F).copy(alpha = 0.10f))
-            Spacer(Modifier.height(10.dp))
-            BadgePerubahan(r.perubahanBonus)
+            LencanaIos("Bonus", NadaIos.PERINGATAN, titik = false)
         }
+        Spacer(Modifier.height(10.dp))
+        Text(rupiah(r.estimasiBonus), style = TipeIos.AngkaBesar, maxLines = 1)
+        Spacer(Modifier.height(10.dp))
+        BadgePerubahan(r.perubahanBonus)
     }
 }
 
@@ -476,7 +333,6 @@ private fun KartuBonus(r: RingkasanArea) {
 /* Performa Zona AM — hanya regional manager                                */
 /* ----------------------------------------------------------------------- */
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PanelPerformaZona(r: RingkasanArea) {
     var zonaTerpilih by remember { mutableStateOf<String?>(null) }
@@ -491,10 +347,10 @@ private fun PanelPerformaZona(r: RingkasanArea) {
             nilai = rupiah(r.totalOmzetSemuaZona),
             keterangan = "${r.zona.size} Zona • ${r.jumlahOutletDalamZona} Cabang Aktif",
             ikon = Icons.Default.WorkspacePremium,
-            warna = Color(0xFFD97706),
+            warna = Emas,
             modifier = Modifier.fillMaxWidth(),
         )
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(8.dp))
         KartuRingkasZona(
             label = "Zona Tertinggi (Rank #1)",
             nilai = r.zonaTertinggi?.zona ?: "-",
@@ -505,78 +361,47 @@ private fun PanelPerformaZona(r: RingkasanArea) {
                 "${rupiah(zona.totalOmzet)} • ${String.format(java.util.Locale.US, "%.1f", kontribusi)}% kontribusi"
             } ?: "Rp 0",
             ikon = Icons.Default.LocalFireDepartment,
-            warna = Color(0xFF059669),
+            warna = WarnaIos.Hijau,
             modifier = Modifier.fillMaxWidth(),
         )
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(8.dp))
         KartuRingkasZona(
             label = "Rata-rata / Zona",
             nilai = rupiah(r.rataRataOmzetPerZona),
             keterangan = "Tolok ukur rata-rata wilayah",
-            ikon = Icons.Default.BarChart,
-            warna = Color(0xFF2563EB),
+            ikon = IkonIos.BarChart,
+            warna = WarnaIos.Biru,
             modifier = Modifier.fillMaxWidth(),
         )
 
         Spacer(Modifier.height(18.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier.size(40.dp).background(SukaOrange, RoundedCornerShape(14.dp)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(Icons.Default.BarChart, null, tint = Color.White, modifier = Modifier.size(20.dp))
-            }
+            IkonBulatIos(IkonIos.BarChart, WarnaIos.Aksen, ukuran = 36.dp)
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
-                Text("Performa Zona AM", color = SukaBrown, fontSize = 16.sp, fontWeight = FontWeight.Black)
-                Text(
-                    "Monitoring omzet aktual & kontribusi per-area manager",
-                    color = SukaGray400,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Medium,
-                )
+                Text("Performa Zona AM", style = TipeIos.Utama)
+                Text("Monitoring omzet aktual & kontribusi per-area manager", style = TipeIos.Catatan)
             }
         }
         Spacer(Modifier.height(12.dp))
 
-        OutlinedTextField(
-            value = pencarian,
-            onValueChange = { pencarian = it },
+        KolomCariIos(
+            nilai = pencarian,
+            onUbah = { pencarian = it },
             modifier = Modifier.fillMaxWidth(),
-            placeholder = {
-                Text(
-                    if (zonaTerpilih == null) "Cari zona atau outlet..." else "Cari outlet...",
-                    fontSize = 12.sp,
-                )
-            },
-            leadingIcon = { Icon(Icons.Default.Search, null, tint = SukaGray400, modifier = Modifier.size(18.dp)) },
-            singleLine = true,
-            shape = RoundedCornerShape(12.dp),
+            placeholder = if (zonaTerpilih == null) "Cari zona atau outlet..." else "Cari outlet...",
         )
         Spacer(Modifier.height(8.dp))
 
         Box {
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = Color.White,
-                border = BorderStroke(1.dp, SukaBrown.copy(alpha = 0.15f)),
-                modifier = Modifier.fillMaxWidth().clickable { menuTerbuka = true },
-            ) {
-                Row(
-                    Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        zonaAktif?.let { "Zona ${it.zona} (${it.outlets.size} Outlet)" }
-                            ?: "Semua Zona (${r.zona.size} Area)",
-                        Modifier.weight(1f),
-                        color = SukaBrown,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Black,
-                    )
-                    Icon(Icons.Default.ArrowDropDown, null, tint = SukaBrown)
-                }
-            }
+            SukaFilterDropdown(
+                label = "",
+                value = zonaAktif?.let { "Zona ${it.zona} (${it.outlets.size} Outlet)" }
+                    ?: "Semua Zona (${r.zona.size} Area)",
+                expanded = menuTerbuka,
+                onClick = { menuTerbuka = true },
+                modifier = Modifier.fillMaxWidth(),
+            )
             SukaDropdownMenu(expanded = menuTerbuka, onDismissRequest = { menuTerbuka = false }) {
                 SukaDropdownHeader(title = "PILIH ZONA", onClose = { menuTerbuka = false })
                 SukaDropdownMenuItem(
@@ -622,88 +447,59 @@ private fun DaftarZona(r: RingkasanArea, pencarian: String, onPilih: (String) ->
             zona.totalOmzet.toDouble() / r.totalOmzetSemuaZona
         } else 0.0
         BarisZona(zona, peringkat, kontribusi) { onPilih(zona.zona) }
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(8.dp))
     }
 
-    Surface(
-        Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = SukaBrown.copy(alpha = 0.03f),
-        border = BorderStroke(1.dp, SukaBrown.copy(alpha = 0.15f)),
+    Row(
+        Modifier.fillMaxWidth()
+            .clip(UkuranIos.SudutBlok)
+            .background(NadaIos.AKSEN.warna.copy(alpha = 0.10f))
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    "TOTAL REGION (${r.zona.size} ZONA)",
-                    color = SukaBrown.copy(alpha = 0.6f),
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 0.8.sp,
-                )
-                Text(
-                    "${r.jumlahOutletDalamZona} outlet terdaftar",
-                    color = SukaBrown.copy(alpha = 0.7f),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
-            Text(rupiah(r.totalOmzetSemuaZona), color = SukaOrange, fontSize = 15.sp, fontWeight = FontWeight.Black)
+        Column(Modifier.weight(1f)) {
+            Text("Total Region (${r.zona.size} Zona)", style = TipeIos.Catatan.copy(fontWeight = FontWeight.SemiBold, color = WarnaIos.Label))
+            Text("${r.jumlahOutletDalamZona} outlet terdaftar", style = TipeIos.Kecil)
         }
+        Text(rupiah(r.totalOmzetSemuaZona), style = TipeIos.Utama.copy(color = NadaIos.AKSEN.teks), maxLines = 1)
     }
 }
 
 @Composable
 private fun BarisZona(zona: PerformaZona, peringkat: Int, kontribusi: Double, onClick: () -> Unit) {
-    Surface(
-        Modifier.fillMaxWidth().clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
-        color = Color.White,
-        border = BorderStroke(1.dp, GarisKartu),
+    Column(
+        Modifier.fillMaxWidth()
+            .tekanIos(onClick)
+            .clip(UkuranIos.SudutBlok)
+            .background(WarnaIos.Latar)
+            .padding(14.dp),
     ) {
-        Column(Modifier.padding(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                LencanaPeringkat(peringkat, ukuran = 28)
-                Spacer(Modifier.width(10.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        "Zona ${zona.zona}",
-                        color = SukaBrown,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Spacer(Modifier.height(3.dp))
-                    Text(
-                        "${zona.outlets.size} Outlet Aktif",
-                        color = SukaBrown.copy(alpha = 0.7f),
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
-                Text(rupiah(zona.totalOmzet), color = SukaBrown, fontSize = 15.sp, fontWeight = FontWeight.Black)
-            }
-            Spacer(Modifier.height(10.dp))
-            HorizontalDivider(color = GarisKartu)
-            Spacer(Modifier.height(8.dp))
-            Row {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            LencanaPeringkat(peringkat, ukuran = 28)
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
                 Text(
-                    "Kontribusi Wilayah",
-                    Modifier.weight(1f),
-                    color = SukaGray400,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Medium,
+                    "Zona ${zona.zona}",
+                    style = TipeIos.Keterangan.copy(fontWeight = FontWeight.SemiBold),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                Text(
-                    "${String.format(java.util.Locale.US, "%.1f", kontribusi * 100)}%",
-                    color = SukaBrown,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Black,
-                )
+                Text("${zona.outlets.size} Outlet Aktif", style = TipeIos.Kecil)
             }
-            Spacer(Modifier.height(5.dp))
-            BarProgres(kontribusi.toFloat())
+            Text(rupiah(zona.totalOmzet), style = TipeIos.Keterangan.copy(fontWeight = FontWeight.Bold), maxLines = 1)
+            Spacer(Modifier.width(4.dp))
+            Icon(IkonIos.ChevronRight, null, tint = WarnaIos.LabelKetiga, modifier = Modifier.size(14.dp))
         }
+        Spacer(Modifier.height(10.dp))
+        Row {
+            Text("Kontribusi Wilayah", Modifier.weight(1f), style = TipeIos.Kecil)
+            Text(
+                "${String.format(java.util.Locale.US, "%.1f", kontribusi * 100)}%",
+                style = TipeIos.Kecil.copy(color = WarnaIos.Label, fontWeight = FontWeight.SemiBold),
+            )
+        }
+        Spacer(Modifier.height(5.dp))
+        BarProgres(kontribusi.toFloat())
     }
 }
 
@@ -714,27 +510,21 @@ private fun DaftarOutletZona(zona: PerformaZona, pencarian: String) {
         .sortedByDescending { it.omzet }
         .filter { kueri.isEmpty() || it.nama.lowercase().contains(kueri) }
 
-    Surface(
-        Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = SukaOrange.copy(alpha = 0.08f),
-        border = BorderStroke(1.dp, SukaOrange.copy(alpha = 0.20f)),
+    Row(
+        Modifier.fillMaxWidth()
+            .clip(UkuranIos.SudutBlok)
+            .background(NadaIos.AKSEN.warna.copy(alpha = 0.10f))
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    "Detail cabang dalam zona",
-                    color = SukaBrown,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Black,
-                )
-                Spacer(Modifier.height(3.dp))
-                ChipJingga(zona.zona.uppercase())
-            }
-            Text(rupiah(zona.totalOmzet), color = SukaOrange, fontSize = 14.sp, fontWeight = FontWeight.Black)
+        Column(Modifier.weight(1f)) {
+            Text("Detail cabang dalam zona", style = TipeIos.Catatan.copy(fontWeight = FontWeight.SemiBold, color = WarnaIos.Label))
+            Spacer(Modifier.height(4.dp))
+            ChipJingga(zona.zona)
         }
+        Text(rupiah(zona.totalOmzet), style = TipeIos.Utama.copy(color = NadaIos.AKSEN.teks), maxLines = 1)
     }
-    Spacer(Modifier.height(10.dp))
+    Spacer(Modifier.height(8.dp))
 
     if (outlets.isEmpty()) {
         PanelKosong("Tidak ada outlet yang cocok dengan pencarian.")
@@ -743,58 +533,36 @@ private fun DaftarOutletZona(zona: PerformaZona, pencarian: String) {
 
     outlets.forEachIndexed { index, outlet ->
         val porsi = if (zona.totalOmzet > 0) outlet.omzet.toDouble() / zona.totalOmzet else 0.0
-        Surface(
-            Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            color = Color.White,
-            border = BorderStroke(1.dp, GarisKartu),
+        Column(
+            Modifier.fillMaxWidth()
+                .clip(UkuranIos.SudutBlok)
+                .background(WarnaIos.Latar)
+                .padding(14.dp),
         ) {
-            Column(Modifier.padding(14.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "#${index + 1}",
-                        Modifier.width(26.dp),
-                        color = SukaBrown.copy(alpha = 0.5f),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Black,
-                    )
-                    Icon(
-                        Icons.Default.Storefront,
-                        null,
-                        tint = SukaBrown.copy(alpha = 0.4f),
-                        modifier = Modifier.size(15.dp),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        outlet.nama,
-                        Modifier.weight(1f),
-                        color = SukaBrown,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(rupiah(outlet.omzet), color = SukaBrown, fontSize = 13.sp, fontWeight = FontWeight.Black)
-                }
-                Spacer(Modifier.height(8.dp))
-                Row {
-                    Text(
-                        "Porsi dalam Zona",
-                        Modifier.weight(1f),
-                        color = SukaBrown.copy(alpha = 0.6f),
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Text(
-                        "${String.format(java.util.Locale.US, "%.1f", porsi * 100)}%",
-                        color = SukaBrown.copy(alpha = 0.6f),
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
-                Spacer(Modifier.height(5.dp))
-                BarProgres(porsi.toFloat(), tinggi = 6)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "#${index + 1}",
+                    Modifier.width(28.dp),
+                    style = TipeIos.Kecil.copy(fontWeight = FontWeight.SemiBold),
+                )
+                Icon(IkonIos.Storefront, null, tint = WarnaIos.Abu, modifier = Modifier.size(15.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    outlet.nama,
+                    Modifier.weight(1f),
+                    style = TipeIos.SubJudul.copy(color = WarnaIos.Label, fontWeight = FontWeight.SemiBold),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(rupiah(outlet.omzet), style = TipeIos.SubJudul.copy(color = WarnaIos.Label, fontWeight = FontWeight.Bold), maxLines = 1)
             }
+            Spacer(Modifier.height(8.dp))
+            Row {
+                Text("Porsi dalam Zona", Modifier.weight(1f), style = TipeIos.Kecil)
+                Text("${String.format(java.util.Locale.US, "%.1f", porsi * 100)}%", style = TipeIos.Kecil)
+            }
+            Spacer(Modifier.height(5.dp))
+            BarProgres(porsi.toFloat(), tinggi = 6)
         }
         Spacer(Modifier.height(8.dp))
     }
@@ -825,31 +593,11 @@ private fun PanelPeringkat(r: RingkasanArea) {
         }
 
         if (r.peringkat.size > 6) {
-            Surface(
-                Modifier.fillMaxWidth().clickable { semua = !semua },
-                shape = RoundedCornerShape(12.dp),
-                color = SukaOrange.copy(alpha = 0.10f),
-            ) {
-                Row(
-                    Modifier.padding(vertical = 10.dp),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        if (semua) "Sembunyikan Ranking" else "Tampilkan Semua (${r.peringkat.size} Outlet)",
-                        color = SukaOrange,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Black,
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Icon(
-                        if (semua) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                        null,
-                        tint = SukaOrange,
-                        modifier = Modifier.size(16.dp),
-                    )
-                }
-            }
+            TombolKeduaIos(
+                if (semua) "Sembunyikan Ranking" else "Tampilkan Semua (${r.peringkat.size} Outlet)",
+                onKlik = { semua = !semua },
+                ikon = if (semua) IkonIos.ExpandLess else IkonIos.ExpandMore,
+            )
         }
     }
 }
@@ -864,22 +612,14 @@ private fun BarisPeringkat(outlet: PeringkatOutlet, peringkat: Int, omzetTerting
             Column(Modifier.weight(1f)) {
                 Text(
                     outlet.nama,
-                    color = SukaBrown,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.ExtraBold,
+                    style = TipeIos.SubJudul.copy(color = WarnaIos.Label, fontWeight = FontWeight.SemiBold),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(Modifier.height(3.dp))
-                Text(
-                    outlet.zona,
-                    color = SukaBrown.copy(alpha = 0.6f),
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Black,
-                )
+                Text(outlet.zona, style = TipeIos.Kecil)
             }
             Spacer(Modifier.width(8.dp))
-            Text(rupiah(outlet.omzet), color = SukaBrown, fontSize = 13.sp, fontWeight = FontWeight.Black)
+            Text(rupiah(outlet.omzet), style = TipeIos.SubJudul.copy(color = WarnaIos.Label, fontWeight = FontWeight.Bold), maxLines = 1)
         }
         Spacer(Modifier.height(7.dp))
         // Bar minimum 1,5% supaya outlet beromzet nol tetap terlihat sebagai baris, bukan celah.
@@ -901,18 +641,14 @@ private fun PanelStatusOutlet(r: RingkasanArea) {
         }
 
         val kelompok = r.statusOutlet.groupBy { it.zona }
-        kelompok.forEach { (zona, outlets) ->
+        kelompok.entries.forEachIndexed { urutan, (zona, outlets) ->
             if (kelompok.size > 1) {
-                ChipJingga(zona.uppercase())
-                Spacer(Modifier.height(10.dp))
+                LabelSeksiIos(zona, Modifier.padding(top = if (urutan > 0) 12.dp else 0.dp, bottom = 2.dp))
             }
             outlets.forEachIndexed { index, outlet ->
                 BarisStatusOutlet(outlet)
-                if (index < outlets.lastIndex) {
-                    HorizontalDivider(color = SukaBrown.copy(alpha = 0.05f))
-                }
+                if (index < outlets.lastIndex) PemisahIos(inset = 0.dp)
             }
-            Spacer(Modifier.height(16.dp))
         }
     }
 }
@@ -926,49 +662,15 @@ private fun BarisStatusOutlet(outlet: StatusOutlet) {
         Text(
             outlet.nama,
             Modifier.weight(1f),
-            color = SukaBrown,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.ExtraBold,
+            style = TipeIos.Keterangan,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
         Spacer(Modifier.width(8.dp))
         if (outlet.jamBuka != null) {
-            Surface(
-                shape = RoundedCornerShape(50),
-                color = HijauLatar,
-                border = BorderStroke(1.dp, HijauGaris),
-            ) {
-                Row(
-                    Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Box(Modifier.size(6.dp).background(Color(0xFF10B981), CircleShape))
-                    Spacer(Modifier.width(5.dp))
-                    Text(
-                        "BUKA - ${outlet.jamBuka}",
-                        color = HijauTeks,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = 0.5.sp,
-                    )
-                }
-            }
+            LencanaIos("Buka - ${outlet.jamBuka}", NadaIos.SUKSES)
         } else {
-            Surface(
-                shape = RoundedCornerShape(50),
-                color = MerahLatar,
-                border = BorderStroke(1.dp, MerahGaris),
-            ) {
-                Text(
-                    "TUTUP",
-                    Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
-                    color = MerahTeks,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 0.5.sp,
-                )
-            }
+            LencanaIos("Tutup", NadaIos.BAHAYA)
         }
     }
 }
