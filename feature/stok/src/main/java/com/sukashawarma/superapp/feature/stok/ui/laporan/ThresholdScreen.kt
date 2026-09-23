@@ -1,8 +1,26 @@
 package com.sukashawarma.superapp.feature.stok.ui.laporan
 
-import androidx.compose.foundation.BorderStroke
+import com.sukashawarma.superapp.core.ui.ios.KartuIos
+import com.sukashawarma.superapp.core.ui.ios.KolomCariIos
+import com.sukashawarma.superapp.core.ui.ios.LencanaIos
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.TombolKapsulIos
+import com.sukashawarma.superapp.core.ui.ios.TombolKeduaIos
+import com.sukashawarma.superapp.core.ui.ios.TombolUtamaIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.ios.permukaanIos
+import com.sukashawarma.superapp.core.ui.ios.tekanIos
+import com.sukashawarma.superapp.core.ui.ios.warnaKolomIos
+import com.sukashawarma.superapp.feature.stok.ui.BannerIos
+import com.sukashawarma.superapp.feature.stok.ui.MemuatPenuh
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.size
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
+import com.sukashawarma.superapp.core.ui.kaca.denganRuangNav
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,22 +34,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import com.sukashawarma.superapp.core.ui.SukaDropdownHeader
 import com.sukashawarma.superapp.core.ui.SukaDropdownMenu
 import com.sukashawarma.superapp.core.ui.SukaDropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -40,7 +49,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -63,12 +71,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
-private val ORANGE = Color(0xFFEA580C)
-private val SLATE400 = Color(0xFF94A3B8)
-private val SLATE500 = Color(0xFF64748B)
-private val SLATE900 = Color(0xFF0F172A)
-private val GARIS = Color(0xFFE2E8F0)
-private val HIJAU = Color(0xFF15803D)
 
 data class ThresholdUiState(
     val outlets: List<OutletRingkas> = emptyList(),
@@ -220,7 +222,7 @@ fun ThresholdScreen(
     // kritis di monitoring, jadi daftar basi menyesatkan.
     RealtimeRefresh(RealtimeTables.BAHAN_BAKU) { viewModel.muatAwal() }
 
-    Column(Modifier.fillMaxSize().background(Color(0xFFF8FAFC))) {
+    Column(Modifier.fillMaxSize().background(WarnaIos.Latar)) {
         HeaderStok(
             judul = "Pengaturan Threshold",
             subjudul = if (state.memuat) "Memuat…" else "${state.jumlahDitimpa} dari ${state.baris.size} bahan diatur khusus",
@@ -229,37 +231,27 @@ fun ThresholdScreen(
 
         val pesan = state.pesan ?: state.error
         if (pesan != null) {
-            Surface(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)
-                    .clickable { viewModel.bersihkanPesan() },
-                shape = RoundedCornerShape(12.dp),
-                color = if (state.pesan != null) Color(0xFFDCFCE7) else Color(0xFFFEE2E2),
-            ) {
-                Text(
-                    pesan,
-                    Modifier.padding(12.dp),
-                    color = if (state.pesan != null) HIJAU else Color(0xFFB91C1C),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
+            // Ketuk untuk menutup, sama seperti sebelumnya.
+            BannerIos(
+                pesan,
+                if (state.pesan != null) NadaIos.SUKSES else NadaIos.BAHAYA,
+                Modifier
+                    .padding(horizontal = UkuranIos.TepiLayar, vertical = 10.dp)
+                    .tekanIos({ viewModel.bersihkanPesan() }, skalaTekan = 0.99f),
+                ikon = if (state.pesan != null) IkonIos.CheckCircle else IkonIos.ErrorOutline,
+            )
         }
 
         if (state.memuat) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = ORANGE)
-            }
+            MemuatPenuh()
         } else {
             Column(Modifier.fillMaxSize()) {
                 PemilihOutletThreshold(state, viewModel)
-                OutlinedTextField(
-                    value = state.cari,
-                    onValueChange = viewModel::ubahCari,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                    placeholder = { Text("Cari bahan…", fontSize = 12.5.sp, color = SLATE400) },
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = kolomThreshold(),
+                KolomCariIos(
+                    nilai = state.cari,
+                    onUbah = viewModel::ubahCari,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = UkuranIos.TepiLayar),
+                    placeholder = "Cari bahan…",
                 )
                 Spacer(Modifier.height(12.dp))
                 if (state.tampil.isEmpty()) {
@@ -267,8 +259,8 @@ fun ThresholdScreen(
                 } else {
                     LazyColumn(
                         Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(9.dp),
+                        contentPadding = PaddingValues(start = UkuranIos.TepiLayar, end = UkuranIos.TepiLayar, bottom = 16.dp).denganRuangNav(),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         items(state.tampil, key = { it.bahanBakuId }) { baris ->
                             KartuThreshold(baris, state, viewModel)
@@ -283,25 +275,31 @@ fun ThresholdScreen(
 @Composable
 private fun PemilihOutletThreshold(state: ThresholdUiState, viewModel: ThresholdViewModel) {
     var terbuka by remember { mutableStateOf(false) }
-    Box(Modifier.padding(16.dp)) {
-        Surface(
-            Modifier.fillMaxWidth().clickable(enabled = state.outlets.size > 1) { terbuka = true },
-            shape = RoundedCornerShape(12.dp),
-            color = Color.White,
-            border = BorderStroke(1.dp, GARIS),
+    val bisaPilih = state.outlets.size > 1
+    Box(Modifier.padding(horizontal = UkuranIos.TepiLayar, vertical = 12.dp)) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .permukaanIos(UkuranIos.SudutGrup)
+                .then(if (bisaPilih) Modifier.tekanIos({ terbuka = true }) else Modifier)
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(Modifier.padding(horizontal = 13.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    state.outletTerpilih?.name ?: "Pilih outlet",
-                    Modifier.weight(1f),
-                    color = SLATE900,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (state.outlets.size > 1) Icon(Icons.Default.ArrowDropDown, null, tint = SLATE500)
+            Box(
+                Modifier.size(30.dp).clip(CircleShape).background(WarnaIos.Aksen.copy(alpha = 0.14f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(IkonIos.Storefront, null, tint = WarnaIos.Aksen, modifier = Modifier.size(17.dp))
             }
+            Spacer(Modifier.width(10.dp))
+            Text(
+                state.outletTerpilih?.name ?: "Pilih outlet",
+                Modifier.weight(1f),
+                style = TipeIos.Keterangan.copy(fontWeight = FontWeight.SemiBold),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (bisaPilih) Icon(IkonIos.ArrowDropDown, null, tint = WarnaIos.Aksen, modifier = Modifier.size(16.dp))
         }
         SukaDropdownMenu(terbuka, { terbuka = false }) {
             SukaDropdownHeader(title = "PILIH OUTLET", onClose = { terbuka = false })
@@ -323,93 +321,69 @@ private fun KartuThreshold(
     viewModel: ThresholdViewModel,
 ) {
     val sedang = state.sedangDiubah == baris.bahanBakuId
-    Surface(
-        Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(13.dp),
-        color = Color.White,
-        border = BorderStroke(1.dp, if (baris.ditimpa) ORANGE.copy(alpha = 0.4f) else GARIS),
-    ) {
-        Column(Modifier.padding(13.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        baris.nama,
-                        color = SLATE900,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+    KartuIos(padding = PaddingValues(14.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    baris.nama,
+                    style = TipeIos.Keterangan.copy(fontWeight = FontWeight.SemiBold),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (baris.ditimpa) {
+                    Spacer(Modifier.height(3.dp))
+                    LencanaIos(
+                        "Khusus outlet ini · bawaan ${formatAngkaStok(baris.defaultReorderPoint)} ${baris.satuan}",
+                        NadaIos.AKSEN,
                     )
-                    Text(
-                        if (baris.ditimpa) {
-                            "Khusus outlet ini · bawaan ${formatAngkaStok(baris.defaultReorderPoint)} ${baris.satuan}"
-                        } else {
-                            "Memakai nilai bawaan"
-                        },
-                        color = if (baris.ditimpa) ORANGE else SLATE400,
-                        fontSize = 10.5.sp,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                }
-                if (!sedang) {
-                    Text(
-                        "${formatAngkaStok(baris.berlaku)} ${baris.satuan}",
-                        color = SLATE900,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Black,
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    TextButton(onClick = { viewModel.mulaiUbah(baris) }) {
-                        Text("UBAH", color = ORANGE, fontSize = 10.5.sp, fontWeight = FontWeight.Black)
-                    }
+                } else {
+                    Text("Memakai nilai bawaan", style = TipeIos.Catatan)
                 }
             }
-
-            if (sedang) {
-                Spacer(Modifier.height(10.dp))
-                OutlinedTextField(
-                    value = state.nilaiKetikan,
-                    onValueChange = viewModel::ubahNilai,
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Titik pesan ulang (${baris.satuan})", fontSize = 11.sp) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                    shape = RoundedCornerShape(11.dp),
-                    colors = kolomThreshold(),
+            if (!sedang) {
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "${formatAngkaStok(baris.berlaku)} ${baris.satuan}",
+                    color = WarnaIos.Label,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
                 )
-                Spacer(Modifier.height(9.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = viewModel::batalUbah, modifier = Modifier.weight(1f)) {
-                        Text("Batal", fontSize = 12.sp, color = SLATE500, fontWeight = FontWeight.Bold)
-                    }
-                    if (baris.ditimpa) {
-                        TextButton(
-                            onClick = { viewModel.kembalikanKeBawaan(baris) },
-                            enabled = !state.menyimpan,
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Text("Pakai bawaan", fontSize = 12.sp, color = ORANGE, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                    Button(
-                        onClick = { viewModel.simpan(baris) },
-                        enabled = !state.menyimpan,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(11.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = ORANGE),
-                    ) {
-                        Text(if (state.menyimpan) "…" else "Simpan", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    }
+                Spacer(Modifier.width(8.dp))
+                TombolKapsulIos("Ubah", { viewModel.mulaiUbah(baris) })
+            }
+        }
+
+        if (sedang) {
+            Spacer(Modifier.height(12.dp))
+            OutlinedTextField(
+                value = state.nilaiKetikan,
+                onValueChange = viewModel::ubahNilai,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Titik pesan ulang (${baris.satuan})", fontSize = 13.sp) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                singleLine = true,
+                textStyle = TipeIos.Isi,
+                shape = UkuranIos.SudutKontrol,
+                colors = warnaKolomIos(),
+            )
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                TombolKeduaIos("Batal", viewModel::batalUbah, Modifier.weight(1f).height(44.dp), warna = WarnaIos.AbuGelap)
+                if (baris.ditimpa) {
+                    TombolKeduaIos(
+                        "Pakai bawaan",
+                        { viewModel.kembalikanKeBawaan(baris) },
+                        Modifier.weight(1f).height(44.dp),
+                        aktif = !state.menyimpan,
+                    )
                 }
+                TombolUtamaIos(
+                    if (state.menyimpan) "…" else "Simpan",
+                    { viewModel.simpan(baris) },
+                    Modifier.weight(1f).height(44.dp),
+                    aktif = !state.menyimpan,
+                )
             }
         }
     }
 }
-
-@Composable
-private fun kolomThreshold() = OutlinedTextFieldDefaults.colors(
-    focusedContainerColor = Color.White,
-    unfocusedContainerColor = Color.White,
-    focusedBorderColor = ORANGE,
-    unfocusedBorderColor = GARIS,
-)
