@@ -10,10 +10,8 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -41,6 +39,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -48,18 +47,28 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sukashawarma.superapp.domain.session.AppSession
 import com.sukashawarma.superapp.presentation.components.FaceCameraPreview
 import com.sukashawarma.superapp.presentation.theme.StatusEmerald
-import com.sukashawarma.superapp.presentation.theme.StatusRed
-import com.sukashawarma.superapp.presentation.theme.SukaOnSurface
-import com.sukashawarma.superapp.presentation.theme.SukaOnSurfaceVariant
 import com.sukashawarma.superapp.presentation.theme.SukaOrange
-import com.sukashawarma.superapp.presentation.theme.SukaSurface
-import com.sukashawarma.superapp.presentation.theme.SukaSurfaceContainerHighest
-import com.sukashawarma.superapp.presentation.theme.SukaSurfaceContainerLowest
+import com.sukashawarma.superapp.core.ui.ios.BarisIos
+import com.sukashawarma.superapp.core.ui.ios.BilahJudulIos
+import com.sukashawarma.superapp.core.ui.ios.GrupIos
+import com.sukashawarma.superapp.core.ui.ios.KartuIos
+import com.sukashawarma.superapp.core.ui.ios.KeadaanIos
+import com.sukashawarma.superapp.core.ui.ios.KolomCariIos
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.PemisahIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.TombolKeduaIos
+import com.sukashawarma.superapp.core.ui.ios.TombolUtamaIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.ios.permukaanIos
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
 import com.sukashawarma.superapp.core.ui.SukaDropdownHeader
 import com.sukashawarma.superapp.core.ui.SukaDropdownMenu
 import com.sukashawarma.superapp.core.ui.SukaDropdownMenuItem
 import com.sukashawarma.superapp.core.ui.RealtimeRefresh
 import com.sukashawarma.superapp.core.ui.RealtimeTables
+import com.sukashawarma.superapp.core.ui.kaca.LocalRuangNavKaca
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -118,15 +127,8 @@ fun EnrollScreen(onExit: () -> Unit) {
     RealtimeRefresh(RealtimeTables.OUTLET_STAFF) { viewModel.segarkanCrew() }
 
     Scaffold(
-        containerColor = SukaSurface,
-        topBar = {
-            TopAppBar(
-                title = { Text("Enrollment Crew", fontWeight = FontWeight.SemiBold) },
-                navigationIcon = {
-                    IconButton(onClick = onExit) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali") }
-                }
-            )
-        }
+        containerColor = WarnaIos.Latar,
+        topBar = { BilahJudulIos(judul = "Enrollment Crew", onKembali = onExit) }
     ) { padding ->
         // Diri sendiri sudah punya kartunya sendiri di atas; dibiarkan ikut di daftar
         // crew hanya akan menampilkan orang yang sama dua kali.
@@ -146,8 +148,10 @@ fun EnrollScreen(onExit: () -> Unit) {
                 // Gulir dipasang sebelum padding supaya jarak bawahnya ikut bergulir dan
                 // baris terakhir tidak mepet ke bilah navigasi.
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+                .padding(horizontal = UkuranIos.TepiLayar, vertical = 16.dp)
+                // Ruang kapsul tab kaca saat tampil sebagai tab pager; nol di rute sendiri.
+                .padding(bottom = LocalRuangNavKaca.current),
+            verticalArrangement = Arrangement.spacedBy(UkuranIos.JarakKartu),
         ) {
             state.self?.let { me ->
                 SelfEnrollmentCard(self = me, onSelect = { viewModel.selectStaff(me.id) })
@@ -163,12 +167,12 @@ fun EnrollScreen(onExit: () -> Unit) {
             )
 
             if (state.error != null) {
-                Text(state.error ?: "", color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
+                Text(state.error ?: "", style = TipeIos.Catatan.copy(color = NadaIos.BAHAYA.teks), modifier = Modifier.padding(horizontal = 4.dp))
             }
 
             if (state.loadingCrew && state.selectedOutletId != null) {
                 Box(Modifier.fillMaxWidth().padding(vertical = 36.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = Color(0xFF9A560C), modifier = Modifier.size(28.dp), strokeWidth = 2.dp)
+                    CircularProgressIndicator(color = WarnaIos.Aksen, modifier = Modifier.size(28.dp), strokeWidth = 2.5.dp)
                 }
             } else if (state.selectedOutletId != null) {
                 CrewEnrollmentSection(
@@ -177,7 +181,7 @@ fun EnrollScreen(onExit: () -> Unit) {
                     crew = notEnrolled,
                     expanded = pendingExpanded,
                     selectedId = state.selectedStaffId,
-                    accent = Color(0xFFD65B5B),
+                    nada = NadaIos.BAHAYA,
                     onExpandedChange = { pendingExpanded = !pendingExpanded },
                     onSelect = viewModel::selectStaff,
                 )
@@ -187,12 +191,16 @@ fun EnrollScreen(onExit: () -> Unit) {
                     crew = enrolled,
                     expanded = enrolledExpanded,
                     selectedId = state.selectedStaffId,
-                    accent = Color(0xFF6D9FA2),
+                    nada = NadaIos.SUKSES,
                     onExpandedChange = { enrolledExpanded = !enrolledExpanded },
                     onSelect = viewModel::selectStaff,
                 )
             } else {
-                Text("Pilih outlet untuk memuat crew.", color = Color(0xFF68757A), fontSize = 14.sp)
+                KeadaanIos(
+                    ikon = IkonIos.Storefront,
+                    judul = "Belum ada outlet",
+                    pesan = "Pilih outlet untuk memuat crew.",
+                )
             }
         }
     }
@@ -263,16 +271,20 @@ private fun FullScreenEnrollCamera(
             enabled = state.stage != EnrollStage.SAVING,
             modifier = Modifier.align(Alignment.TopStart).padding(top = 38.dp, start = 16.dp)
                 .clip(CircleShape).background(Color.Black.copy(alpha = 0.48f)),
-        ) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Kembali ke daftar crew", tint = Color.White) }
+        ) { Icon(IkonIos.ArrowBack, "Kembali ke daftar crew", tint = Color.White, modifier = Modifier.size(20.dp)) }
 
         Column(
             modifier = Modifier.align(Alignment.TopCenter).padding(top = 42.dp, start = 68.dp, end = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text("ENROLLMENT WAJAH", color = SukaOrange, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
+            Text("Enrollment Wajah", color = WarnaIos.Aksen, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
             Text(crewName, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
         }
 
+        // Sebagai tab pager, kamera tampil di dalam shell kaca dan kapsul tab mengambang
+        // di atas dasar layar — kartu aksi naik di atasnya supaya tombolnya tetap bisa
+        // disentuh. Di rute ENROLL yang berdiri sendiri ruangnya nol.
+        val dasar = Modifier.align(Alignment.BottomCenter).padding(bottom = LocalRuangNavKaca.current)
         if (!hasCameraPermission) {
             CameraPermissionCard(
                 onRequest = onRequestCameraPermission,
@@ -283,27 +295,27 @@ private fun FullScreenEnrollCamera(
                 hint = state.scanHint,
                 progress = state.scanProgress,
                 error = state.captureResult,
-                modifier = Modifier.align(Alignment.BottomCenter),
+                modifier = dasar,
             )
             EnrollStage.CAPTURING, EnrollStage.VERIFYING -> ProcessingEnrollmentCard(
                 text = if (state.stage == EnrollStage.CAPTURING) "Mengambil foto otomatis…" else "Memeriksa kejernihan wajah…",
-                modifier = Modifier.align(Alignment.BottomCenter),
+                modifier = dasar,
             )
             EnrollStage.REVIEWING -> EnrollmentReviewCard(
                 crewName = crewName,
                 error = state.captureResult,
                 onRetake = onRetake,
                 onConfirm = onConfirm,
-                modifier = Modifier.align(Alignment.BottomCenter),
+                modifier = dasar,
             )
             EnrollStage.SAVING -> ProcessingEnrollmentCard(
                 text = "Mendaftarkan wajah secara aman…",
-                modifier = Modifier.align(Alignment.BottomCenter),
+                modifier = dasar,
             )
             EnrollStage.SUCCESS -> EnrollmentSuccessCard(
                 crewName = crewName,
                 onFinish = onFinish,
-                modifier = Modifier.align(Alignment.BottomCenter),
+                modifier = dasar,
             )
         }
     }
@@ -442,6 +454,9 @@ private fun ProcessingEnrollmentCard(text: String, modifier: Modifier = Modifier
     }
 }
 
+/** Lembar putih iOS di dasar layar kamera — sudut atas membulat, bayangan lembut. */
+private val BentukLembarBawah = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+
 @Composable
 private fun EnrollmentReviewCard(
     crewName: String,
@@ -450,93 +465,75 @@ private fun EnrollmentReviewCard(
     onConfirm: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = Color.White,
-        shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
-        shadowElevation = 18.dp,
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .permukaanIos(BentukLembarBawah)
+            .padding(horizontal = 20.dp, vertical = 22.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 22.dp, vertical = 22.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Box(Modifier.size(44.dp).clip(CircleShape).background(SukaOrange.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
-                Icon(Icons.Default.FaceRetouchingNatural, contentDescription = null, tint = SukaOrange)
-            }
-            Text("Konfirmasi wajah", color = SukaOnSurface, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-            Text("Apakah ini wajah $crewName?", color = SukaOnSurface, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-            Text("Pastikan foto jelas dan sesuai dengan crew yang dipilih.", color = Color(0xFF64748B), fontSize = 12.sp)
-            if (error != null) Text(error, color = StatusRed, fontSize = 12.sp)
-            Spacer(Modifier.height(4.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedButton(
-                    onClick = onRetake,
-                    modifier = Modifier.weight(1f).height(52.dp),
-                    shape = RoundedCornerShape(15.dp),
-                    border = BorderStroke(1.dp, Color(0xFFCBD5E1)),
-                ) {
-                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(7.dp))
-                    Text("Scan ulang")
-                }
-                Button(
-                    onClick = onConfirm,
-                    modifier = Modifier.weight(1.35f).height(52.dp),
-                    shape = RoundedCornerShape(15.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = SukaOrange, contentColor = Color.White),
-                ) {
-                    Icon(Icons.Default.HowToReg, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(7.dp))
-                    Text("Ya, daftarkan", fontWeight = FontWeight.Bold)
-                }
-            }
+        Box(Modifier.size(48.dp).clip(CircleShape).background(WarnaIos.Aksen.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
+            Icon(Icons.Default.FaceRetouchingNatural, contentDescription = null, tint = WarnaIos.Aksen)
+        }
+        Text("Konfirmasi wajah", style = TipeIos.Catatan.copy(fontWeight = FontWeight.SemiBold))
+        Text("Apakah ini wajah $crewName?", style = TipeIos.Judul3, textAlign = TextAlign.Center)
+        Text("Pastikan foto jelas dan sesuai dengan crew yang dipilih.", style = TipeIos.Catatan, textAlign = TextAlign.Center)
+        if (error != null) Text(error, style = TipeIos.Catatan.copy(color = NadaIos.BAHAYA.teks), textAlign = TextAlign.Center)
+        Spacer(Modifier.height(6.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            TombolKeduaIos(
+                teks = "Scan ulang",
+                onKlik = onRetake,
+                ikon = IkonIos.Refresh,
+                modifier = Modifier.weight(1f),
+            )
+            TombolUtamaIos(
+                teks = "Ya, daftarkan",
+                onKlik = onConfirm,
+                ikon = Icons.Default.HowToReg,
+                modifier = Modifier.weight(1.35f),
+            )
         }
     }
 }
 
 @Composable
 private fun EnrollmentSuccessCard(crewName: String, onFinish: () -> Unit, modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = Color.White,
-        shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .permukaanIos(BentukLembarBawah)
+            .padding(horizontal = 20.dp, vertical = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 24.dp, vertical = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Box(Modifier.size(58.dp).clip(CircleShape).background(StatusEmerald.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
-                Icon(Icons.Default.Verified, contentDescription = null, tint = StatusEmerald, modifier = Modifier.size(32.dp))
-            }
-            Text("Enrollment berhasil", color = SukaOnSurface, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-            Text("Wajah $crewName sudah siap digunakan untuk absensi.", color = Color(0xFF64748B), fontSize = 13.sp)
-            Button(
-                onClick = onFinish,
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-                shape = RoundedCornerShape(15.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = StatusEmerald),
-            ) { Text("Selesai", fontWeight = FontWeight.Bold) }
+        Box(Modifier.size(60.dp).clip(CircleShape).background(WarnaIos.Hijau.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
+            Icon(Icons.Default.Verified, contentDescription = null, tint = WarnaIos.Hijau, modifier = Modifier.size(32.dp))
         }
+        Text("Enrollment berhasil", style = TipeIos.Judul3)
+        Text("Wajah $crewName sudah siap digunakan untuk absensi.", style = TipeIos.Catatan, textAlign = TextAlign.Center)
+        Spacer(Modifier.height(6.dp))
+        TombolUtamaIos(teks = "Selesai", onKlik = onFinish, warna = WarnaIos.Hijau)
     }
 }
 
 @Composable
 private fun CameraPermissionCard(onRequest: () -> Unit, modifier: Modifier = Modifier) {
-    Surface(modifier = modifier, shape = RoundedCornerShape(24.dp), color = Color(0xEEFFFFFF)) {
-        Column(
-            modifier = Modifier.padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Icon(Icons.Default.NoPhotography, contentDescription = null, tint = SukaOrange, modifier = Modifier.size(38.dp))
-            Text("Kamera diperlukan", color = SukaOnSurface, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            Text("Izinkan kamera untuk memindai wajah crew secara otomatis.", color = Color(0xFF64748B), fontSize = 13.sp)
-            Button(onClick = onRequest, colors = ButtonDefaults.buttonColors(containerColor = SukaOrange)) {
-                Text("Izinkan kamera")
-            }
+    Column(
+        modifier = modifier
+            .permukaanIos(UkuranIos.SudutKartu)
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Box(Modifier.size(60.dp).clip(CircleShape).background(WarnaIos.Aksen.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
+            Icon(Icons.Default.NoPhotography, contentDescription = null, tint = WarnaIos.Aksen, modifier = Modifier.size(30.dp))
         }
+        Text("Kamera diperlukan", style = TipeIos.Utama)
+        Text("Izinkan kamera untuk memindai wajah crew secara otomatis.", style = TipeIos.Catatan, textAlign = TextAlign.Center)
+        Spacer(Modifier.height(6.dp))
+        TombolUtamaIos(teks = "Izinkan kamera", onKlik = onRequest)
     }
 }
 
@@ -559,42 +556,34 @@ private fun OutletSelectionCard(
         if (!expanded) searchQuery = ""
     }
 
-    Surface(shape = RoundedCornerShape(12.dp), color = Color.White, border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE5D7C6))) {
-        Column(Modifier.padding(12.dp)) {
-            Text("Outlet", color = Color(0xFF9A560C), fontSize = 12.sp, fontWeight = FontWeight.Medium)
-            Spacer(Modifier.height(5.dp))
+    GrupIos(judul = "Outlet") {
             if (bisaPilihOutlet) {
                 Box {
-                    Surface(
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable(enabled = !loading && outlets.isNotEmpty()) { expanded = true },
-                        shape = RoundedCornerShape(12.dp),
-                        color = SukaSurfaceContainerLowest,
-                        border = BorderStroke(1.dp, SukaSurfaceContainerHighest),
+                            .clickable(enabled = !loading && outlets.isNotEmpty()) { expanded = true }
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        ) {
-                            Icon(Icons.Default.Storefront, contentDescription = null, tint = SukaOrange, modifier = Modifier.size(21.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text(
-                                    if (loading) "Memuat outlet..." else selected?.name ?: "Pilih outlet",
-                                    color = SukaOnSurface,
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    maxLines = 1,
-                                )
-                                Text("Ketuk untuk memilih outlet", color = SukaOnSurfaceVariant, fontSize = 11.sp, maxLines = 1)
-                            }
-                            Icon(
-                                if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                contentDescription = "Pilih outlet",
-                                tint = SukaOnSurfaceVariant,
-                            )
+                        Box(Modifier.size(30.dp).clip(CircleShape).background(WarnaIos.Aksen.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
+                            Icon(IkonIos.Storefront, contentDescription = null, tint = WarnaIos.Aksen, modifier = Modifier.size(17.dp))
                         }
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                if (loading) "Memuat outlet..." else selected?.name ?: "Pilih outlet",
+                                style = TipeIos.Isi.copy(fontWeight = FontWeight.SemiBold),
+                                maxLines = 1,
+                            )
+                            Text("Ketuk untuk memilih outlet", style = TipeIos.Catatan, maxLines = 1)
+                        }
+                        Icon(
+                            if (expanded) IkonIos.ExpandLess else IkonIos.ExpandMore,
+                            contentDescription = "Pilih outlet",
+                            tint = WarnaIos.LabelKetiga,
+                            modifier = Modifier.size(16.dp),
+                        )
                     }
                     SukaDropdownMenu(
                         expanded = expanded,
@@ -606,35 +595,11 @@ private fun OutletSelectionCard(
                             onClose = { expanded = false },
                         )
                         Column(Modifier.padding(horizontal = 10.dp, vertical = 4.dp)) {
-                            OutlinedTextField(
-                                value = searchQuery,
-                                onValueChange = { searchQuery = it },
+                            KolomCariIos(
+                                nilai = searchQuery,
+                                onUbah = { searchQuery = it },
                                 modifier = Modifier.fillMaxWidth(),
-                                singleLine = true,
-                                shape = RoundedCornerShape(12.dp),
-                                placeholder = { Text("Cari outlet...", fontSize = 13.sp) },
-                                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                                trailingIcon = {
-                                    if (searchQuery.isNotEmpty()) {
-                                        IconButton(onClick = { searchQuery = "" }) {
-                                            Icon(Icons.Default.Clear, contentDescription = "Hapus pencarian")
-                                        }
-                                    }
-                                },
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedTextColor = Color(0xFF1D1D1F),
-                                    unfocusedTextColor = Color(0xFF1D1D1F),
-                                    focusedBorderColor = SukaOrange,
-                                    unfocusedBorderColor = Color(0xFFE5E5EA),
-                                    focusedContainerColor = Color(0xFFF2F2F7),
-                                    unfocusedContainerColor = Color(0xFFF2F2F7),
-                                    focusedPlaceholderColor = Color(0xFF8E8E93),
-                                    unfocusedPlaceholderColor = Color(0xFF8E8E93),
-                                    focusedLeadingIconColor = SukaOrange,
-                                    unfocusedLeadingIconColor = Color(0xFF8E8E93),
-                                    focusedTrailingIconColor = Color(0xFF8E8E93),
-                                    unfocusedTrailingIconColor = Color(0xFF8E8E93),
-                                ),
+                                placeholder = "Cari outlet...",
                             )
                             Spacer(Modifier.height(6.dp))
                             Column(
@@ -646,15 +611,14 @@ private fun OutletSelectionCard(
                                 if (filteredOutlets.isEmpty()) {
                                     Text(
                                         "Outlet tidak ditemukan",
-                                        color = Color(0xFF8E8E93),
-                                        fontSize = 13.sp,
+                                        style = TipeIos.Catatan,
                                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 18.dp),
                                     )
                                 } else filteredOutlets.forEach { outlet ->
                                     SukaDropdownMenuItem(
                                         title = outlet.name,
                                         selected = outlet.id == selected?.id,
-                                        leadingIcon = Icons.Default.Storefront,
+                                        leadingIcon = IkonIos.Storefront,
                                         onClick = {
                                             onSelect(outlet.id)
                                             expanded = false
@@ -666,9 +630,8 @@ private fun OutletSelectionCard(
                     }
                 }
             } else {
-                Text(outletName ?: "Outlet", color = Color(0xFF293235), fontSize = 16.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(4.dp))
+                BarisIos(judul = outletName ?: "Outlet", ikon = IkonIos.Storefront)
             }
-        }
     }
 }
 
@@ -677,29 +640,20 @@ private fun OutletSelectionCard(
  *  Regional Manager, dan staff pusat sering tidak terdaftar di outlet yang mereka buka. */
 @Composable
 private fun SelfEnrollmentCard(self: EnrollCrewOption, onSelect: () -> Unit) {
-    val accent = Color(0xFF9A560C)
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = Color.White,
-        border = androidx.compose.foundation.BorderStroke(1.dp, accent.copy(alpha = 0.35f)),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().clickable(onClick = onSelect).padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(Modifier.size(34.dp).clip(CircleShape).background(accent.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
-                Icon(Icons.Default.Face, null, tint = accent, modifier = Modifier.size(19.dp))
+    KartuIos(onKlik = onSelect, padding = PaddingValues(horizontal = 16.dp, vertical = 14.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(40.dp).clip(CircleShape).background(WarnaIos.Aksen.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.Face, null, tint = WarnaIos.Aksen, modifier = Modifier.size(22.dp))
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text("Wajah Saya", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1D282B))
+                Text("Wajah Saya", style = TipeIos.Utama)
                 Text(
                     "${self.name} · ${if (self.alreadyEnrolled) "Sudah terdaftar, ketuk untuk perbarui" else "Belum terdaftar"}",
-                    fontSize = 11.sp,
-                    color = if (self.alreadyEnrolled) Color(0xFF718084) else Color(0xFFD65B5B),
+                    style = TipeIos.Catatan.copy(color = if (self.alreadyEnrolled) WarnaIos.LabelKedua else NadaIos.BAHAYA.teks),
                 )
             }
-            Icon(Icons.AutoMirrored.Filled.ArrowForward, null, tint = accent, modifier = Modifier.size(18.dp))
+            Icon(IkonIos.ChevronRight, null, tint = WarnaIos.LabelKetiga, modifier = Modifier.size(15.dp))
         }
     }
 }
@@ -711,54 +665,53 @@ private fun CrewEnrollmentSection(
     crew: List<EnrollCrewOption>,
     expanded: Boolean,
     selectedId: String?,
-    accent: Color,
+    nada: NadaIos,
     onExpandedChange: () -> Unit,
     onSelect: (String?) -> Unit,
 ) {
-    Surface(shape = RoundedCornerShape(12.dp), color = Color.White, border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD7E0E0))) {
-        Column {
-            Row(
-                modifier = Modifier.fillMaxWidth().clickable(onClick = onExpandedChange).padding(14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(Modifier.size(30.dp).clip(CircleShape).background(accent.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
-                    Icon(if (title == "Belum Enroll") Icons.Default.PersonAdd else Icons.Default.Verified, null, tint = accent, modifier = Modifier.size(17.dp))
-                }
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(title, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1D282B))
-                    Text(subtitle, fontSize = 11.sp, color = Color(0xFF718084))
-                }
-                Icon(if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, null, tint = Color(0xFF66777A))
+    Column(Modifier.fillMaxWidth().permukaanIos(UkuranIos.SudutGrup)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().clickable(onClick = onExpandedChange).padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(Modifier.size(30.dp).clip(CircleShape).background(nada.warna.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
+                Icon(if (title == "Belum Enroll") Icons.Default.PersonAdd else Icons.Default.Verified, null, tint = nada.warna, modifier = Modifier.size(17.dp))
             }
-            if (expanded) {
-                HorizontalDivider(color = Color(0xFFE0E8E8))
-                if (crew.isEmpty()) {
-                    Text("Tidak ada crew.", color = Color(0xFF718084), fontSize = 13.sp, modifier = Modifier.padding(16.dp))
-                } else crew.forEach { member ->
-                    CrewMemberRow(member, member.id == selectedId, accent, onSelect)
-                }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(title, style = TipeIos.Utama)
+                Text(subtitle, style = TipeIos.Catatan)
+            }
+            Icon(if (expanded) IkonIos.ExpandLess else IkonIos.ExpandMore, null, tint = WarnaIos.LabelKetiga, modifier = Modifier.size(16.dp))
+        }
+        if (expanded) {
+            PemisahIos()
+            if (crew.isEmpty()) {
+                Text("Tidak ada crew.", style = TipeIos.Catatan, modifier = Modifier.padding(16.dp))
+            } else crew.forEachIndexed { i, member ->
+                if (i > 0) PemisahIos(inset = 62.dp)
+                CrewMemberRow(member, member.id == selectedId, nada, onSelect)
             }
         }
     }
 }
 
 @Composable
-private fun CrewMemberRow(member: EnrollCrewOption, selected: Boolean, accent: Color, onSelect: (String?) -> Unit) {
+private fun CrewMemberRow(member: EnrollCrewOption, selected: Boolean, nada: NadaIos, onSelect: (String?) -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().background(if (selected) accent.copy(alpha = 0.07f) else Color.Transparent)
-            .clickable { onSelect(member.id) }.padding(horizontal = 14.dp, vertical = 11.dp),
+        modifier = Modifier.fillMaxWidth().background(if (selected) nada.warna.copy(alpha = 0.07f) else Color.Transparent)
+            .clickable { onSelect(member.id) }.padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val initials = member.name.trim().split(Regex("\\s+")).mapNotNull { it.firstOrNull()?.uppercase() }.take(2).joinToString("")
-        Box(Modifier.size(34.dp).clip(CircleShape).background(Color(0xFFE8F1F1)), contentAlignment = Alignment.Center) {
-            Text(initials.ifBlank { "-" }, color = Color(0xFF557073), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        Box(Modifier.size(34.dp).clip(CircleShape).background(WarnaIos.Isian), contentAlignment = Alignment.Center) {
+            Text(initials.ifBlank { "-" }, color = WarnaIos.AbuGelap, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
         }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(member.name, color = Color(0xFF273236), fontSize = 14.sp, fontWeight = FontWeight.Medium)
-            Text("ID: ${member.id.take(8)} · ${if (member.alreadyEnrolled) "Terdaftar" else "Belum terdaftar"}", color = Color(0xFF718084), fontSize = 10.sp)
+            Text(member.name, style = TipeIos.Isi.copy(fontSize = 16.sp))
+            Text("ID: ${member.id.take(8)} · ${if (member.alreadyEnrolled) "Terdaftar" else "Belum terdaftar"}", style = TipeIos.Kecil)
         }
-        Icon(Icons.AutoMirrored.Filled.ArrowForward, null, tint = Color(0xFF758588), modifier = Modifier.size(18.dp))
+        Icon(IkonIos.ChevronRight, null, tint = WarnaIos.LabelKetiga, modifier = Modifier.size(15.dp))
     }
 }
