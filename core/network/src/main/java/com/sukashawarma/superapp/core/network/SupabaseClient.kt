@@ -9,7 +9,9 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
 object SupabaseClient {
-    var onRefreshNeeded: (suspend () -> Boolean)? = null
+    /** Menerima access token yang baru saja ditolak server (null bila request dikirim
+     *  dengan anon key); mengembalikan true bila sesi sudah punya token yang bisa dicoba. */
+    var onRefreshNeeded: (suspend (tokenGagal: String?) -> Boolean)? = null
     const val BASE_URL = "${BuildConfig.SUPABASE_URL}/"
     private const val ANON_KEY = BuildConfig.SUPABASE_ANON_KEY
     private const val HOST = "khpkoreaaucvyqfhynfq.supabase.co"
@@ -34,11 +36,27 @@ object SupabaseClient {
 
     // 401 = token kedaluwarsa. Refresh sekali lalu ulangi request.
     private val tokenAuthenticator = okhttp3.Authenticator { _, response ->
-        val path = response.request.url.encodedPath
-        if (path.contains("auth/v1/token") || response.request.header(RETRY_HEADER) != null) return@Authenticator null
-        val refreshed = kotlinx.coroutines.runBlocking { onRefreshNeeded?.invoke() ?: false }
-        if (!refreshed) return@Authenticator null
-        response.request.newBuilder().header(RETRY_HEADER, "1").build()
+        val request = response.request
+        if (request.url.encodedPath.contains("auth/v1/token") || request.header(RETRY_HEADER) != null) {
+            return@Authenticator null
+        }
+        val tokenGagal = request.header("Authorization")?.removePrefix("Bearer ")?.takeIf { it != ANON_KEY }
+        // Request anonim tanpa sesi sama sekali: tidak ada yang bisa di-refresh.
+        if (tokenGagal == null && SessionTokenHolder.refreshToken == null) return@Authenticator null
+
+        val siap = kotlinx.coroutines.runBlocking { onRefreshNeeded?.invoke(tokenGagal) ?: false }
+        val tokenBaru = SessionTokenHolder.accessToken
+        // Mengulang dengan token yang sama pasti 401 lagi — hanya menambah beban server.
+        if (!siap || tokenBaru == null || tokenBaru == tokenGagal) return@Authenticator null
+
+        // Header wajib ditulis ulang di sini. authInterceptor adalah application
+        // interceptor dan OkHttp tidak menjalankannya lagi untuk request susulan
+        // authenticator: dulu retry membawa token lama yang baru saja ditolak, jadi
+        // refresh yang berhasil pun tetap berakhir 401.
+        request.newBuilder()
+            .header("Authorization", "Bearer $tokenBaru")
+            .header(RETRY_HEADER, "1")
+            .build()
     }
 
     private const val RETRY_HEADER = "X-Token-Retry"
