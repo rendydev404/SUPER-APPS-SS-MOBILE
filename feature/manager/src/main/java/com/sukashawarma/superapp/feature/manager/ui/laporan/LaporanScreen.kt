@@ -1,9 +1,7 @@
 package com.sukashawarma.superapp.feature.manager.ui.laporan
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,40 +17,20 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CardGiftcard
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CreditCard
-import androidx.compose.material.icons.filled.LocalOffer
-import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.QrCode2
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.ShoppingBag
-import androidx.compose.material.icons.filled.Storefront
-import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.Widgets
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePickerDefaults
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DateRangePicker
-import com.sukashawarma.superapp.core.ui.SukaDropdownHeader
-import com.sukashawarma.superapp.core.ui.SukaDropdownMenu
-import com.sukashawarma.superapp.core.ui.SukaDropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDateRangePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -62,6 +40,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -73,6 +52,23 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sukashawarma.superapp.core.ui.RealtimeRefresh
 import com.sukashawarma.superapp.core.ui.RealtimeTables
+import com.sukashawarma.superapp.core.ui.SukaDropdownHeader
+import com.sukashawarma.superapp.core.ui.SukaDropdownMenu
+import com.sukashawarma.superapp.core.ui.SukaDropdownMenuItem
+import com.sukashawarma.superapp.core.ui.SukaFilterDropdown
+import com.sukashawarma.superapp.core.ui.ios.BilahJudulIos
+import com.sukashawarma.superapp.core.ui.ios.IkonBulatIos
+import com.sukashawarma.superapp.core.ui.ios.JudulSeksiIos
+import com.sukashawarma.superapp.core.ui.ios.KartuIos
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.PanelGalatIos
+import com.sukashawarma.superapp.core.ui.ios.PemisahIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.TombolBundarIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
+import com.sukashawarma.superapp.core.ui.kaca.denganRuangNav
 import com.sukashawarma.superapp.feature.manager.domain.AnalitikLaporan
 import com.sukashawarma.superapp.feature.manager.domain.FilterChannel
 import com.sukashawarma.superapp.feature.manager.domain.FilterPembayaran
@@ -82,33 +78,28 @@ import com.sukashawarma.superapp.feature.manager.domain.RincianPembayaran
 import com.sukashawarma.superapp.feature.manager.domain.cacah
 import com.sukashawarma.superapp.feature.manager.domain.rupiah
 import com.sukashawarma.superapp.feature.manager.ui.BarProgres
-import com.sukashawarma.superapp.feature.manager.ui.GarisKartu
-import com.sukashawarma.superapp.feature.manager.ui.HijauGaris
-import com.sukashawarma.superapp.feature.manager.ui.HijauLatar
-import com.sukashawarma.superapp.feature.manager.ui.HijauTeks
+import com.sukashawarma.superapp.feature.manager.ui.KartuKpi
 import com.sukashawarma.superapp.feature.manager.ui.KartuPanel
-import com.sukashawarma.superapp.feature.manager.ui.MerahGaris
-import com.sukashawarma.superapp.feature.manager.ui.MerahLatar
-import com.sukashawarma.superapp.feature.manager.ui.MerahTeks
+import com.sukashawarma.superapp.feature.manager.ui.LencanaPeringkat
 import com.sukashawarma.superapp.feature.manager.ui.PanelKosong
-import com.sukashawarma.superapp.presentation.theme.SukaBrown
-import com.sukashawarma.superapp.presentation.theme.SukaCream
-import com.sukashawarma.superapp.presentation.theme.SukaGray400
-import com.sukashawarma.superapp.presentation.theme.SukaOrange
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
 
-/** Warna per metode bayar — cermin `PAYMENT_META` di `ReportsClient.tsx`. */
+/**
+ * Warna per metode bayar — urutannya cermin `PAYMENT_META` di `ReportsClient.tsx`
+ * (tunai hijau, QRIS biru, kartu ungu), tetapi memakai warna sistem iOS supaya
+ * cincin dan baris rinciannya serasi dengan lencana di layar lain.
+ */
 private fun warnaMetode(metode: String): Color = when (metode) {
-    "cash" -> Color(0xFF10B981)
-    "qris" -> Color(0xFF3B82F6)
-    "card" -> Color(0xFF8B5CF6)
-    else -> Color(0xFF6B7280)
+    "cash" -> WarnaIos.Hijau
+    "qris" -> WarnaIos.Biru
+    "card" -> WarnaIos.Ungu
+    else -> WarnaIos.Abu
 }
 
 private fun ikonMetode(metode: String): ImageVector = when (metode) {
-    "cash" -> Icons.Default.Payments
+    "cash" -> IkonIos.Payments
     "qris" -> Icons.Default.QrCode2
     "card" -> Icons.Default.CreditCard
     else -> Icons.Default.Widgets
@@ -132,32 +123,28 @@ fun LaporanScreen(
     RealtimeRefresh(RealtimeTables.ORDERS, RealtimeTables.ORDER_ITEMS) { viewModel.segarkanDariRealtime() }
 
     Scaffold(
-        containerColor = SukaCream,
+        containerColor = WarnaIos.Latar,
         topBar = {
-            TopAppBar(
-                title = { Text("Laporan", fontWeight = FontWeight.Black, fontSize = 17.sp, color = SukaBrown, maxLines = 1) },
-                navigationIcon = {
-                    IconButton(onClick = onExit) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Kembali", tint = SukaBrown)
-                    }
-                },
-                actions = {
-                    IconButton(onClick = viewModel::muatPaksa) {
-                        Icon(Icons.Default.Refresh, "Muat ulang", tint = SukaBrown)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White),
+            BilahJudulIos(
+                judul = "Laporan",
+                onKembali = onExit,
+                aksi = { TombolBundarIos(IkonIos.Refresh, "Muat ulang", viewModel::muatPaksa) },
             )
         },
     ) { padding ->
         LazyColumn(
             Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(
+                start = UkuranIos.TepiLayar,
+                end = UkuranIos.TepiLayar,
+                top = 12.dp,
+                bottom = 16.dp,
+            ).denganRuangNav(),
+            verticalArrangement = Arrangement.spacedBy(UkuranIos.JarakKartu),
         ) {
             item { PanelPenyaring(state, viewModel) }
             if (state.galat != null) {
-                item { PanelGalat(state.galat!!, viewModel::muatPaksa) }
+                item { PanelGalatIos(state.galat!!, viewModel::muatPaksa) }
             }
             kartuKpi(state.analitik)
             item { PanelStatusTransaksi(state.analitik) }
@@ -177,27 +164,13 @@ private fun PanelPenyaring(state: LaporanUiState, viewModel: LaporanViewModel) {
     var dialogTanggal by remember { mutableStateOf(false) }
 
     KartuPanel {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    "Laporan & Analitik Cabang",
-                    color = SukaBrown,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Black,
-                )
-                Spacer(Modifier.height(3.dp))
-                Text(
-                    "Insight performa bisnis secara real-time",
-                    color = SukaGray400,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                )
-            }
-        }
+        Text("Laporan & Analitik Cabang", style = TipeIos.Judul3)
+        Spacer(Modifier.height(2.dp))
+        Text("Insight performa bisnis secara real-time", style = TipeIos.Catatan)
 
         Spacer(Modifier.height(14.dp))
         PilihanTurun(
-            ikon = Icons.Default.CalendarMonth,
+            ikon = IkonIos.CalendarMonth,
             nilai = state.labelRentang,
             pilihan = PresetLaporan.entries.map { it to it.label },
             onPilih = { preset ->
@@ -207,14 +180,14 @@ private fun PanelPenyaring(state: LaporanUiState, viewModel: LaporanViewModel) {
         )
         Spacer(Modifier.height(8.dp))
         PilihanTurun(
-            ikon = Icons.Default.Storefront,
+            ikon = IkonIos.Storefront,
             nilai = state.channel.label,
             pilihan = FilterChannel.entries.map { it to it.label },
             onPilih = viewModel::pilihChannel,
         )
         Spacer(Modifier.height(8.dp))
         PilihanTurun(
-            ikon = Icons.Default.Payments,
+            ikon = IkonIos.Payments,
             nilai = state.pembayaran.label,
             pilihan = FilterPembayaran.entries.map { it to it.label },
             onPilih = viewModel::pilihPembayaran,
@@ -224,7 +197,7 @@ private fun PanelPenyaring(state: LaporanUiState, viewModel: LaporanViewModel) {
         // belum merender pemilihnya. Di layar sekecil ini penyaring itu justru yang
         // membuat laporan bisa dibaca per cabang, jadi dipasang di sini.
         PilihanTurun(
-            ikon = Icons.Default.Storefront,
+            ikon = IkonIos.Storefront,
             nilai = state.namaOutletTerpilih ?: "Semua Outlet",
             pilihan = listOf<Pair<String?, String>>(null to "Semua Outlet") +
                 state.daftarOutlet.map { it.id to it.nama },
@@ -252,30 +225,14 @@ private fun <T> PilihanTurun(
 ) {
     var terbuka by remember { mutableStateOf(false) }
     Box {
-        Surface(
-            shape = RoundedCornerShape(12.dp),
-            color = Color.White,
-            border = BorderStroke(1.dp, if (terbuka) SukaOrange else SukaBrown.copy(alpha = 0.15f)),
-            modifier = Modifier.fillMaxWidth().clickable { terbuka = true },
-        ) {
-            Row(
-                Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(ikon, null, tint = SukaOrange, modifier = Modifier.size(15.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    nilai,
-                    Modifier.weight(1f),
-                    color = SukaBrown,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Black,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Icon(Icons.Default.ArrowDropDown, null, tint = if (terbuka) SukaOrange else SukaBrown)
-            }
-        }
+        SukaFilterDropdown(
+            label = "",
+            value = nilai,
+            expanded = terbuka,
+            onClick = { terbuka = true },
+            modifier = Modifier.fillMaxWidth(),
+            leadingIcon = ikon,
+        )
         SukaDropdownMenu(expanded = terbuka, onDismissRequest = { terbuka = false }) {
             SukaDropdownHeader(title = "PILIH OPSI", onClose = { terbuka = false })
             pilihan.forEach { (nilaiPilihan, label) ->
@@ -293,49 +250,49 @@ private fun <T> PilihanTurun(
 @Composable
 private fun DialogRentang(onTutup: () -> Unit, onPilih: (LocalDate, LocalDate) -> Unit) {
     val picker = rememberDateRangePickerState()
+    val warna = DatePickerDefaults.colors(
+        containerColor = WarnaIos.Kartu,
+        selectedDayContainerColor = WarnaIos.Aksen,
+        todayDateBorderColor = WarnaIos.Aksen,
+        dayInSelectionRangeContainerColor = WarnaIos.Aksen.copy(alpha = 0.14f),
+    )
     DatePickerDialog(
         onDismissRequest = onTutup,
         confirmButton = {
+            val bisa = picker.selectedStartDateMillis != null
             TextButton(
                 onClick = {
                     val dari = picker.selectedStartDateMillis?.let(::tanggalDari)
                     val sampai = picker.selectedEndDateMillis?.let(::tanggalDari)
                     if (dari != null) onPilih(dari, sampai ?: dari)
                 },
-                enabled = picker.selectedStartDateMillis != null,
-            ) { Text("Terapkan", fontWeight = FontWeight.ExtraBold) }
+                enabled = bisa,
+            ) {
+                Text("Terapkan", color = if (bisa) WarnaIos.Aksen else WarnaIos.Abu, fontWeight = FontWeight.SemiBold)
+            }
         },
-        dismissButton = { TextButton(onClick = onTutup) { Text("Batal") } },
+        dismissButton = {
+            TextButton(onClick = onTutup) { Text("Batal", color = WarnaIos.Aksen) }
+        },
+        shape = UkuranIos.SudutKartu,
+        colors = warna,
     ) {
-        DateRangePicker(state = picker, title = {
-            Text(
-                "Pilih Rentang Tanggal",
-                Modifier.padding(start = 24.dp, top = 16.dp),
-                fontWeight = FontWeight.Black,
-            )
-        })
+        DateRangePicker(
+            state = picker,
+            title = {
+                Text(
+                    "Pilih Rentang Tanggal",
+                    Modifier.padding(start = 24.dp, top = 16.dp),
+                    style = TipeIos.Utama,
+                )
+            },
+            colors = warna,
+        )
     }
 }
 
 private fun tanggalDari(millis: Long): LocalDate =
     Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
-
-@Composable
-private fun PanelGalat(pesan: String, onCoba: () -> Unit) {
-    Surface(
-        Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        color = MerahLatar,
-        border = BorderStroke(1.dp, MerahGaris),
-    ) {
-        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(pesan, Modifier.weight(1f), color = MerahTeks, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            TextButton(onClick = onCoba) {
-                Text("Coba Lagi", color = MerahTeks, fontWeight = FontWeight.Black, fontSize = 12.sp)
-            }
-        }
-    }
-}
 
 /* ----------------------------------------------------------------------- */
 /* Kartu KPI                                                                */
@@ -348,8 +305,8 @@ private fun LazyListScope.kartuKpi(a: AnalitikLaporan) {
             "Potongan Merchant",
             rupiah(a.potonganMerchant),
             "Diskon yang ditanggung outlet",
-            Icons.Default.LocalOffer,
-            Color(0xFFF43F5E),
+            IkonIos.Sell,
+            WarnaIos.Merah,
         )
     }
     item {
@@ -358,7 +315,7 @@ private fun LazyListScope.kartuKpi(a: AnalitikLaporan) {
             rupiah(a.subsidiPlatform),
             "Info — ditanggung aplikasi, bukan potongan outlet",
             Icons.Default.CardGiftcard,
-            Color(0xFFF97316),
+            WarnaIos.Oranye,
         )
     }
     item {
@@ -366,8 +323,8 @@ private fun LazyListScope.kartuKpi(a: AnalitikLaporan) {
             "Pesanan Sukses",
             cacah(a.pesananSukses),
             "Transaksi berhasil diproses",
-            Icons.Default.ShoppingBag,
-            Color(0xFF3B82F6),
+            IkonIos.ShoppingBag,
+            WarnaIos.Biru,
         )
     }
     item {
@@ -375,8 +332,8 @@ private fun LazyListScope.kartuKpi(a: AnalitikLaporan) {
             "Rata-rata / Order",
             rupiah(a.rataRataPerOrder),
             "Rata-rata belanja per pesanan",
-            Icons.Default.TrendingUp,
-            Color(0xFF8B5CF6),
+            IkonIos.TrendingUp,
+            WarnaIos.Ungu,
         )
     }
     item {
@@ -390,52 +347,46 @@ private fun LazyListScope.kartuKpi(a: AnalitikLaporan) {
                 "—"
             },
             "Jam dengan pesanan terbanyak",
-            Icons.Default.Schedule,
-            Color(0xFF6366F1),
+            IkonIos.Schedule,
+            WarnaIos.Indigo,
         )
     }
 }
 
+/**
+ * Omzet kotor tetap menjadi satu-satunya kartu berisi warna aksen: angka inilah
+ * yang pertama dicari manajer, jadi ia dibedakan dari KPI pendamping yang putih.
+ */
 @Composable
 private fun KartuOmzetKotor(a: AnalitikLaporan) {
-    Surface(
-        Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        color = SukaOrange,
-        shadowElevation = 3.dp,
-    ) {
-        Column(Modifier.padding(20.dp)) {
+    KartuIos(latar = WarnaIos.Aksen) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
-                Modifier.size(40.dp).background(Color.White.copy(alpha = 0.20f), RoundedCornerShape(14.dp)),
+                Modifier.size(30.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.22f)),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Default.Payments, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                Icon(IkonIos.aktif(IkonIos.Payments), null, tint = Color.White, modifier = Modifier.size(17.dp))
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.width(10.dp))
             Text(
-                "OMZET KOTOR",
-                color = Color.White.copy(alpha = 0.85f),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Black,
-                letterSpacing = 0.8.sp,
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                rupiah(a.omzetKotor),
-                color = Color.White,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Black,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(10.dp))
-            Text(
-                "*Total penerimaan pesanan lunas",
-                color = Color.White.copy(alpha = 0.75f),
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Medium,
+                "Omzet Kotor",
+                color = Color.White.copy(alpha = 0.92f),
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
             )
         }
+        Spacer(Modifier.height(10.dp))
+        Text(
+            rupiah(a.omzetKotor),
+            style = TipeIos.AngkaBesar.copy(color = Color.White, fontSize = 30.sp),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "*Total penerimaan pesanan lunas",
+            style = TipeIos.Catatan.copy(color = Color.White.copy(alpha = 0.8f)),
+        )
     }
 }
 
@@ -447,33 +398,13 @@ private fun KartuAngka(
     ikon: ImageVector,
     warna: Color,
 ) {
-    KartuPanel {
-        Box(
-            Modifier.size(40.dp).background(warna.copy(alpha = 0.10f), RoundedCornerShape(14.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(ikon, null, tint = warna, modifier = Modifier.size(20.dp))
-        }
-        Spacer(Modifier.height(12.dp))
-        Text(
-            judul.uppercase(),
-            color = SukaGray400,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Black,
-            letterSpacing = 0.8.sp,
-        )
-        Spacer(Modifier.height(4.dp))
-        Text(
-            nilai,
-            color = SukaBrown,
-            fontSize = 26.sp,
-            fontWeight = FontWeight.Black,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Spacer(Modifier.height(10.dp))
-        Text(keterangan, color = SukaGray400, fontSize = 10.sp, fontWeight = FontWeight.Medium)
-    }
+    KartuKpi(
+        judul = judul,
+        nilai = nilai,
+        ikon = ikon,
+        warnaIkon = warna,
+        kaki = { Text(keterangan, style = TipeIos.Catatan) },
+    )
 }
 
 /* ----------------------------------------------------------------------- */
@@ -483,36 +414,30 @@ private fun KartuAngka(
 @Composable
 private fun PanelStatusTransaksi(a: AnalitikLaporan) {
     KartuPanel {
-        Text("Status Transaksi", color = SukaBrown, fontSize = 16.sp, fontWeight = FontWeight.Black)
-        Spacer(Modifier.height(2.dp))
-        Text(
-            "Pesanan lunas vs batal",
-            color = SukaGray400,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Medium,
-        )
-        Spacer(Modifier.height(14.dp))
-        BarisStatus(
-            ikon = Icons.Default.CheckCircle,
-            judul = "Selesai",
-            keterangan = "Pembayaran sukses",
-            jumlah = a.pesananSukses,
-            persen = a.persenSukses,
-            latar = HijauLatar,
-            garis = HijauGaris,
-            teks = HijauTeks,
-        )
-        Spacer(Modifier.height(10.dp))
-        BarisStatus(
-            ikon = Icons.Default.Cancel,
-            judul = "Dibatalkan",
-            keterangan = "Kedaluwarsa / batal kasir",
-            jumlah = a.pesananBatal,
-            persen = a.persenBatal,
-            latar = MerahLatar,
-            garis = MerahGaris,
-            teks = MerahTeks,
-        )
+        Text("Status Transaksi", style = TipeIos.Utama)
+        Text("Pesanan lunas vs batal", style = TipeIos.Catatan)
+        Spacer(Modifier.height(12.dp))
+        // Dua status dalam satu blok abu bersekat, seperti daftar ringkas iOS —
+        // perbandingan lunas vs batal terbaca sekali lirik.
+        Column(Modifier.fillMaxWidth().clip(UkuranIos.SudutBlok).background(WarnaIos.Latar)) {
+            BarisStatus(
+                ikon = IkonIos.CheckCircle,
+                judul = "Selesai",
+                keterangan = "Pembayaran sukses",
+                jumlah = a.pesananSukses,
+                persen = a.persenSukses,
+                nada = NadaIos.SUKSES,
+            )
+            PemisahIos(inset = 56.dp)
+            BarisStatus(
+                ikon = IkonIos.Close,
+                judul = "Dibatalkan",
+                keterangan = "Kedaluwarsa / batal kasir",
+                jumlah = a.pesananBatal,
+                persen = a.persenBatal,
+                nada = NadaIos.BAHAYA,
+            )
+        }
     }
 }
 
@@ -523,27 +448,22 @@ private fun BarisStatus(
     keterangan: String,
     jumlah: Int,
     persen: Int,
-    latar: Color,
-    garis: Color,
-    teks: Color,
+    nada: NadaIos,
 ) {
-    Surface(
-        Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
-        color = latar,
-        border = BorderStroke(1.dp, garis),
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(ikon, null, tint = teks, modifier = Modifier.size(22.dp))
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(judul, color = SukaBrown, fontSize = 13.sp, fontWeight = FontWeight.Black)
-                Text(keterangan, color = teks, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-            }
-            Column(horizontalAlignment = Alignment.End) {
-                Text(cacah(jumlah), color = SukaBrown, fontSize = 18.sp, fontWeight = FontWeight.Black)
-                Text("$persen%", color = teks, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-            }
+        IkonBulatIos(ikon, nada.warna)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(judul, style = TipeIos.Keterangan.copy(fontWeight = FontWeight.SemiBold))
+            Text(keterangan, style = TipeIos.Catatan, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Spacer(Modifier.width(8.dp))
+        Column(horizontalAlignment = Alignment.End) {
+            Text(cacah(jumlah), style = TipeIos.Angka)
+            Text("$persen%", color = nada.teks, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -555,9 +475,8 @@ private fun BarisStatus(
 @Composable
 private fun PanelDistribusiPembayaran(a: AnalitikLaporan) {
     KartuPanel {
-        Text("Distribusi Pembayaran", color = SukaBrown, fontSize = 16.sp, fontWeight = FontWeight.Black)
-        Spacer(Modifier.height(2.dp))
-        Text("Rincian per metode bayar", color = SukaGray400, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+        Text("Distribusi Pembayaran", style = TipeIos.Utama)
+        Text("Rincian per metode bayar", style = TipeIos.Catatan)
         Spacer(Modifier.height(16.dp))
 
         if (a.rincianPembayaran.isEmpty()) {
@@ -569,21 +488,18 @@ private fun PanelDistribusiPembayaran(a: AnalitikLaporan) {
             Box(Modifier.size(168.dp), contentAlignment = Alignment.Center) {
                 CincinPembayaran(a.rincianPembayaran)
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        cacah(a.pesananSukses),
-                        color = SukaBrown,
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Black,
-                    )
-                    Text("Total", color = SukaGray400, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Text(cacah(a.pesananSukses), style = TipeIos.AngkaBesar)
+                    Text("Total", style = TipeIos.Catatan)
                 }
             }
         }
 
         Spacer(Modifier.height(16.dp))
-        a.rincianPembayaran.forEach { rincian ->
-            BarisMetodeBayar(rincian, a.omzetKotor)
-            Spacer(Modifier.height(8.dp))
+        Column(Modifier.fillMaxWidth().clip(UkuranIos.SudutBlok).background(WarnaIos.Latar)) {
+            a.rincianPembayaran.forEachIndexed { i, rincian ->
+                if (i > 0) PemisahIos(inset = 56.dp)
+                BarisMetodeBayar(rincian, a.omzetKotor)
+            }
         }
     }
 }
@@ -626,38 +542,30 @@ private fun CincinPembayaran(rincian: List<RincianPembayaran>) {
 private fun BarisMetodeBayar(rincian: RincianPembayaran, omzetKotor: Long) {
     val warna = warnaMetode(rincian.metode)
     val persen = if (omzetKotor > 0) rincian.omzet.toDouble() / omzetKotor * 100 else 0.0
-    Surface(
-        Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
-        color = SukaBrown.copy(alpha = 0.03f),
-        border = BorderStroke(1.dp, GarisKartu),
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier.size(38.dp).background(warna.copy(alpha = 0.12f), RoundedCornerShape(12.dp)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(ikonMetode(rincian.metode), null, tint = warna, modifier = Modifier.size(18.dp))
-            }
-            Spacer(Modifier.width(11.dp))
-            Column(Modifier.weight(1f)) {
-                Text(rincian.label, color = SukaBrown, fontSize = 13.sp, fontWeight = FontWeight.Black)
-                Text(
-                    "${cacah(rincian.jumlah)} transaksi",
-                    color = SukaGray400,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
-            Column(horizontalAlignment = Alignment.End) {
-                Text(rupiah(rincian.omzet), color = SukaBrown, fontSize = 13.sp, fontWeight = FontWeight.Black)
-                Text(
-                    String.format(java.util.Locale.US, "%.1f%%", persen),
-                    color = warna,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
+        IkonBulatIos(ikonMetode(rincian.metode), warna)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                rincian.label,
+                style = TipeIos.Keterangan.copy(fontWeight = FontWeight.SemiBold),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text("${cacah(rincian.jumlah)} transaksi", style = TipeIos.Catatan)
+        }
+        Spacer(Modifier.width(8.dp))
+        Column(horizontalAlignment = Alignment.End) {
+            Text(rupiah(rincian.omzet), style = TipeIos.Keterangan.copy(fontWeight = FontWeight.SemiBold))
+            Text(
+                String.format(java.util.Locale.US, "%.1f%%", persen),
+                color = warna,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
         }
     }
 }
@@ -670,20 +578,13 @@ private fun LazyListScope.daftarItemTerjual(a: AnalitikLaporan) {
     if (a.daftarItem.isEmpty()) return
 
     item {
-        KartuPanel {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("Item Yang Terjual", color = SukaBrown, fontSize = 16.sp, fontWeight = FontWeight.Black)
-                    Text(
-                        "${cacah(a.itemTerjual)} porsi dari ${cacah(a.daftarItem.size)} menu",
-                        color = SukaGray400,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                    )
-                }
-            }
-            Spacer(Modifier.height(12.dp))
-            HorizontalDivider(color = GarisKartu)
+        Column {
+            JudulSeksiIos("Item Yang Terjual")
+            Text(
+                "${cacah(a.itemTerjual)} porsi dari ${cacah(a.daftarItem.size)} menu",
+                Modifier.padding(horizontal = 4.dp),
+                style = TipeIos.Catatan,
+            )
         }
     }
 
@@ -696,37 +597,25 @@ private fun LazyListScope.daftarItemTerjual(a: AnalitikLaporan) {
 private fun BarisItemTerjual(item: ItemTerjual, peringkat: Int, qtyTertinggi: Int) {
     KartuPanel {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                "#$peringkat",
-                Modifier.width(30.dp),
-                color = if (peringkat <= 3) SukaOrange else SukaGray400,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Black,
-            )
+            LencanaPeringkat(peringkat)
+            Spacer(Modifier.width(10.dp))
             Text(
                 item.nama,
                 Modifier.weight(1f),
-                color = SukaBrown,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
+                style = TipeIos.Keterangan.copy(fontWeight = FontWeight.SemiBold),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Spacer(Modifier.width(8.dp))
             Column(horizontalAlignment = Alignment.End) {
-                Text(rupiah(item.omzet), color = SukaBrown, fontSize = 12.sp, fontWeight = FontWeight.Black)
-                Text(
-                    "${cacah(item.qty)} terjual",
-                    color = SukaGray400,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Medium,
-                )
+                Text(rupiah(item.omzet), style = TipeIos.Keterangan.copy(fontWeight = FontWeight.SemiBold))
+                Text("${cacah(item.qty)} terjual", style = TipeIos.Catatan)
             }
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(10.dp))
         BarProgres(
             rasio = if (qtyTertinggi > 0) item.qty.toFloat() / qtyTertinggi else 0f,
-            tinggi = 5,
+            tinggi = 6,
             sorot = peringkat <= 3,
         )
     }
