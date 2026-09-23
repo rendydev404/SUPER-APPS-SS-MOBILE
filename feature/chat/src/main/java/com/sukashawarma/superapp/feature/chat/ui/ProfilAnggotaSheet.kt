@@ -1,5 +1,12 @@
 package com.sukashawarma.superapp.feature.chat.ui
 
+import androidx.compose.foundation.layout.heightIn
+import com.sukashawarma.superapp.core.ui.ios.PemisahIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.TombolUtamaIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.ios.permukaanIos
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -62,11 +69,10 @@ import com.sukashawarma.superapp.feature.chat.data.labelRole
  * username login, atau data kepegawaian di sini karena server memang tidak
  * pernah mengirimkannya.
  */
-private val OranyeMerek = Color(0xFFEA580C)
-private val OranyeLembut = Color(0xFFFFF1E7)
-private val AbuProfil = Color(0xFF8E8E93)
-private val LatarProfil = Color(0xFFF2F2F7)
-private val PemisahProfil = Color(0x1F3C3C43)
+private val OranyeMerek = WarnaIos.Aksen
+private val OranyeLembut = WarnaIos.Aksen.copy(alpha = 0.14f)
+private val AbuProfil = WarnaIos.LabelKedua
+private val LatarProfil = WarnaIos.Latar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -129,14 +135,12 @@ fun ProfilAnggotaSheet(
             Spacer(Modifier.height(14.dp))
             Text(
                 nama,
-                fontSize = 21.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.Black,
+                style = TipeIos.Judul2,
                 textAlign = TextAlign.Center,
             )
             if (akuSendiri) {
                 Spacer(Modifier.height(4.dp))
-                Text("Ini Anda", fontSize = 12.5.sp, color = AbuProfil)
+                Text("Ini Anda", style = TipeIos.Catatan)
             }
 
             Spacer(Modifier.height(20.dp))
@@ -149,13 +153,12 @@ fun ProfilAnggotaSheet(
                         modifier = Modifier.size(26.dp),
                     )
                     Spacer(Modifier.height(8.dp))
-                    Text("Memuat keterangan…", fontSize = 12.5.sp, color = AbuProfil)
+                    Text("Memuat keterangan…", style = TipeIos.Catatan)
                 }
 
                 anggota == null -> Text(
                     "Keterangan lengkapnya tidak tersedia. Orang ini mungkin sudah tidak aktif.",
-                    fontSize = 12.5.sp,
-                    color = AbuProfil,
+                    style = TipeIos.Catatan,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(horizontal = 16.dp),
                 )
@@ -163,8 +166,7 @@ fun ProfilAnggotaSheet(
                 else -> Column(
                     Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color.White),
+                        .permukaanIos(UkuranIos.SudutGrup),
                 ) {
                     if (!anggota.username.isNullOrBlank()) {
                         BarisProfil(Icons.Filled.Badge, "Nama Resmi", anggota.nama)
@@ -180,33 +182,15 @@ fun ProfilAnggotaSheet(
 
             if (!akuSendiri && anggota != null && onKirimPesanPribadi != null) {
                 Spacer(Modifier.height(16.dp))
-                Button(
-                    onClick = {
+                TombolUtamaIos(
+                    teks = "Kirim Pesan Pribadi",
+                    onKlik = {
                         onTutup()
                         onKirimPesanPribadi(anggota.id, anggota.namaTampil, anggota.avatar)
                     },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF34C759)
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.Chat,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                        tint = Color.White
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Kirim Pesan Pribadi",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.White
-                    )
-                }
+                    ikon = Icons.AutoMirrored.Filled.Chat,
+                    warna = WarnaIos.Hijau,
+                )
             }
         }
     }
@@ -226,25 +210,25 @@ fun ProfilAnggotaSheet(
 @Composable
 private fun BarisProfil(ikon: ImageVector, label: String, nilai: String) {
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+        Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            Modifier.size(30.dp).clip(RoundedCornerShape(8.dp)).background(OranyeLembut),
+            Modifier.size(30.dp).clip(CircleShape).background(OranyeLembut),
             contentAlignment = Alignment.Center,
         ) {
             Icon(ikon, null, tint = OranyeMerek, modifier = Modifier.size(17.dp))
         }
         Spacer(Modifier.width(12.dp))
-        Text(label, fontSize = 14.5.sp, color = Color.Black)
+        Text(label, style = TipeIos.Isi)
         Spacer(Modifier.width(12.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            Text(nilai, fontSize = 14.5.sp, color = AbuProfil, textAlign = TextAlign.End)
+            Text(nilai, style = TipeIos.Isi, color = AbuProfil, textAlign = TextAlign.End)
         }
     }
 }
 
 @Composable
 private fun PemisahBaris() {
-    Box(Modifier.fillMaxWidth().padding(start = 56.dp).height(0.5.dp).background(PemisahProfil))
+    PemisahIos(inset = 58.dp)
 }
