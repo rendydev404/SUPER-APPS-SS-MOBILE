@@ -1,5 +1,12 @@
 package com.sukashawarma.superapp.feature.chat.ui
 
+import com.sukashawarma.superapp.core.ui.ios.BarisIos
+import com.sukashawarma.superapp.core.ui.ios.GrupIos
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.PemisahIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -59,8 +66,8 @@ import androidx.compose.ui.unit.sp
  * tombol kirim — bukan di kotak dialog yang memotong gambar jadi kartu kecil.
  */
 
-private val BiruIosLampiran = Color(0xFF007AFF)
-private val AbuTeks = Color(0xFF8E8E93)
+private val BiruIosLampiran = WarnaIos.Biru
+private val AbuTeks = WarnaIos.Abu
 
 /** Foto yang sudah dikompres dan siap dikirim, beserta pratinjaunya. */
 data class FotoTerpilih(
@@ -86,45 +93,37 @@ fun LembarPilihSumberFoto(
     ModalBottomSheet(
         onDismissRequest = onTutup,
         sheetState = state,
-        containerColor = Color.White,
+        containerColor = WarnaIos.Latar,
         shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
     ) {
         Column(
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp)
+                .padding(horizontal = UkuranIos.TepiLayar)
                 .padding(bottom = 32.dp),
         ) {
             Text(
                 "Kirim foto",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Color(0xFF000000),
-                modifier = Modifier.padding(bottom = 18.dp),
+                style = TipeIos.Utama,
+                modifier = Modifier.padding(start = 4.dp, bottom = 12.dp),
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
-                PetakSumber("Galeri", Icons.Filled.PhotoLibrary, Color(0xFF7C3AED), onGaleri)
-                PetakSumber("Kamera", Icons.Filled.PhotoCamera, Color(0xFFE11D48), onKamera)
+            // Lembar aksi ala iOS: dua baris dalam satu grup, bukan petak ikon.
+            GrupIos {
+                BarisIos(
+                    judul = "Galeri",
+                    ikon = Icons.Filled.PhotoLibrary,
+                    nadaIkon = NadaIos.UNGU,
+                    onKlik = onGaleri,
+                )
+                PemisahIos(inset = 58.dp)
+                BarisIos(
+                    judul = "Kamera",
+                    ikon = Icons.Filled.PhotoCamera,
+                    nadaIkon = NadaIos.BAHAYA,
+                    onKlik = onKamera,
+                )
             }
         }
-    }
-}
-
-@Composable
-private fun PetakSumber(label: String, ikon: ImageVector, warna: Color, onKlik: () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(
-            Modifier
-                .size(58.dp)
-                .clip(CircleShape)
-                .background(warna.copy(alpha = 0.14f))
-                .clickable(onClick = onKlik),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(ikon, null, tint = warna, modifier = Modifier.size(27.dp))
-        }
-        Spacer(Modifier.height(7.dp))
-        Text(label, fontSize = 12.5.sp, color = AbuTeks)
     }
 }
 
