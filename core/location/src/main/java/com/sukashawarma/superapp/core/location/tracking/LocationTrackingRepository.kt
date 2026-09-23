@@ -3,6 +3,7 @@ package com.sukashawarma.superapp.data.location
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
+import com.sukashawarma.superapp.data.remote.AuthSessionManager
 import com.sukashawarma.superapp.data.remote.Postgrest
 import com.sukashawarma.superapp.domain.session.AppSession
 
@@ -106,11 +107,12 @@ object LocationTrackingRepository {
         val staffId = staff?.id ?: (context?.let { LocationTrackingPrefs.getStaffId(it) }) ?: throw NoStaffSessionException()
         val outletId = staff?.outletId ?: (context?.let { LocationTrackingPrefs.getOutletId(it) })
 
-        // Pastikan token terpasang jika baru dihidupkan ulang oleh sistem
-        if (context != null && com.sukashawarma.superapp.data.remote.SessionTokenHolder.accessToken == null) {
-            com.sukashawarma.superapp.data.remote.SessionTokenHolder.accessToken = LocationTrackingPrefs.getAccessToken(context)
-            com.sukashawarma.superapp.data.remote.SessionTokenHolder.refreshToken = LocationTrackingPrefs.getRefreshToken(context)
-        }
+        // Tanpa sesi, request hanya akan membawa anon key lalu ditolak RLS. Pemulihan token
+        // dari salinan disk sengaja TIDAK dilakukan di sini lagi: dulu blok ini menimpa
+        // refresh token di memori dengan salinan disk yang sudah hangus setiap kali access
+        // token kosong, dan refresh berikutnya membuat GoTrue mencabut sesi staff. Pemulihan
+        // kini hanya lewat LocationTrackingService.ensureSession, dan hanya saat memori kosong.
+        if (!AuthSessionManager.punyaSesiAktif()) throw NoStaffSessionException()
 
         val trails = JsonArray().apply {
             points.forEach { add(trailJson(it, staffId, outletId)) }
