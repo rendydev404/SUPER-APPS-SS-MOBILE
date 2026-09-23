@@ -1,6 +1,21 @@
 package com.sukashawarma.superapp.feature.stok.ui.ledger
 
-import androidx.compose.foundation.BorderStroke
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
+import com.sukashawarma.superapp.core.ui.kaca.denganRuangNav
+import com.sukashawarma.superapp.core.ui.ios.KartuIos
+import com.sukashawarma.superapp.core.ui.ios.KolomCariIos
+import com.sukashawarma.superapp.core.ui.ios.LabelSeksiIos
+import com.sukashawarma.superapp.core.ui.ios.LencanaIos
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.PemisahIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.TombolBundarIos
+import com.sukashawarma.superapp.core.ui.ios.TombolKapsulIos
+import com.sukashawarma.superapp.core.ui.ios.TombolUtamaIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.ios.permukaanIos
+import com.sukashawarma.superapp.core.ui.ios.tekanIos
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -23,31 +38,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.ArrowUpward
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.HourglassEmpty
-import androidx.compose.material.icons.filled.Inventory2
-import androidx.compose.material.icons.filled.MenuBook
-import androidx.compose.material.icons.filled.Receipt
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Scale
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.SwapHoriz
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -98,10 +92,6 @@ import com.sukashawarma.superapp.feature.stok.ui.KeadaanTidakBerhak
 import com.sukashawarma.superapp.feature.stok.ui.MemuatPenuh
 import com.sukashawarma.superapp.feature.stok.ui.PemilihOutlet
 import com.sukashawarma.superapp.feature.stok.ui.waktuSingkat
-import com.sukashawarma.superapp.presentation.theme.SukaOnSurface
-import com.sukashawarma.superapp.presentation.theme.SukaOnSurfaceVariant
-import com.sukashawarma.superapp.presentation.theme.SukaOrange
-import com.sukashawarma.superapp.presentation.theme.SukaSurface
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -111,12 +101,12 @@ import java.util.Locale
  * 6 Kategori filter pada ledger stok — cermin `FILTER_LABELS` di web.
  */
 enum class KategoriLedger(val label: String, val icon: ImageVector) {
-    SEMUA("Semua", Icons.Default.Inventory2),
-    MASUK("Masuk", Icons.Default.ArrowDownward),
-    ORDER("Order", Icons.Default.Receipt),
-    WASTE("Waste", Icons.Default.Delete),
-    KELUAR("Keluar", Icons.Default.ArrowUpward),
-    PENYESUAIAN("Penyesuaian", Icons.Default.Scale);
+    SEMUA("Semua", IkonIos.Inventory2),
+    MASUK("Masuk", IkonIos.ArrowDownward),
+    ORDER("Order", IkonIos.Receipt),
+    WASTE("Waste", IkonIos.Delete),
+    KELUAR("Keluar", IkonIos.ArrowUpward),
+    PENYESUAIAN("Penyesuaian", IkonIos.Scale);
 }
 
 data class LedgerUiState(
@@ -355,11 +345,9 @@ fun LedgerScreen(
         }
     }
 
-    Column(Modifier.fillMaxSize().background(SukaSurface)) {
+    Column(Modifier.fillMaxSize().background(WarnaIos.Latar)) {
         HeaderStok(judul = "Ledger Stok", subjudul = "Buku Kas & Riwayat Mutasi Bahan") {
-            IconButton(onClick = viewModel::segarkan) {
-                Icon(Icons.Default.Refresh, "Segarkan", tint = Color(0xFF1E293B))
-            }
+            TombolBundarIos(IkonIos.Refresh, "Segarkan", viewModel::segarkan)
         }
 
         if (!state.tidakBerhak && state.outlets.size > 1) {
@@ -374,61 +362,22 @@ fun LedgerScreen(
                 Column(Modifier.fillMaxSize()) {
                     // 1. Tombol Buat Entri Manual (persis web)
                     if (onEntriManual != null) {
-                        Surface(
-                            onClick = onEntriManual,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                            shape = RoundedCornerShape(14.dp),
-                            color = SukaOrange,
-                            shadowElevation = 1.dp,
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(vertical = 12.dp),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Icon(Icons.Default.Add, null, tint = Color.White, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Text(
-                                    "BUAT ENTRI MANUAL",
-                                    color = Color.White,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    letterSpacing = 0.5.sp,
-                                    )
-                            }
-                        }
+                        TombolUtamaIos(
+                            "Buat Entri Manual",
+                            onEntriManual,
+                            Modifier.padding(horizontal = UkuranIos.TepiLayar, vertical = 8.dp),
+                            ikon = IkonIos.Add,
+                        )
                     }
 
                     // 2. Bar Pencarian
-                    OutlinedTextField(
-                        value = state.kataKunci,
-                        onValueChange = viewModel::ubahKataKunci,
-                        modifier = Modifier
+                    KolomCariIos(
+                        state.kataKunci,
+                        viewModel::ubahKataKunci,
+                        Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 4.dp),
-                        placeholder = {
-                            Text("Cari nama bahan baku atau nomor order/opname…", fontSize = 12.sp, color = Color(0xFF94A3B8))
-                        },
-                        leadingIcon = {
-                            Icon(Icons.Default.Search, contentModifier("Cari"), tint = Color(0xFF94A3B8), modifier = Modifier.size(18.dp))
-                        },
-                        trailingIcon = {
-                            if (state.kataKunci.isNotEmpty()) {
-                                IconButton(onClick = { viewModel.ubahKataKunci("") }) {
-                                    Icon(Icons.Default.Clear, "Hapus", tint = Color(0xFF94A3B8), modifier = Modifier.size(16.dp))
-                                }
-                            }
-                        },
-                        singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = Color.White,
-                            unfocusedContainerColor = Color.White,
-                            focusedBorderColor = SukaOrange,
-                            unfocusedBorderColor = Color(0xFFE2E8F0),
-                        ),
+                            .padding(horizontal = UkuranIos.TepiLayar, vertical = 4.dp),
+                        placeholder = "Cari nama bahan baku atau nomor order/opname…",
                     )
 
                     // 3. Filter Chips Row + Tombol Glosarium
@@ -436,63 +385,16 @@ fun LedgerScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .horizontalScroll(rememberScrollState())
-                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                            .padding(horizontal = UkuranIos.TepiLayar, vertical = 8.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         KategoriLedger.entries.forEach { kat ->
-                            val aktif = kat == state.filterAktif
-                            Surface(
-                                onClick = { viewModel.pilihFilter(kat) },
-                                shape = RoundedCornerShape(20.dp),
-                                color = if (aktif) Color(0xFF0F172A) else Color.White,
-                                border = BorderStroke(1.dp, if (aktif) Color(0xFF0F172A) else Color(0xFFE2E8F0)),
-                                shadowElevation = if (aktif) 0.5.dp else 0.dp,
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                ) {
-                                    Icon(
-                                        kat.icon,
-                                        null,
-                                        tint = if (aktif) Color.White else Color(0xFF64748B),
-                                        modifier = Modifier.size(14.dp),
-                                    )
-                                    Text(
-                                        kat.label.uppercase(Locale.ROOT),
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (aktif) Color.White else Color(0xFF475569),
-                                        letterSpacing = 0.3.sp,
-                                    )
-                                }
-                            }
+                            ChipFilter(kat.label, kat.icon, kat == state.filterAktif) { viewModel.pilihFilter(kat) }
                         }
 
                         // Tombol Glosarium
-                        Surface(
-                            onClick = viewModel::bukaGlosarium,
-                            shape = RoundedCornerShape(20.dp),
-                            color = Color.White,
-                            border = BorderStroke(1.dp, Color(0xFFFDBA74)),
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            ) {
-                                Icon(Icons.Default.MenuBook, null, tint = SukaOrange, modifier = Modifier.size(14.dp))
-                                Text(
-                                    "GLOSARIUM",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = SukaOrange,
-                                    letterSpacing = 0.3.sp,
-                                )
-                            }
-                        }
+                        TombolKapsulIos("Glosarium", viewModel::bukaGlosarium, ikon = IkonIos.MenuBook)
                     }
 
                     // 4. Daftar Transaksi (Pull-to-Refresh standar industri)
@@ -507,26 +409,21 @@ fun LedgerScreen(
                         } else {
                             LazyColumn(
                                 Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(9.dp),
+                                contentPadding = PaddingValues(
+                                    start = UkuranIos.TepiLayar, end = UkuranIos.TepiLayar, top = 4.dp, bottom = UkuranIos.TepiLayar,
+                                ).denganRuangNav(),
+                                verticalArrangement = Arrangement.spacedBy(UkuranIos.JarakKartu),
                             ) {
                                 items(terfilter, key = { it.transaksiKey }) { t ->
                                     KartuTransaksi(t) { viewModel.bukaDetail(t) }
                                 }
                                 if (!state.habis && state.kataKunci.isEmpty() && state.filterAktif == KategoriLedger.SEMUA) {
                                     item(key = "lagi") {
-                                        Surface(
-                                            Modifier.fillMaxWidth().clickable { viewModel.muatLagi() },
-                                            shape = RoundedCornerShape(14.dp),
-                                            color = Color.White,
-                                            border = BorderStroke(1.dp, Color(0xFFE7ECF2)),
-                                        ) {
+                                        KartuIos(onKlik = { viewModel.muatLagi() }) {
                                             Text(
                                                 if (state.memuatLagi) "Memuat…" else "Muat lebih banyak",
-                                                Modifier.fillMaxWidth().padding(14.dp),
-                                                color = Color(0xFFEA580C),
-                                                fontSize = 13.sp,
-                                                fontWeight = FontWeight.Bold,
+                                                Modifier.fillMaxWidth(),
+                                                style = TipeIos.Isi.copy(color = WarnaIos.Aksen, fontWeight = FontWeight.SemiBold),
                                                 textAlign = TextAlign.Center,
                                             )
                                         }
@@ -538,8 +435,8 @@ fun LedgerScreen(
                         PullToRefreshContainer(
                             state = pullRefreshState,
                             modifier = Modifier.align(Alignment.TopCenter),
-                            containerColor = Color.White,
-                            contentColor = SukaOrange,
+                            containerColor = WarnaIos.Kartu,
+                            contentColor = WarnaIos.Aksen,
                         )
                     }
                 }
@@ -550,7 +447,11 @@ fun LedgerScreen(
     // Modal BottomSheet Detail Transaksi
     val detailUntuk = state.detailUntuk
     if (detailUntuk != null) {
-        ModalBottomSheet(onDismissRequest = viewModel::tutupDetail, sheetState = sheetState) {
+        ModalBottomSheet(
+            onDismissRequest = viewModel::tutupDetail,
+            sheetState = sheetState,
+            containerColor = WarnaIos.Latar,
+        ) {
             DetailBottomSheetContent(
                 t = detailUntuk,
                 memuat = state.memuatDetail,
@@ -564,13 +465,42 @@ fun LedgerScreen(
 
     // Modal Glosarium Satuan
     if (state.bukaGlosarium) {
-        ModalBottomSheet(onDismissRequest = viewModel::tutupGlosarium, sheetState = glosariumSheetState) {
+        ModalBottomSheet(
+            onDismissRequest = viewModel::tutupGlosarium,
+            sheetState = glosariumSheetState,
+            containerColor = WarnaIos.Latar,
+        ) {
             GlosariumSatuanSheet(
                 daftarBahan = state.daftarBahanGlosarium,
                 memuat = state.memuatGlosarium,
                 onTutup = viewModel::tutupGlosarium,
             )
         }
+    }
+}
+
+/**
+ * Chip filter kategori. Aktif terisi aksen; pasif berupa isian abu seperti
+ * kontrol iOS lain — tanpa garis tepi dan tanpa huruf kapital.
+ */
+@Composable
+private fun ChipFilter(teks: String, ikon: ImageVector, aktif: Boolean, onKlik: () -> Unit) {
+    Row(
+        Modifier
+            .height(34.dp)
+            .background(if (aktif) WarnaIos.Aksen else WarnaIos.Isian, UkuranIos.SudutKapsul)
+            .tekanIos(onKlik)
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Icon(ikon, null, tint = if (aktif) Color.White else WarnaIos.LabelKedua, modifier = Modifier.size(14.dp))
+        Text(
+            teks,
+            color = if (aktif) Color.White else WarnaIos.Label,
+            fontSize = 14.sp,
+            fontWeight = if (aktif) FontWeight.SemiBold else FontWeight.Medium,
+        )
     }
 }
 
@@ -583,78 +513,44 @@ data class VisualTransaksi(
     val borderColor: Color,
 )
 
+/** Visual per jenis transaksi. Latar selalu warna ikon tipis, seperti ikon baris iOS. */
+private fun visual(icon: ImageVector, warna: Color) = VisualTransaksi(
+    icon = icon,
+    iconColor = warna,
+    bgColor = warna.copy(alpha = 0.14f),
+    borderColor = Color.Transparent,
+)
+
 private fun getTransaksiVisual(t: LedgerTransaksi): VisualTransaksi {
     if (t.refOrderId != null) {
-        return VisualTransaksi(
-            icon = Icons.Default.Receipt,
-            iconColor = Color(0xFF2563EB),
-            bgColor = Color(0xFFEFF6FF),
-            borderColor = Color(0xFFDBEAFE),
-        )
+        return visual(IkonIos.Receipt, WarnaIos.Biru)
     }
     if (t.refOpnameId != null) {
-        return VisualTransaksi(
-            icon = Icons.Default.Tune,
-            iconColor = Color(0xFFD97706),
-            bgColor = Color(0xFFFFFBEB),
-            borderColor = Color(0xFFFEF3C7),
-        )
+        return visual(IkonIos.Tune, WarnaIos.Oranye)
     }
     if (t.refShipmentId != null) {
         val isKirim = (t.singleQty ?: 0.0) < 0
-        return VisualTransaksi(
-            icon = if (isKirim) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward,
-            iconColor = if (isKirim) Color(0xFFEA580C) else Color(0xFF168451),
-            bgColor = if (isKirim) Color(0xFFFFF7ED) else Color(0xFFECFDF5),
-            borderColor = if (isKirim) Color(0xFFFFEDD5) else Color(0xFFD1FAE5),
+        return visual(
+            if (isKirim) IkonIos.ArrowUpward else IkonIos.ArrowDownward,
+            if (isKirim) WarnaIos.Aksen else WarnaIos.Hijau,
         )
     }
     if (t.refTransferId != null) {
-        return VisualTransaksi(
-            icon = Icons.Default.SwapHoriz,
-            iconColor = Color(0xFFEA580C),
-            bgColor = Color(0xFFFFF7ED),
-            borderColor = Color(0xFFFFEDD5),
-        )
+        return visual(IkonIos.SwapHoriz, WarnaIos.Aksen)
     }
     if (t.singleTipe == "terima_kiriman" || t.singleTipe == "transfer_masuk" || t.singleTipe == "pembelian_supplier") {
-        return VisualTransaksi(
-            icon = Icons.Default.ArrowDownward,
-            iconColor = Color(0xFF168451),
-            bgColor = Color(0xFFECFDF5),
-            borderColor = Color(0xFFD1FAE5),
-        )
+        return visual(IkonIos.ArrowDownward, WarnaIos.Hijau)
     }
     if (t.singleTipe == "waste" || t.singleTipe == "pemakaian") {
-        return VisualTransaksi(
-            icon = Icons.Default.Delete,
-            iconColor = Color(0xFFDC2626),
-            bgColor = Color(0xFFFEF2F2),
-            borderColor = Color(0xFFFEE2E2),
-        )
+        return visual(IkonIos.Delete, WarnaIos.Merah)
     }
     if (t.singleTipe == "waste_pending") {
-        return VisualTransaksi(
-            icon = Icons.Default.HourglassEmpty,
-            iconColor = Color(0xFFD97706),
-            bgColor = Color(0xFFFFFBEB),
-            borderColor = Color(0xFFFEF3C7),
-        )
+        return visual(IkonIos.HourglassEmpty, WarnaIos.Oranye)
     }
     if (t.singleTipe == "transfer_keluar") {
-        return VisualTransaksi(
-            icon = Icons.Default.ArrowUpward,
-            iconColor = Color(0xFFEA580C),
-            bgColor = Color(0xFFFFF7ED),
-            borderColor = Color(0xFFFFEDD5),
-        )
+        return visual(IkonIos.ArrowUpward, WarnaIos.Aksen)
     }
-    return VisualTransaksi(
-        icon = Icons.Default.Scale,
-        iconColor = Color(0xFF64748B),
-        bgColor = Color(0xFFF8FAFC),
-        borderColor = Color(0xFFE2E8F0),
-    )
+    return visual(IkonIos.Scale, WarnaIos.Abu)
 }
 
 /**
@@ -691,21 +587,13 @@ private fun KartuTransaksi(t: LedgerTransaksi, onKlik: () -> Unit) {
         t.refOpnameId == null && t.refShipmentId == null && t.refTransferId == null
     val menambah = (t.singleQty ?: 0.0) >= 0
 
-    Surface(
-        Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onKlik),
-        shape = RoundedCornerShape(16.dp),
-        color = Color.White,
-        border = BorderStroke(1.dp, Color(0xFFF1F5F9)),
-        shadowElevation = 0.5.dp,
-    ) {
-        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            // Icon Kotak Visual
+    KartuIos(onKlik = onKlik, padding = PaddingValues(horizontal = UkuranIos.PaddingKartu, vertical = 14.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            // Ikon bundar bernada, bahasa ikon yang sama dengan baris iOS.
             Box(
                 Modifier
-                    .size(42.dp)
-                    .background(visual.bgColor, RoundedCornerShape(12.dp)),
+                    .size(40.dp)
+                    .background(visual.bgColor, CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
@@ -721,30 +609,21 @@ private fun KartuTransaksi(t: LedgerTransaksi, onKlik: () -> Unit) {
             // Info Utama
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Badge Judul
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = Color(0xFFF1F5F9),
-                        border = BorderStroke(0.5.dp, Color(0xFFE2E8F0)),
-                    ) {
-                        Text(
-                            label.title.uppercase(Locale.ROOT),
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                            color = Color(0xFF475569),
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            letterSpacing = 0.5.sp,
-                        )
-                    }
-                    Spacer(Modifier.width(6.dp))
                     Text(
-                        waktuRelatif(t.createdAt),
-                        color = Color(0xFF94A3B8),
-                        fontSize = 10.sp,
+                        label.title,
+                        style = TipeIos.Kecil.copy(color = visual.iconColor, fontWeight = FontWeight.SemiBold),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    Text(
+                        "  ·  ${waktuRelatif(t.createdAt)}",
+                        style = TipeIos.Kecil,
+                        maxLines = 1,
                     )
                 }
 
-                Spacer(Modifier.height(3.dp))
+                Spacer(Modifier.height(2.dp))
 
                 // Headline Nama Bahan / Menu Order / Keterangan
                 val headline = if (isManual) {
@@ -755,9 +634,7 @@ private fun KartuTransaksi(t: LedgerTransaksi, onKlik: () -> Unit) {
 
                 Text(
                     headline,
-                    color = SukaOnSurface,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
+                    style = TipeIos.Utama.copy(fontSize = 16.sp),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -768,8 +645,7 @@ private fun KartuTransaksi(t: LedgerTransaksi, onKlik: () -> Unit) {
                     if (!cleanCatatan.isNullOrBlank()) {
                         Text(
                             cleanCatatan,
-                            color = SukaOnSurfaceVariant,
-                            fontSize = 10.sp,
+                            style = TipeIos.Catatan,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -791,28 +667,21 @@ private fun KartuTransaksi(t: LedgerTransaksi, onKlik: () -> Unit) {
 
                     Text(
                         deltaTeks,
-                        color = if (t.wastePending) Color(0xFFD97706) else if (menambah) Color(0xFF168451) else Color(0xFFDC2626),
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.ExtraBold,
+                        style = TipeIos.Keterangan.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = when {
+                                t.wastePending -> NadaIos.PERINGATAN.teks
+                                menambah -> NadaIos.SUKSES.teks
+                                else -> NadaIos.BAHAYA.teks
+                            },
+                        ),
                         textAlign = TextAlign.End,
                     )
 
-                    Spacer(Modifier.height(3.dp))
+                    Spacer(Modifier.height(4.dp))
 
                     if (t.wastePending) {
-                        Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = Color(0xFFFFFBEB),
-                            border = BorderStroke(0.5.dp, Color(0xFFFDE68A)),
-                        ) {
-                            Text(
-                                "Menunggu Verifikasi",
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
-                                color = Color(0xFFB45309),
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                            )
-                        }
+                        LencanaIos("Menunggu Verifikasi", NadaIos.PERINGATAN, titik = false)
                     } else if (t.singleSaldoSesudah != null) {
                         val saldoTeks = if (isDelivery && t.singleNamaBahan != null) {
                             DeliveryUnits.format(t.singleSaldoSesudah, t.singleNamaBahan, true)
@@ -820,38 +689,47 @@ private fun KartuTransaksi(t: LedgerTransaksi, onKlik: () -> Unit) {
                         } else {
                             UnitScale.formatSaldoLedger(t.singleSaldoSesudah, t.singleMeta, t.singleSaldoIsGram)
                         }
-                        Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = Color(0xFFF8FAFC),
-                            border = BorderStroke(0.5.dp, Color(0xFFE2E8F0)),
-                        ) {
-                            Text(
-                                "Saldo: $saldoTeks",
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
-                                color = Color(0xFF64748B),
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                        }
+                        Text("Saldo: $saldoTeks", style = TipeIos.Kecil, textAlign = TextAlign.End)
                     }
                 } else {
                     // Kejadian Gabungan (Composite)
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = Color(0xFFF8FAFC),
-                        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-                    ) {
-                        Text(
-                            "Detail ▾",
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            color = Color(0xFF64748B),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Detail", style = TipeIos.Catatan)
+                        Spacer(Modifier.width(2.dp))
+                        Icon(IkonIos.ChevronRight, null, tint = WarnaIos.LabelKetiga, modifier = Modifier.size(15.dp))
                     }
                 }
             }
         }
+    }
+}
+
+/** Baris putih bersudut untuk isi lembar bawah — kartu tipis tanpa garis tepi. */
+private fun Modifier.barisLembar(): Modifier =
+    fillMaxWidth().background(WarnaIos.Kartu, UkuranIos.SudutBlok)
+
+/** Kepala lembar bawah: judul, keterangan, tombol tutup bulat. */
+@Composable
+private fun KepalaLembar(judul: String, keterangan: String, onTutup: () -> Unit, ikon: ImageVector? = null) {
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (ikon != null) {
+            Box(
+                Modifier.size(36.dp).background(WarnaIos.Aksen.copy(alpha = 0.14f), CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(ikon, null, tint = WarnaIos.Aksen, modifier = Modifier.size(19.dp))
+            }
+            Spacer(Modifier.width(10.dp))
+        }
+        Column(Modifier.weight(1f)) {
+            Text(judul, style = TipeIos.Judul3)
+            Text(keterangan, style = TipeIos.Catatan)
+        }
+        Spacer(Modifier.width(8.dp))
+        TombolBundarIos(IkonIos.Close, "Tutup", onTutup, warnaIkon = WarnaIos.LabelKedua)
     }
 }
 
@@ -877,97 +755,51 @@ private fun DetailBottomSheetContent(
     Column(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 12.dp)
+            .padding(horizontal = UkuranIos.TepiLayar, vertical = 12.dp)
             .heightIn(max = 650.dp),
     ) {
         // Header Sheet
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    label.title,
-                    color = SukaOnSurface,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                )
-                Text(
-                    waktuSingkat(t.createdAt),
-                    color = SukaOnSurfaceVariant,
-                    fontSize = 11.sp,
-                )
-            }
-            IconButton(onClick = onTutup) {
-                Icon(Icons.Default.Close, "Tutup", tint = Color(0xFF64748B))
-            }
-        }
+        KepalaLembar(label.title, waktuSingkat(t.createdAt), onTutup)
 
         Spacer(Modifier.height(14.dp))
 
         if (memuat) {
             Box(Modifier.fillMaxWidth().padding(vertical = 40.dp), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = SukaOrange, modifier = Modifier.size(32.dp))
+                CircularProgressIndicator(color = WarnaIos.Aksen, modifier = Modifier.size(32.dp))
             }
             return
         }
 
         LazyColumn(
             Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             // A. Kasus Transaksi ORDER / PENJUALAN
             if (t.refOrderId != null) {
                 item {
-                    Text(
-                        "RINCIAN PESANAN",
-                        color = Color(0xFF64748B),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.5.sp,
-                    )
-                    Spacer(Modifier.height(6.dp))
+                    LabelSeksiIos("Rincian Pesanan", Modifier.padding(start = 4.dp, bottom = 2.dp))
                 }
 
                 if (orderDetails.isEmpty()) {
                     item {
-                        Text("Tidak ada data rincian pesanan.", color = SukaOnSurfaceVariant, fontSize = 12.sp)
+                        Text("Tidak ada data rincian pesanan.", style = TipeIos.SubJudul)
                     }
                 } else {
                     items(orderDetails, key = { it.id }) { item ->
-                        Surface(
-                            Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(10.dp),
-                            color = Color(0xFFF8FAFC),
-                            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                        Row(
+                            Modifier
+                                .barisLembar()
+                                .padding(horizontal = 14.dp, vertical = 11.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Row(
-                                Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(
-                                    item.menuItemName,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = SukaOnSurface,
-                                    modifier = Modifier.weight(1f),
-                                )
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = Color.White,
-                                    border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-                                ) {
-                                    Text(
-                                        "${item.quantity} Porsi",
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = Color(0xFF1E293B),
-                                    )
-                                }
-                            }
+                            Text(
+                                item.menuItemName,
+                                style = TipeIos.Keterangan.copy(fontWeight = FontWeight.SemiBold),
+                                modifier = Modifier.weight(1f),
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            LencanaIos("${item.quantity} Porsi", NadaIos.AKSEN, titik = false)
                         }
                     }
                 }
@@ -986,9 +818,7 @@ private fun DetailBottomSheetContent(
                     item {
                         Text(
                             t.singleCatatan ?: "Tidak ada rincian tambahan.",
-                            color = SukaOnSurfaceVariant,
-                            fontSize = 12.sp,
-                            lineHeight = 18.sp,
+                            style = TipeIos.SubJudul,
                         )
                     }
                 } else {
@@ -1016,25 +846,13 @@ private fun DetailBottomSheetContent(
                     grouped.forEach { (grup, list) ->
                         if (showGroupHeaders) {
                             item {
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = Color(0xFFF8FAFC),
-                                    border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-                                    modifier = Modifier.padding(top = 4.dp),
+                                Row(
+                                    Modifier.padding(start = 4.dp, top = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 ) {
-                                    Row(
-                                        Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    ) {
-                                        Icon(Icons.Default.FolderOpen, null, tint = Color(0xFF64748B), modifier = Modifier.size(13.dp))
-                                        Text(
-                                            grup.uppercase(Locale.ROOT),
-                                            color = Color(0xFF475569),
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.ExtraBold,
-                                        )
-                                    }
+                                    Icon(IkonIos.FolderOpen, null, tint = WarnaIos.Abu, modifier = Modifier.size(14.dp))
+                                    LabelSeksiIos(grup)
                                 }
                             }
                         }
@@ -1052,7 +870,7 @@ private fun DetailBottomSheetContent(
 @Composable
 private fun BarisBahanBreakdown(row: LedgerDetailRow, isDelivery: Boolean) {
     val menambah = row.qty >= 0
-    val warna = if (menambah) Color(0xFF168451) else Color(0xFFDC2626)
+    val warna = if (menambah) NadaIos.SUKSES.teks else NadaIos.BAHAYA.teks
 
     val deltaTeks = if (isDelivery && row.namaBahan != null) {
         DeliveryUnits.format(row.qty, row.namaBahan, false)
@@ -1072,112 +890,87 @@ private fun BarisBahanBreakdown(row: LedgerDetailRow, isDelivery: Boolean) {
 
     Row(
         Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
+            .barisLembar()
+            .padding(horizontal = 14.dp, vertical = 11.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             row.namaBahan ?: "(bahan tidak dikenal)",
-            color = SukaOnSurface,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
+            style = TipeIos.Keterangan.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
             modifier = Modifier.weight(1f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-
+        Spacer(Modifier.width(8.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 deltaTeks,
-                color = warna,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.ExtraBold,
+                style = TipeIos.Catatan.copy(color = warna, fontWeight = FontWeight.Bold),
             )
             if (sisaTeks != null) {
-                Text(
-                    " → sisa $sisaTeks",
-                    color = Color(0xFF94A3B8),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                )
+                Text(" → sisa $sisaTeks", style = TipeIos.Kecil)
             }
         }
     }
 }
 
+/** Satu baris label–nilai di kartu audit, dengan garis hairline di atasnya. */
+@Composable
+private fun BarisAudit(label: String, nilai: String, warna: Color = WarnaIos.Label, pemisah: Boolean = true) {
+    if (pemisah) PemisahIos()
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, style = TipeIos.SubJudul)
+        Spacer(Modifier.width(12.dp))
+        Text(
+            nilai,
+            Modifier.weight(1f),
+            style = TipeIos.SubJudul.copy(color = warna, fontWeight = FontWeight.SemiBold),
+            textAlign = TextAlign.End,
+        )
+    }
+}
+
 @Composable
 private fun KartuAuditLengkap(audit: LedgerAuditDetail, isDelivery: Boolean) {
-    Surface(
-        Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
-        color = Color.White,
-        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        // Rincian sebagai grup iOS: satu kartu, baris dipisah garis hairline.
+        Column(Modifier.fillMaxWidth().permukaanIos(UkuranIos.SudutGrup)) {
             // Log ID & Tipe
             Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column {
-                    Text("ID LOG", fontSize = 9.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF94A3B8))
-                    Text(audit.id, fontSize = 10.sp, fontFamily = FontFamily.Monospace, color = Color(0xFF64748B))
-                }
-                Surface(
-                    shape = RoundedCornerShape(6.dp),
-                    color = Color(0xFFF1F5F9),
-                    border = BorderStroke(0.5.dp, Color(0xFFCBD5E1)),
-                ) {
+                Column(Modifier.weight(1f)) {
+                    Text("ID Log", style = TipeIos.Kecil)
                     Text(
-                        audit.tipe.uppercase(Locale.ROOT),
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Color(0xFF334155),
+                        audit.id,
+                        style = TipeIos.Kecil.copy(fontFamily = FontFamily.Monospace, color = WarnaIos.LabelKedua),
                     )
                 }
+                Spacer(Modifier.width(8.dp))
+                LencanaIos(audit.tipe, NadaIos.NETRAL, titik = false)
             }
-
-            Spacer(Modifier.height(2.dp))
 
             // Waktu Transaksi
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Waktu Transaksi", fontSize = 11.sp, color = Color(0xFF64748B), fontWeight = FontWeight.Medium)
-                Text(waktuSingkat(audit.createdAt), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = SukaOnSurface)
-            }
+            BarisAudit("Waktu Transaksi", waktuSingkat(audit.createdAt))
 
             // Dibuat Oleh / Pelapor
             if (!audit.wasteReporterName.isNullOrBlank()) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Dilaporkan Oleh", fontSize = 11.sp, color = Color(0xFF64748B), fontWeight = FontWeight.Medium)
-                    Text(audit.wasteReporterName, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = SukaOnSurface)
-                }
+                BarisAudit("Dilaporkan Oleh", audit.wasteReporterName)
             }
             if (!audit.wasteApproverName.isNullOrBlank()) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Disetujui Oleh", fontSize = 11.sp, color = Color(0xFF64748B), fontWeight = FontWeight.Medium)
-                    Text(audit.wasteApproverName, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = SukaOnSurface)
-                }
+                BarisAudit("Disetujui Oleh", audit.wasteApproverName)
             }
             if (audit.wasteReporterName.isNullOrBlank() && !audit.genericCreatorName.isNullOrBlank()) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Dibuat Oleh", fontSize = 11.sp, color = Color(0xFF64748B), fontWeight = FontWeight.Medium)
-                    Text(audit.genericCreatorName, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = SukaOnSurface)
-                }
+                BarisAudit("Dibuat Oleh", audit.genericCreatorName)
             }
 
             // Bahan Baku
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Bahan Baku", fontSize = 11.sp, color = Color(0xFF64748B), fontWeight = FontWeight.Medium)
-                Text(
-                    audit.namaBahan ?: "-",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color(0xFF0F172A),
-                )
-            }
+            BarisAudit("Bahan Baku", audit.namaBahan ?: "-")
 
             // Perubahan Stok
             val deltaTeks = if (isDelivery && audit.namaBahan != null) {
@@ -1186,15 +979,11 @@ private fun KartuAuditLengkap(audit: LedgerAuditDetail, isDelivery: Boolean) {
             } else {
                 UnitScale.formatQtyLedger(audit.qty, audit.meta, audit.saldoIsGram)
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Jumlah Perubahan", fontSize = 11.sp, color = Color(0xFF64748B), fontWeight = FontWeight.Medium)
-                Text(
-                    deltaTeks,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = if (audit.qty >= 0) Color(0xFF168451) else Color(0xFFDC2626),
-                )
-            }
+            BarisAudit(
+                "Jumlah Perubahan",
+                deltaTeks,
+                if (audit.qty >= 0) NadaIos.SUKSES.teks else NadaIos.BAHAYA.teks,
+            )
 
             // Mutasi Saldo
             if (audit.saldoSebelum != null && audit.saldoSesudah != null) {
@@ -1210,55 +999,45 @@ private fun KartuAuditLengkap(audit: LedgerAuditDetail, isDelivery: Boolean) {
                 } else {
                     UnitScale.formatSaldoLedger(audit.saldoSesudah, audit.meta, audit.saldoIsGram)
                 }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Mutasi Saldo", fontSize = 11.sp, color = Color(0xFF64748B), fontWeight = FontWeight.Medium)
-                    Text("$sblm → $sesudah", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = SukaOnSurface)
-                }
+                BarisAudit("Mutasi Saldo", "$sblm → $sesudah")
             }
+        }
 
-            // Catatan
-            if (!audit.catatan.isNullOrBlank()) {
-                val bersih = LedgerRepository.cleanCatatan(audit.catatan)
-                if (!bersih.isNullOrBlank()) {
-                    Column(Modifier.fillMaxWidth()) {
-                        Text("Catatan", fontSize = 11.sp, color = Color(0xFF64748B), fontWeight = FontWeight.Medium)
-                        Spacer(Modifier.height(2.dp))
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = Color(0xFFF8FAFC),
-                            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-                        ) {
-                            Text(
-                                bersih,
-                                modifier = Modifier.padding(8.dp),
-                                fontSize = 11.sp,
-                                color = SukaOnSurface,
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Foto Lampiran Waste (jika ada)
-            if (!audit.wastePhotoUrl.isNullOrBlank()) {
+        // Catatan
+        if (!audit.catatan.isNullOrBlank()) {
+            val bersih = LedgerRepository.cleanCatatan(audit.catatan)
+            if (!bersih.isNullOrBlank()) {
                 Column(Modifier.fillMaxWidth()) {
-                    Text("Foto Lampiran Bukti", fontSize = 11.sp, color = Color(0xFF64748B), fontWeight = FontWeight.Medium)
-                    Spacer(Modifier.height(4.dp))
-                    Box(
-                        Modifier
+                    LabelSeksiIos("Catatan", Modifier.padding(start = 16.dp, bottom = 6.dp))
+                    Text(
+                        bersih,
+                        modifier = Modifier
                             .fillMaxWidth()
-                            .height(200.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(Color(0xFFF1F5F9)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        AsyncImage(
-                            model = audit.wastePhotoUrl,
-                            contentDescription = "Bukti Waste",
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Fit,
-                        )
-                    }
+                            .permukaanIos(UkuranIos.SudutGrup)
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        style = TipeIos.SubJudul.copy(color = WarnaIos.Label),
+                    )
+                }
+            }
+        }
+
+        // Foto Lampiran Waste (jika ada)
+        if (!audit.wastePhotoUrl.isNullOrBlank()) {
+            Column(Modifier.fillMaxWidth()) {
+                LabelSeksiIos("Foto Lampiran Bukti", Modifier.padding(start = 16.dp, bottom = 6.dp))
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(200.dp)
+                        .permukaanIos(UkuranIos.SudutGrup, WarnaIos.Isian),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    AsyncImage(
+                        model = audit.wastePhotoUrl,
+                        contentDescription = "Bukti Waste",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit,
+                    )
                 }
             }
         }
@@ -1285,62 +1064,29 @@ private fun GlosariumSatuanSheet(
     Column(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 12.dp)
+            .padding(horizontal = UkuranIos.TepiLayar, vertical = 12.dp)
             .heightIn(max = 600.dp),
     ) {
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(Icons.Default.MenuBook, null, tint = SukaOrange, modifier = Modifier.size(22.dp))
-                Column {
-                    Text(
-                        "Glosarium Satuan Bahan Baku",
-                        color = Color(0xFF0F172A),
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                    )
-                    Text(
-                        "Konversi satuan besar → kecil, biar tidak salah hitung.",
-                        color = Color(0xFF64748B),
-                        fontSize = 11.sp,
-                    )
-                }
-            }
-            IconButton(onClick = onTutup) {
-                Icon(Icons.Default.Close, "Tutup", tint = Color(0xFF64748B))
-            }
-        }
-
-        Spacer(Modifier.height(10.dp))
-
-        OutlinedTextField(
-            value = cari,
-            onValueChange = { cari = it },
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("Cari nama bahan…", fontSize = 12.sp, color = Color(0xFF94A3B8)) },
-            leadingIcon = { Icon(Icons.Default.Search, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(16.dp)) },
-            singleLine = true,
-            shape = RoundedCornerShape(10.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = Color.White,
-                unfocusedContainerColor = Color.White,
-                focusedBorderColor = SukaOrange,
-                unfocusedBorderColor = Color(0xFFE2E8F0),
-            ),
+        KepalaLembar(
+            "Glosarium Satuan Bahan Baku",
+            "Konversi satuan besar → kecil, biar tidak salah hitung.",
+            onTutup,
+            ikon = IkonIos.MenuBook,
         )
 
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(12.dp))
+
+        KolomCariIos(cari, { cari = it }, Modifier.fillMaxWidth(), placeholder = "Cari nama bahan…")
+
+        Spacer(Modifier.height(12.dp))
 
         if (memuat) {
             Box(Modifier.fillMaxWidth().padding(vertical = 30.dp), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = SukaOrange, modifier = Modifier.size(28.dp))
+                CircularProgressIndicator(color = WarnaIos.Aksen, modifier = Modifier.size(28.dp))
             }
         } else if (terfilter.isEmpty()) {
             Box(Modifier.fillMaxWidth().padding(vertical = 30.dp), contentAlignment = Alignment.Center) {
-                Text("Tidak ada bahan yang cocok.", color = Color(0xFF94A3B8), fontSize = 12.sp)
+                Text("Tidak ada bahan yang cocok.", style = TipeIos.SubJudul)
             }
         } else {
             LazyColumn(
@@ -1348,35 +1094,26 @@ private fun GlosariumSatuanSheet(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(terfilter, key = { it.id }) { b ->
-                    Surface(
-                        Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp),
-                        color = Color(0xFFFFF8F1),
-                        border = BorderStroke(1.dp, Color(0xFFFED7AA).copy(alpha = 0.5f)),
+                    Row(
+                        Modifier
+                            .barisLembar()
+                            .padding(horizontal = 14.dp, vertical = 11.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Row(
-                            Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                b.nama.uppercase(Locale.ROOT),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF1E1B15),
-                                modifier = Modifier.weight(1f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                formatKonversiBahan(b),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = Color(0xFFEA580C),
-                                textAlign = TextAlign.End,
-                            )
-                        }
+                        Text(
+                            b.nama,
+                            style = TipeIos.Keterangan.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            formatKonversiBahan(b),
+                            style = TipeIos.Catatan.copy(color = NadaIos.AKSEN.teks, fontWeight = FontWeight.SemiBold),
+                            textAlign = TextAlign.End,
+                        )
                     }
                 }
             }
