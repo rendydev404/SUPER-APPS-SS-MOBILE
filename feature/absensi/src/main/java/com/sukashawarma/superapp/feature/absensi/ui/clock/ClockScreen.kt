@@ -1,5 +1,9 @@
 package com.sukashawarma.superapp.presentation.absensi.clock
 
+import com.sukashawarma.superapp.core.ui.kaca.LatarKaca
+import com.sukashawarma.superapp.core.ui.kaca.panelKaca
+import com.sukashawarma.superapp.core.ui.kaca.rememberLatarKaca
+import com.sukashawarma.superapp.core.ui.kaca.sumberKaca
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.compose.animation.AnimatedContent
@@ -85,6 +89,20 @@ import androidx.compose.ui.res.painterResource
 import com.sukashawarma.superapp.core.ui.AvatarStaf
 import com.sukashawarma.superapp.core.ui.RealtimeRefresh
 import com.sukashawarma.superapp.core.ui.RealtimeTables
+import com.sukashawarma.superapp.core.ui.kaca.LocalRuangNavKaca
+import com.sukashawarma.superapp.core.ui.ios.JudulSeksiIos
+import com.sukashawarma.superapp.core.ui.ios.KartuIos
+import com.sukashawarma.superapp.core.ui.ios.KeadaanIos
+import com.sukashawarma.superapp.core.ui.ios.KolomCariIos
+import com.sukashawarma.superapp.core.ui.ios.LabelSeksiIos
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.PemisahIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.TombolKapsulIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.ios.permukaanIos
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
 
 /**
  * Panel absen.
@@ -121,56 +139,30 @@ fun ClockScreen(
     // Selama daftar outlet masih dimuat, jangan tampilkan kartu "belum terhubung" — itu
     // bukan kesimpulan yang bisa diambil sebelum datanya masuk.
     if (outletId == null && outletsState.loading) {
-        Scaffold(containerColor = SukaSurface) { padding ->
+        Scaffold(containerColor = WarnaIos.Latar) { padding ->
             Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = SukaOrange, strokeWidth = 3.dp)
+                CircularProgressIndicator(color = WarnaIos.Aksen, strokeWidth = 2.5.dp, modifier = Modifier.size(28.dp))
             }
         }
         return
     }
 
     if (outletId == null) {
-        Scaffold(containerColor = SukaSurface) { padding ->
+        Scaffold(containerColor = WarnaIos.Latar) { padding ->
             Box(
                 Modifier
                     .padding(padding)
                     .fillMaxSize()
-                    .padding(24.dp),
+                    .padding(UkuranIos.TepiLayar),
                 contentAlignment = Alignment.Center
             ) {
-                Surface(
-                    shape = RoundedCornerShape(24.dp),
-                    color = SukaSurfaceContainerLowest,
-                    border = BorderStroke(1.dp, SukaSurfaceContainerHighest),
-                    shadowElevation = 2.dp,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Icon(
-                            Icons.Default.Storefront,
-                            contentDescription = null,
-                            tint = SukaOrange,
-                            modifier = Modifier.size(48.dp)
-                        )
-                        Spacer(Modifier.height(16.dp))
-                        Text(
-                            "Akun Belum Terhubung Outlet",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp,
-                            color = SukaOnSurface,
-                            textAlign = TextAlign.Center
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            "Akun Anda belum terhubung ke outlet. Silakan hubungi admin atau SPV Anda.",
-                            color = SukaOnSurfaceVariant,
-                            fontSize = 14.sp,
-                            textAlign = TextAlign.Center
-                        )
-                    }
+                KartuIos {
+                    KeadaanIos(
+                        ikon = IkonIos.Storefront,
+                        judul = "Akun Belum Terhubung Outlet",
+                        pesan = "Akun Anda belum terhubung ke outlet. Silakan hubungi admin atau SPV Anda.",
+                        nada = NadaIos.AKSEN,
+                    )
                 }
             }
         }
@@ -268,14 +260,14 @@ fun ClockScreen(
     val scrollProgress by remember { derivedStateOf { (scrollState.value / 80f).coerceIn(0f, 1f) } }
 
     Scaffold(
-        containerColor = SukaSurface,
+        containerColor = WarnaIos.Latar,
         modifier = Modifier.fillMaxSize()
     ) { padding ->
         Column(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
-                .background(Color(0xFFF8F9FB))
+                .background(WarnaIos.Latar)
         ) {
             // Top App Bar — di LUAR area scroll (bukan child dari Column yang di-scroll)
             // supaya selalu ikut/menempel di atas, bukan ikut ter-scroll menghilang.
@@ -349,6 +341,9 @@ fun ClockScreen(
 
                     Spacer(Modifier.height(32.dp))
                 }
+                // Sebagai tab pager, riwayat terakhir berada di balik kapsul tab kaca;
+                // di rute CLOCK yang berdiri sendiri nilainya nol.
+                Spacer(Modifier.height(LocalRuangNavKaca.current))
             }
         }
     }
@@ -390,50 +385,42 @@ private fun AttendanceOutletSelector(
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = "Lokasi absen",
-                color = SukaOnSurfaceVariant,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f),
-            )
+            LabelSeksiIos("Lokasi absen", Modifier.weight(1f).padding(start = 4.dp))
             if (state.hasChoice && !state.autoDetected && !state.locating) {
                 TextButton(
                     onClick = onRedetect,
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                 ) {
-                    Text("Deteksi ulang", fontSize = 12.sp, color = SukaOrange, fontWeight = FontWeight.Bold)
+                    Text("Deteksi ulang", fontSize = 13.sp, color = WarnaIos.Aksen, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
 
         Box {
-            Surface(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable(enabled = state.outlets.isNotEmpty()) { onExpandedChange(true) },
-                shape = RoundedCornerShape(16.dp),
-                color = SukaSurfaceContainerLowest,
-                border = BorderStroke(1.dp, SukaSurfaceContainerHighest),
-                shadowElevation = 1.dp,
+                    .permukaanIos(UkuranIos.SudutGrup)
+                    .clickable(enabled = state.outlets.isNotEmpty()) { onExpandedChange(true) }
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Storefront,
-                        contentDescription = null,
-                        tint = SukaOrange,
-                        modifier = Modifier.size(22.dp),
-                    )
+                    Box(
+                        Modifier.size(32.dp).clip(CircleShape).background(WarnaIos.Aksen.copy(alpha = 0.14f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = IkonIos.Storefront,
+                            contentDescription = null,
+                            tint = WarnaIos.Aksen,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = selected?.name ?: if (state.loading) "Memuat outlet..." else "Pilih outlet",
-                            color = SukaOnSurface,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
+                            style = TipeIos.Isi.copy(fontWeight = FontWeight.SemiBold),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -448,8 +435,7 @@ private fun AttendanceOutletSelector(
                                     formatDistanceShort(selectedDistance) + " dari Anda"
                                 else -> state.outlets.size.toString() + " outlet terhubung ke akun Anda"
                             },
-                            color = SukaOnSurfaceVariant,
-                            fontSize = 11.sp,
+                            style = TipeIos.Catatan,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -458,16 +444,16 @@ private fun AttendanceOutletSelector(
                         CircularProgressIndicator(
                             modifier = Modifier.size(18.dp),
                             strokeWidth = 2.dp,
-                            color = SukaOrange,
+                            color = WarnaIos.Aksen,
                         )
                     } else {
                         Icon(
-                            imageVector = Icons.Default.KeyboardArrowDown,
+                            imageVector = IkonIos.ExpandMore,
                             contentDescription = "Ganti outlet",
-                            tint = SukaOnSurfaceVariant,
+                            tint = WarnaIos.LabelKetiga,
+                            modifier = Modifier.size(16.dp),
                         )
                     }
-                }
             }
 
             SukaDropdownMenu(
@@ -479,21 +465,11 @@ private fun AttendanceOutletSelector(
             ) {
                 Column(Modifier.padding(horizontal = 8.dp, vertical = 6.dp)) {
                     if (state.outlets.size > 6) {
-                        OutlinedTextField(
-                            value = searchQuery,
-                            onValueChange = { searchQuery = it },
+                        KolomCariIos(
+                            nilai = searchQuery,
+                            onUbah = { searchQuery = it },
                             modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            shape = RoundedCornerShape(12.dp),
-                            placeholder = { Text("Cari outlet", fontSize = 13.sp) },
-                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                            trailingIcon = {
-                                if (searchQuery.isNotEmpty()) {
-                                    IconButton(onClick = { searchQuery = "" }) {
-                                        Icon(Icons.Default.Clear, contentDescription = "Hapus pencarian")
-                                    }
-                                }
-                            },
+                            placeholder = "Cari outlet",
                         )
                         Spacer(Modifier.height(6.dp))
                     }
@@ -507,8 +483,7 @@ private fun AttendanceOutletSelector(
                         if (filteredOutlets.isEmpty()) {
                             Text(
                                 "Outlet tidak ditemukan",
-                                color = SukaOnSurfaceVariant,
-                                fontSize = 13.sp,
+                                style = TipeIos.Catatan,
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 18.dp),
                             )
                         } else filteredOutlets.forEach { outlet ->
@@ -523,7 +498,7 @@ private fun AttendanceOutletSelector(
                                 },
                                 badgeText = if (outlet.id == nearestId) "Terdekat" else null,
                                 selected = isSelected,
-                                leadingIcon = Icons.Default.Storefront,
+                                leadingIcon = IkonIos.Storefront,
                                 onClick = {
                                     onSelect(outlet.id)
                                     onExpandedChange(false)
@@ -542,11 +517,10 @@ private fun AttendanceOutletSelector(
             ) {
                 Text(
                     text = state.error,
-                    color = MaterialTheme.colorScheme.error,
-                    fontSize = 12.sp,
-                    modifier = Modifier.weight(1f),
+                    style = TipeIos.Catatan.copy(color = NadaIos.BAHAYA.teks),
+                    modifier = Modifier.weight(1f).padding(start = 4.dp),
                 )
-                TextButton(onClick = onRetry) { Text("Coba lagi") }
+                TombolKapsulIos("Coba lagi", onRetry)
             }
         }
     }
@@ -1334,51 +1308,32 @@ private fun GreetingSection(staffName: String?, outletName: String?) {
 
 @Composable
 private fun StatusHariIni(todayFormatted: String, currentStatusText: String, pulseAlpha: Float) {
-    Surface(
-        shape = RoundedCornerShape(24.dp),
-        color = Color.White,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(
-            modifier = Modifier.padding(20.dp)
+    KartuIos(padding = PaddingValues(horizontal = 18.dp, vertical = 16.dp)) {
+        Text(text = "Status Hari ini", style = TipeIos.Catatan)
+        Spacer(Modifier.height(2.dp))
+        Text(text = todayFormatted, style = TipeIos.Utama)
+        Spacer(Modifier.height(12.dp))
+        // Lencana bernada aksen ala LencanaIos, dengan titik berdenyut sebagai penanda "live".
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .clip(UkuranIos.SudutKapsul)
+                .background(WarnaIos.Aksen.copy(alpha = 0.14f))
+                .padding(horizontal = 12.dp, vertical = 6.dp)
         ) {
-            Text(
-                text = "Status Hari ini",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
-                color = Color.Gray
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(WarnaIos.Aksen.copy(alpha = pulseAlpha))
             )
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.width(7.dp))
             Text(
-                text = todayFormatted,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Color(0xFF11142D)
+                text = currentStatusText,
+                color = NadaIos.AKSEN.teks,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold
             )
-            Spacer(Modifier.height(14.dp))
-            Surface(
-                color = Color(0xFFFFF4EC),
-                shape = RoundedCornerShape(50)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(10.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFFE86F21).copy(alpha = pulseAlpha))
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = currentStatusText,
-                        color = Color(0xFFE86F21),
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-            }
         }
     }
 }
@@ -1392,119 +1347,85 @@ private fun HistorySection(
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text(
-            text = "Riwayat Absensi Terakhir",
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color(0xFF11142D),
-            modifier = Modifier.padding(horizontal = 4.dp)
-        )
+        JudulSeksiIos("Riwayat Absensi Terakhir")
 
         if (isLoading) {
-            Surface(
-                shape = RoundedCornerShape(24.dp),
-                color = Color.White,
-                modifier = Modifier.fillMaxWidth()
-            ) {
+            KartuIos {
                 Box(
-                    modifier = Modifier.fillMaxWidth().padding(32.dp),
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp, color = SukaOrange)
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp, color = WarnaIos.Aksen)
                 }
             }
         } else if (error != null) {
-            Surface(
-                shape = RoundedCornerShape(24.dp),
-                color = Color.White,
-                modifier = Modifier.fillMaxWidth()
-            ) {
+            KartuIos {
                 Column(
-                    modifier = Modifier.fillMaxWidth().padding(24.dp),
+                    modifier = Modifier.fillMaxWidth().padding(8.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    Text(error, fontSize = 14.sp, color = Color.Gray, textAlign = TextAlign.Center)
-                    TextButton(onClick = onRefresh) { Text("Coba lagi") }
+                    Text(error, style = TipeIos.SubJudul, textAlign = TextAlign.Center)
+                    TombolKapsulIos("Coba lagi", onRefresh)
                 }
             }
         } else if (history.isEmpty()) {
-            Surface(
-                shape = RoundedCornerShape(24.dp),
-                color = Color.White,
-                modifier = Modifier.fillMaxWidth()
-            ) {
+            KartuIos {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(32.dp),
+                        .padding(16.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        "Belum ada riwayat absensi",
-                        fontSize = 14.sp,
-                        color = Color.Gray,
-                        fontWeight = FontWeight.Medium
-                    )
+                    Text("Belum ada riwayat absensi", style = TipeIos.SubJudul)
                 }
             }
         } else {
-            history.forEach { item ->
-                val isClockIn = item.type == "in"
-                val (timeStr, relativeTag) = formatAttendanceTimeAndTag(item.occurredAtIso)
-
-                Surface(
-                    shape = RoundedCornerShape(24.dp),
-                    color = Color.White,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
+            // Satu grup inset iOS berisi baris-baris riwayat, dipisah garis hairline.
+            Column(Modifier.fillMaxWidth().permukaanIos(UkuranIos.SudutKartu)) {
+                history.forEachIndexed { index, item ->
+                    val isClockIn = item.type == "in"
+                    val (timeStr, relativeTag) = formatAttendanceTimeAndTag(item.occurredAtIso)
+                    if (index > 0) PemisahIos(inset = 70.dp)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp),
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(
+                            modifier = Modifier.weight(1f),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(54.dp)
+                                    .size(40.dp)
                                     .clip(CircleShape)
-                                    .background(if (isClockIn) Color(0xFFE6F4EA) else Color(0xFFFCE8E6)),
+                                    .background((if (isClockIn) WarnaIos.Hijau else WarnaIos.Merah).copy(alpha = 0.14f)),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = if (isClockIn) Icons.AutoMirrored.Filled.Login else Icons.AutoMirrored.Filled.Logout,
                                     contentDescription = if (isClockIn) "Clock In" else "Clock Out",
-                                    tint = if (isClockIn) Color(0xFF137333) else Color(0xFFC5221F),
-                                    modifier = Modifier.size(26.dp)
+                                    tint = if (isClockIn) NadaIos.SUKSES.teks else NadaIos.BAHAYA.teks,
+                                    modifier = Modifier.size(20.dp)
                                 )
                             }
                             Column {
                                 Text(
                                     text = if (isClockIn) "Clock In" else "Clock Out",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 16.sp,
-                                    color = Color(0xFF11142D)
+                                    style = TipeIos.Utama.copy(fontSize = 16.sp),
                                 )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = relativeTag,
-                                    fontSize = 13.sp,
-                                    color = Color.Gray
-                                )
+                                Text(text = relativeTag, style = TipeIos.Catatan)
                             }
                         }
                         Text(
                             text = timeStr,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            color = Color(0xFF11142D)
+                            style = TipeIos.Keterangan.copy(fontWeight = FontWeight.SemiBold),
                         )
                     }
                 }
@@ -1517,6 +1438,7 @@ private fun HistorySection(
 private fun CameraFeedbackBanner(
     visible: Boolean,
     message: String?,
+    latar: LatarKaca?,
     title: String = "Yuk, coba lagi",
     modifier: Modifier = Modifier,
 ) {
@@ -1526,13 +1448,9 @@ private fun CameraFeedbackBanner(
         enter = fadeIn(tween(140)) + scaleIn(tween(180), initialScale = 0.94f),
         exit = fadeOut(tween(100)) + scaleOut(tween(120), targetScale = 0.96f),
     ) {
-        Surface(
-            color = Color(0xFF1F2937).copy(alpha = 0.94f),
-            shape = RoundedCornerShape(18.dp),
-            border = BorderStroke(1.dp, Color(0xFFFBBF24).copy(alpha = 0.45f)),
-            shadowElevation = 4.dp,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
+        // Kaca cair yang sama dengan tab bar: preview kamera di belakangnya dibiaskan
+        // (diperbesar di tengah, ditekuk di tepi) lewat `latar` milik ActionArea.
+        Box(Modifier.fillMaxWidth().panelKaca(latar, sudut = 18.dp)) {
             Row(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -1558,18 +1476,29 @@ private fun CameraFeedbackBanner(
                         color = Color.White,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
+                        style = TeksDiAtasKaca,
                     )
                     Text(
                         text = message.orEmpty(),
-                        color = Color.White.copy(alpha = 0.78f),
+                        color = Color.White.copy(alpha = 0.9f),
                         fontSize = 12.sp,
                         lineHeight = 16.sp,
+                        style = TeksDiAtasKaca,
                     )
                 }
             }
         }
     }
 }
+
+/**
+ * Teks putih di atas kaca bening yang melayang di atas kamera: kaca tidak menggelapkan
+ * latar, jadi bayangan tipis inilah yang menjaga teks tetap terbaca saat kamera
+ * menyorot sesuatu yang terang.
+ */
+private val TeksDiAtasKaca = androidx.compose.ui.text.TextStyle(
+    shadow = androidx.compose.ui.graphics.Shadow(Color.Black.copy(alpha = 0.55f), androidx.compose.ui.geometry.Offset(0f, 1f), 6f),
+)
 
 private data class PillStatus(
     val icon: androidx.compose.ui.graphics.vector.ImageVector,
@@ -1588,13 +1517,10 @@ private fun CameraStatusPill(
     text: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     tint: Color,
+    latar: LatarKaca?,
     showSpinner: Boolean = false,
 ) {
-    Surface(
-        color = Color(0xFF0F172A).copy(alpha = 0.82f),
-        shape = RoundedCornerShape(50),
-        border = BorderStroke(1.dp, tint.copy(alpha = 0.4f)),
-    ) {
+    Box(Modifier.panelKaca(latar)) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1622,6 +1548,7 @@ private fun CameraStatusPill(
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     textAlign = TextAlign.Center,
+                    style = TeksDiAtasKaca,
                 )
             }
         }
@@ -1683,6 +1610,9 @@ private fun ActionArea(
         state.phase == ClockPhase.RESULT && resultOk == false -> Color(0xFFEF4444)
         else -> Color(0xFF3B82F6)
     }
+    // Kartu status di atas kamera memakai kaca cair yang sama dengan tab bar. Sumbernya
+    // hanya preview + mesh (bukan kartu itu sendiri), supaya kaca tidak membiaskan dirinya.
+    val latarKamera = rememberLatarKaca()
     val glowPulse by rememberInfiniteTransition(label = "frameGlow").animateFloat(
         initialValue = 0.5f,
         targetValue = 1f,
@@ -1723,64 +1653,69 @@ private fun ActionArea(
             shadowElevation = 14.dp
         ) {
         Box(Modifier.fillMaxSize()) {
-            if (cameraMounted) {
-                FaceCameraPreview(
-                    modifier = Modifier.fillMaxSize(),
-                    isActive = isActive,
-                    needsCrop = { state.phase == ClockPhase.IDLE },
-                    onFrame = { frame ->
-                        faceTrack = frame.faceBox?.let { box ->
-                            FaceTrackData(cx = box.cx, cy = box.cy, w = box.w, h = box.h, yawDeg = frame.signal.yawDeg)
-                        }
-                        val mesh = frame.faceMesh
-                        if (mesh != null) {
-                            smoothedMesh = smoothedMesh?.let { lerpContours(it, mesh, 0.4f) } ?: mesh
-                            lastMeshSeenMs = System.currentTimeMillis()
-                        } else if (System.currentTimeMillis() - lastMeshSeenMs > 600L) {
-                            smoothedMesh = null
-                        }
+            Box(Modifier.fillMaxSize().sumberKaca(latarKamera)) {
+                if (cameraMounted) {
+                    FaceCameraPreview(
+                        modifier = Modifier.fillMaxSize(),
+                        isActive = isActive,
+                        needsCrop = { state.phase == ClockPhase.IDLE },
+                        onFrame = { frame ->
+                            faceTrack = frame.faceBox?.let { box ->
+                                FaceTrackData(cx = box.cx, cy = box.cy, w = box.w, h = box.h, yawDeg = frame.signal.yawDeg)
+                            }
+                            val mesh = frame.faceMesh
+                            if (mesh != null) {
+                                smoothedMesh = smoothedMesh?.let { lerpContours(it, mesh, 0.4f) } ?: mesh
+                                lastMeshSeenMs = System.currentTimeMillis()
+                            } else if (System.currentTimeMillis() - lastMeshSeenMs > 600L) {
+                                smoothedMesh = null
+                            }
 
-                        val now = System.currentTimeMillis()
-                        val minIntervalMs = if (state.phase == ClockPhase.LIVENESS) 200L else 250L
-                        if (now - lastFrameMs < minIntervalMs) return@FaceCameraPreview
-                        onUpdateLastFrameMs(now)
-                        if (state.phase == ClockPhase.IDLE) viewModel.onIdleFrame(frame)
-                        else if (state.phase == ClockPhase.LIVENESS) viewModel.onLivenessFrame(frame)
-                    },
-                    onImageCaptureReady = { imageCapture = it },
-                )
+                            val now = System.currentTimeMillis()
+                            val minIntervalMs = if (state.phase == ClockPhase.LIVENESS) 200L else 250L
+                            if (now - lastFrameMs < minIntervalMs) return@FaceCameraPreview
+                            onUpdateLastFrameMs(now)
+                            if (state.phase == ClockPhase.IDLE) viewModel.onIdleFrame(frame)
+                            else if (state.phase == ClockPhase.LIVENESS) viewModel.onLivenessFrame(frame)
+                        },
+                        onImageCaptureReady = { imageCapture = it },
+                    )
+                }
+
+                if (showScanUi) {
+                    // The preview remains mounted through feedback, submitting, and result states.
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color.Black.copy(alpha = 0.32f),
+                                        Color.Transparent,
+                                        Color.Black.copy(alpha = 0.52f)
+                                    )
+                                )
+                            )
+                    )
+
+                    // Mesh SELALU tampil selama kamera hidup. Aksen pemindaian biru membuatnya
+                    // mudah dibedakan dari bingkai oranye; hasil tetap hijau/merah.
+                    FaceMeshOverlay(
+                        faceTrack = faceTrack,
+                        faceMesh = smoothedMesh,
+                        isDetecting = state.phase == ClockPhase.IDLE || state.phase == ClockPhase.LIVENESS || state.phase == ClockPhase.SUBMITTING,
+                        accentColor = meshAccent,
+                        celebrate = state.phase == ClockPhase.RESULT,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             }
 
             if (showScanUi) {
-                // The preview remains mounted through feedback, submitting, and result states.
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Black.copy(alpha = 0.32f),
-                                    Color.Transparent,
-                                    Color.Black.copy(alpha = 0.52f)
-                                )
-                            )
-                        )
-                )
-
-                // Mesh SELALU tampil selama kamera hidup. Aksen pemindaian biru membuatnya
-                // mudah dibedakan dari bingkai oranye; hasil tetap hijau/merah.
-                FaceMeshOverlay(
-                    faceTrack = faceTrack,
-                    faceMesh = smoothedMesh,
-                    isDetecting = state.phase == ClockPhase.IDLE || state.phase == ClockPhase.LIVENESS || state.phase == ClockPhase.SUBMITTING,
-                    accentColor = meshAccent,
-                    celebrate = state.phase == ClockPhase.RESULT,
-                    modifier = Modifier.fillMaxSize()
-                )
-
                 CameraFeedbackBanner(
                     visible = state.phase == ClockPhase.IDLE && resultOk == false,
                     message = state.result?.message?.let { formatDistanceInMessage(it) },
+                    latar = latarKamera,
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .padding(18.dp),
@@ -1811,7 +1746,7 @@ private fun ActionArea(
                             else ->
                                 PillStatus(Icons.Filled.Face, SukaOrange, "Posisikan wajah di tengah", false)
                         }
-                        CameraStatusPill(text = pillText, icon = pillIcon, tint = pillTint, showSpinner = pillSpinner)
+                        CameraStatusPill(text = pillText, icon = pillIcon, tint = pillTint, latar = latarKamera, showSpinner = pillSpinner)
 
                         if (allowManual && staff?.id != null && state.phase == ClockPhase.IDLE) {
                             Button(
