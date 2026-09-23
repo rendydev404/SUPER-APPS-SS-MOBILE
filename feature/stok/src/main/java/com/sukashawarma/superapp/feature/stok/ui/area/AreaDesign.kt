@@ -1,21 +1,21 @@
 package com.sukashawarma.superapp.feature.stok.ui.area
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
 
 /**
  * Palet dan potongan tampilan bersama untuk modul pengelola area. Dipisah supaya
@@ -52,51 +52,53 @@ internal val Amber300 = Color(0xFFFCD34D)
 internal val Amber500 = Color(0xFFF59E0B)
 internal val Amber800 = Color(0xFF92400E)
 
+/** Lencana kecil abu (kategori, satuan) — kapsul isian tipis ala iOS, tanpa garis tepi. */
 @Composable
 internal fun MiniBadge(text: String, background: Color, color: Color, border: Color? = null) {
     Box(
         Modifier
-            .background(background, RoundedCornerShape(6.dp))
-            .then(if (border != null) Modifier.border(1.dp, border, RoundedCornerShape(6.dp)) else Modifier)
-            .padding(horizontal = 6.dp, vertical = 2.dp),
+            .clip(UkuranIos.SudutKapsul)
+            .background(background)
+            .padding(horizontal = 8.dp, vertical = 3.dp),
     ) {
-        Text(text, color = color, fontSize = 9.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+        Text(text, color = color, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1)
     }
 }
 
-/** Lencana status berpita: titik berwarna + teks, dipakai di kepala setiap kartu. */
+/** Lencana status: titik berwarna + teks, bentuk sama dengan [LencanaIos]. */
 @Composable
 internal fun StatusChip(label: String, chip: Color, border: Color, text: Color, dot: Color) {
-    Surface(shape = RoundedCornerShape(50), color = chip, border = BorderStroke(1.dp, border)) {
-        Row(Modifier.padding(horizontal = 8.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(6.dp).background(dot, CircleShape))
-            Spacer(Modifier.width(4.dp))
-            Text(label, color = text, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-        }
+    Row(
+        Modifier.clip(UkuranIos.SudutKapsul).background(chip).padding(horizontal = 10.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(7.dp).clip(CircleShape).background(dot))
+        Spacer(Modifier.width(6.dp))
+        Text(label, color = text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
     }
 }
 
 @Composable
 internal fun RowScope.KpiCell(title: String, value: String, caption: String, titleColor: Color, valueColor: Color, captionColor: Color) {
     Column(Modifier.weight(1f).padding(horizontal = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(title, color = titleColor, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-        Spacer(Modifier.height(4.dp))
-        Text(value, color = valueColor, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
+        Text(title, style = TipeIos.Kecil.copy(fontWeight = FontWeight.Medium), textAlign = TextAlign.Center, maxLines = 1)
         Spacer(Modifier.height(2.dp))
-        Text(caption, color = captionColor, fontSize = 9.sp, textAlign = TextAlign.Center, lineHeight = 11.sp, maxLines = 2)
+        Text(value, style = TipeIos.Angka.copy(color = valueColor, fontSize = 18.sp), maxLines = 1)
+        Spacer(Modifier.height(1.dp))
+        Text(caption, style = TipeIos.Kecil.copy(fontSize = 11.sp, lineHeight = 13.sp), textAlign = TextAlign.Center, maxLines = 2)
     }
 }
 
 @Composable
-internal fun KpiDivider() = Box(Modifier.height(38.dp).width(1.dp).background(Slate100))
+internal fun KpiDivider() = Box(Modifier.height(34.dp).width(0.5.dp).background(WarnaIos.Pemisah))
 
-/** Baris label kiri / nilai kanan di dalam kotak meta abu-abu. */
+/** Baris label kiri / nilai kanan di dalam blok abu. */
 @Composable
 internal fun MetaRow(label: String, value: String) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, color = Slate400, fontSize = 10.sp)
+        Text(label, style = TipeIos.Catatan)
         Text(
-            value, color = Slate700, fontSize = 10.sp, fontWeight = FontWeight.SemiBold,
+            value, color = WarnaIos.Label, fontSize = 13.sp, fontWeight = FontWeight.Medium,
             maxLines = 2, textAlign = TextAlign.End, modifier = Modifier.padding(start = 12.dp),
         )
     }
