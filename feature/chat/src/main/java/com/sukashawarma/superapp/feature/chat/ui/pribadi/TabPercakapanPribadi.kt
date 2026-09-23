@@ -1,5 +1,15 @@
 package com.sukashawarma.superapp.feature.chat.ui.pribadi
 
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.lazy.itemsIndexed
+import com.sukashawarma.superapp.core.ui.ios.KeadaanIos
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.PemisahIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -57,80 +67,50 @@ fun TabPercakapanPribadi(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFFF2F2F7))
+            .background(WarnaIos.Latar)
     ) {
         if (memuat && percakapanList.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = Color(0xFF007AFF))
+                CircularProgressIndicator(color = WarnaIos.Biru)
             }
         } else if (percakapanList.isEmpty()) {
-            // Tampilan kosong
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(80.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFE5E5EA)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.Chat,
-                        contentDescription = null,
-                        tint = Color(0xFF8E8E93),
-                        modifier = Modifier.size(40.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "Belum Ada Obrolan Pribadi",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1C1C1E)
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                KeadaanIos(
+                    ikon = Icons.AutoMirrored.Filled.Chat,
+                    judul = "Belum Ada Obrolan Pribadi",
+                    pesan = "Mulai obrolan 1-on-1 dengan rekan kerja Anda. Pesan otomatis terhapus setiap 03:00 AM WIB.",
+                    nada = NadaIos.INFO,
+                    teksAksi = "Kirim Pesan Baru",
+                    onAksi = onMulaiChatBaru,
                 )
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = "Mulai obrolan 1-on-1 dengan rekan kerja Anda. Pesan otomatis terhapus setiap 03:00 AM WIB.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFF8E8E93),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                )
-                Spacer(modifier = Modifier.height(20.dp))
-                androidx.compose.material3.Button(
-                    onClick = onMulaiChatBaru,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF007AFF)
-                    )
-                ) {
-                    Icon(imageVector = Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Kirim Pesan Baru", fontWeight = FontWeight.SemiBold)
-                }
             }
         } else {
+            // Grup "inset grouped" dibentuk per baris (sudut atas di baris pertama,
+            // sudut bawah di baris terakhir). Dulu seluruh LazyColumn yang di-clip
+            // putih, sehingga kartu putih ikut memanjang sampai dasar layar walau
+            // obrolannya hanya dua.
             LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(Color.White)
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    start = UkuranIos.TepiLayar,
+                    end = UkuranIos.TepiLayar,
+                    top = 12.dp,
+                    bottom = 96.dp,
+                ),
             ) {
-                items(percakapanList, key = { it.partnerId }) { item ->
-                    BarisPercakapanPribadi(
-                        item = item,
-                        onClick = { onBukaChat(item.partnerId, item.namaTampil, item.partnerAvatar) }
-                    )
-                    HorizontalDivider(
-                        color = Color(0xFFF2F2F7),
-                        thickness = 1.dp,
-                        modifier = Modifier.padding(start = 72.dp)
-                    )
+                itemsIndexed(percakapanList, key = { _, it -> it.partnerId }) { i, item ->
+                    val terakhir = i == percakapanList.lastIndex
+                    Column(
+                        Modifier
+                            .clip(bentukBarisGrup(pertama = i == 0, terakhir = terakhir))
+                            .background(WarnaIos.Kartu)
+                    ) {
+                        BarisPercakapanPribadi(
+                            item = item,
+                            onClick = { onBukaChat(item.partnerId, item.namaTampil, item.partnerAvatar) }
+                        )
+                        if (!terakhir) PemisahIos(inset = 74.dp)
+                    }
                 }
             }
         }
@@ -138,7 +118,7 @@ fun TabPercakapanPribadi(
         // FAB Tambah Chat Baru (Floating Button Biru)
         FloatingActionButton(
             onClick = onMulaiChatBaru,
-            containerColor = Color(0xFF007AFF),
+            containerColor = WarnaIos.Biru,
             contentColor = Color.White,
             shape = CircleShape,
             modifier = Modifier
@@ -182,9 +162,8 @@ private fun BarisPercakapanPribadi(
             ) {
                 Text(
                     text = item.namaTampil,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 15.sp,
-                    color = Color(0xFF1C1C1E),
+                    style = TipeIos.Utama,
+                    fontSize = 16.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false)
@@ -192,8 +171,8 @@ private fun BarisPercakapanPribadi(
 
                 Text(
                     text = jamFormatted,
-                    fontSize = 12.sp,
-                    color = if (item.unreadCount > 0) Color(0xFF007AFF) else Color(0xFF8E8E93),
+                    style = TipeIos.Catatan,
+                    color = if (item.unreadCount > 0) WarnaIos.Biru else WarnaIos.Abu,
                     fontWeight = if (item.unreadCount > 0) FontWeight.Bold else FontWeight.Normal
                 )
             }
@@ -222,8 +201,9 @@ private fun BarisPercakapanPribadi(
 
                 Text(
                     text = previewTeks,
-                    fontSize = 13.sp,
-                    color = if (item.unreadCount > 0) Color(0xFF1C1C1E) else Color(0xFF8E8E93),
+                    style = TipeIos.SubJudul,
+                    fontSize = 14.sp,
+                    color = if (item.unreadCount > 0) WarnaIos.Label else WarnaIos.LabelKedua,
                     fontWeight = if (item.unreadCount > 0) FontWeight.Medium else FontWeight.Normal,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -236,7 +216,7 @@ private fun BarisPercakapanPribadi(
                             .padding(start = 6.dp)
                             .size(20.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFF007AFF)),
+                            .background(WarnaIos.Biru),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -251,3 +231,19 @@ private fun BarisPercakapanPribadi(
         }
     }
 }
+
+/**
+ * Bentuk satu baris di dalam grup "inset grouped" yang digulir LazyColumn:
+ * hanya baris pertama dan terakhir yang bersudut, agar tumpukan baris terbaca
+ * sebagai satu kartu. Objek bentuknya tetap (bukan dibuat per komposisi).
+ */
+internal fun bentukBarisGrup(pertama: Boolean, terakhir: Boolean): Shape = when {
+    pertama && terakhir -> SudutGrupTunggal
+    pertama -> SudutGrupAtas
+    terakhir -> SudutGrupBawah
+    else -> RectangleShape
+}
+
+private val SudutGrupTunggal = RoundedCornerShape(16.dp)
+private val SudutGrupAtas = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+private val SudutGrupBawah = RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp)
