@@ -1,5 +1,18 @@
 package com.sukashawarma.superapp.feature.chat.ui.area
 
+import com.sukashawarma.superapp.core.ui.ios.LencanaIos
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.TombolBundarIos
+import com.sukashawarma.superapp.core.ui.ios.TombolKapsulIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.ios.permukaanIos
+import com.sukashawarma.superapp.core.ui.ios.tekanIos
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.SolidColor
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -150,10 +163,10 @@ import kotlinx.coroutines.launch
 /* ---------- Skema Warna Standar WhatsApp / iOS Chat ---------- */
 private val BubbleSendiri = Color(0xFFF4F4F7)
 private val BubbleLawan = Color(0xFFDEDEE4)
-private val TeksUtama = Color(0xFF000000)
-private val TeksSekunder = Color(0xFF8E8E93)
-private val BiruIos = Color(0xFF007AFF)
-private val Oranye = Color(0xFFEA580C)
+private val TeksUtama = WarnaIos.Label
+private val TeksSekunder = WarnaIos.Abu
+private val BiruIos = WarnaIos.Biru
+private val Oranye = WarnaIos.Aksen
 private val OranyeMenyala = Color(0xFFFF8A00)
 
 private val WarnaNama = listOf(
@@ -284,7 +297,7 @@ fun LayarChatArea(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFFF4F6F9))
+            .background(WarnaIos.Latar)
     ) {
         Column(
             modifier = Modifier
@@ -409,8 +422,10 @@ fun LayarChatArea(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color.White)
-                        .border(1.dp, Color(0xFFE5E7EB))
+                        .background(WarnaIos.Kartu)
+                        .drawBehind {
+                            drawLine(WarnaIos.Pemisah, Offset(0f, 0f), Offset(size.width, 0f), 0.5.dp.toPx())
+                        }
                         .padding(8.dp)
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -418,7 +433,7 @@ fun LayarChatArea(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
+                                    .clip(UkuranIos.SudutKontrol)
                                     .clickable { vm.sisipkanSebutan(user) }
                                     .padding(horizontal = 10.dp, vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically
@@ -427,15 +442,13 @@ fun LayarChatArea(
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = user.namaTampil,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = Color(0xFF1F2937)
+                                    style = TipeIos.Keterangan,
+                                    fontWeight = FontWeight.Medium,
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = "(${user.outlet ?: "Staf"})",
-                                    fontSize = 11.sp,
-                                    color = Color(0xFF6B7280)
+                                    style = TipeIos.Catatan,
                                 )
                             }
                         }
@@ -533,7 +546,7 @@ fun LayarChatArea(
                         konfirmasiHapus = null
                     }
                 ) {
-                    Text("Hapus", color = Color(0xFFFF3B30), fontWeight = FontWeight.Bold)
+                    Text("Hapus", color = WarnaIos.Merah, fontWeight = FontWeight.SemiBold)
                 }
             },
             dismissButton = {
@@ -660,12 +673,12 @@ private fun HeaderAreaModern(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color.White)
+            .background(WarnaIos.Kartu)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 12.dp, end = 8.dp, top = 6.dp, bottom = 8.dp),
+                .padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Identitas Area (Avatar + Judul + Subtitle) - seluruh area dapat diklik untuk membuka sheet anggota
@@ -712,28 +725,17 @@ private fun HeaderAreaModern(
                     ) {
                         Text(
                             text = area.namaArea,
-                            fontSize = 15.5.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFF0F172A),
+                            style = TipeIos.Utama,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f, fill = false)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = if (isAreaManager) Color(0xFFEEF2FF) else Color(0xFFFEF3C7),
-                        ) {
-                            Text(
-                                text = if (isAreaManager) "👑 ANDA (AM)" else "👑 AM",
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = if (isAreaManager) Color(0xFF4338CA) else Color(0xFFB45309),
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
-                                maxLines = 1,
-                                softWrap = false
-                            )
-                        }
+                        LencanaIos(
+                            teks = if (isAreaManager) "👑 Anda (AM)" else "👑 AM",
+                            nada = if (isAreaManager) NadaIos.INFO else NadaIos.PERINGATAN,
+                            titik = false,
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(2.dp))
@@ -741,8 +743,7 @@ private fun HeaderAreaModern(
                     val amText = if (area.amName.isNotBlank()) " · AM: ${area.amName}" else ""
                     Text(
                         text = "${area.outlets.size} Cabang · $jumlahAnggota Anggota$amText",
-                        fontSize = 11.5.sp,
-                        color = Color(0xFF64748B),
+                        style = TipeIos.Kecil,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -751,51 +752,18 @@ private fun HeaderAreaModern(
 
             // Tombol Switch Area (Bagi role yang berhak)
             if (bolehGantiArea) {
-                Surface(
-                    onClick = onKlikGantiArea,
-                    shape = RoundedCornerShape(16.dp),
-                    color = Color(0xFFF1F5F9),
-                    border = BorderStroke(0.5.dp, Color(0xFFCBD5E1)),
-                    modifier = Modifier.height(36.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 10.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.SwapHoriz,
-                            contentDescription = "Ganti Area",
-                            tint = Color(0xFF1D4ED8),
-                            modifier = Modifier.size(15.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Ganti",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF1D4ED8),
-                            maxLines = 1,
-                            softWrap = false
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.width(2.dp))
+                TombolKapsulIos(
+                    teks = "Ganti",
+                    onKlik = onKlikGantiArea,
+                    ikon = IkonIos.SwapHoriz,
+                )
+                Spacer(modifier = Modifier.width(8.dp))
             }
 
             // Tombol Detail / Anggota
-            IconButton(
-                onClick = onKlikAnggota,
-                modifier = Modifier.size(44.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Group,
-                    contentDescription = "Daftar Anggota",
-                    tint = Color(0xFF64748B),
-                    modifier = Modifier.size(22.dp)
-                )
-            }
+            TombolBundarIos(IkonIos.Groups, "Daftar Anggota", onKlikAnggota)
         }
-        HorizontalDivider(thickness = 0.5.dp, color = Color(0x1F000000))
+        HorizontalDivider(thickness = 0.5.dp, color = WarnaIos.Pemisah)
     }
 }
 
@@ -810,12 +778,10 @@ private fun BannerInfoArea(area: AreaInfo) {
             .padding(horizontal = 16.dp, vertical = 12.dp),
         contentAlignment = Alignment.Center
     ) {
-        Surface(
-            shape = RoundedCornerShape(14.dp),
-            color = Color(0xF2FFFFFF),
-            shadowElevation = 0.5.dp,
-            border = BorderStroke(0.5.dp, Color(0x1F000000)),
-            modifier = Modifier.widthIn(max = 420.dp)
+        Box(
+            modifier = Modifier
+                .widthIn(max = 420.dp)
+                .permukaanIos(UkuranIos.SudutGrup, WarnaIos.Kartu.copy(alpha = 0.95f))
         ) {
             Column(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
@@ -828,15 +794,15 @@ private fun BannerInfoArea(area: AreaInfo) {
                     Icon(
                         imageVector = Icons.Default.LocationOn,
                         contentDescription = null,
-                        tint = Color(0xFF2563EB),
+                        tint = WarnaIos.Biru,
                         modifier = Modifier.size(14.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "Ruang Obrolan Resmi ${area.namaArea}",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF0F172A),
+                        style = TipeIos.Catatan,
+                        fontWeight = FontWeight.SemiBold,
+                        color = WarnaIos.Label,
                         textAlign = TextAlign.Center
                     )
                 }
@@ -845,8 +811,7 @@ private fun BannerInfoArea(area: AreaInfo) {
                     Spacer(modifier = Modifier.height(3.dp))
                     Text(
                         text = "Mencakup outlet: ${area.ringkasanOutlet}",
-                        fontSize = 11.sp,
-                        color = Color(0xFF64748B),
+                        style = TipeIos.Kecil,
                         textAlign = TextAlign.Center,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
@@ -856,9 +821,9 @@ private fun BannerInfoArea(area: AreaInfo) {
                 Spacer(modifier = Modifier.height(3.dp))
                 Text(
                     text = "🔒 Enkripsi Area · Terhapus otomatis setiap 03:00 WIB",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Color(0xFF94A3B8),
+                    style = TipeIos.Kecil,
+                    fontSize = 11.sp,
+                    color = WarnaIos.Abu,
                     textAlign = TextAlign.Center
                 )
             }
@@ -874,12 +839,11 @@ private fun PemisahTanggalArea(label: String) {
     Box(Modifier.fillMaxWidth().padding(vertical = 10.dp), contentAlignment = Alignment.Center) {
         Text(
             label,
-            fontSize = 11.5.sp,
+            style = TipeIos.Kecil,
             fontWeight = FontWeight.Medium,
-            color = TeksSekunder,
             modifier = Modifier
-                .clip(RoundedCornerShape(10.dp))
-                .background(Color(0xFFF2F2F7))
+                .clip(UkuranIos.SudutKapsul)
+                .background(WarnaIos.Latar)
                 .padding(horizontal = 10.dp, vertical = 4.dp),
         )
     }
@@ -1499,7 +1463,7 @@ private fun KartuBalasComposerArea(target: PesanAreaChat, onTutup: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
-            .background(Color(0xFFF7F7F8))
+            .background(WarnaIos.Kartu)
             .padding(start = 12.dp, end = 4.dp, top = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -1528,10 +1492,8 @@ private fun TombolKeBawah(badge: Int, onClick: () -> Unit) {
         Box(
             Modifier
                 .size(40.dp)
-                .clip(CircleShape)
-                .background(Color.White)
-                .border(1.dp, Color(0xFFE5E7EB), CircleShape)
-                .clickable(onClick = onClick),
+                .permukaanIos(CircleShape)
+                .tekanIos(onClick),
             contentAlignment = Alignment.Center,
         ) {
             Icon(Icons.Filled.KeyboardArrowDown, "Ke pesan terbaru", tint = BiruIos)
@@ -1561,15 +1523,13 @@ private fun TombolKeBawah(badge: Int, onClick: () -> Unit) {
 private fun LembarSemuaEmoji(onPilih: (String) -> Unit, onTutup: () -> Unit) {
     ModalBottomSheet(
         onDismissRequest = onTutup,
-        containerColor = Color(0xFFF7F7F8),
+        containerColor = WarnaIos.Latar,
         shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
     ) {
         Column(Modifier.navigationBarsPadding()) {
             Text(
                 "Pilih reaksi",
-                fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = TeksUtama,
+                style = TipeIos.Utama,
                 modifier = Modifier.padding(start = 20.dp, bottom = 8.dp),
             )
             PapanEmoji(
@@ -1599,7 +1559,7 @@ private fun BarInputArea(
     val statusRekam = rememberStatusRekam()
 
     Surface(
-        color = Color.White,
+        color = WarnaIos.Kartu,
         shadowElevation = 8.dp,
         modifier = Modifier
             .fillMaxWidth()
@@ -1629,7 +1589,7 @@ private fun BarInputArea(
                     Icon(
                         imageVector = Icons.Default.AttachFile,
                         contentDescription = "Lampiran",
-                        tint = Color(0xFF6B7280)
+                        tint = WarnaIos.Biru
                     )
                 }
 
@@ -1638,20 +1598,21 @@ private fun BarInputArea(
                     modifier = Modifier
                         .weight(1f)
                         .clip(RoundedCornerShape(20.dp))
-                        .background(Color(0xFFF3F4F6))
+                        .background(WarnaIos.Isian)
                         .padding(horizontal = 14.dp, vertical = 10.dp)
                 ) {
                     if (teks.isEmpty()) {
                         Text(
                             text = "Ketik pesan ke Tim Area...",
-                            fontSize = 14.sp,
-                            color = Color(0xFF9CA3AF)
+                            style = TipeIos.Keterangan,
+                            color = WarnaIos.Abu
                         )
                     }
                     BasicTextField(
                         value = teks,
                         onValueChange = onTeksChange,
-                        textStyle = TextStyle(fontSize = 14.sp, color = Color(0xFF111827)),
+                        textStyle = TipeIos.Keterangan,
+                        cursorBrush = SolidColor(WarnaIos.Biru),
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
