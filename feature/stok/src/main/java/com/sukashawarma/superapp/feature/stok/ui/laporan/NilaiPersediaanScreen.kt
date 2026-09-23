@@ -1,8 +1,24 @@
 package com.sukashawarma.superapp.feature.stok.ui.laporan
 
-import androidx.compose.foundation.BorderStroke
+import com.sukashawarma.superapp.core.ui.ios.KartuIos
+import com.sukashawarma.superapp.core.ui.ios.KeadaanIos
+import com.sukashawarma.superapp.core.ui.ios.LencanaIos
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.PemisahIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.TombolBundarIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.feature.stok.ui.BannerIos
+import com.sukashawarma.superapp.feature.stok.ui.MemuatPenuh
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.text.style.TextAlign
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
+import com.sukashawarma.superapp.core.ui.kaca.denganRuangNav
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,20 +31,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -52,13 +61,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
-private val ORANGE = Color(0xFFEA580C)
-private val SLATE400 = Color(0xFF94A3B8)
-private val SLATE500 = Color(0xFF64748B)
-private val SLATE900 = Color(0xFF0F172A)
-private val GARIS = Color(0xFFE2E8F0)
-private val AMBER = Color(0xFF92400E)
-private val AMBER_LATAR = Color(0xFFFEF3C7)
 
 data class NilaiPersediaanUiState(
     val outlets: List<RingkasNilaiOutlet> = emptyList(),
@@ -117,28 +119,24 @@ fun NilaiPersediaanScreen(
     val state by viewModel.state.collectAsState()
     RealtimeRefresh(RealtimeTables.STOK_BALANCE, RealtimeTables.BAHAN_BAKU_HARGA) { viewModel.muatUlang() }
 
-    Column(Modifier.fillMaxSize().background(Color(0xFFF8FAFC))) {
+    Column(Modifier.fillMaxSize().background(WarnaIos.Latar)) {
         HeaderStok(
             judul = "Nilai Persediaan",
             subjudul = if (state.memuat) "Memuat…" else "${state.outlets.size} outlet",
             onKembali = onBack,
             aksi = {
-                IconButton(onClick = viewModel::muatUlang) {
-                    Icon(Icons.Default.Refresh, "Muat ulang", tint = Color(0xFF1E293B))
-                }
+                TombolBundarIos(IkonIos.Refresh, "Muat ulang", viewModel::muatUlang)
             },
         )
 
         when {
-            state.memuat -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = ORANGE)
-            }
+            state.memuat -> MemuatPenuh()
             state.error != null -> PesanKosongLaporan(state.error!!)
             state.outlets.isEmpty() -> PesanKosongLaporan("Belum ada data nilai persediaan.")
             else -> LazyColumn(
                 Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(horizontal = UkuranIos.TepiLayar, vertical = 12.dp).denganRuangNav(),
+                verticalArrangement = Arrangement.spacedBy(UkuranIos.JarakKartu),
             ) {
                 item { KartuTotalNilai(state.total) }
                 items(state.outlets, key = { it.outletId }) { outlet ->
@@ -155,172 +153,138 @@ fun NilaiPersediaanScreen(
 
 @Composable
 private fun KartuTotalNilai(total: TotalNilai) {
-    Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), color = SLATE900) {
-        Column(Modifier.padding(18.dp)) {
-            Text(
-                "NILAI PERSEDIAAN SELURUH OUTLET",
-                color = Color(0xFF94A3B8),
-                fontSize = 9.5.sp,
-                fontWeight = FontWeight.Black,
-                letterSpacing = 0.8.sp,
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                formatRupiah(total.total),
-                color = Color.White,
-                fontSize = 26.sp,
-                fontWeight = FontWeight.Black,
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "Rentang ${formatRupiah(total.batasBawah)} – ${formatRupiah(total.batasAtas)}",
-                color = Color(0xFFCBD5E1),
-                fontSize = 11.5.sp,
-                fontWeight = FontWeight.Medium,
-            )
+    KartuIos {
+        Text("Nilai persediaan seluruh outlet", style = TipeIos.SubJudul)
+        Spacer(Modifier.height(4.dp))
+        Text(formatRupiah(total.total), style = TipeIos.JudulBesar.copy(fontSize = 30.sp))
+        Spacer(Modifier.height(2.dp))
+        Text(
+            "Rentang ${formatRupiah(total.batasBawah)} – ${formatRupiah(total.batasAtas)}",
+            style = TipeIos.Catatan,
+        )
 
-            Spacer(Modifier.height(14.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                AngkaKecil("Pasti", formatRupiah(total.nilaiPasti), Modifier.weight(1f))
-                AngkaKecil("Belum pasti", formatRupiah(total.nilaiBelumPasti), Modifier.weight(1f))
-            }
-            if (total.jumlahBelumPasti > 0 || total.jumlahDataKurang > 0) {
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    buildString {
-                        if (total.jumlahBelumPasti > 0) {
-                            append("${total.jumlahBelumPasti} bahan skalanya belum dipastikan opname")
-                        }
-                        if (total.jumlahDataKurang > 0) {
-                            if (isNotEmpty()) append(" · ")
-                            append("${total.jumlahDataKurang} bahan belum punya harga atau isi kemasan")
-                        }
-                    },
-                    color = Color(0xFFFCD34D),
-                    fontSize = 11.sp,
-                    lineHeight = 16.sp,
-                    fontWeight = FontWeight.Medium,
-                )
-            }
+        Spacer(Modifier.height(14.dp))
+        Row(
+            Modifier.fillMaxWidth().clip(UkuranIos.SudutBlok).background(WarnaIos.Latar).padding(vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            AngkaKecil("Pasti", formatRupiah(total.nilaiPasti), Modifier.weight(1f))
+            Box(Modifier.width(0.5.dp).height(30.dp).background(WarnaIos.Pemisah))
+            AngkaKecil("Belum pasti", formatRupiah(total.nilaiBelumPasti), Modifier.weight(1f))
+        }
+        if (total.jumlahBelumPasti > 0 || total.jumlahDataKurang > 0) {
+            Spacer(Modifier.height(10.dp))
+            BannerIos(
+                buildString {
+                    if (total.jumlahBelumPasti > 0) {
+                        append("${total.jumlahBelumPasti} bahan skalanya belum dipastikan opname")
+                    }
+                    if (total.jumlahDataKurang > 0) {
+                        if (isNotEmpty()) append(" · ")
+                        append("${total.jumlahDataKurang} bahan belum punya harga atau isi kemasan")
+                    }
+                },
+                NadaIos.PERINGATAN,
+                ikon = IkonIos.WarningAmber,
+            )
         }
     }
 }
 
 @Composable
 private fun AngkaKecil(label: String, nilai: String, modifier: Modifier = Modifier) {
-    Column(modifier) {
-        Text(label.uppercase(), color = Color(0xFF94A3B8), fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 0.6.sp)
-        Spacer(Modifier.height(3.dp))
-        Text(nilai, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(label, style = TipeIos.Kecil.copy(fontWeight = FontWeight.Medium))
+        Spacer(Modifier.height(2.dp))
+        Text(
+            nilai,
+            color = WarnaIos.Label, fontSize = 16.sp, fontWeight = FontWeight.Bold,
+            maxLines = 1, overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
 @Composable
 private fun KartuOutletNilai(outlet: RingkasNilaiOutlet, terbuka: Boolean, onKlik: () -> Unit) {
-    Surface(
-        Modifier.fillMaxWidth().clickable(onClick = onKlik),
-        shape = RoundedCornerShape(15.dp),
-        color = Color.White,
-        border = BorderStroke(1.dp, GARIS),
-    ) {
-        Column(Modifier.padding(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        outlet.outlet,
-                        color = SLATE900,
-                        fontSize = 13.5.sp,
-                        fontWeight = FontWeight.Black,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        "${outlet.jumlahBahan} bahan",
-                        color = SLATE400,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                }
-                Text(
-                    formatRupiah(outlet.total),
-                    color = SLATE900,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Black,
-                )
+    KartuIos(onKlik = onKlik) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(outlet.outlet, style = TipeIos.Utama, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("${outlet.jumlahBahan} bahan", style = TipeIos.Catatan)
             }
+            Spacer(Modifier.width(8.dp))
+            Text(formatRupiah(outlet.total), style = TipeIos.Angka.copy(fontSize = 17.sp))
+            Spacer(Modifier.width(4.dp))
+            Icon(
+                if (terbuka) IkonIos.ExpandLess else IkonIos.ExpandMore, null,
+                tint = WarnaIos.LabelKetiga, modifier = Modifier.size(18.dp),
+            )
+        }
 
-            if (outlet.jumlahBelumPasti > 0 || outlet.jumlahDataKurang > 0) {
-                Spacer(Modifier.height(8.dp))
-                Surface(shape = RoundedCornerShape(8.dp), color = AMBER_LATAR) {
-                    Text(
-                        listOfNotNull(
-                            outlet.jumlahBelumPasti.takeIf { it > 0 }?.let { "$it skala belum pasti" },
-                            outlet.jumlahDataKurang.takeIf { it > 0 }?.let { "$it data belum lengkap" },
-                        ).joinToString(" · "),
-                        Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
-                        color = AMBER,
-                        fontSize = 10.5.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
-            }
+        if (outlet.jumlahBelumPasti > 0 || outlet.jumlahDataKurang > 0) {
+            Spacer(Modifier.height(8.dp))
+            LencanaIos(
+                listOfNotNull(
+                    outlet.jumlahBelumPasti.takeIf { it > 0 }?.let { "$it skala belum pasti" },
+                    outlet.jumlahDataKurang.takeIf { it > 0 }?.let { "$it data belum lengkap" },
+                ).joinToString(" · "),
+                NadaIos.PERINGATAN,
+            )
+        }
 
-            if (terbuka) {
-                Spacer(Modifier.height(12.dp))
-                // Sepuluh bahan termahal saja: sisanya jarang mengubah keputusan,
-                // dan menampilkan ratusan baris di dalam kartu justru mengubur
-                // yang penting.
-                outlet.items.take(10).forEach { baris ->
-                    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        if (terbuka) {
+            Spacer(Modifier.height(12.dp))
+            // Sepuluh bahan termahal saja: sisanya jarang mengubah keputusan,
+            // dan menampilkan ratusan baris di dalam kartu justru mengubur
+            // yang penting.
+            Column(Modifier.fillMaxWidth().clip(UkuranIos.SudutBlok).background(WarnaIos.Latar)) {
+                outlet.items.take(10).forEachIndexed { i, baris ->
+                    if (i > 0) PemisahIos(inset = 12.dp)
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 9.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                         Column(Modifier.weight(1f)) {
                             Text(
                                 baris.bahan,
-                                color = SLATE900,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
+                                style = TipeIos.Keterangan.copy(fontSize = 15.sp),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
                             if (baris.status != StatusNilai.PASTI) {
-                                Text(
-                                    baris.status.label,
-                                    color = AMBER,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                )
+                                Text(baris.status.label, style = TipeIos.Kecil.copy(color = NadaIos.PERINGATAN.teks, fontWeight = FontWeight.Medium))
                             }
                         }
-                        Text(
-                            formatRupiah(baris.nilai),
-                            color = SLATE500,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(formatRupiah(baris.nilai), color = WarnaIos.LabelKedua, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
-                if (outlet.items.size > 10) {
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        "${outlet.items.size - 10} bahan lain tidak ditampilkan.",
-                        color = SLATE400,
-                        fontSize = 10.5.sp,
-                    )
-                }
+            }
+            if (outlet.items.size > 10) {
+                Spacer(Modifier.height(6.dp))
+                Text("${outlet.items.size - 10} bahan lain tidak ditampilkan.", style = TipeIos.Kecil)
             }
         }
     }
 }
 
+/** Keadaan kosong/gagal bersama untuk layar laporan — gaya [KeadaanIos] tanpa judul terpisah. */
 @Composable
 internal fun PesanKosongLaporan(teks: String) {
     Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
-        Text(
-            teks,
-            color = SLATE500,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Medium,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            lineHeight = 19.sp,
-        )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(
+                Modifier.size(56.dp).clip(CircleShape).background(WarnaIos.Isian),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(IkonIos.Inbox, null, tint = WarnaIos.Abu, modifier = Modifier.size(26.dp))
+            }
+            Spacer(Modifier.height(12.dp))
+            Text(
+                teks,
+                style = TipeIos.SubJudul.copy(lineHeight = 21.sp),
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 }
