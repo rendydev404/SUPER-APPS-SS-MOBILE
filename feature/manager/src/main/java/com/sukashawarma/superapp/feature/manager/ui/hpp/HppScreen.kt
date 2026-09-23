@@ -1,8 +1,6 @@
 package com.sukashawarma.superapp.feature.manager.ui.hpp
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,32 +19,18 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.MenuBook
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.TrendingUp
-import androidx.compose.material.icons.filled.WarningAmber
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -54,36 +38,47 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.sukashawarma.superapp.core.ui.RealtimeRefresh
+import com.sukashawarma.superapp.core.ui.RealtimeTables
+import com.sukashawarma.superapp.core.ui.ios.AngkaIos
+import com.sukashawarma.superapp.core.ui.ios.BarisIos
+import com.sukashawarma.superapp.core.ui.ios.BilahJudulIos
+import com.sukashawarma.superapp.core.ui.ios.BlokAngkaIos
+import com.sukashawarma.superapp.core.ui.ios.GrupIos
+import com.sukashawarma.superapp.core.ui.ios.IkonBulatIos
+import com.sukashawarma.superapp.core.ui.ios.KapsulPilihanIos
+import com.sukashawarma.superapp.core.ui.ios.KartuIos
+import com.sukashawarma.superapp.core.ui.ios.KolomCariIos
+import com.sukashawarma.superapp.core.ui.ios.LabelSeksiIos
+import com.sukashawarma.superapp.core.ui.ios.LencanaIos
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.PanelGalatIos
+import com.sukashawarma.superapp.core.ui.ios.PemisahIos
+import com.sukashawarma.superapp.core.ui.ios.SegmenIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.TombolBundarIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WadahSegmenIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
+import com.sukashawarma.superapp.core.ui.kaca.denganRuangNav
 import com.sukashawarma.superapp.feature.manager.domain.BarisResep
-import com.sukashawarma.superapp.feature.manager.domain.KelompokMenu
 import com.sukashawarma.superapp.feature.manager.domain.MenuHpp
 import com.sukashawarma.superapp.feature.manager.domain.ResepMenu
 import com.sukashawarma.superapp.feature.manager.domain.RingkasanHpp
 import com.sukashawarma.superapp.feature.manager.domain.cacah
 import com.sukashawarma.superapp.feature.manager.domain.rupiah
 import com.sukashawarma.superapp.feature.manager.ui.BarProgres
-import com.sukashawarma.superapp.feature.manager.ui.GarisKartu
-import com.sukashawarma.superapp.feature.manager.ui.HijauGaris
-import com.sukashawarma.superapp.feature.manager.ui.HijauLatar
-import com.sukashawarma.superapp.feature.manager.ui.HijauTeks
+import com.sukashawarma.superapp.feature.manager.ui.JudulPanel
 import com.sukashawarma.superapp.feature.manager.ui.KartuPanel
-import com.sukashawarma.superapp.feature.manager.ui.MerahGaris
-import com.sukashawarma.superapp.feature.manager.ui.MerahLatar
-import com.sukashawarma.superapp.feature.manager.ui.MerahTeks
 import com.sukashawarma.superapp.feature.manager.ui.PanelKosong
-import com.sukashawarma.superapp.presentation.theme.SukaBrown
-import com.sukashawarma.superapp.presentation.theme.SukaCream
-import com.sukashawarma.superapp.presentation.theme.SukaGray400
-import com.sukashawarma.superapp.presentation.theme.SukaOrange
-import com.sukashawarma.superapp.core.ui.RealtimeRefresh
-import com.sukashawarma.superapp.core.ui.RealtimeTables
-
-private val AMBER_LATAR = Color(0xFFFEF3C7)
-private val AMBER_GARIS = Color(0xFFFCD34D)
-private val AMBER_TEKS = Color(0xFF78350F)
 
 private fun persenTeks(nilai: Double?): String =
     nilai?.let { String.format(java.util.Locale.US, "%.1f%%", it) } ?: "—"
+
+/** Warna angka sehat/bermasalah — teks nada iOS, lebih gelap dari warna isiannya agar terbaca. */
+private val TeksBaik = NadaIos.SUKSES.teks
+private val TeksBuruk = NadaIos.BAHAYA.teks
 
 /**
  * Resep & HPP — cermin `app/resep/` web.
@@ -107,34 +102,28 @@ fun HppScreen(
     RealtimeRefresh(RealtimeTables.BAHAN_BAKU_HARGA, RealtimeTables.BAHAN_BAKU) { viewModel.muatUlang(silent = true) }
 
     Scaffold(
-        containerColor = SukaCream,
+        containerColor = WarnaIos.Latar,
         topBar = {
-            TopAppBar(
-                title = {
-                    Text("Resep & HPP", fontWeight = FontWeight.Black, fontSize = 17.sp, color = SukaBrown, maxLines = 1)
-                },
-                navigationIcon = {
-                    IconButton(onClick = onExit) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Kembali", tint = SukaBrown)
-                    }
-                },
-                actions = {
-                    IconButton(onClick = viewModel::muatUlang) {
-                        Icon(Icons.Default.Refresh, "Muat ulang", tint = SukaBrown)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White),
+            BilahJudulIos(
+                judul = "Resep & HPP",
+                onKembali = onExit,
+                aksi = { TombolBundarIos(IkonIos.Refresh, "Muat ulang", viewModel::muatUlang) },
             )
         },
     ) { padding ->
         LazyColumn(
             Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(
+                start = UkuranIos.TepiLayar,
+                end = UkuranIos.TepiLayar,
+                top = 12.dp,
+                bottom = 16.dp,
+            ).denganRuangNav(),
+            verticalArrangement = Arrangement.spacedBy(UkuranIos.JarakKartu),
         ) {
             item { PanelKepala(state, viewModel) }
             if (state.galat != null) {
-                item { PanelGalat(state.galat!!) }
+                item { PanelGalatIos(state.galat!!) }
             }
             when (state.tab) {
                 TabHpp.ANALISIS -> isiAnalisis(state)
@@ -152,83 +141,22 @@ fun HppScreen(
 @Composable
 private fun PanelKepala(state: HppUiState, viewModel: HppViewModel) {
     KartuPanel {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("Resep & HPP", color = SukaBrown, fontSize = 18.sp, fontWeight = FontWeight.Black)
-                Spacer(Modifier.height(3.dp))
-                Text(
-                    "Pantau Bill of Materials dan Harga Pokok Penjualan semua menu.",
-                    color = SukaGray400,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                    lineHeight = 16.sp,
+        Text("Resep & HPP", style = TipeIos.Judul3)
+        Spacer(Modifier.height(2.dp))
+        Text("Pantau Bill of Materials dan Harga Pokok Penjualan semua menu.", style = TipeIos.Catatan)
+
+        Spacer(Modifier.height(14.dp))
+        WadahSegmenIos {
+            TabHpp.entries.forEach { tab ->
+                SegmenIos(
+                    label = if (tab == TabHpp.RESEP) "${tab.label} (${state.semuaMenu.size})" else tab.label,
+                    aktif = state.tab == tab,
+                    onKlik = { viewModel.pilihTab(tab) },
+                    modifier = Modifier.weight(1f),
+                    ikon = if (tab == TabHpp.ANALISIS) IkonIos.TrendingUp else IkonIos.MenuBook,
                 )
             }
         }
-
-        Spacer(Modifier.height(14.dp))
-        Row(
-            Modifier.fillMaxWidth().background(SukaBrown.copy(alpha = 0.04f), RoundedCornerShape(14.dp)).padding(4.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            TabHpp.entries.forEach { tab ->
-                TombolTab(
-                    label = if (tab == TabHpp.RESEP) "${tab.label} (${state.semuaMenu.size})" else tab.label,
-                    ikon = if (tab == TabHpp.ANALISIS) Icons.Default.TrendingUp else Icons.Default.MenuBook,
-                    terpilih = state.tab == tab,
-                    modifier = Modifier.weight(1f),
-                ) { viewModel.pilihTab(tab) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun TombolTab(
-    label: String,
-    ikon: androidx.compose.ui.graphics.vector.ImageVector,
-    terpilih: Boolean,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit,
-) {
-    Surface(
-        modifier = modifier.clickable(onClick = onClick),
-        shape = RoundedCornerShape(11.dp),
-        color = if (terpilih) SukaOrange else Color.Transparent,
-    ) {
-        Row(
-            Modifier.padding(vertical = 10.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                ikon,
-                null,
-                tint = if (terpilih) Color.White else SukaBrown.copy(alpha = 0.7f),
-                modifier = Modifier.size(14.dp),
-            )
-            Spacer(Modifier.width(6.dp))
-            Text(
-                label,
-                color = if (terpilih) Color.White else SukaBrown.copy(alpha = 0.7f),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Black,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
-}
-
-@Composable
-private fun PanelGalat(pesan: String) {
-    Surface(
-        Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = MerahLatar,
-        border = BorderStroke(1.dp, MerahGaris),
-    ) {
-        Text(pesan, Modifier.padding(14.dp), color = MerahTeks, fontSize = 12.sp, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -243,17 +171,15 @@ private fun LazyListScope.isiAnalisis(state: HppUiState) {
         item {
             KartuPanel {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.TrendingUp, null, tint = HijauTeks, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(9.dp))
+                    IkonBulatIos(IkonIos.TrendingUp, WarnaIos.Hijau, ukuran = 26.dp)
+                    Spacer(Modifier.width(10.dp))
                     Text(
                         if (state.memuat) {
                             "Memuat katalog menu..."
                         } else {
                             "Tidak ada menu dengan foodcost di atas 40%."
                         },
-                        color = SukaBrown,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
+                        style = TipeIos.SubJudul.copy(color = WarnaIos.Label),
                     )
                 }
             }
@@ -262,16 +188,13 @@ private fun LazyListScope.isiAnalisis(state: HppUiState) {
     }
 
     item {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
-            Icon(Icons.Default.WarningAmber, null, tint = AMBER_TEKS, modifier = Modifier.size(15.dp))
-            Spacer(Modifier.width(7.dp))
-            Text(
-                "PERLU DITENGOK — FOODCOST DI ATAS 40%",
-                color = SukaBrown.copy(alpha = 0.6f),
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Black,
-                letterSpacing = 0.7.sp,
-            )
+        Row(
+            Modifier.padding(start = 4.dp, end = 4.dp, top = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(IkonIos.WarningAmber, null, tint = NadaIos.PERINGATAN.warna, modifier = Modifier.size(15.dp))
+            Spacer(Modifier.width(6.dp))
+            LabelSeksiIos("Perlu ditengok — foodcost di atas 40%")
         }
     }
     items(r.perluDitengok, key = { "tengok-${it.id}" }) { menu -> KartuMenu(menu, onKlik = null) }
@@ -279,86 +202,66 @@ private fun LazyListScope.isiAnalisis(state: HppUiState) {
 
 @Composable
 private fun KartuRingkasan(r: RingkasanHpp) {
+    val rataRata = r.rataRataFoodcost ?: 0.0
     KartuPanel {
-        Text(
-            "ANALISIS HPP & DISTRIBUSI",
-            color = SukaGray400,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Black,
-            letterSpacing = 0.7.sp,
+        JudulPanel("Analisis HPP & Distribusi")
+        BlokAngkaIos(
+            listOf(
+                AngkaIos("Menu terdaftar", cacah(r.jumlahMenu)),
+                AngkaIos("Punya HPP", cacah(r.jumlahBerResep)),
+            ),
         )
-        Spacer(Modifier.height(12.dp))
-        Row {
-            AngkaRingkas("Menu terdaftar", cacah(r.jumlahMenu), Modifier.weight(1f))
-            AngkaRingkas("Punya HPP", cacah(r.jumlahBerResep), Modifier.weight(1f))
-        }
-        Spacer(Modifier.height(14.dp))
-        HorizontalDivider(color = GarisKartu)
-        Spacer(Modifier.height(14.dp))
 
-        Text(
-            "RATA-RATA FOODCOST",
-            color = SukaGray400,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Black,
-            letterSpacing = 0.7.sp,
-        )
-        Spacer(Modifier.height(5.dp))
+        Spacer(Modifier.height(16.dp))
+        Text("Rata-rata foodcost", style = TipeIos.Catatan.copy(fontWeight = FontWeight.SemiBold))
+        Spacer(Modifier.height(2.dp))
         Text(
             persenTeks(r.rataRataFoodcost),
-            color = if ((r.rataRataFoodcost ?: 0.0) > 40.0) MerahTeks else HijauTeks,
-            fontSize = 26.sp,
-            fontWeight = FontWeight.Black,
+            style = TipeIos.AngkaBesar.copy(color = if (rataRata > 40.0) TeksBuruk else TeksBaik),
         )
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(8.dp))
         BarProgres(
-            rasio = ((r.rataRataFoodcost ?: 0.0) / 100).toFloat(),
+            rasio = (rataRata / 100).toFloat(),
             tinggi = 6,
-            sorot = (r.rataRataFoodcost ?: 0.0) <= 40.0,
+            sorot = rataRata <= 40.0,
         )
         Spacer(Modifier.height(6.dp))
-        Text(
-            "Dihitung dari menu yang punya harga jual dan HPP",
-            color = SukaGray400,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Medium,
-        )
+        Text("Dihitung dari menu yang punya harga jual dan HPP", style = TipeIos.Kecil)
 
-        r.foodcostTertinggi?.let {
+        if (r.foodcostTertinggi != null || r.foodcostTerendah != null) {
             Spacer(Modifier.height(14.dp))
-            BarisEkstrem("Foodcost tertinggi", it, MerahTeks)
+            Column(Modifier.fillMaxWidth().clip(UkuranIos.SudutBlok).background(WarnaIos.Latar)) {
+                r.foodcostTertinggi?.let {
+                    BarisEkstrem("Foodcost tertinggi", it, TeksBuruk)
+                }
+                if (r.foodcostTertinggi != null && r.foodcostTerendah != null) {
+                    PemisahIos(inset = 14.dp)
+                }
+                r.foodcostTerendah?.let {
+                    BarisEkstrem("Foodcost terendah", it, TeksBaik)
+                }
+            }
         }
-        r.foodcostTerendah?.let {
-            Spacer(Modifier.height(8.dp))
-            BarisEkstrem("Foodcost terendah", it, HijauTeks)
-        }
-    }
-}
-
-@Composable
-private fun AngkaRingkas(label: String, nilai: String, modifier: Modifier = Modifier) {
-    Column(modifier) {
-        Text(label.uppercase(), color = SukaGray400, fontSize = 9.sp, fontWeight = FontWeight.Black)
-        Spacer(Modifier.height(4.dp))
-        Text(nilai, color = SukaBrown, fontSize = 20.sp, fontWeight = FontWeight.Black)
     }
 }
 
 @Composable
 private fun BarisEkstrem(label: String, menu: MenuHpp, warna: Color) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Column(Modifier.weight(1f)) {
-            Text(label, color = SukaGray400, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            Text(label, style = TipeIos.Kecil)
             Text(
                 menu.nama,
-                color = SukaBrown,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Black,
+                style = TipeIos.Keterangan.copy(fontWeight = FontWeight.SemiBold, fontSize = 15.sp),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Text(persenTeks(menu.foodcostPersen), color = warna, fontSize = 14.sp, fontWeight = FontWeight.Black)
+        Spacer(Modifier.width(8.dp))
+        Text(persenTeks(menu.foodcostPersen), color = warna, fontSize = 16.sp, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -388,139 +291,93 @@ private fun LazyListScope.isiResep(state: HppUiState, viewModel: HppViewModel) {
 @Composable
 private fun PanelPenyaringMenu(state: HppUiState, viewModel: HppViewModel) {
     KartuPanel {
-        OutlinedTextField(
-            value = state.pencarian,
-            onValueChange = viewModel::ubahPencarian,
+        KolomCariIos(
+            nilai = state.pencarian,
+            onUbah = viewModel::ubahPencarian,
             modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("Cari menu atau kategori...", fontSize = 12.sp) },
-            leadingIcon = { Icon(Icons.Default.Search, null, tint = SukaGray400, modifier = Modifier.size(18.dp)) },
-            singleLine = true,
-            shape = RoundedCornerShape(12.dp),
+            placeholder = "Cari menu atau kategori...",
         )
         Spacer(Modifier.height(10.dp))
         Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            ChipKelompok("Semua (${state.semuaMenu.size})", state.kelompok == null) {
+            KapsulPilihanIos("Semua (${state.semuaMenu.size})", state.kelompok == null, {
                 viewModel.pilihKelompok(null)
-            }
+            })
             state.kelompokTersedia.forEach { k ->
-                ChipKelompok(
+                KapsulPilihanIos(
                     "${k.ikon} ${k.singkat} (${state.jumlahDalamKelompok(k)})",
                     state.kelompok == k,
-                ) { viewModel.pilihKelompok(k) }
+                    { viewModel.pilihKelompok(k) },
+                )
             }
         }
-    }
-}
-
-@Composable
-private fun ChipKelompok(label: String, aktif: Boolean, onClick: () -> Unit) {
-    Surface(
-        shape = RoundedCornerShape(50),
-        color = if (aktif) SukaOrange else Color.White,
-        border = BorderStroke(1.dp, if (aktif) SukaOrange else SukaBrown.copy(alpha = 0.15f)),
-        modifier = Modifier.clickable(onClick = onClick),
-    ) {
-        Text(
-            label,
-            Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-            color = if (aktif) Color.White else SukaBrown.copy(alpha = 0.75f),
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Black,
-            maxLines = 1,
-        )
     }
 }
 
 @Composable
 private fun KartuMenu(menu: MenuHpp, onKlik: (() -> Unit)?) {
-    val modifier = if (onKlik != null) Modifier.clickable(onClick = onKlik) else Modifier
-    Surface(
-        modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        color = Color.White,
-        border = BorderStroke(1.dp, GarisKartu),
-        shadowElevation = 2.dp,
-    ) {
-        Column(Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.Top) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        menu.nama,
-                        color = SukaBrown,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Black,
-                        lineHeight = 18.sp,
-                    )
-                    Spacer(Modifier.height(3.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            "${menu.kelompok.ikon} ${menu.kelompok.singkat}",
-                            color = SukaGray400,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        if (menu.paket) {
-                            Spacer(Modifier.width(6.dp))
-                            LencanaKecil("PAKET", SukaOrange.copy(alpha = 0.10f), SukaOrange)
-                        }
-                        if (!menu.tersedia) {
-                            Spacer(Modifier.width(6.dp))
-                            LencanaKecil("NONAKTIF", SukaBrown.copy(alpha = 0.05f), SukaGray400)
-                        }
+    KartuIos(onKlik = onKlik) {
+        Row(verticalAlignment = Alignment.Top) {
+            Column(Modifier.weight(1f)) {
+                Text(menu.nama, style = TipeIos.Utama)
+                Spacer(Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("${menu.kelompok.ikon} ${menu.kelompok.singkat}", style = TipeIos.Catatan)
+                    if (menu.paket) {
+                        Spacer(Modifier.width(6.dp))
+                        LencanaIos("Paket", NadaIos.AKSEN, titik = false)
+                    }
+                    if (!menu.tersedia) {
+                        Spacer(Modifier.width(6.dp))
+                        LencanaIos("Nonaktif", NadaIos.NETRAL, titik = false)
                     }
                 }
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(rupiah(menu.hargaJual), color = SukaBrown, fontSize = 14.sp, fontWeight = FontWeight.Black)
-                    Text("harga jual", color = SukaGray400, fontSize = 9.sp, fontWeight = FontWeight.Medium)
-                }
             }
+            Spacer(Modifier.width(8.dp))
+            Column(horizontalAlignment = Alignment.End) {
+                Text(rupiah(menu.hargaJual), style = TipeIos.Keterangan.copy(fontWeight = FontWeight.SemiBold))
+                Text("harga jual", style = TipeIos.Kecil)
+            }
+        }
 
-            Spacer(Modifier.height(12.dp))
-            HorizontalDivider(color = GarisKartu)
-            Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(12.dp))
 
-            // Cabang ditulis eksplisit if/else, BUKAN keluar-awal `return@Column`.
-            // `Column` adalah fungsi inline: keluar dari lambdanya setelah sudah
-            // memancarkan composable meninggalkan pembukuan grup kompilator tidak
-            // seimbang, dan begitu keadaannya berbalik, tabel slot dibaca dengan
-            // indeks negatif -> ArrayIndexOutOfBoundsException di SlotTableKt.key.
-            val hpp = menu.hpp
-            if (hpp == null) {
-                Text(
-                    if (menu.paket) "Komponen paket belum punya HPP" else "Resep belum tersedia",
-                    color = SukaGray400,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                )
-            } else {
-                Row {
-                    KolomAngka("HPP", rupiah(hpp), SukaBrown, Modifier.weight(1f))
-                    KolomAngka(
-                        "Margin",
-                        rupiah(menu.marginRp ?: 0L),
-                        if ((menu.marginRp ?: 0L) >= 0) HijauTeks else MerahTeks,
-                        Modifier.weight(1f),
-                    )
-                    KolomAngka(
-                        "Foodcost",
-                        persenTeks(menu.foodcostPersen),
-                        if (menu.foodcostTinggi) MerahTeks else HijauTeks,
-                        Modifier.weight(1f),
-                    )
-                }
+        // Cabang ditulis eksplisit if/else, BUKAN keluar-awal `return@Column`.
+        // `Column` adalah fungsi inline: keluar dari lambdanya setelah sudah
+        // memancarkan composable meninggalkan pembukuan grup kompilator tidak
+        // seimbang, dan begitu keadaannya berbalik, tabel slot dibaca dengan
+        // indeks negatif -> ArrayIndexOutOfBoundsException di SlotTableKt.key.
+        val hpp = menu.hpp
+        if (hpp == null) {
+            Text(
+                if (menu.paket) "Komponen paket belum punya HPP" else "Resep belum tersedia",
+                style = TipeIos.Catatan,
+            )
+        } else {
+            BlokTigaAngka(
+                Triple("HPP", rupiah(hpp), WarnaIos.Label),
+                Triple(
+                    "Margin",
+                    rupiah(menu.marginRp ?: 0L),
+                    if ((menu.marginRp ?: 0L) >= 0) TeksBaik else TeksBuruk,
+                ),
+                Triple(
+                    "Foodcost",
+                    persenTeks(menu.foodcostPersen),
+                    if (menu.foodcostTinggi) TeksBuruk else TeksBaik,
+                ),
+            )
 
-                if (menu.hppOverride != null || menu.parsial) {
-                    Spacer(Modifier.height(10.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        if (menu.hppOverride != null) {
-                            LencanaKecil("HPP MANUAL", AMBER_LATAR, AMBER_TEKS)
-                        }
-                        if (menu.parsial) {
-                            LencanaKecil("HPP PARSIAL", MerahLatar, MerahTeks)
-                        }
+            if (menu.hppOverride != null || menu.parsial) {
+                Spacer(Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (menu.hppOverride != null) {
+                        LencanaIos("HPP manual", NadaIos.PERINGATAN, titik = false)
+                    }
+                    if (menu.parsial) {
+                        LencanaIos("HPP parsial", NadaIos.BAHAYA, titik = false)
                     }
                 }
             }
@@ -528,129 +385,112 @@ private fun KartuMenu(menu: MenuHpp, onKlik: (() -> Unit)?) {
     }
 }
 
+/**
+ * Blok abu bersekat tiga angka HPP / Margin / Foodcost.
+ *
+ * Bukan [BlokAngkaIos]: angka rupiah di sepertiga lebar kartu terpotong pada
+ * ukuran 20sp miliknya, dan margin perlu hijau saat untung — BlokAngkaIos hanya
+ * mengenal hitam dan merah.
+ */
 @Composable
-private fun KolomAngka(label: String, nilai: String, warna: Color, modifier: Modifier = Modifier) {
-    Column(modifier) {
-        Text(label.uppercase(), color = SukaGray400, fontSize = 8.sp, fontWeight = FontWeight.Black)
-        Spacer(Modifier.height(3.dp))
-        Text(
-            nilai,
-            color = warna,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Black,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
-
-@Composable
-private fun LencanaKecil(teks: String, latar: Color, warna: Color) {
-    Surface(shape = RoundedCornerShape(6.dp), color = latar) {
-        Text(
-            teks,
-            Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-            color = warna,
-            fontSize = 8.sp,
-            fontWeight = FontWeight.Black,
-            letterSpacing = 0.4.sp,
-        )
+private fun BlokTigaAngka(vararg kolom: Triple<String, String, Color>) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(UkuranIos.SudutBlok)
+            .background(WarnaIos.Latar)
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        kolom.forEachIndexed { i, (label, nilai, warna) ->
+            if (i > 0) Box(Modifier.width(0.5.dp).height(30.dp).background(WarnaIos.Pemisah))
+            Column(
+                Modifier.weight(1f).padding(horizontal = 6.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(label, style = TipeIos.Kecil.copy(fontWeight = FontWeight.Medium), maxLines = 1)
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    nilai,
+                    color = warna,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
     }
 }
 
 @Composable
 private fun DialogResep(menu: MenuHpp, resep: ResepMenu?, onTutup: () -> Unit) {
     Dialog(onDismissRequest = onTutup) {
-        Surface(shape = RoundedCornerShape(24.dp), color = Color.White) {
+        Surface(shape = UkuranIos.SudutKartu, color = WarnaIos.Latar) {
             Column(Modifier.heightIn(max = 520.dp)) {
-                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    Modifier.padding(start = 16.dp, end = 12.dp, top = 14.dp, bottom = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Column(Modifier.weight(1f)) {
                         Text(
                             menu.nama,
-                            color = SukaBrown,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Black,
+                            style = TipeIos.Utama,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
-                        Text(
-                            "${menu.kelompok.ikon} ${menu.kelompok.singkat}",
-                            color = SukaGray400,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
+                        Text("${menu.kelompok.ikon} ${menu.kelompok.singkat}", style = TipeIos.Catatan)
                     }
-                    IconButton(onClick = onTutup) {
-                        Icon(Icons.Default.Close, "Tutup", tint = SukaBrown)
-                    }
+                    Spacer(Modifier.width(8.dp))
+                    TombolBundarIos(IkonIos.Close, "Tutup", onTutup, warnaIkon = WarnaIos.LabelKedua)
                 }
-                HorizontalDivider(color = GarisKartu)
+                PemisahIos(inset = 0.dp)
 
                 Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp)) {
                     when {
                         menu.paket -> Text(
                             "Menu paket. HPP-nya dirakit dari HPP tiap komponen, " +
                                 "bukan dari resep bahan sendiri.",
-                            color = SukaGray400,
-                            fontSize = 11.sp,
-                            lineHeight = 16.sp,
-                            fontWeight = FontWeight.Medium,
+                            style = TipeIos.SubJudul,
                         )
                         resep == null || resep.baris.isEmpty() -> Text(
                             "Resep untuk menu ini belum diisi.",
-                            color = SukaGray400,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
+                            style = TipeIos.SubJudul,
                         )
                         else -> {
-                            resep.baris.forEach { baris -> BarisBahan(baris) }
-                            Spacer(Modifier.height(10.dp))
-                            HorizontalDivider(color = GarisKartu)
-                            Spacer(Modifier.height(10.dp))
-                            BarisTotal("Total bahan", rupiah(resep.totalBahan), SukaBrown)
-                            if (resep.buffer > 0) {
-                                Spacer(Modifier.height(4.dp))
-                                BarisTotal("Buffer", rupiah(resep.buffer), SukaGray400)
-                            }
-                            Spacer(Modifier.height(6.dp))
-                            BarisTotal("Total HPP", rupiah(resep.totalHpp), SukaOrange, besar = true)
-                            if (resep.adaBahanTanpaHarga) {
-                                Spacer(Modifier.height(10.dp))
-                                Surface(
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = AMBER_LATAR,
-                                    border = BorderStroke(1.dp, AMBER_GARIS),
-                                ) {
-                                    Text(
-                                        "Sebagian bahan belum punya harga beli, jadi HPP di atas " +
-                                            "masih lebih rendah dari yang sebenarnya.",
-                                        Modifier.padding(10.dp),
-                                        color = AMBER_TEKS,
-                                        fontSize = 10.sp,
-                                        lineHeight = 15.sp,
-                                        fontWeight = FontWeight.Bold,
-                                    )
+                            GrupIos {
+                                resep.baris.forEachIndexed { i, baris ->
+                                    if (i > 0) PemisahIos()
+                                    BarisBahan(baris)
                                 }
+                            }
+                            Spacer(Modifier.height(12.dp))
+                            GrupIos {
+                                BarisIos("Total bahan", nilai = rupiah(resep.totalBahan))
+                                if (resep.buffer > 0) {
+                                    PemisahIos()
+                                    BarisIos("Buffer", nilai = rupiah(resep.buffer))
+                                }
+                                PemisahIos()
+                                BarisTotalHpp(rupiah(resep.totalHpp))
+                            }
+                            if (resep.adaBahanTanpaHarga) {
+                                Spacer(Modifier.height(12.dp))
+                                CatatanBernada(
+                                    "Sebagian bahan belum punya harga beli, jadi HPP di atas " +
+                                        "masih lebih rendah dari yang sebenarnya.",
+                                    NadaIos.PERINGATAN,
+                                )
                             }
                         }
                     }
 
                     if (menu.hppOverride != null) {
                         Spacer(Modifier.height(12.dp))
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = HijauLatar,
-                            border = BorderStroke(1.dp, HijauGaris),
-                        ) {
-                            Text(
-                                "HPP yang dipakai POS ditulis manual: ${rupiah(menu.hppOverride!!)}.",
-                                Modifier.padding(10.dp),
-                                color = HijauTeks,
-                                fontSize = 10.sp,
-                                lineHeight = 15.sp,
-                                fontWeight = FontWeight.Bold,
-                            )
-                        }
+                        CatatanBernada(
+                            "HPP yang dipakai POS ditulis manual: ${rupiah(menu.hppOverride!!)}.",
+                            NadaIos.SUKSES,
+                        )
                     }
                 }
             }
@@ -660,51 +500,40 @@ private fun DialogResep(menu: MenuHpp, resep: ResepMenu?, onTutup: () -> Unit) {
 
 @Composable
 private fun BarisBahan(baris: BarisResep) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            Text(
-                baris.bahanNama,
-                color = SukaBrown,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                "${baris.qtyTeks} ${baris.satuan}",
-                color = SukaGray400,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Medium,
-            )
-        }
-        Spacer(Modifier.width(8.dp))
-        if (baris.adaHarga) {
-            Text(rupiah(baris.subtotal), color = SukaBrown, fontSize = 12.sp, fontWeight = FontWeight.Black)
+    BarisIos(
+        judul = baris.bahanNama,
+        keterangan = "${baris.qtyTeks} ${baris.satuan}",
+        nilai = if (baris.adaHarga) rupiah(baris.subtotal) else null,
+        trailing = if (baris.adaHarga) {
+            null
         } else {
-            Box(
-                Modifier.background(AMBER_LATAR, RoundedCornerShape(6.dp)).padding(horizontal = 6.dp, vertical = 2.dp),
-            ) {
-                Text("tanpa harga", color = AMBER_TEKS, fontSize = 9.sp, fontWeight = FontWeight.Black)
-            }
-        }
+            { LencanaIos("tanpa harga", NadaIos.PERINGATAN, titik = false) }
+        },
+    )
+}
+
+/** Baris penutup rincian: total HPP ditebalkan beraksen karena itu angka yang dicari. */
+@Composable
+private fun BarisTotalHpp(nilai: String) {
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("Total HPP", Modifier.weight(1f), style = TipeIos.Utama)
+        Text(nilai, color = WarnaIos.Aksen, fontSize = 17.sp, fontWeight = FontWeight.Bold)
     }
 }
 
+/** Catatan kecil berlatar nada tipis, pengganti kotak berbingkai di dalam dialog. */
 @Composable
-private fun BarisTotal(label: String, nilai: String, warna: Color, besar: Boolean = false) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            label,
-            Modifier.weight(1f),
-            color = if (besar) SukaBrown else SukaGray400,
-            fontSize = if (besar) 12.sp else 11.sp,
-            fontWeight = if (besar) FontWeight.Black else FontWeight.Bold,
-        )
-        Text(
-            nilai,
-            color = warna,
-            fontSize = if (besar) 16.sp else 12.sp,
-            fontWeight = FontWeight.Black,
-        )
-    }
+private fun CatatanBernada(teks: String, nada: NadaIos) {
+    Text(
+        teks,
+        Modifier
+            .fillMaxWidth()
+            .clip(UkuranIos.SudutBlok)
+            .background(nada.warna.copy(alpha = 0.12f))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        style = TipeIos.Catatan.copy(color = nada.teks, lineHeight = 18.sp),
+    )
 }
