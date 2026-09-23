@@ -1,5 +1,17 @@
 package com.sukashawarma.superapp.feature.chat.ui.area
 
+import androidx.compose.foundation.lazy.itemsIndexed
+import com.sukashawarma.superapp.core.ui.ios.LabelSeksiIos
+import com.sukashawarma.superapp.core.ui.ios.LencanaIos
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.PemisahIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.ios.permukaanIos
+import com.sukashawarma.superapp.core.ui.ios.tekanIos
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
+import com.sukashawarma.superapp.feature.chat.ui.pribadi.bentukBarisGrup
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -62,13 +74,13 @@ fun SheetAnggotaArea(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = Color(0xFFF9FAFB),
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+        containerColor = WarnaIos.Latar,
+        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp)
+                .padding(horizontal = UkuranIos.TepiLayar)
                 .navigationBarsPadding()
         ) {
             // Header Sheet
@@ -80,28 +92,25 @@ fun SheetAnggotaArea(
                     modifier = Modifier
                         .size(40.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFFFEF3C7)),
+                        .background(WarnaIos.Oranye.copy(alpha = 0.14f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Group,
+                        imageVector = IkonIos.Groups,
                         contentDescription = null,
-                        tint = Color(0xFFD97706),
-                        modifier = Modifier.size(22.dp)
+                        tint = WarnaIos.Oranye,
+                        modifier = Modifier.size(21.dp)
                     )
                 }
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text(
                         text = "Anggota ${area.namaArea}",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF111827)
+                        style = TipeIos.Judul3,
                     )
                     Text(
                         text = "${anggota.size} Anggota Tim (AM, Leader & Crew)",
-                        fontSize = 13.sp,
-                        color = Color(0xFF6B7280)
+                        style = TipeIos.Catatan,
                     )
                 }
             }
@@ -115,34 +124,23 @@ fun SheetAnggotaArea(
                         .height(180.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(color = Color(0xFF007AFF), modifier = Modifier.size(32.dp))
+                    CircularProgressIndicator(color = WarnaIos.Biru, modifier = Modifier.size(32.dp))
                 }
             } else {
                 LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     // Seksi Area Manager (VIP Card)
                     item {
-                        Text(
-                            text = "👑 AREA MANAGER",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFFB45309),
-                            letterSpacing = 1.sp
+                        LabelSeksiIos(
+                            "👑 Area Manager",
+                            Modifier.padding(start = 16.dp, bottom = 7.dp)
                         )
-                        Spacer(modifier = Modifier.height(6.dp))
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(
-                                    Brush.horizontalGradient(
-                                        listOf(Color(0xFFFFFBEB), Color(0xFFFEF3C7))
-                                    )
-                                )
-                                .border(1.dp, Color(0xFFFDE68A), RoundedCornerShape(16.dp))
-                                .padding(14.dp)
+                                .permukaanIos(UkuranIos.SudutGrup)
+                                .padding(horizontal = 16.dp, vertical = 12.dp)
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -157,14 +155,12 @@ fun SheetAnggotaArea(
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = area.amName,
-                                        fontSize = 16.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF92400E)
+                                        style = TipeIos.Utama,
                                     )
                                     Text(
                                         text = "Pembina ${area.namaArea}",
-                                        fontSize = 12.sp,
-                                        color = Color(0xFFB45309)
+                                        style = TipeIos.Catatan,
+                                        color = NadaIos.PERINGATAN.teks,
                                     )
                                 }
 
@@ -181,23 +177,29 @@ fun SheetAnggotaArea(
                     // Seksi Kru & Leader per Outlet
                     anggotaPerOutlet.forEach { (outletNama, anggotaList) ->
                         item {
-                            Text(
-                                text = "🏪 $outletNama (${anggotaList.size})",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF4B5563),
-                                letterSpacing = 0.5.sp
+                            LabelSeksiIos(
+                                "🏪 $outletNama (${anggotaList.size})",
+                                Modifier.padding(start = 16.dp, top = 22.dp, bottom = 7.dp)
                             )
                         }
 
-                        items(anggotaList, key = { it.id }) { user ->
-                            BarisAnggotaArea(
-                                user = user,
-                                onChat = {
-                                    onMulaiChatPribadi(user.id, user.namaTampil, user.avatar)
-                                    onDismiss()
-                                }
-                            )
+                        itemsIndexed(anggotaList, key = { _, it -> it.id }) { i, user ->
+                            val terakhir = i == anggotaList.lastIndex
+                            Column(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clip(bentukBarisGrup(pertama = i == 0, terakhir = terakhir))
+                                    .background(WarnaIos.Kartu)
+                            ) {
+                                BarisAnggotaArea(
+                                    user = user,
+                                    onChat = {
+                                        onMulaiChatPribadi(user.id, user.namaTampil, user.avatar)
+                                        onDismiss()
+                                    }
+                                )
+                                if (!terakhir) PemisahIos(inset = 66.dp)
+                            }
                         }
                     }
 
@@ -218,10 +220,7 @@ private fun BarisAnggotaArea(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(Color.White)
-            .border(1.dp, Color(0xFFE5E7EB), RoundedCornerShape(14.dp))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         AvatarStaf(
@@ -234,31 +233,19 @@ private fun BarisAnggotaArea(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = user.namaTampil,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF1F2937)
+                    style = TipeIos.Isi,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f, fill = false)
                 )
                 if (user.isLeader) {
                     Spacer(modifier = Modifier.width(6.dp))
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(Color(0xFFE0F2FE))
-                            .padding(horizontal = 5.dp, vertical = 1.dp)
-                    ) {
-                        Text(
-                            text = "⭐ Leader",
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF0284C7)
-                        )
-                    }
+                    LencanaIos("⭐ Leader", NadaIos.INFO, titik = false)
                 }
             }
             Text(
                 text = labelRole(user.role) + " • " + (user.outlet ?: "Outlet"),
-                fontSize = 11.sp,
-                color = Color(0xFF6B7280)
+                style = TipeIos.Catatan,
             )
         }
 
@@ -270,25 +257,25 @@ private fun BarisAnggotaArea(
 private fun TombolChatPribadiMini(onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(Color(0xFFEBF5FF))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 6.dp),
+            .clip(UkuranIos.SudutKapsul)
+            .background(WarnaIos.Biru.copy(alpha = 0.12f))
+            .tekanIos(onClick)
+            .padding(horizontal = 12.dp, vertical = 7.dp),
         contentAlignment = Alignment.Center
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.Chat,
                 contentDescription = null,
-                tint = Color(0xFF007AFF),
+                tint = WarnaIos.Biru,
                 modifier = Modifier.size(14.dp)
             )
             Spacer(modifier = Modifier.width(4.dp))
             Text(
                 text = "Chat",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF007AFF)
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = WarnaIos.Biru
             )
         }
     }
