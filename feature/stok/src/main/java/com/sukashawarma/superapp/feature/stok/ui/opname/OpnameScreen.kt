@@ -1,11 +1,22 @@
 package com.sukashawarma.superapp.feature.stok.ui.opname
 
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
+import com.sukashawarma.superapp.core.ui.kaca.denganRuangNav
+import com.sukashawarma.superapp.core.ui.kaca.navigationBarsPaddingKaca
+import com.sukashawarma.superapp.core.ui.ios.KartuIos
+import com.sukashawarma.superapp.core.ui.ios.KolomCariIos
+import com.sukashawarma.superapp.core.ui.ios.LencanaIos
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.TombolKeduaIos
+import com.sukashawarma.superapp.core.ui.ios.TombolUtamaIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -13,19 +24,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.EditNote
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -43,13 +47,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sukashawarma.superapp.feature.stok.data.model.OpnameHeader
 import com.sukashawarma.superapp.feature.stok.data.model.OpnameItemRow
@@ -65,9 +67,6 @@ import com.sukashawarma.superapp.feature.stok.ui.MemuatPenuh
 import com.sukashawarma.superapp.feature.stok.ui.PemilihOutlet
 import com.sukashawarma.superapp.feature.stok.ui.PitaPesan
 import com.sukashawarma.superapp.feature.stok.ui.tanggalSingkat
-import com.sukashawarma.superapp.presentation.theme.SukaOnSurface
-import com.sukashawarma.superapp.presentation.theme.SukaOnSurfaceVariant
-import com.sukashawarma.superapp.presentation.theme.SukaSurface
 import com.sukashawarma.superapp.core.ui.RealtimeRefresh
 import com.sukashawarma.superapp.core.ui.RealtimeTables
 import androidx.compose.material3.AlertDialog
@@ -104,7 +103,7 @@ fun OpnameScreen(viewModel: OpnameViewModel = viewModel()) {
     } else if (state.formTerbuka) {
         FormOpname(state, viewModel)
     } else {
-    Column(Modifier.fillMaxSize().background(SukaSurface)) {
+    Column(Modifier.fillMaxSize().background(WarnaIos.Latar)) {
         HeaderStok(judul = "Stock Opname", subjudul = "Hitung fisik & rekonsiliasi stok")
 
         if (!state.tidakBerhak && state.outlets.size > 1) {
@@ -116,61 +115,41 @@ fun OpnameScreen(viewModel: OpnameViewModel = viewModel()) {
         if (!state.tidakBerhak) {
             if (state.crewSudahOpname) {
                 // Crew yang sudah opname hari ini: tampilkan pesan, bukan tombol.
-                Surface(
-                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                    shape = RoundedCornerShape(14.dp),
-                    color = Color(0xFF94A3B8).copy(alpha = 0.10f),
-                    border = BorderStroke(1.dp, Color(0xFF94A3B8).copy(alpha = 0.25f)),
-                ) {
+                KartuIos(Modifier.padding(horizontal = UkuranIos.TepiLayar, vertical = 12.dp)) {
                     Row(
-                        Modifier.padding(14.dp),
+                        Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center,
                     ) {
                         Icon(
-                            Icons.Default.CheckCircle, null,
-                            tint = Color(0xFF168451),
-                            modifier = Modifier.size(18.dp),
+                            IkonIos.CheckCircle, null,
+                            tint = WarnaIos.Hijau,
+                            modifier = Modifier.size(20.dp),
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
                             "Opname hari ini sudah selesai",
-                            color = Color(0xFF64748B),
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
+                            style = TipeIos.Keterangan.copy(fontWeight = FontWeight.SemiBold),
                         )
                     }
                 }
             } else {
                 val adaDraft = state.riwayat.any { it.status == StatusOpname.DRAFT }
                 val draftHeader = state.riwayat.firstOrNull { it.status == StatusOpname.DRAFT }
-                Button(
-                    onClick = viewModel::bukaForm,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (adaDraft) Color(0xFFD97706) else Color(0xFFEA580C),
-                    ),
-                    shape = RoundedCornerShape(14.dp),
+                Column(
+                    Modifier.fillMaxWidth().padding(horizontal = UkuranIos.TepiLayar, vertical = 12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Icon(
-                        if (adaDraft) Icons.Default.EditNote else Icons.Default.Add,
-                        null,
-                        modifier = Modifier.size(18.dp),
+                    TombolUtamaIos(
+                        if (adaDraft) "Lanjutkan Draft" else "Mulai Opname Hari Ini",
+                        viewModel::bukaForm,
+                        ikon = if (adaDraft) IkonIos.EditNote else IkonIos.Add,
+                        // Oranye sistem membedakan "lanjutkan" dari "mulai" sekilas pandang.
+                        warna = if (adaDraft) WarnaIos.Oranye else WarnaIos.Aksen,
                     )
-                    Spacer(Modifier.width(7.dp))
-                    Column {
-                        Text(
-                            if (adaDraft) "Lanjutkan Draft" else "Mulai Opname Hari Ini",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp,
-                        )
-                        if (adaDraft && draftHeader != null && draftHeader.jumlahItem > 0) {
-                            Text(
-                                "${draftHeader.jumlahItem} item tersimpan",
-                                fontSize = 10.sp,
-                                color = Color.White.copy(alpha = 0.80f),
-                            )
-                        }
+                    if (adaDraft && draftHeader != null && draftHeader.jumlahItem > 0) {
+                        Spacer(Modifier.height(6.dp))
+                        Text("${draftHeader.jumlahItem} item tersimpan", style = TipeIos.Catatan)
                     }
                 }
             }
@@ -183,8 +162,10 @@ fun OpnameScreen(viewModel: OpnameViewModel = viewModel()) {
             state.riwayat.isEmpty() -> KeadaanKosong("Belum ada riwayat opname di outlet ini.")
             else -> LazyColumn(
                 Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(9.dp),
+                contentPadding = PaddingValues(
+                    start = UkuranIos.TepiLayar, end = UkuranIos.TepiLayar, bottom = 20.dp,
+                ).denganRuangNav(),
+                verticalArrangement = Arrangement.spacedBy(UkuranIos.JarakKartu),
             ) {
                 items(state.riwayat, key = { it.id }) { h ->
                     KartuRiwayat(h, onKlik = { detailId = h.id })
@@ -195,54 +176,38 @@ fun OpnameScreen(viewModel: OpnameViewModel = viewModel()) {
     }
 }
 
+private fun StatusOpname.nadaIos(): NadaIos = when (this) {
+    StatusOpname.FINALIZED, StatusOpname.APPROVED -> NadaIos.SUKSES
+    StatusOpname.PENDING_APPROVAL -> NadaIos.PERINGATAN
+    StatusOpname.REJECTED -> NadaIos.BAHAYA
+    StatusOpname.DRAFT -> NadaIos.NETRAL
+}
+
 @Composable
 private fun KartuRiwayat(h: OpnameHeader, onKlik: () -> Unit) {
-    val warna = when (h.status) {
-        StatusOpname.FINALIZED, StatusOpname.APPROVED -> Color(0xFF168451)
-        StatusOpname.PENDING_APPROVAL -> Color(0xFFC27A12)
-        StatusOpname.REJECTED -> Color(0xFFDC2626)
-        StatusOpname.DRAFT -> Color(0xFF64748B)
-    }
-    Surface(
-        Modifier.fillMaxWidth().clickable(onClick = onKlik),
-        shape = RoundedCornerShape(16.dp),
-        color = Color.White,
-        border = BorderStroke(1.dp, Color(0xFFF1F5F9)),
-    ) {
-        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+    KartuIos(onKlik = onKlik) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(
-                    tanggalSingkat(h.tanggal),
-                    color = SukaOnSurface,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                )
+                Text(tanggalSingkat(h.tanggal), style = TipeIos.Utama)
                 Text(
                     listOfNotNull(h.tipe, h.creatorName).joinToString(" · ").ifBlank { "-" },
-                    color = SukaOnSurfaceVariant,
-                    fontSize = 10.sp,
+                    style = TipeIos.Catatan,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (h.jumlahItem > 0) {
                     Text(
                         "${h.jumlahItem} item" + if (h.jumlahFlagged > 0) " · ${h.jumlahFlagged} di luar toleransi" else "",
-                        color = if (h.jumlahFlagged > 0) Color(0xFFC2410C) else Color(0xFF94A3B8),
-                        fontSize = 10.sp,
+                        style = TipeIos.Catatan.copy(
+                            color = if (h.jumlahFlagged > 0) NadaIos.PERINGATAN.teks else WarnaIos.LabelKedua,
+                        ),
                     )
                 }
             }
-            Surface(
-                shape = RoundedCornerShape(50),
-                color = warna.copy(alpha = 0.10f),
-                border = BorderStroke(1.dp, warna.copy(alpha = 0.28f)),
-            ) {
-                Text(
-                    h.status.label,
-                    Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
-                    color = warna, fontSize = 10.sp, fontWeight = FontWeight.Black,
-                )
-            }
+            Spacer(Modifier.width(8.dp))
+            LencanaIos(h.status.label, h.status.nadaIos())
+            Spacer(Modifier.width(6.dp))
+            Icon(IkonIos.ChevronRight, null, tint = WarnaIos.LabelKetiga, modifier = Modifier.size(15.dp))
         }
     }
 }
@@ -252,7 +217,7 @@ private fun KartuRiwayat(h: OpnameHeader, onKlik: () -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FormOpname(state: OpnameUiState, viewModel: OpnameViewModel) {
-    Column(Modifier.fillMaxSize().background(SukaSurface)) {
+    Column(Modifier.fillMaxSize().background(WarnaIos.Latar)) {
         HeaderStok(
             judul = "Hitung Fisik",
             subjudul = "${state.jumlahTerisi} dari ${state.items.size} bahan terisi",
@@ -270,59 +235,43 @@ private fun FormOpname(state: OpnameUiState, viewModel: OpnameViewModel) {
             // penyimpanannya pasti ditolak lebih buruk daripada tidak menampilkannya.
             KeadaanKosong(terkunci.pesan)
         } else {
-        OutlinedTextField(
-            value = state.cari,
-            onValueChange = viewModel::ubahCari,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
-            placeholder = { Text("Cari bahan…", fontSize = 13.sp, color = Color(0xFF94A3B8)) },
-            leadingIcon = { Icon(Icons.Default.Search, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(18.dp)) },
-            singleLine = true,
-            shape = RoundedCornerShape(14.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = Color.White,
-                unfocusedContainerColor = Color.White,
-                focusedBorderColor = Color(0xFFF97316),
-                unfocusedBorderColor = Color(0xFFE2E8F0),
-            ),
+        KolomCariIos(
+            state.cari,
+            viewModel::ubahCari,
+            Modifier.fillMaxWidth().padding(horizontal = UkuranIos.TepiLayar, vertical = 10.dp),
+            placeholder = "Cari bahan…",
         )
 
         LazyColumn(
             Modifier.weight(1f),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(9.dp),
+            contentPadding = PaddingValues(start = UkuranIos.TepiLayar, end = UkuranIos.TepiLayar, top = 2.dp, bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(UkuranIos.JarakKartu),
         ) {
             items(state.itemTampil, key = { it.bahanBakuId }) { item ->
                 BarisHitung(item, viewModel)
             }
         }
 
-        Surface(color = Color.White, shadowElevation = 8.dp) {
+        Surface(color = WarnaIos.Kartu, shadowElevation = 8.dp) {
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(16.dp),
+                    .navigationBarsPaddingKaca()
+                    .padding(UkuranIos.TepiLayar),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                OutlinedButton(
-                    onClick = viewModel::simpanDraft,
-                    modifier = Modifier.weight(1f),
-                    enabled = !state.menyimpan,
-                    shape = RoundedCornerShape(13.dp),
-                ) { Text("Simpan Draft", fontSize = 13.sp, fontWeight = FontWeight.Bold) }
-
-                Button(
-                    onClick = viewModel::mintaFinalisasi,
-                    modifier = Modifier.weight(1f),
-                    enabled = !state.menyimpan,
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEA580C)),
-                    shape = RoundedCornerShape(13.dp),
-                ) {
-                    Text(
-                        if (state.menyimpan) "Memproses…" else "Finalisasi",
-                        fontSize = 13.sp, fontWeight = FontWeight.Bold,
-                    )
-                }
+                TombolKeduaIos(
+                    "Simpan Draft",
+                    viewModel::simpanDraft,
+                    Modifier.weight(1f),
+                    aktif = !state.menyimpan,
+                )
+                TombolUtamaIos(
+                    if (state.menyimpan) "Memproses…" else "Finalisasi",
+                    viewModel::mintaFinalisasi,
+                    Modifier.weight(1f),
+                    aktif = !state.menyimpan,
+                )
             }
         }
         }
@@ -336,84 +285,68 @@ private fun BarisHitung(item: OpnameItemRow, viewModel: OpnameViewModel) {
     val ditandai = viewModel.ditandai(item)
     val persen = Selisih.persen(selisih, item.qtySystemSmallest)
 
-    // Warna border: merah bila selisih di luar toleransi, hijau bila sudah tersimpan
-    // sebagai draft, abu-abu polos bila belum ada aksi apa-apa.
-    val borderColor = when {
-        item.adaMasukan && ditandai -> Color(0xFFDC2626).copy(alpha = 0.35f)
-        item.tersimpanDraft -> Color(0xFF168451).copy(alpha = 0.30f)
-        else -> Color(0xFFF1F5F9)
+    // Garis tepi hanya untuk selisih di luar toleransi — satu-satunya keadaan yang
+    // harus menarik mata. Baris tersimpan cukup ditandai lencana hijau.
+    val tepiBahaya = if (item.adaMasukan && ditandai) {
+        Modifier.border(1.dp, WarnaIos.Merah.copy(alpha = 0.45f), UkuranIos.SudutKartu)
+    } else {
+        Modifier
     }
 
-    Surface(
-        Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = if (item.tersimpanDraft) Color(0xFFF0FDF4) else Color.White,
-        border = BorderStroke(1.dp, borderColor),
-    ) {
-        Column(Modifier.padding(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        item.namaBahan,
-                        color = Color(0xFFEA580C),
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        "Sistem: ${formatAngkaStok(item.qtySystemSmallest)} ${formatSatuan(item.meta.satuanKecil ?: item.meta.satuan)}" +
-                            if (item.terukur) " · toleransi 5%" else " · toleransi 0%",
-                        color = SukaOnSurfaceVariant,
-                        fontSize = 10.sp,
-                    )
-                    // Tanda visual: baris yang sudah tersimpan sebagai draft tidak polos.
-                    if (item.tersimpanDraft) {
-                        Text(
-                            "✓ Tersimpan",
-                            color = Color(0xFF168451),
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
-                }
-                if (item.adaMasukan) {
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(
-                            (if (selisih > 0) "+" else "") + formatAngkaStok(selisih),
-                            color = if (ditandai) Color(0xFFDC2626) else Color(0xFF168451),
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                        )
-                        Text(persen.teks, color = Color(0xFF94A3B8), fontSize = 9.sp)
-                    }
+    KartuIos(tepiBahaya) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    item.namaBahan,
+                    style = TipeIos.Utama,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    "Sistem: ${formatAngkaStok(item.qtySystemSmallest)} ${formatSatuan(item.meta.satuanKecil ?: item.meta.satuan)}" +
+                        if (item.terukur) " · toleransi 5%" else " · toleransi 0%",
+                    style = TipeIos.Catatan,
+                )
+                // Tanda visual: baris yang sudah tersimpan sebagai draft tidak polos.
+                if (item.tersimpanDraft) {
+                    Spacer(Modifier.height(5.dp))
+                    LencanaIos("Tersimpan", NadaIos.SUKSES, ikon = IkonIos.Check)
                 }
             }
+            if (item.adaMasukan) {
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        (if (selisih > 0) "+" else "") + formatAngkaStok(selisih),
+                        style = TipeIos.Angka.copy(color = if (ditandai) WarnaIos.Merah else NadaIos.SUKSES.teks),
+                    )
+                    Text(persen.teks, style = TipeIos.Kecil)
+                }
+            }
+        }
 
-            Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(12.dp))
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            KolomAngka(
+                label = formatSatuan(item.meta.satuan).ifBlank { "Besar" },
+                nilai = item.besar,
+                modifier = Modifier.weight(1f),
+            ) { viewModel.ubahMasukan(item.bahanBakuId, besar = it) }
+
+            if (item.meta.satuanTengah != null) {
                 KolomAngka(
-                    label = formatSatuan(item.meta.satuan).ifBlank { "Besar" },
-                    nilai = item.besar,
+                    label = formatSatuan(item.meta.satuanTengah),
+                    nilai = item.tengah,
                     modifier = Modifier.weight(1f),
-                ) { viewModel.ubahMasukan(item.bahanBakuId, besar = it) }
+                ) { viewModel.ubahMasukan(item.bahanBakuId, tengah = it) }
+            }
 
-                if (item.meta.satuanTengah != null) {
-                    KolomAngka(
-                        label = formatSatuan(item.meta.satuanTengah),
-                        nilai = item.tengah,
-                        modifier = Modifier.weight(1f),
-                    ) { viewModel.ubahMasukan(item.bahanBakuId, tengah = it) }
-                }
-
-                if (item.meta.satuanKecil != null) {
-                    KolomAngka(
-                        label = formatSatuan(item.meta.satuanKecil),
-                        nilai = item.kecil,
-                        modifier = Modifier.weight(1f),
-                    ) { viewModel.ubahMasukan(item.bahanBakuId, kecil = it) }
-                }
+            if (item.meta.satuanKecil != null) {
+                KolomAngka(
+                    label = formatSatuan(item.meta.satuanKecil),
+                    nilai = item.kecil,
+                    modifier = Modifier.weight(1f),
+                ) { viewModel.ubahMasukan(item.bahanBakuId, kecil = it) }
             }
         }
     }
@@ -429,14 +362,14 @@ private fun KolomAngka(
 ) {
     Column(modifier) {
         Text(
-            label.uppercase(),
-            color = Color(0xFF9AA6B2),
-            fontSize = 8.sp,
-            fontWeight = FontWeight.Bold,
+            label,
+            style = TipeIos.Kecil.copy(fontWeight = FontWeight.Medium),
             textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.fillMaxWidth(),
         )
-        Spacer(Modifier.height(3.dp))
+        Spacer(Modifier.height(4.dp))
         OutlinedTextField(
             value = nilai,
             // Hanya angka dan satu titik desimal yang diterima; menolak di sini lebih
@@ -445,15 +378,16 @@ private fun KolomAngka(
                 if (teks.isEmpty() || teks.matches(Regex("^\\d*\\.?\\d*$"))) onUbah(teks)
             },
             modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("0", fontSize = 13.sp, color = Color(0xFFCBD5E1)) },
+            placeholder = { Text("0", style = TipeIos.Keterangan.copy(color = WarnaIos.LabelKetiga)) },
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            shape = RoundedCornerShape(11.dp),
+            shape = UkuranIos.SudutKontrol,
             colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = Color.White,
-                unfocusedContainerColor = Color(0xFFFBFCFE),
-                focusedBorderColor = Color(0xFFF97316),
-                unfocusedBorderColor = Color(0xFFE2E8F0),
+                focusedContainerColor = WarnaIos.Kartu,
+                unfocusedContainerColor = WarnaIos.Kartu,
+                focusedBorderColor = WarnaIos.Aksen,
+                unfocusedBorderColor = WarnaIos.Pemisah,
+                cursorColor = WarnaIos.Aksen,
             ),
         )
     }
@@ -478,12 +412,10 @@ private fun DialogPenurunanDrastis(
 ) {
     AlertDialog(
         onDismissRequest = { if (!menyimpan) onBatal() },
+        containerColor = WarnaIos.Kartu,
+        shape = UkuranIos.SudutKartu,
         title = {
-            Text(
-                "Periksa ${penurunan.size} bahan ini dulu",
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 16.sp,
-            )
+            Text("Periksa ${penurunan.size} bahan ini dulu", style = TipeIos.Judul3)
         },
         text = {
             Column(
@@ -494,47 +426,38 @@ private fun DialogPenurunanDrastis(
                     "Hitungannya turun jauh di bawah catatan sistem. Finalisasi akan " +
                         "memotong stoknya sebanyak selisih itu, dan tidak bisa dibatalkan " +
                         "dari aplikasi.",
-                    fontSize = 12.sp,
-                    color = Color(0xFF64748B),
+                    style = TipeIos.SubJudul,
                 )
                 penurunan.forEach { baris ->
-                    Surface(
-                        shape = RoundedCornerShape(11.dp),
-                        color = if (baris.habisTotal) Color(0xFFFEF2F2) else Color(0xFFFFFBEB),
-                        border = BorderStroke(
-                            1.dp,
-                            if (baris.habisTotal) Color(0xFFFECACA) else Color(0xFFFDE68A),
-                        ),
+                    val nada = if (baris.habisTotal) NadaIos.BAHAYA else NadaIos.PERINGATAN
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .background(nada.warna.copy(alpha = 0.10f), UkuranIos.SudutBlok)
+                            .padding(12.dp),
                     ) {
-                        Column(Modifier.padding(11.dp)) {
-                            Text(
-                                baris.calon.nama,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF1E293B),
-                            )
-                            Text(
-                                if (baris.habisTotal) {
-                                    "Ditandai HABIS, padahal sistem masih mencatat stok."
-                                } else {
-                                    "Turun jauh dari catatan sistem."
-                                },
-                                fontSize = 11.sp,
-                                color = Color(0xFF7C2D12),
-                            )
-                            if (baris.bolehLewati) {
-                                Spacer(Modifier.height(7.dp))
-                                OutlinedButton(
-                                    onClick = { onLewati(baris.calon.bahanBakuId) },
-                                    enabled = !menyimpan,
-                                    shape = RoundedCornerShape(9.dp),
-                                ) {
-                                    Text(
-                                        "Belum dihitung, lewati",
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                    )
-                                }
+                        Text(baris.calon.nama, style = TipeIos.Keterangan.copy(fontWeight = FontWeight.SemiBold))
+                        Text(
+                            if (baris.habisTotal) {
+                                "Ditandai HABIS, padahal sistem masih mencatat stok."
+                            } else {
+                                "Turun jauh dari catatan sistem."
+                            },
+                            style = TipeIos.Catatan.copy(color = nada.teks),
+                        )
+                        if (baris.bolehLewati) {
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedButton(
+                                onClick = { onLewati(baris.calon.bahanBakuId) },
+                                enabled = !menyimpan,
+                                shape = UkuranIos.SudutKontrol,
+                                border = BorderStroke(1.dp, WarnaIos.Pemisah),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    containerColor = WarnaIos.Kartu,
+                                    contentColor = WarnaIos.Aksen,
+                                ),
+                            ) {
+                                Text("Belum dihitung, lewati", fontWeight = FontWeight.SemiBold)
                             }
                         }
                     }
@@ -545,13 +468,12 @@ private fun DialogPenurunanDrastis(
             Button(
                 onClick = onLanjut,
                 enabled = !menyimpan,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEA580C)),
-                shape = RoundedCornerShape(11.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = WarnaIos.Aksen),
+                shape = UkuranIos.SudutKontrol,
             ) {
                 Text(
                     if (menyimpan) "Memproses…" else "Benar, finalisasi",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.SemiBold,
                 )
             }
         },
@@ -559,8 +481,10 @@ private fun DialogPenurunanDrastis(
             OutlinedButton(
                 onClick = onBatal,
                 enabled = !menyimpan,
-                shape = RoundedCornerShape(11.dp),
-            ) { Text("Periksa lagi", fontSize = 13.sp, fontWeight = FontWeight.Bold) }
+                shape = UkuranIos.SudutKontrol,
+                border = BorderStroke(1.dp, WarnaIos.Pemisah),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = WarnaIos.Aksen),
+            ) { Text("Periksa lagi", fontWeight = FontWeight.SemiBold) }
         },
     )
 }
