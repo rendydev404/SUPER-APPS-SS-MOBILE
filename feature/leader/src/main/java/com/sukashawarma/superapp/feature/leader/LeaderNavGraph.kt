@@ -1,8 +1,6 @@
 package com.sukashawarma.superapp.feature.leader
 
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -19,6 +17,7 @@ import com.sukashawarma.superapp.core.ui.keluarMundur
 import com.sukashawarma.superapp.core.ui.masukMaju
 import com.sukashawarma.superapp.core.ui.masukMundur
 import com.sukashawarma.superapp.core.ui.RealtimeTables
+import com.sukashawarma.superapp.core.ui.kaca.ShellKaca
 import com.sukashawarma.superapp.domain.session.AppSession
 import com.sukashawarma.superapp.feature.leader.domain.LeaderAkses
 import com.sukashawarma.superapp.feature.leader.ui.LencanaViewModel
@@ -75,15 +74,19 @@ fun LeaderNavGraph(onExit: () -> Unit, tujuanAwal: TujuanLeader? = null) {
         if (tujuanAwal != null) pindah(tujuanAwal)
     }
 
-    Scaffold(
-        bottomBar = {
+    // Isi digambar sampai dasar layar di balik kapsul; tiap layar sendiri yang memberi
+    // ruang bawah pada daftarnya (lihat `denganRuangNav`), jadi NavHost sengaja tidak
+    // dipotong setinggi bilah — kalau dipotong, kacanya hanya membiaskan latar kosong.
+    ShellKaca(
+        bilah = { latar ->
             NavBawahLeader(
                 aktif = aktif,
                 jumlahAksi = jumlahAksi,
+                latar = latar,
                 onPilih = { pindah(it) },
             )
         },
-    ) { padding ->
+    ) {
         NavHost(
             navController = navController,
             startDestination = TujuanLeader.RINGKASAN.rute,
@@ -91,9 +94,7 @@ fun LeaderNavGraph(onExit: () -> Unit, tujuanAwal: TujuanLeader? = null) {
             exitTransition = { keluarMaju() },
             popEnterTransition = { masukMundur() },
             popExitTransition = { keluarMundur() },
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(bottom = padding.calculateBottomPadding()),
+            modifier = Modifier.fillMaxSize(),
         ) {
             composable(TujuanLeader.RINGKASAN.rute) {
                 RingkasanScreen(
