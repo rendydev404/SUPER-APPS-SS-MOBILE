@@ -1,6 +1,6 @@
 package com.sukashawarma.superapp.feature.leader.ui.penjualan
 
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,23 +15,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.LocalOffer
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -39,7 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -47,29 +36,23 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sukashawarma.superapp.core.ui.RealtimeRefresh
 import com.sukashawarma.superapp.core.ui.RealtimeTables
-import com.sukashawarma.superapp.feature.leader.domain.PenjualanHariIni
+import com.sukashawarma.superapp.core.ui.ios.JudulSeksiIos
+import com.sukashawarma.superapp.core.ui.ios.KartuIos
+import com.sukashawarma.superapp.core.ui.ios.LencanaIos
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
+import com.sukashawarma.superapp.core.ui.kaca.denganRuangNav
+import com.sukashawarma.superapp.core.ui.kaca.navigationBarsPaddingKaca
 import com.sukashawarma.superapp.feature.leader.domain.PesananTerbaru
 import com.sukashawarma.superapp.feature.leader.domain.StatusPesanan
 import com.sukashawarma.superapp.feature.leader.domain.rupiah
 import com.sukashawarma.superapp.feature.leader.ui.BarProgres
-import com.sukashawarma.superapp.feature.leader.ui.BiruGaris
-import com.sukashawarma.superapp.feature.leader.ui.BiruLatar
-import com.sukashawarma.superapp.feature.leader.ui.BiruTeks
-import com.sukashawarma.superapp.feature.leader.ui.GarisKartu
-import com.sukashawarma.superapp.feature.leader.ui.HijauGaris
-import com.sukashawarma.superapp.feature.leader.ui.HijauLatar
-import com.sukashawarma.superapp.feature.leader.ui.HijauTeks
-import com.sukashawarma.superapp.feature.leader.ui.KartuPanel
-import com.sukashawarma.superapp.feature.leader.ui.MerahGaris
-import com.sukashawarma.superapp.feature.leader.ui.MerahLatar
-import com.sukashawarma.superapp.feature.leader.ui.MerahTeks
+import com.sukashawarma.superapp.feature.leader.ui.BilahJudulLeader
 import com.sukashawarma.superapp.feature.leader.ui.PanelKosong
 import com.sukashawarma.superapp.feature.leader.ui.PemilihOutlet
-import com.sukashawarma.superapp.feature.leader.ui.PilStatus
-import com.sukashawarma.superapp.presentation.theme.SukaBrown
-import com.sukashawarma.superapp.presentation.theme.SukaCream
-import com.sukashawarma.superapp.presentation.theme.SukaGray400
-import com.sukashawarma.superapp.presentation.theme.SukaOrange
 
 /**
  * Penjualan & Target — cermin `app/dashboard/leader/sales/page.tsx` web.
@@ -78,7 +61,6 @@ import com.sukashawarma.superapp.presentation.theme.SukaOrange
  * dipakai memantau antrean yang sedang berjalan, sedangkan angka omzet di atasnya
  * tetap hanya menghitung pesanan `completed`.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PenjualanScreen(
     onExit: () -> Unit,
@@ -99,62 +81,34 @@ fun PenjualanScreen(
     }
 
     Scaffold(
-        containerColor = SukaCream,
-        snackbarHost = { SnackbarHost(snackbar) },
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        "Penjualan & Target",
-                        fontWeight = FontWeight.Black,
-                        fontSize = 17.sp,
-                        color = SukaBrown,
-                        maxLines = 1,
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onExit) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Kembali", tint = SukaBrown)
-                    }
-                },
-                actions = {
-                    IconButton(onClick = viewModel::muatUlang) {
-                        Icon(Icons.Default.Refresh, "Muat ulang", tint = SukaBrown)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White),
-            )
-        },
+        containerColor = WarnaIos.Latar,
+        snackbarHost = { SnackbarHost(snackbar, Modifier.navigationBarsPaddingKaca()) },
+        topBar = { BilahJudulLeader("Penjualan & Target", onExit, viewModel::muatUlang) },
     ) { padding ->
         LazyColumn(
             Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            contentPadding = PaddingValues(
+                start = UkuranIos.TepiLayar,
+                end = UkuranIos.TepiLayar,
+                top = 12.dp,
+                bottom = 16.dp,
+            ).denganRuangNav(),
+            verticalArrangement = Arrangement.spacedBy(UkuranIos.JarakKartu),
         ) {
             item {
                 PemilihOutlet(state.cabang, state.outletTerpilih) { viewModel.pilihOutlet(it) }
             }
             item { PanelOmzet(state) }
-            item {
-                Text(
-                    "TRANSAKSI TERAKHIR HARI INI",
-                    color = SukaBrown,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 0.8.sp,
-                )
-            }
+            item { JudulSeksiIos("Transaksi Terakhir Hari Ini") }
             if (state.data.pesanan.isEmpty()) {
                 item {
-                    KartuPanel {
-                        PanelKosong(
-                            if (state.memuat) "Memuat transaksi…" else "Belum ada transaksi hari ini."
-                        )
-                    }
+                    PanelKosong(
+                        if (state.memuat) "Memuat transaksi…" else "Belum ada transaksi hari ini.",
+                        IkonIos.Receipt,
+                    )
                 }
             }
             items(state.data.pesanan, key = { it.id }) { KartuPesanan(it) }
-            item { Spacer(Modifier.height(8.dp)) }
         }
     }
 }
@@ -162,88 +116,60 @@ fun PenjualanScreen(
 @Composable
 private fun PanelOmzet(state: PenjualanUiState) {
     val data = state.data
-    KartuPanel {
+    KartuIos {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    "TOTAL PENJUALAN HARI INI",
-                    color = SukaGray400,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 0.7.sp,
+                    "Total Penjualan Hari Ini",
+                    style = TipeIos.SubJudul.copy(fontWeight = FontWeight.SemiBold),
                 )
                 state.namaCabang?.let {
-                    Spacer(Modifier.height(2.dp))
-                    Text(it, color = SukaGray400, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(1.dp))
+                    Text(it, style = TipeIos.Catatan, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
             if (state.memuat) {
-                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = SukaOrange)
+                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = WarnaIos.Aksen)
             }
         }
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(8.dp))
         Text(
             rupiah(data.omzet),
-            color = SukaBrown,
-            fontSize = 32.sp,
-            fontWeight = FontWeight.Black,
+            style = TipeIos.AngkaBesar.copy(fontSize = 32.sp),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
 
-        // if/else, bukan keluar-awal: `return@KartuPanel` dari lambda inline yang
+        // if/else, bukan keluar-awal: `return@KartuIos` dari lambda inline yang
         // memancarkan composable adalah cara paling andal merusak tabel slot Compose.
         if (!data.adaTarget) {
             // Target nol berarti snapshot harian belum ditulis cron, BUKAN target nol
             // yang sudah tercapai. Menggambar bilah penuh di sini akan menipu.
-            Spacer(Modifier.height(12.dp))
-            Text(
-                "Target harian belum ditentukan untuk cabang ini.",
-                color = SukaGray400,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-            )
+            Spacer(Modifier.height(10.dp))
+            Text("Target harian belum ditentukan untuk cabang ini.", style = TipeIos.Catatan)
         } else {
             Spacer(Modifier.height(10.dp))
-            PilStatus(
+            LencanaIos(
                 teks = if (data.tercapai) "Target tercapai" else "On track",
-                latar = if (data.tercapai) HijauLatar else BiruLatar,
-                garis = if (data.tercapai) HijauGaris else BiruGaris,
-                warnaTeks = if (data.tercapai) HijauTeks else BiruTeks,
-                ikon = Icons.Default.TrendingUp,
+                nada = if (data.tercapai) NadaIos.SUKSES else NadaIos.INFO,
+                ikon = IkonIos.TrendingUp,
             )
             Spacer(Modifier.height(16.dp))
-            Row(Modifier.fillMaxWidth()) {
-                Text(
-                    "Progres pencapaian",
-                    Modifier.weight(1f),
-                    color = SukaGray400,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                )
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+                Text("Progres pencapaian", Modifier.weight(1f), style = TipeIos.Catatan)
                 Text(
                     "Target ${rupiah(data.target)}",
-                    color = SukaBrown,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Black,
+                    style = TipeIos.Catatan.copy(color = WarnaIos.Label, fontWeight = FontWeight.SemiBold),
                 )
             }
             Spacer(Modifier.height(8.dp))
             BarProgres(data.rasio, data.tercapai)
             Spacer(Modifier.height(6.dp))
             Row(Modifier.fillMaxWidth()) {
-                Text(
-                    "0%",
-                    Modifier.weight(1f),
-                    color = SukaGray400,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                )
+                Text("0%", Modifier.weight(1f), style = TipeIos.Kecil)
                 Text(
                     "${data.persenTeks}%",
-                    color = SukaBrown,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Black,
+                    style = TipeIos.Kecil.copy(color = WarnaIos.Label, fontWeight = FontWeight.SemiBold),
                 )
             }
         }
@@ -252,59 +178,37 @@ private fun PanelOmzet(state: PenjualanUiState) {
 
 @Composable
 private fun KartuPesanan(pesanan: PesananTerbaru) {
-    KartuPanel {
+    KartuIos {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-            Surface(
-                shape = RoundedCornerShape(14.dp),
-                color = SukaCream,
-                border = BorderStroke(1.dp, GarisKartu),
+            Box(
+                Modifier.size(48.dp).clip(UkuranIos.SudutBlok).background(WarnaIos.Latar),
+                contentAlignment = Alignment.Center,
             ) {
-                Box(Modifier.size(46.dp), contentAlignment = Alignment.Center) {
-                    Text(
-                        pesanan.jam,
-                        color = SukaBrown,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Black,
-                    )
-                }
+                Text(pesanan.jam, style = TipeIos.Catatan.copy(color = WarnaIos.Label, fontWeight = FontWeight.SemiBold))
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        pesanan.nomor?.let { "#$it" } ?: "Pesanan",
-                        color = SukaBrown,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Black,
-                    )
+                    Text(pesanan.nomor?.let { "#$it" } ?: "Pesanan", style = TipeIos.Utama)
                     Spacer(Modifier.width(8.dp))
                     BadgeStatusPesanan(pesanan.status)
                 }
                 Spacer(Modifier.height(4.dp))
                 Text(
                     pesanan.ringkasanItem,
-                    color = SukaGray400,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
+                    style = TipeIos.Catatan,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                    lineHeight = 16.sp,
+                    lineHeight = 18.sp,
                 )
                 if (pesanan.promo.isNotEmpty()) {
                     Spacer(Modifier.height(6.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Default.LocalOffer,
-                            null,
-                            tint = SukaOrange,
-                            modifier = Modifier.size(12.dp),
-                        )
+                        Icon(IkonIos.Sell, null, tint = WarnaIos.Aksen, modifier = Modifier.size(13.dp))
                         Spacer(Modifier.width(5.dp))
                         Text(
                             pesanan.promo.joinToString(", "),
-                            color = SukaOrange,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Black,
+                            style = TipeIos.Kecil.copy(color = NadaIos.AKSEN.teks, fontWeight = FontWeight.SemiBold),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -314,9 +218,7 @@ private fun KartuPesanan(pesanan: PesananTerbaru) {
             Spacer(Modifier.width(8.dp))
             Text(
                 rupiah(pesanan.total),
-                color = SukaBrown,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Black,
+                style = TipeIos.Keterangan.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
                 maxLines = 1,
             )
         }
@@ -325,10 +227,10 @@ private fun KartuPesanan(pesanan: PesananTerbaru) {
 
 @Composable
 private fun BadgeStatusPesanan(status: StatusPesanan) {
-    val (latar, garis, teks) = when (status) {
-        StatusPesanan.SELESAI -> Triple(HijauLatar, HijauGaris, HijauTeks)
-        StatusPesanan.DIBATALKAN -> Triple(MerahLatar, MerahGaris, MerahTeks)
-        StatusPesanan.PROSES -> Triple(BiruLatar, BiruGaris, BiruTeks)
+    val nada = when (status) {
+        StatusPesanan.SELESAI -> NadaIos.SUKSES
+        StatusPesanan.DIBATALKAN -> NadaIos.BAHAYA
+        StatusPesanan.PROSES -> NadaIos.INFO
     }
-    PilStatus(status.label, latar, garis, teks)
+    LencanaIos(status.label, nada)
 }
