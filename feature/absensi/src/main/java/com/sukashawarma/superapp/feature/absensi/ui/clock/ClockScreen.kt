@@ -1,5 +1,7 @@
 package com.sukashawarma.superapp.presentation.absensi.clock
 
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.draw.drawBehind
 import com.sukashawarma.superapp.core.ui.kaca.LatarKaca
 import com.sukashawarma.superapp.core.ui.kaca.panelKaca
 import com.sukashawarma.superapp.core.ui.kaca.rememberLatarKaca
@@ -1613,7 +1615,11 @@ private fun ActionArea(
     // Kartu status di atas kamera memakai kaca cair yang sama dengan tab bar. Sumbernya
     // hanya preview + mesh (bukan kartu itu sendiri), supaya kaca tidak membiaskan dirinya.
     val latarKamera = rememberLatarKaca()
-    val glowPulse by rememberInfiniteTransition(label = "frameGlow").animateFloat(
+    // Nilai denyut dibaca HANYA di fase gambar (drawBehind / Canvas), bukan saat
+    // komposisi: membacanya di komposisi membuat seluruh ActionArea — termasuk
+    // pemanggilan preview kamera — dikomposisi ulang 60x per detik hanya untuk
+    // mengubah transparansi cahaya.
+    val glowPulse = rememberInfiniteTransition(label = "frameGlow").animateFloat(
         initialValue = 0.5f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(tween(1800, easing = FastOutSlowInEasing), RepeatMode.Reverse),
@@ -1631,13 +1637,15 @@ private fun ActionArea(
             modifier = Modifier
                 .matchParentSize()
                 .padding(2.dp)
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(frameAccent.copy(alpha = 0.32f * glowPulse), Color.Transparent),
-                        radius = 620f,
-                    ),
-                    RoundedCornerShape(34.dp)
-                )
+                .drawBehind {
+                    drawRoundRect(
+                        Brush.radialGradient(
+                            colors = listOf(frameAccent.copy(alpha = 0.32f * glowPulse.value), Color.Transparent),
+                            radius = 620f,
+                        ),
+                        cornerRadius = CornerRadius(34.dp.toPx()),
+                    )
+                }
         )
 
         Surface(
@@ -1786,21 +1794,21 @@ private fun ActionArea(
 
         // Aksen sudut ala viewfinder kamera premium — nempel di tepi luar frame, warnanya
         // ikut `frameAccent`, jadi identitasnya beda dari kotak polos sebelumnya.
-        ViewfinderCorners(color = frameAccent, alpha = 0.55f + 0.45f * glowPulse)
+        ViewfinderCorners(color = frameAccent, alpha = { 0.55f + 0.45f * glowPulse.value })
     }
 }
 
 /** Empat aksen sudut L kecil di tepi luar frame kamera — sentuhan "viewfinder" seperti
  *  kamera mirrorless modern, dibangun dari garis sederhana (murah), bukan gambar/aset. */
 @Composable
-private fun ViewfinderCorners(color: Color, alpha: Float, modifier: Modifier = Modifier) {
+private fun ViewfinderCorners(color: Color, alpha: () -> Float, modifier: Modifier = Modifier) {
     Canvas(modifier = modifier.fillMaxSize()) {
         val len = 22.dp.toPx()
         val stroke = 3.dp.toPx()
         val inset = 2.dp.toPx()
         val w = size.width
         val h = size.height
-        val c = color.copy(alpha = alpha)
+        val c = color.copy(alpha = alpha())
 
         // Top-left
         drawLine(c, Offset(inset, inset + len), Offset(inset, inset), strokeWidth = stroke, cap = StrokeCap.Round)

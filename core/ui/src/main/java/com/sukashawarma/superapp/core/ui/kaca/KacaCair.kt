@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -75,7 +76,7 @@ class LatarKaca {
         internal set
 
     internal var nodeIsi: Any? = null
-    /** Satu RenderNode buram per panel — ukurannya berbeda-beda. */
+    /** Sepasang node buram per panel ([NodeKaca]) — ukurannya berbeda-beda. */
     internal val nodeKaca = HashMap<Any, Any>()
 }
 
@@ -142,73 +143,92 @@ private fun ContentDrawScope.gambarDenganKaca(latar: LatarKaca): Boolean {
 
     // Node milik panel yang sudah hilang dibuang, supaya peta tidak tumbuh terus.
     latar.nodeKaca.keys.retainAll(latar.panel.keys)
+    val l = latar.lensa.translate(-latar.asalIsi)
+    val adaLensa = l.width > 1f && l.height > 1f
+    var lensaTergambar = false
     for ((kunci, p) in latar.panel) {
         val b = p.batas.translate(-latar.asalIsi)
         if (b.width < 1f || b.height < 1f) continue
         // Panel di luar isi (mis. saat isi belum terukur) tidak perlu kaca.
         if (b.bottom <= 0f || b.top >= size.height || b.right <= 0f || b.left >= size.width) continue
-        val kaca = (latar.nodeKaca[kunci] as? RenderNode) ?: nodeKacaBaru().also { latar.nodeKaca[kunci] = it }
-        gambarPanel(isi, kaca, b, p.sudut.coerceAtMost(b.minDimension / 2), p.perbesarX, p.perbesarY)
-    }
+        val node = (latar.nodeKaca[kunci] as? NodeKaca) ?: NodeKaca().also { latar.nodeKaca[kunci] = it }
+        node.rekam(this, isi, b)
+        gambarPanel(node.hasil, b, p.sudut.coerceAtMost(b.minDimension / 2), p.perbesarX, p.perbesarY)
 
-    // Tetes kaca di bawah tab aktif membesarkan lebih kuat lagi, berpusat di tetesnya
-    // sendiri — ikut meluncur saat tab berpindah.
-    val l = latar.lensa.translate(-latar.asalIsi)
-    if (l.width > 1f && l.height > 1f) {
-        val kaca = (latar.nodeKaca[KUNCI_LENSA] as? RenderNode)
-            ?: nodeKacaBaru().also { latar.nodeKaca[KUNCI_LENSA] = it }
-        rekamKaca(isi, kaca, l)
-        clipPath(bulat(l, l.height / 2)) { gambarKaca(kaca, l, 1.32f, 1.55f) }
+        // Tetes kaca tab aktif selalu berada di dalam kapsulnya, jadi ia memakai ulang
+        // hasil blur kapsul itu — tidak perlu blur kedua untuk area yang sama.
+        if (adaLensa && !lensaTergambar && b.contains(l.center)) {
+            clipPath(bulat(l, l.height / 2)) { gambarKaca(node.hasil, l, 1.32f, 1.55f) }
+            lensaTergambar = true
+        }
     }
     return true
 }
 
-private val KUNCI_LENSA = Any()
-
 /**
- * Blur tipis saja: yang membuat kaca terasa cair adalah pembesarannya, dan isi yang
- * diperbesar harus tetap bisa dikenali — kalau diburamkan tebal, lensanya tidak
- * kelihatan bekerja.
+ * Sepasang RenderNode untuk satu panel.
+ *
+ * [kaca] membawa efek blur+saturasi; [hasil] membungkusnya sebagai lapisan
+ * komposit. Pembungkus ini penting untuk performa: RenderEffect diterapkan ulang
+ * SETIAP kali node-nya digambar, sedangkan lensa menggambar isi panel belasan kali
+ * per frame (satu kali per pita). Dengan lapisan komposit, blur dihitung sekali saat
+ * lapisan diperbarui, lalu setiap pita hanya menyalin tekstur yang sudah jadi.
+ * Tanpa ini, preview kamera 30 fps di bawah tiga panel membuat GPU menghitung blur
+ * ~90 kali per frame dan layar Absensi turun ke ~14 fps.
  */
 @RequiresApi(Build.VERSION_CODES.S)
-private fun nodeKacaBaru(): RenderNode = RenderNode("kaca").apply {
-    val radius = 2.5f * android.content.res.Resources.getSystem().displayMetrics.density
-    val saturasi = ColorMatrix().apply { setSaturation(1.35f) }
-    setRenderEffect(
-        RenderEffect.createChainEffect(
-            RenderEffect.createColorFilterEffect(ColorMatrixColorFilter(saturasi)),
-            RenderEffect.createBlurEffect(radius, radius, Shader.TileMode.CLAMP),
-        ),
-    )
-}
-
-/**
- * Merekam isi di sekitar [b] ke [kaca]. Direkam jauh lebih lebar dari panel: tepi
- * lensa yang memperkecil isi memperlihatkan apa yang ada di LUAR panel.
- */
-@RequiresApi(Build.VERSION_CODES.S)
-private fun ContentDrawScope.rekamKaca(isi: RenderNode, kaca: RenderNode, b: Rect): Rect {
-    val tepi = 40.dp.toPx()
-    val area = Rect(b.left - tepi, b.top - tepi, b.right + tepi, b.bottom + tepi)
-    kaca.setPosition(area.left.toInt(), area.top.toInt(), area.right.toInt(), area.bottom.toInt())
-    val rekam = kaca.beginRecording()
-    try {
-        rekam.translate(-area.left, -area.top)
-        rekam.drawRenderNode(isi)
-    } finally {
-        kaca.endRecording()
+private class NodeKaca {
+    val kaca = RenderNode("kaca").apply {
+        val radius = 2.5f * android.content.res.Resources.getSystem().displayMetrics.density
+        val saturasi = ColorMatrix().apply { setSaturation(1.35f) }
+        setRenderEffect(
+            RenderEffect.createChainEffect(
+                RenderEffect.createColorFilterEffect(ColorMatrixColorFilter(saturasi)),
+                RenderEffect.createBlurEffect(radius, radius, Shader.TileMode.CLAMP),
+            ),
+        )
     }
-    return area
+    val hasil = RenderNode("kacaHasil").apply { setUseCompositingLayer(true, null) }
+
+    /**
+     * Merekam isi di sekitar [b]. Direkam sedikit lebih lebar dari panel: tepi lensa
+     * yang memperkecil isi memperlihatkan hingga ~18dp di luar panel (pil terpendek),
+     * ditambah radius blur. Area sekecil mungkin karena biaya blur sebanding luasnya.
+     */
+    fun rekam(scope: DrawScope, isi: RenderNode, b: Rect) {
+        val tepi = with(scope) { 24.dp.toPx() }
+        val kiri = (b.left - tepi).toInt()
+        val atas = (b.top - tepi).toInt()
+        val lebar = (b.width + tepi * 2).toInt()
+        val tinggi = (b.height + tepi * 2).toInt()
+
+        kaca.setPosition(0, 0, lebar, tinggi)
+        val rk = kaca.beginRecording()
+        try {
+            rk.translate(-kiri.toFloat(), -atas.toFloat())
+            rk.drawRenderNode(isi)
+        } finally {
+            kaca.endRecording()
+        }
+
+        hasil.setPosition(kiri, atas, kiri + lebar, atas + tinggi)
+        val rh = hasil.beginRecording()
+        try {
+            rh.drawRenderNode(kaca)
+        } finally {
+            hasil.endRecording()
+        }
+    }
 }
 
-/** Menggambar [kaca] di tempatnya, diskalakan dari titik tengah [b]. */
+/** Menggambar [hasil] di tempatnya, diskalakan dari titik tengah [b]. */
 @RequiresApi(Build.VERSION_CODES.S)
-private fun DrawScope.gambarKaca(kaca: RenderNode, b: Rect, sx: Float, sy: Float) = drawIntoCanvas {
+private fun DrawScope.gambarKaca(hasil: RenderNode, b: Rect, sx: Float, sy: Float) = drawIntoCanvas {
     val c = it.nativeCanvas
     c.save()
     c.scale(sx, sy, b.center.x, b.center.y)
     // RenderNode diletakkan lewat setPosition, jadi cukup digambar di titik asal.
-    c.drawRenderNode(kaca)
+    c.drawRenderNode(hasil)
     c.restore()
 }
 
@@ -225,15 +245,13 @@ private fun bulat(r: Rect, sudut: Float) = Path().apply {
  * menunjukkan pita bias yang sama tebalnya.
  */
 @RequiresApi(Build.VERSION_CODES.S)
-private fun ContentDrawScope.gambarPanel(
-    isi: RenderNode,
-    kaca: RenderNode,
+private fun DrawScope.gambarPanel(
+    hasil: RenderNode,
     b: Rect,
     sudut: Float,
     sxDalam: Float,
     syDalam: Float,
 ) {
-    rekamKaca(isi, kaca, b)
     val geser = 10.dp.toPx()
     val sxLuar = (1f - geser / (b.width / 2)).coerceIn(0.5f, 1f)
     val syLuar = (1f - geser / (b.height / 2)).coerceIn(0.5f, 1f)
@@ -243,20 +261,32 @@ private fun ContentDrawScope.gambarPanel(
     // lengkung tak rapi di ujung kiri-kanan panel yang lebar. Setipis ini lompatannya
     // lebih kecil dari radius blur, jadi batas pita tidak lagi terlihat.
     val potongan = (kedalaman / 0.6.dp.toPx()).toInt().coerceIn(12, 32)
-    clipPath(bulat(b, sudut)) {
-        for (k in 0..potongan) {
-            val t = k / potongan.toFloat()
-            // Profil lengkung smoothstep: landai di tepi DAN di tengah, sehingga pita
-            // terluar menyatu dengan bingkai dan pita terdalam menyatu dengan badan
-            // lensa tanpa sambungan.
-            val u = t * t * (3f - 2f * t)
-            val sx = sxLuar + (sxDalam - sxLuar) * u
-            val sy = syLuar + (syDalam - syLuar) * u
-            val d = kedalaman * t
-            val dalam = b.deflate(d)
-            if (dalam.width <= 0f || dalam.height <= 0f) break
-            clipPath(bulat(dalam, sudut - d)) { gambarKaca(kaca, b, sx, sy) }
+    // Tiap pita hanya mengisi CINCIN-nya sendiri (bukan seluruh bagian dalam panel),
+    // jadi setiap piksel digambar sekitar sekali, bukan sampai puluhan kali. Lubang
+    // cincin disisip sedikit lebih dalam supaya pita bertumpuk tipis — tanpa itu
+    // antialias clip meninggalkan celah rambut yang memperlihatkan isi tanpa bias.
+    val tumpang = 0.75f
+    for (k in 0..potongan) {
+        val t = k / potongan.toFloat()
+        // Profil lengkung smoothstep: landai di tepi DAN di tengah, sehingga pita
+        // terluar menyatu dengan bingkai dan pita terdalam menyatu dengan badan
+        // lensa tanpa sambungan.
+        val u = t * t * (3f - 2f * t)
+        val sx = sxLuar + (sxDalam - sxLuar) * u
+        val sy = syLuar + (syDalam - syLuar) * u
+        val d = kedalaman * t
+        val luar = b.deflate(d)
+        if (luar.width <= 0f || luar.height <= 0f) break
+        val jalur = bulat(luar, sudut - d)
+        if (k < potongan) {
+            val dBerikut = kedalaman * (k + 1) / potongan + tumpang
+            val lubang = b.deflate(dBerikut)
+            if (lubang.width > 0f && lubang.height > 0f) {
+                jalur.fillType = PathFillType.EvenOdd
+                jalur.addRoundRect(RoundRect(lubang, CornerRadius((sudut - dBerikut).coerceAtLeast(0f))))
+            }
         }
+        clipPath(jalur) { gambarKaca(hasil, b, sx, sy) }
     }
 }
 
