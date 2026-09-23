@@ -1,12 +1,26 @@
 package com.sukashawarma.superapp.feature.stok.ui
 
-import androidx.compose.foundation.BorderStroke
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
+import com.sukashawarma.superapp.core.ui.ios.BilahJudulIos
+import com.sukashawarma.superapp.core.ui.ios.KeadaanIos
+import com.sukashawarma.superapp.core.ui.ios.KolomCariIos
+import com.sukashawarma.superapp.core.ui.ios.LabelSeksiIos
+import com.sukashawarma.superapp.core.ui.ios.LencanaIos
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.PemisahIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.ios.tekanIos
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,44 +29,27 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.Inbox
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material3.IconButton
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.Surface
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -62,9 +59,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sukashawarma.superapp.feature.stok.data.model.OutletRingkas
 import com.sukashawarma.superapp.feature.stok.domain.StokStatus
-import com.sukashawarma.superapp.presentation.theme.SukaOnSurface
-import com.sukashawarma.superapp.presentation.theme.SukaOnSurfaceVariant
-import com.sukashawarma.superapp.presentation.theme.SukaOrange
 
 /** Warna badge status. Abu-abu dipakai saat skala satuan tak dapat dipercaya. */
 fun StokStatus.warna(): Color = when (this) {
@@ -81,30 +75,20 @@ fun StokStatus.label(): String = when (this) {
     StokStatus.UNKNOWN -> "Skala?"
 }
 
+/**
+ * Nada iOS untuk status stok. Dipisah dari [warna] karena kode lain memakai warna
+ * lama itu untuk angka dan grafik — lencana cukup memakai nada sistem iOS.
+ */
+internal fun StokStatus.nadaIos(): NadaIos = when (this) {
+    StokStatus.OK -> NadaIos.SUKSES
+    StokStatus.WARNING -> NadaIos.PERINGATAN
+    StokStatus.BELOW -> NadaIos.BAHAYA
+    StokStatus.UNKNOWN -> NadaIos.NETRAL
+}
+
 @Composable
 fun StatusBadge(status: StokStatus, modifier: Modifier = Modifier) {
-    val warna = status.warna()
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(50),
-        color = warna.copy(alpha = 0.10f),
-        border = BorderStroke(1.dp, warna.copy(alpha = 0.28f)),
-    ) {
-        Row(
-            Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(Modifier.size(6.dp).background(warna, CircleShape))
-            Spacer(Modifier.width(5.dp))
-            Text(
-                status.label().uppercase(),
-                color = warna,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Black,
-                letterSpacing = 0.3.sp,
-            )
-        }
-    }
+    LencanaIos(status.label(), status.nadaIos(), modifier)
 }
 
 /**
@@ -114,82 +98,31 @@ fun StatusBadge(status: StokStatus, modifier: Modifier = Modifier) {
  */
 @Composable
 fun KeadaanKosong(pesan: String, modifier: Modifier = Modifier) =
-    KeadaanPesan(Icons.Default.Inbox, "Belum ada data", pesan, modifier)
+    KeadaanIos(IkonIos.Inbox, "Belum ada data", pesan, modifier)
 
 @Composable
 fun KeadaanTidakBerhak(pesan: String, modifier: Modifier = Modifier) =
-    KeadaanPesan(Icons.Default.Lock, "Tidak ada akses", pesan, modifier)
+    KeadaanIos(IkonIos.Lock, "Tidak ada akses", pesan, modifier, nada = NadaIos.PERINGATAN)
 
 @Composable
-fun KeadaanGagal(pesan: String, onCobaLagi: () -> Unit, modifier: Modifier = Modifier) {
-    Column(
-        modifier.fillMaxWidth().heightIn(min = 240.dp).padding(28.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Box(
-            Modifier.size(56.dp).background(Color(0xFFFEF2F2), RoundedCornerShape(18.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(Icons.Default.CloudOff, null, tint = Color(0xFFDC2626), modifier = Modifier.size(27.dp))
-        }
-        Spacer(Modifier.height(14.dp))
-        Text("Gagal memuat", color = Color(0xFF0F172A), fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
-        Spacer(Modifier.height(5.dp))
-        Text(
-            pesan,
-            color = Color(0xFF64748B),
-            fontSize = 12.sp,
-            lineHeight = 17.sp,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(16.dp))
-        Button(
-            onClick = onCobaLagi,
-            colors = ButtonDefaults.buttonColors(containerColor = SukaOrange),
-            shape = RoundedCornerShape(12.dp),
-        ) {
-            Text("Coba lagi", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-        }
-    }
-}
-
-@Composable
-private fun KeadaanPesan(icon: ImageVector, judul: String, pesan: String, modifier: Modifier) {
-    Column(
-        modifier.fillMaxWidth().heightIn(min = 240.dp).padding(28.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Box(
-            Modifier.size(56.dp).background(Color(0xFFF1F5F9), RoundedCornerShape(18.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(icon, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(27.dp))
-        }
-        Spacer(Modifier.height(14.dp))
-        Text(judul, color = Color(0xFF0F172A), fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
-        Spacer(Modifier.height(5.dp))
-        Text(
-            pesan,
-            color = Color(0xFF64748B),
-            fontSize = 12.sp,
-            lineHeight = 17.sp,
-            textAlign = TextAlign.Center,
-        )
-    }
-}
+fun KeadaanGagal(pesan: String, onCobaLagi: () -> Unit, modifier: Modifier = Modifier) =
+    KeadaanIos(
+        IkonIos.CloudOff, "Gagal memuat", pesan, modifier,
+        nada = NadaIos.BAHAYA, teksAksi = "Coba lagi", onAksi = onCobaLagi,
+    )
 
 @Composable
 fun MemuatPenuh(modifier: Modifier = Modifier) {
     Box(modifier.fillMaxSize().heightIn(min = 240.dp), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator(color = SukaOrange)
+        CircularProgressIndicator(Modifier.size(30.dp), color = WarnaIos.Abu, strokeWidth = 2.5.dp)
     }
 }
 
 /**
- * Header clean minimalist yang dipakai seluruh layar modul Stok, bergaya Apple HIG
- * dengan latar putih, tipografi slate kontras tinggi, dan batas halus.
+ * Header seluruh layar modul Stok — bilah judul iOS dengan tombol kembali bulat.
+ *
+ * Aksi di kanan diberi warna konten aksen, supaya `IconButton` lama milik layar
+ * yang belum dipindah ke tombol bulat tetap tampil serasi tanpa diubah satu per satu.
  */
 @Composable
 fun HeaderStok(
@@ -198,53 +131,20 @@ fun HeaderStok(
     onKembali: (() -> Unit)? = null,
     aksi: @Composable RowScope.() -> Unit = {},
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = Color.White,
-        border = BorderStroke(1.dp, Color(0xFFF1F5F9)),
-    ) {
-        Row(
-            Modifier
-                .statusBarsPadding()
-                .padding(
-                    start = if (onKembali != null) 4.dp else 16.dp,
-                    end = 12.dp,
-                    top = 8.dp,
-                    bottom = 12.dp
-                ),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (onKembali != null) {
-                IconButton(onClick = onKembali) {
-                    Icon(Icons.Default.ArrowBack, "Kembali", tint = Color(0xFF0F172A))
-                }
-            }
-            Column(Modifier.weight(1f)) {
-                Text(
-                    judul,
-                    color = Color(0xFF0F172A),
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = (-0.3).sp,
-                )
-                if (subjudul != null) {
-                    Text(
-                        subjudul,
-                        color = Color(0xFF64748B),
-                        fontSize = 11.5.sp,
-                        lineHeight = 15.sp,
-                    )
-                }
-            }
-            CompositionLocalProvider(LocalContentColor provides Color(0xFF1E293B)) {
+    BilahJudulIos(
+        judul = judul,
+        subjudul = subjudul,
+        onKembali = onKembali,
+        aksi = {
+            CompositionLocalProvider(LocalContentColor provides WarnaIos.Aksen) {
                 aksi()
             }
-        }
-    }
+        },
+    )
 }
 
 /**
- * Baris pemilih outlet berbentuk capsule pill clean minimalist.
+ * Pemilih outlet bergaya "pull-down button" iOS: kapsul abu dengan chevron.
  * Dipakai bersama oleh Ledger, Opname, Permintaan, dan Mutasi.
  */
 @Composable
@@ -254,38 +154,33 @@ fun PemilihOutlet(
     onPilih: (OutletRingkas) -> Unit,
 ) {
     var terbuka by remember { mutableStateOf(false) }
-    Box(Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 4.dp)) {
-        Surface(
-            onClick = { terbuka = true },
-            shape = RoundedCornerShape(20.dp),
-            color = Color.White,
-            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-            shadowElevation = 0.5.dp,
+    Box(Modifier.padding(start = UkuranIos.TepiLayar, end = UkuranIos.TepiLayar, top = 10.dp, bottom = 4.dp)) {
+        Row(
+            Modifier
+                .heightIn(min = 36.dp)
+                .clip(UkuranIos.SudutKapsul)
+                .background(WarnaIos.Isian)
+                .tekanIos({ terbuka = true })
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(6.dp)
-                        .background(Color(0xFFEA580C), CircleShape)
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    terpilih?.name ?: "Pilih outlet",
-                    color = Color(0xFF0F172A),
-                    fontSize = 12.5.sp,
-                    fontWeight = FontWeight.Bold,
-                )
-                Spacer(Modifier.width(4.dp))
-                Icon(
-                    Icons.Default.ArrowDropDown,
-                    contentDescription = "Ganti outlet",
-                    tint = Color(0xFF64748B),
-                    modifier = Modifier.size(18.dp),
-                )
-            }
+            Icon(IkonIos.Storefront, null, tint = WarnaIos.Aksen, modifier = Modifier.size(15.dp))
+            Spacer(Modifier.width(7.dp))
+            Text(
+                terpilih?.name ?: "Pilih outlet",
+                style = TipeIos.Keterangan.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                // Batas lebar, bukan weight: kapsul harus tetap seukuran isinya.
+                modifier = Modifier.widthIn(max = 240.dp),
+            )
+            Spacer(Modifier.width(4.dp))
+            Icon(
+                IkonIos.ArrowDropDown,
+                contentDescription = "Ganti outlet",
+                tint = WarnaIos.Aksen,
+                modifier = Modifier.size(16.dp),
+            )
         }
     }
     if (terbuka) {
@@ -331,50 +226,22 @@ fun LembarPilihOutlet(
     ModalBottomSheet(
         onDismissRequest = onTutup,
         sheetState = lembar,
-        containerColor = Color.White,
+        containerColor = WarnaIos.Latar,
     ) {
         Column(Modifier.fillMaxWidth().heightIn(max = 620.dp)) {
             Row(
                 Modifier.padding(start = 20.dp, end = 20.dp, bottom = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(judul, color = SukaOnSurface, fontSize = 16.sp, fontWeight = FontWeight.Black)
-                Spacer(Modifier.width(9.dp))
-                Text(
-                    "${hasil.size}",
-                    Modifier
-                        .background(Color(0xFFFFF7ED), RoundedCornerShape(7.dp))
-                        .padding(horizontal = 7.dp, vertical = 2.dp),
-                    color = SukaOrange, fontSize = 11.sp, fontWeight = FontWeight.Black,
-                )
+                Text(judul, Modifier.weight(1f), style = TipeIos.Judul3.copy(fontWeight = FontWeight.Bold))
+                Text("${hasil.size} outlet", style = TipeIos.SubJudul)
             }
 
-            OutlinedTextField(
-                value = cari,
-                onValueChange = { cari = it },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                placeholder = { Text("Cari nama outlet…", fontSize = 13.sp, color = Color(0xFF94A3B8)) },
-                leadingIcon = {
-                    Icon(Icons.Default.Search, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(18.dp))
-                },
-                trailingIcon = {
-                    if (cari.isNotEmpty()) {
-                        IconButton(onClick = { cari = "" }) {
-                            Icon(
-                                Icons.Default.Close, "Hapus pencarian",
-                                tint = Color(0xFF94A3B8), modifier = Modifier.size(17.dp),
-                            )
-                        }
-                    }
-                },
-                singleLine = true,
-                shape = RoundedCornerShape(13.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = Color.White,
-                    unfocusedContainerColor = Color.White,
-                    focusedBorderColor = SukaOrange,
-                    unfocusedBorderColor = Color(0xFFE2E8F0),
-                ),
+            KolomCariIos(
+                nilai = cari,
+                onUbah = { cari = it },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = UkuranIos.TepiLayar),
+                placeholder = "Cari nama outlet…",
             )
             Spacer(Modifier.height(10.dp))
 
@@ -383,15 +250,12 @@ fun LembarPilihOutlet(
                     Modifier.fillMaxWidth().padding(vertical = 44.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(
-                        "Tidak ada outlet bernama \"$cari\".",
-                        color = Color(0xFF94A3B8), fontSize = 13.sp,
-                    )
+                    Text("Tidak ada outlet bernama \"$cari\".", style = TipeIos.SubJudul)
                 }
             } else {
                 LazyColumn(
                     Modifier.weight(1f, fill = false),
-                    contentPadding = PaddingValues(bottom = 24.dp),
+                    contentPadding = PaddingValues(start = UkuranIos.TepiLayar, end = UkuranIos.TepiLayar, bottom = 24.dp),
                 ) {
                     URUTAN_KELOMPOK.forEach { nama ->
                         val isi = kelompok[nama].orEmpty()
@@ -400,16 +264,16 @@ fun LembarPilihOutlet(
                         // dan pemisah malah memecah daftar pendek jadi kepingan.
                         if (cari.isBlank()) {
                             item(key = "judul-$nama") {
-                                Text(
-                                    nama.uppercase(),
-                                    Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 6.dp),
-                                    color = Color(0xFF94A3B8), fontSize = 10.sp,
-                                    fontWeight = FontWeight.Black, letterSpacing = 0.9.sp,
-                                )
+                                LabelSeksiIos(nama, Modifier.padding(start = 16.dp, top = 14.dp, bottom = 7.dp))
                             }
                         }
-                        items(isi, key = { it.id }) { o ->
-                            BarisOutlet(o, o.id == terpilih?.id) { onPilih(o) }
+                        itemsIndexed(isi, key = { _, o -> o.id }) { i, o ->
+                            BarisOutlet(
+                                outlet = o,
+                                aktif = o.id == terpilih?.id,
+                                pertama = i == 0,
+                                terakhir = i == isi.lastIndex,
+                            ) { onPilih(o) }
                         }
                     }
                 }
@@ -418,30 +282,47 @@ fun LembarPilihOutlet(
     }
 }
 
+/**
+ * Satu baris dalam grup "inset grouped". Grup disusun per baris (bukan satu
+ * kartu berisi semua baris) supaya daftar tetap lazy — sudut hanya dibulatkan
+ * di baris pertama dan terakhir kelompok.
+ */
 @Composable
-private fun BarisOutlet(outlet: OutletRingkas, aktif: Boolean, onKlik: () -> Unit) {
-    Surface(
-        onClick = onKlik,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 3.dp),
-        shape = RoundedCornerShape(12.dp),
-        color = if (aktif) Color(0xFFFFF7ED) else Color.White,
-        border = BorderStroke(1.dp, if (aktif) Color(0xFFFED7AA) else Color(0xFFF1F5F9)),
-    ) {
-        Row(Modifier.padding(horizontal = 13.dp, vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
+private fun BarisOutlet(
+    outlet: OutletRingkas,
+    aktif: Boolean,
+    pertama: Boolean,
+    terakhir: Boolean,
+    onKlik: () -> Unit,
+) {
+    val sudut = RoundedCornerShape(
+        topStart = if (pertama) 16.dp else 0.dp,
+        topEnd = if (pertama) 16.dp else 0.dp,
+        bottomStart = if (terakhir) 16.dp else 0.dp,
+        bottomEnd = if (terakhir) 16.dp else 0.dp,
+    )
+    Column(Modifier.fillMaxWidth().clip(sudut).background(WarnaIos.Kartu)) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onKlik)
+                .heightIn(min = 48.dp)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Text(
                 outlet.name,
                 Modifier.weight(1f),
-                color = if (aktif) SukaOrange else SukaOnSurface,
-                fontSize = 13.5.sp,
-                fontWeight = if (aktif) FontWeight.Black else FontWeight.SemiBold,
+                style = if (aktif) TipeIos.Isi.copy(color = WarnaIos.Aksen, fontWeight = FontWeight.SemiBold) else TipeIos.Isi,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
             if (aktif) {
                 Spacer(Modifier.width(8.dp))
-                Icon(Icons.Default.CheckCircle, "Terpilih", tint = SukaOrange, modifier = Modifier.size(19.dp))
+                Icon(IkonIos.Check, "Terpilih", tint = WarnaIos.Aksen, modifier = Modifier.size(18.dp))
             }
         }
+        if (!terakhir) PemisahIos()
     }
 }
 
@@ -490,29 +371,192 @@ fun tanggalSingkat(nilai: String?): String {
     }
 }
 
+// ─────────────────────────────────────────── pelengkap design system iOS modul Stok
+
+/**
+ * Kapsul filter bergaya segmen iOS: terisi aksen saat terpilih. [jumlah] tampil
+ * redup di sebelah label; [titik] memberi penanda warna kategori saat tidak terpilih.
+ */
+@Composable
+internal fun KapsulFilter(
+    teks: String,
+    aktif: Boolean,
+    onKlik: () -> Unit,
+    modifier: Modifier = Modifier,
+    jumlah: Int? = null,
+    titik: Color? = null,
+) {
+    Row(
+        modifier
+            .height(36.dp)
+            .clip(UkuranIos.SudutKapsul)
+            .background(if (aktif) WarnaIos.Aksen else WarnaIos.Isian)
+            .tekanIos(onKlik)
+            .padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (titik != null && !aktif) {
+            Box(Modifier.size(7.dp).clip(CircleShape).background(titik))
+            Spacer(Modifier.width(6.dp))
+        }
+        Text(
+            teks,
+            color = if (aktif) Color.White else WarnaIos.Label,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+        )
+        if (jumlah != null) {
+            Spacer(Modifier.width(6.dp))
+            Text(
+                "$jumlah",
+                color = if (aktif) Color.White.copy(alpha = 0.85f) else WarnaIos.LabelKedua,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+/**
+ * Pemicu menu ala "pull-down button" iOS — sama dengan [TombolKapsulIos], ditambah
+ * status [aktif] supaya filter yang sedang berlaku terlihat beda dari bawaan.
+ */
+@Composable
+internal fun KapsulMenu(
+    teks: String,
+    onKlik: () -> Unit,
+    modifier: Modifier = Modifier,
+    aktif: Boolean = false,
+    ikon: ImageVector? = null,
+    chevron: Boolean = true,
+) {
+    Row(
+        modifier
+            .height(UkuranIos.TinggiKontrol)
+            .clip(UkuranIos.SudutKontrol)
+            .background(if (aktif) WarnaIos.Aksen.copy(alpha = 0.14f) else WarnaIos.Isian)
+            .tekanIos(onKlik)
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (ikon != null) {
+            Icon(ikon, null, tint = WarnaIos.Aksen, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(6.dp))
+        }
+        Text(
+            teks,
+            color = if (aktif) WarnaIos.Aksen else WarnaIos.Label,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (chevron) {
+            Spacer(Modifier.width(4.dp))
+            Icon(IkonIos.ArrowDropDown, null, tint = WarnaIos.Aksen, modifier = Modifier.size(14.dp))
+        }
+    }
+}
+
+/**
+ * Catatan berwarna di dalam kartu (peringatan, info, hasil) — isian nada tipis
+ * tanpa garis tepi, pengganti kotak berbingkai warna-warni.
+ */
+@Composable
+internal fun BannerIos(
+    teks: String,
+    nada: NadaIos,
+    modifier: Modifier = Modifier,
+    ikon: ImageVector? = null,
+) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .clip(UkuranIos.SudutKontrol)
+            .background(nada.warna.copy(alpha = 0.12f))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        if (ikon != null) {
+            Icon(ikon, null, tint = nada.warna, modifier = Modifier.padding(top = 1.dp).size(16.dp))
+            Spacer(Modifier.width(8.dp))
+        }
+        Text(teks, style = TipeIos.Catatan.copy(color = nada.teks, fontWeight = FontWeight.Medium, lineHeight = 18.sp))
+    }
+}
+
+/** Blok abu di dalam kartu untuk rincian label–nilai, seperti [BlokAngkaIos]. */
+@Composable
+internal fun BlokAbuIos(
+    modifier: Modifier = Modifier,
+    isi: @Composable ColumnScope.() -> Unit,
+) {
+    Column(
+        modifier
+            .fillMaxWidth()
+            .clip(UkuranIos.SudutBlok)
+            .background(WarnaIos.Latar)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        content = isi,
+    )
+}
+
+/** Satu baris label kiri – nilai kanan untuk [BlokAbuIos]. */
+@Composable
+internal fun BarisRincianIos(label: String, nilai: String, warnaNilai: Color = WarnaIos.Label, tebal: Boolean = false) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+        Text(label, style = TipeIos.Catatan)
+        Spacer(Modifier.width(12.dp))
+        Text(
+            nilai,
+            Modifier.weight(1f),
+            color = warnaNilai,
+            fontSize = 13.sp,
+            fontWeight = if (tebal) FontWeight.Bold else FontWeight.Medium,
+            textAlign = TextAlign.End,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
 /**
  * Pita pesan singkat di bawah header — dipakai untuk hasil aksi (berhasil/gagal)
  * agar pengguna tidak menebak apakah tombolnya bekerja.
  */
 @Composable
 fun PitaPesan(pesan: String, gagal: Boolean, onTutup: () -> Unit) {
-    val warna = if (gagal) Color(0xFFDC2626) else Color(0xFF168451)
-    Surface(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-        shape = RoundedCornerShape(12.dp),
-        color = warna.copy(alpha = 0.08f),
-        border = BorderStroke(1.dp, warna.copy(alpha = 0.25f)),
+    val nada = if (gagal) NadaIos.BAHAYA else NadaIos.SUKSES
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = UkuranIos.TepiLayar, vertical = 8.dp)
+            .clip(UkuranIos.SudutKontrol)
+            .background(nada.warna.copy(alpha = 0.12f))
+            .padding(start = 12.dp, end = 6.dp, top = 10.dp, bottom = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(pesan, Modifier.weight(1f), color = warna, fontSize = 12.sp, lineHeight = 17.sp)
-            Spacer(Modifier.width(8.dp))
-            Text(
-                "Tutup",
-                Modifier.clickable(onClick = onTutup),
-                color = warna,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-            )
+        Box(
+            Modifier.size(22.dp).clip(CircleShape).background(nada.warna),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(if (gagal) IkonIos.Close else IkonIos.Check, null, tint = Color.White, modifier = Modifier.size(13.dp))
         }
+        Spacer(Modifier.width(10.dp))
+        Text(pesan, Modifier.weight(1f), style = TipeIos.Catatan.copy(color = nada.teks, lineHeight = 18.sp))
+        Spacer(Modifier.width(4.dp))
+        Text(
+            "Tutup",
+            Modifier
+                .clip(UkuranIos.SudutKapsul)
+                .tekanIos(onTutup)
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+            color = nada.teks,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
     }
 }
