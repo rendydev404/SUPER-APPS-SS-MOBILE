@@ -1,5 +1,6 @@
 package com.sukashawarma.superapp.feature.chat.ui
 
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
@@ -72,10 +73,10 @@ import androidx.compose.ui.unit.sp
 val EMOJI_REAKSI = listOf("👍", "❤️", "😂", "😮", "😢", "🙏")
 
 private val PutihKartu = Color(0xFFF7F7F8)
-private val AbuIkonMenu = Color(0xFF8E8E93)
-private val TeksAksi = Color(0xFF000000)
-private val MerahAksi = Color(0xFFFF3B30)
-private val GarisAksi = Color(0x1F3C3C43)
+private val AbuIkonMenu = WarnaIos.Abu
+private val TeksAksi = WarnaIos.Label
+private val MerahAksi = WarnaIos.Merah
+private val GarisAksi = WarnaIos.Pemisah
 
 @Composable
 fun MenuPesanPopup(
@@ -201,7 +202,7 @@ private fun BarisEmoji(terpilih: String?, onPilih: (String) -> Unit, onSemuaEmoj
                 .padding(start = 2.dp)
                 .size(42.dp)
                 .clip(CircleShape)
-                .background(Color(0xFFF0F0F2))
+                .background(WarnaIos.Isian)
                 .clickable(onClick = onSemuaEmoji),
             contentAlignment = Alignment.Center,
         ) {
