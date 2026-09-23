@@ -1,5 +1,11 @@
 package com.sukashawarma.superapp.feature.chat.ui
 
+import androidx.compose.foundation.lazy.itemsIndexed
+import com.sukashawarma.superapp.core.ui.ios.PemisahIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.ios.tekanIos
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -46,9 +52,9 @@ import com.sukashawarma.superapp.feature.chat.data.ReaksiPesan
  * awal namanya yang tampil. Menyimpan path avatar per reaksi hanya akan
  * menduplikasi data yang berumur 24 jam.
  */
-private val BiruIosReaksi = Color(0xFF007AFF)
-private val AbuReaksi = Color(0xFF8E8E93)
-private val LatarPil = Color(0xFFF2F2F7)
+private val BiruIosReaksi = WarnaIos.Aksen
+private val AbuReaksi = WarnaIos.LabelKedua
+private val LatarPil = WarnaIos.Isian
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,7 +75,7 @@ fun DaftarReaksiSheet(
     ModalBottomSheet(
         onDismissRequest = onTutup,
         sheetState = sheetState,
-        containerColor = Color.White,
+        containerColor = WarnaIos.Latar,
         shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
     ) {
         Column(
@@ -80,9 +86,7 @@ fun DaftarReaksiSheet(
         ) {
             Text(
                 "Reaksi",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Color.Black,
+                style = TipeIos.Utama,
                 modifier = Modifier.padding(start = 20.dp, bottom = 12.dp),
             )
 
@@ -96,15 +100,22 @@ fun DaftarReaksiSheet(
                 }
             }
 
-            Spacer(Modifier.height(8.dp))
-            LazyColumn(Modifier.heightIn(max = 340.dp)) {
-                items(tampil, key = { it.userId + it.emoji }) { r ->
+            Spacer(Modifier.height(12.dp))
+            LazyColumn(
+                Modifier
+                    .heightIn(max = 340.dp)
+                    .padding(horizontal = UkuranIos.TepiLayar)
+                    .clip(UkuranIos.SudutGrup)
+                    .background(WarnaIos.Kartu)
+            ) {
+                itemsIndexed(tampil, key = { _, it -> it.userId + it.emoji }) { i, r ->
                     val milikku = r.userId == userId
+                    if (i > 0) PemisahIos(inset = 66.dp)
                     Row(
                         Modifier
                             .fillMaxWidth()
                             .then(if (milikku) Modifier.clickable(onClick = onCabut) else Modifier)
-                            .padding(horizontal = 20.dp, vertical = 9.dp),
+                            .padding(horizontal = 16.dp, vertical = 9.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         AvatarStaf(
@@ -117,11 +128,10 @@ fun DaftarReaksiSheet(
                         Column(Modifier.weight(1f)) {
                             Text(
                                 if (milikku) "Anda" else r.userName.ifBlank { "Tanpa Nama" },
-                                fontSize = 15.sp,
-                                color = Color.Black,
+                                style = TipeIos.Isi,
                             )
                             if (milikku) {
-                                Text("Ketuk untuk menghapus reaksi", fontSize = 12.sp, color = AbuReaksi)
+                                Text("Ketuk untuk menghapus reaksi", style = TipeIos.Catatan)
                             }
                         }
                         Text(r.emoji, fontSize = 21.sp)
@@ -136,15 +146,15 @@ fun DaftarReaksiSheet(
 private fun PilTab(label: String, aktif: Boolean, onKlik: () -> Unit) {
     Box(
         Modifier
-            .clip(RoundedCornerShape(15.dp))
+            .clip(UkuranIos.SudutKapsul)
             .background(if (aktif) BiruIosReaksi else LatarPil)
-            .clickable(onClick = onKlik)
+            .tekanIos(onKlik)
             .padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
         Text(
             label,
-            fontSize = 13.sp,
-            color = if (aktif) Color.White else Color.Black,
+            fontSize = 14.sp,
+            color = if (aktif) Color.White else WarnaIos.Label,
             fontWeight = if (aktif) FontWeight.SemiBold else FontWeight.Normal,
         )
     }
