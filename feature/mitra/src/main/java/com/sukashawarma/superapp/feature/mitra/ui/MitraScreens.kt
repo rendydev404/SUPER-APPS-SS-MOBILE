@@ -10,38 +10,35 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.PersonOff
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.sukashawarma.superapp.core.ui.ios.BarisIos
+import com.sukashawarma.superapp.core.ui.ios.GrupIos
+import com.sukashawarma.superapp.core.ui.ios.KartuIos
+import com.sukashawarma.superapp.core.ui.ios.LencanaIos
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.PemisahIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.TombolKeduaIos
+import com.sukashawarma.superapp.core.ui.ios.TombolUtamaIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
 import com.sukashawarma.superapp.domain.session.AppSession
-import com.sukashawarma.superapp.presentation.theme.StatusEmerald
-import com.sukashawarma.superapp.presentation.theme.StatusRed
-import com.sukashawarma.superapp.presentation.theme.SukaOnSurface
-import com.sukashawarma.superapp.presentation.theme.SukaOnSurfaceVariant
-import com.sukashawarma.superapp.presentation.theme.SukaOrange
-import com.sukashawarma.superapp.presentation.theme.SukaSurface
-import com.sukashawarma.superapp.presentation.theme.SukaSurfaceContainerLowest
 
 /**
  * Kerangka dashboard mitra. SENGAJA minimal — KPI, omzet, ROI, tren, orderan, transfer,
@@ -56,50 +53,49 @@ fun MitraDashboardScaffold(onOpenProfil: () -> Unit, onLoggedOut: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(SukaSurface)
-            .padding(20.dp)
+            .background(WarnaIos.Latar)
+            .padding(horizontal = UkuranIos.TepiLayar, vertical = 20.dp)
     ) {
         Text(
             "Halo, ${profil?.namaMitra ?: "Mitra"}",
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            color = SukaOnSurface,
+            style = TipeIos.Judul1,
         )
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(2.dp))
         Text(
             staff?.outletName ?: "Outlet belum diketahui",
-            fontSize = 14.sp,
-            color = SukaOnSurfaceVariant,
+            style = TipeIos.SubJudul,
         )
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(10.dp))
 
         val aktif = profil?.isAktif == true
-        Text(
+        LencanaIos(
             if (aktif) "Kemitraan aktif" else "Kemitraan tidak aktif",
-            modifier = Modifier
-                .clip(RoundedCornerShape(12.dp))
-                .background(if (aktif) StatusEmerald else StatusRed)
-                .padding(horizontal = 12.dp, vertical = 6.dp),
-            color = Color.White,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
+            if (aktif) NadaIos.SUKSES else NadaIos.BAHAYA,
         )
 
-        Spacer(Modifier.height(28.dp))
-        Text(
-            "Ringkasan penjualan, bagi hasil, dan laporan outlet akan tampil di sini.",
-            fontSize = 14.sp,
-            color = SukaOnSurfaceVariant,
-        )
+        Spacer(Modifier.height(20.dp))
+        KartuIos {
+            Text("Dashboard mitra", style = TipeIos.Utama)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Ringkasan penjualan, bagi hasil, dan laporan outlet akan tampil di sini.",
+                style = TipeIos.Catatan,
+            )
+        }
 
         Spacer(Modifier.weight(1f))
         // Mitra tidak punya modul Absensi maupun Beranda, jadi ini satu-satunya
         // jalan mereka ke halaman profil dan ganti password.
-        TextButton(onClick = onOpenProfil) {
-            Text("Profil Saya", color = SukaOrange, fontWeight = FontWeight.Bold)
-        }
-        TextButton(onClick = { AppSession.signOut(); onLoggedOut() }) {
-            Text("Keluar", color = SukaOrange, fontWeight = FontWeight.Bold)
+        GrupIos {
+            BarisIos("Profil Saya", ikon = IkonIos.Person, onKlik = onOpenProfil)
+            PemisahIos(inset = 58.dp)
+            BarisIos(
+                "Keluar",
+                ikon = Icons.AutoMirrored.Filled.Logout,
+                nadaIkon = NadaIos.BAHAYA,
+                onKlik = { AppSession.signOut(); onLoggedOut() },
+                chevron = false,
+            )
         }
     }
 }
@@ -145,68 +141,41 @@ private fun MitraMessageScreen(
     primaryLoading: Boolean = false,
 ) {
     Box(
-        modifier = Modifier.fillMaxSize().background(SukaSurface),
+        modifier = Modifier.fillMaxSize().background(WarnaIos.Latar),
         contentAlignment = Alignment.Center,
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(28.dp)
-                .clip(RoundedCornerShape(24.dp))
-                .background(SukaSurfaceContainerLowest)
-                .padding(28.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
+        KartuIos(
+            modifier = Modifier.padding(24.dp),
+            padding = androidx.compose.foundation.layout.PaddingValues(24.dp),
         ) {
-            Box(
-                modifier = Modifier
-                    .size(72.dp)
-                    .clip(CircleShape)
-                    .background(SukaOrange.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center,
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
             ) {
-                Icon(icon, contentDescription = null, tint = SukaOrange, modifier = Modifier.size(32.dp))
-            }
-            Spacer(Modifier.height(16.dp))
-            Text(
-                title,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = SukaOnSurface,
-                textAlign = TextAlign.Center,
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                message,
-                fontSize = 14.sp,
-                color = SukaOnSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
-            Spacer(Modifier.height(20.dp))
-            if (primaryLabel != null && onPrimary != null) {
-                Button(
-                    onClick = onPrimary,
-                    enabled = !primaryLoading,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = SukaOrange,
-                        disabledContainerColor = SukaOrange.copy(alpha = 0.5f),
-                        disabledContentColor = Color.White,
-                    ),
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(CircleShape)
+                        .background(WarnaIos.Aksen.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    if (primaryLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            color = Color.White,
-                            strokeWidth = 2.dp,
-                        )
-                        Spacer(Modifier.width(8.dp))
-                    }
-                    Text(primaryLabel, color = Color.White, fontWeight = FontWeight.Bold)
+                    Icon(icon, contentDescription = null, tint = WarnaIos.Aksen, modifier = Modifier.size(30.dp))
                 }
-                Spacer(Modifier.height(4.dp))
-            }
-            TextButton(onClick = { AppSession.signOut(); onLoggedOut() }) {
-                Text("Keluar", color = SukaOnSurfaceVariant)
+                Spacer(Modifier.height(14.dp))
+                Text(title, style = TipeIos.Utama, textAlign = TextAlign.Center)
+                Spacer(Modifier.height(6.dp))
+                Text(message, style = TipeIos.SubJudul, textAlign = TextAlign.Center)
+                Spacer(Modifier.height(20.dp))
+                if (primaryLabel != null && onPrimary != null) {
+                    TombolUtamaIos(primaryLabel, onPrimary, memuat = primaryLoading)
+                    Spacer(Modifier.height(10.dp))
+                }
+                TombolKeduaIos(
+                    "Keluar",
+                    onKlik = { AppSession.signOut(); onLoggedOut() },
+                    warna = WarnaIos.AbuGelap,
+                )
             }
         }
     }
