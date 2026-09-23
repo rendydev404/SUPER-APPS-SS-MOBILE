@@ -57,6 +57,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -92,6 +93,7 @@ import com.sukashawarma.superapp.feature.stok.ui.KeadaanTidakBerhak
 import com.sukashawarma.superapp.feature.stok.ui.MemuatPenuh
 import com.sukashawarma.superapp.feature.stok.ui.PemilihOutlet
 import com.sukashawarma.superapp.feature.stok.ui.waktuSingkat
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -171,8 +173,8 @@ class LedgerViewModel : ViewModel() {
 
     init { muatAwal() }
 
-    fun muatAwal() {
-        viewModelScope.launch {
+    fun muatAwal(): Job {
+        return viewModelScope.launch {
             _state.value = _state.value.copy(memuat = true, error = null, tidakBerhak = false)
             try {
                 val outlets = StokRepository.accessibleOutlets()
@@ -314,9 +316,9 @@ class LedgerViewModel : ViewModel() {
         )
     }
 
-    fun segarkan() {
+    fun segarkan(): Job {
         StokRepository.invalidate()
-        muatAwal()
+        return muatAwal()
     }
 }
 
@@ -334,14 +336,16 @@ fun LedgerScreen(
     val glosariumSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     val pullRefreshState = rememberPullToRefreshState()
+    // Tutup indikator setelah Job refresh benar-benar selesai. Dulu memakai
+    // LaunchedEffect(state.memuat), tapi StateFlow bisa melewatkan nilai true
+    // (conflation) sehingga endRefresh tak pernah terpanggil dan indikator nyangkut.
     if (pullRefreshState.isRefreshing) {
         LaunchedEffect(true) {
-            viewModel.segarkan()
-        }
-    }
-    LaunchedEffect(state.memuat) {
-        if (!state.memuat) {
-            pullRefreshState.endRefresh()
+            try {
+                viewModel.segarkan().join()
+            } finally {
+                pullRefreshState.endRefresh()
+            }
         }
     }
 
@@ -399,9 +403,12 @@ fun LedgerScreen(
 
                     // 4. Daftar Transaksi (Pull-to-Refresh standar industri)
                     val terfilter = state.transaksiTerfilter
+                    // clipToBounds wajib: PullToRefreshContainer M3 1.2 tetap menggambar
+                    // lingkaran kartu di atas tepi Box saat diam; tanpa klip ia menutupi chip.
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
+                            .clipToBounds()
                             .nestedScroll(pullRefreshState.nestedScrollConnection)
                     ) {
                         if (terfilter.isEmpty() && !state.memuat) {
