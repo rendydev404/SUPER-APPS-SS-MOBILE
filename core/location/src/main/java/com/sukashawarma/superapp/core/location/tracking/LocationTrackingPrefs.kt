@@ -63,6 +63,16 @@ object LocationTrackingPrefs {
         editor.apply()
     }
 
+    /** Server menolak refresh token-nya: buang pasangan token tanpa menyentuh staff/outlet,
+     *  supaya restart service berikutnya tidak memulihkan token hangus. Titik baru tetap
+     *  diantrekan dan terkirim setelah staff login ulang (token baru masuk lewat updateTokens). */
+    fun clearTokens(context: Context) {
+        require(context).edit()
+            .remove(KEY_ACCESS_TOKEN)
+            .remove(KEY_REFRESH_TOKEN)
+            .apply()
+    }
+
     fun clearSession(context: Context) {
         require(context).edit()
             .remove(KEY_STAFF_ID)
