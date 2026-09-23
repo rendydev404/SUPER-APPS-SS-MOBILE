@@ -55,6 +55,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
@@ -84,15 +85,16 @@ fun MutasiScreen(viewModel: MutasiViewModel = viewModel()) {
     val state by viewModel.state.collectAsState()
     val pullRefreshState = rememberPullToRefreshState()
 
+    // Tutup indikator setelah Job refresh benar-benar selesai. Dulu memakai
+    // LaunchedEffect(state.memuat), tapi StateFlow bisa melewatkan nilai true
+    // (conflation) sehingga endRefresh tak pernah terpanggil dan indikator nyangkut.
     if (pullRefreshState.isRefreshing) {
         LaunchedEffect(true) {
-            viewModel.segarkanManual()
-        }
-    }
-
-    LaunchedEffect(state.memuat) {
-        if (!state.memuat) {
-            pullRefreshState.endRefresh()
+            try {
+                viewModel.segarkanManual().join()
+            } finally {
+                pullRefreshState.endRefresh()
+            }
         }
     }
 
@@ -123,9 +125,12 @@ fun MutasiScreen(viewModel: MutasiViewModel = viewModel()) {
             )
         }
 
+        // clipToBounds wajib: PullToRefreshContainer M3 1.2 tetap menggambar
+        // lingkaran kartu di atas tepi Box saat diam; tanpa klip ia menutupi tombol.
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .clipToBounds()
                 .nestedScroll(pullRefreshState.nestedScrollConnection)
         ) {
             when {
