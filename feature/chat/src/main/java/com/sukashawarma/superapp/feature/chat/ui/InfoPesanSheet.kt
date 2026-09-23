@@ -1,5 +1,11 @@
 package com.sukashawarma.superapp.feature.chat.ui
 
+import com.sukashawarma.superapp.core.ui.ios.LabelSeksiIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.TombolBundarIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -55,10 +61,13 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-private val BiruWaCentang = Color(0xFF007AFF)
-private val AbuCentang = Color(0xFF8E8E93)
-private val LatarIosGrouped = Color(0xFFF2F2F7)
-private val GarisPemisahIos = Color(0xFFE5E5EA)
+private val BiruWaCentang = WarnaIos.Biru
+private val AbuCentang = WarnaIos.Abu
+private val LatarIosGrouped = WarnaIos.Latar
+private val GarisPemisahIos = WarnaIos.Pemisah
+private val SudutGrupInfo = UkuranIos.SudutGrup
+private val SudutGrupInfoAtas = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+private val SudutGrupInfoBawah = RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp)
 
 private val ZONA_WIB = ZoneId.of("Asia/Jakarta")
 private val FORMAT_JAM = DateTimeFormatter.ofPattern("HH:mm", Locale("id", "ID"))
@@ -110,7 +119,7 @@ fun InfoPesanSheet(
         onDismissRequest = onTutup,
         sheetState = sheetState,
         containerColor = LatarIosGrouped,
-        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
         dragHandle = null,
     ) {
         Column(
@@ -130,7 +139,7 @@ fun InfoPesanSheet(
                     Modifier
                         .size(width = 36.dp, height = 5.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFFD1D1D6))
+                        .background(WarnaIos.LabelKetiga)
                 )
             }
 
@@ -142,26 +151,16 @@ fun InfoPesanSheet(
             ) {
                 Text(
                     "Info Pesan",
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.Black,
+                    style = TipeIos.Utama,
                     modifier = Modifier.align(Alignment.Center),
                 )
-                IconButton(
-                    onClick = onTutup,
-                    modifier = Modifier
-                        .size(30.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFE5E5EA))
-                        .align(Alignment.CenterEnd),
-                ) {
-                    Icon(
-                        Icons.Filled.Close,
-                        contentDescription = "Tutup",
-                        tint = Color(0xFF8E8E93),
-                        modifier = Modifier.size(16.dp),
-                    )
-                }
+                TombolBundarIos(
+                    IkonIos.Close,
+                    "Tutup",
+                    onTutup,
+                    Modifier.align(Alignment.CenterEnd),
+                    warnaIkon = WarnaIos.LabelKedua,
+                )
             }
 
             if (memuat && detail == null) {
@@ -195,13 +194,9 @@ fun InfoPesanSheet(
                     // 2a. Seksi DIDENGARKAN OLEH — hanya untuk pesan suara.
                     if (pesan.audioPath != null) {
                         item(key = "header_dengar") {
-                            Text(
+                            LabelSeksiIos(
                                 "DIDENGARKAN OLEH (${pendengarSuara.size})",
-                                fontSize = 12.5.sp,
-                                fontWeight = FontWeight.Normal,
-                                color = Color(0xFF6D6D72),
-                                letterSpacing = 0.4.sp,
-                                modifier = Modifier.padding(start = 32.dp, top = 14.dp, bottom = 6.dp),
+                                Modifier.padding(start = 32.dp, top = 14.dp, bottom = 7.dp),
                             )
                         }
 
@@ -211,24 +206,23 @@ fun InfoPesanSheet(
                                     Modifier
                                         .fillMaxWidth()
                                         .padding(horizontal = 16.dp)
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(Color.White)
+                                        .clip(SudutGrupInfo)
+                                        .background(WarnaIos.Kartu)
                                         .padding(vertical = 14.dp, horizontal = 16.dp),
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     Text(
                                         "Belum ada yang memutar pesan suara ini",
-                                        fontSize = 13.5.sp,
-                                        color = Color(0xFF8E8E93),
+                                        style = TipeIos.SubJudul,
                                     )
                                 }
                             }
                         } else {
                             itemsIndexed(pendengarSuara, key = { _, it -> "dengar_" + it.userId }) { index, orang ->
                                 val bentuk = when {
-                                    pendengarSuara.size == 1 -> RoundedCornerShape(12.dp)
-                                    index == 0 -> RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)
-                                    index == pendengarSuara.size - 1 -> RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp)
+                                    pendengarSuara.size == 1 -> SudutGrupInfo
+                                    index == 0 -> SudutGrupInfoAtas
+                                    index == pendengarSuara.size - 1 -> SudutGrupInfoBawah
                                     else -> RoundedCornerShape(0.dp)
                                 }
                                 Box(
@@ -236,7 +230,7 @@ fun InfoPesanSheet(
                                         .fillMaxWidth()
                                         .padding(horizontal = 16.dp)
                                         .clip(bentuk)
-                                        .background(Color.White),
+                                        .background(WarnaIos.Kartu),
                                 ) {
                                     BarisItemPembacaIos(
                                         pembaca = orang,
@@ -260,13 +254,9 @@ fun InfoPesanSheet(
 
                     // 2. Seksi DIBACA OLEH
                     item(key = "header_dibaca") {
-                        Text(
+                        LabelSeksiIos(
                             "DIBACA OLEH (${daftarDibaca.size})",
-                            fontSize = 12.5.sp,
-                            fontWeight = FontWeight.Normal,
-                            color = Color(0xFF6D6D72),
-                            letterSpacing = 0.4.sp,
-                            modifier = Modifier.padding(start = 32.dp, top = 14.dp, bottom = 6.dp),
+                            Modifier.padding(start = 32.dp, top = 14.dp, bottom = 7.dp),
                         )
                     }
 
@@ -276,24 +266,23 @@ fun InfoPesanSheet(
                                 Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 16.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(Color.White)
+                                    .clip(SudutGrupInfo)
+                                    .background(WarnaIos.Kartu)
                                     .padding(vertical = 14.dp, horizontal = 16.dp),
                                 contentAlignment = Alignment.Center,
                             ) {
                                 Text(
                                     "Belum ada yang membaca pesan ini",
-                                    fontSize = 13.5.sp,
-                                    color = Color(0xFF8E8E93),
+                                    style = TipeIos.SubJudul,
                                 )
                             }
                         }
                     } else {
                         itemsIndexed(daftarDibaca, key = { _, it -> "baca_" + it.userId }) { index, pembaca ->
                             val shape = when {
-                                daftarDibaca.size == 1 -> RoundedCornerShape(12.dp)
-                                index == 0 -> RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)
-                                index == daftarDibaca.size - 1 -> RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp)
+                                daftarDibaca.size == 1 -> SudutGrupInfo
+                                index == 0 -> SudutGrupInfoAtas
+                                index == daftarDibaca.size - 1 -> SudutGrupInfoBawah
                                 else -> RoundedCornerShape(0.dp)
                             }
                             Box(
@@ -301,7 +290,7 @@ fun InfoPesanSheet(
                                     .fillMaxWidth()
                                     .padding(horizontal = 16.dp)
                                     .clip(shape)
-                                    .background(Color.White),
+                                    .background(WarnaIos.Kartu),
                             ) {
                                 BarisItemPembacaIos(
                                     pembaca = pembaca,
@@ -324,13 +313,9 @@ fun InfoPesanSheet(
 
                     // 3. Seksi TERSAMPAIKAN KE
                     item(key = "header_belum") {
-                        Text(
+                        LabelSeksiIos(
                             "TERSAMPAIKAN KE (${daftarBelum.size})",
-                            fontSize = 12.5.sp,
-                            fontWeight = FontWeight.Normal,
-                            color = Color(0xFF6D6D72),
-                            letterSpacing = 0.4.sp,
-                            modifier = Modifier.padding(start = 32.dp, top = 20.dp, bottom = 6.dp),
+                            Modifier.padding(start = 32.dp, top = 20.dp, bottom = 7.dp),
                         )
                     }
 
@@ -340,24 +325,23 @@ fun InfoPesanSheet(
                                 Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 16.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(Color.White)
+                                    .clip(SudutGrupInfo)
+                                    .background(WarnaIos.Kartu)
                                     .padding(vertical = 14.dp, horizontal = 16.dp),
                                 contentAlignment = Alignment.Center,
                             ) {
                                 Text(
                                     "Semua anggota telah membaca pesan ini",
-                                    fontSize = 13.5.sp,
-                                    color = Color(0xFF8E8E93),
+                                    style = TipeIos.SubJudul,
                                 )
                             }
                         }
                     } else {
                         itemsIndexed(daftarBelum, key = { _, it -> "belum_" + it.userId }) { index, pembaca ->
                             val shape = when {
-                                daftarBelum.size == 1 -> RoundedCornerShape(12.dp)
-                                index == 0 -> RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)
-                                index == daftarBelum.size - 1 -> RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp)
+                                daftarBelum.size == 1 -> SudutGrupInfo
+                                index == 0 -> SudutGrupInfoAtas
+                                index == daftarBelum.size - 1 -> SudutGrupInfoBawah
                                 else -> RoundedCornerShape(0.dp)
                             }
                             Box(
@@ -365,7 +349,7 @@ fun InfoPesanSheet(
                                     .fillMaxWidth()
                                     .padding(horizontal = 16.dp)
                                     .clip(shape)
-                                    .background(Color.White),
+                                    .background(WarnaIos.Kartu),
                             ) {
                                 BarisItemPembacaIos(
                                     pembaca = pembaca,
@@ -548,9 +532,8 @@ private fun BarisItemPembacaIos(
         Column(Modifier.weight(1f)) {
             Text(
                 pembaca.namaTampil,
-                fontSize = 15.5.sp,
+                style = TipeIos.Isi,
                 fontWeight = FontWeight.Medium,
-                color = Color.Black,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -562,8 +545,7 @@ private fun BarisItemPembacaIos(
             if (subLabel.isNotBlank()) {
                 Text(
                     subLabel,
-                    fontSize = 12.5.sp,
-                    color = AbuCentang,
+                    style = TipeIos.Catatan,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
