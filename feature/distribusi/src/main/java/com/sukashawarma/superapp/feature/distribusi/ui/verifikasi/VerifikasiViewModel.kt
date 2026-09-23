@@ -249,6 +249,12 @@ class VerifikasiViewModel(private val suratJalanId: String) : ViewModel() {
     // ------------------------------------------------------------ tanda tangan
 
     fun tandaTangan(peran: String, nama: String, gambar: String) {
+        // Ketukan ganda pada tombol simpan kanvas memanggil fungsi ini dua kali dalam
+        // satu frame, sebelum layar sempat menutup kanvasnya. Tanpa penjaga ini request
+        // kedua sampai ke server ~90 ms setelah yang pertama dan ditolak RPC ("Supir
+        // sudah menandatangani penerimaan") — padahal TTD-nya sudah tersimpan, jadi crew
+        // melihat galat untuk pekerjaan yang sebenarnya berhasil.
+        if (_state.value.menandatangani) return
         if (nama.isBlank()) {
             _state.value = _state.value.copy(error = "Nama penanda tangan harus diisi.")
             return
@@ -259,8 +265,10 @@ class VerifikasiViewModel(private val suratJalanId: String) : ViewModel() {
             )
             return
         }
+        // Ditandai SEBELUM launch: di dalam coroutine, tanda ini baru terpasang setelah
+        // pemanggilan kedua lolos pemeriksaan di atas.
+        _state.value = _state.value.copy(menandatangani = true, error = null)
         viewModelScope.launch {
-            _state.value = _state.value.copy(menandatangani = true, error = null)
             try {
                 val daftar = SuratJalanRepository.tandaTanganPenerimaan(suratJalanId, nama, peran, gambar)
                 _state.value = _state.value.copy(
