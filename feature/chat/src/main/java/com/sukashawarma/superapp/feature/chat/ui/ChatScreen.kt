@@ -1,5 +1,15 @@
 package com.sukashawarma.superapp.feature.chat.ui
 
+import com.sukashawarma.superapp.core.ui.ios.KeadaanIos
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.TombolBundarIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.ios.permukaanIos
+import com.sukashawarma.superapp.core.ui.ios.tekanIos
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import com.sukashawarma.superapp.feature.chat.BuildConfig
 import android.Manifest
 import android.content.Intent
@@ -196,10 +206,13 @@ import java.util.Locale
 
 /* ---------- Palet estetika iOS (iMessage) ---------- */
 
-private val LatarChat = Color(0xFFFFFFFF)
+// Warna sistem diambil dari token bersama `WarnaIos` supaya chat tetap satu
+// keluarga dengan modul lain; biru dipertahankan sebagai aksen DI DALAM
+// percakapan (centang, tautan, kutipan) mengikuti iMessage.
+private val LatarChat = WarnaIos.Kartu
 private val LatarBar = Color(0xFFF7F7F8)
-private val GarisTipis = Color(0x2E3C3C43)
-private val BiruIos = Color(0xFF007AFF)
+private val GarisTipis = WarnaIos.Pemisah
+private val BiruIos = WarnaIos.Biru
 /**
  * Gelembung abu, bukan biru.
  *
@@ -213,15 +226,15 @@ private val BiruIos = Color(0xFF007AFF)
  */
 private val BubbleSendiri = Color(0xFFF4F4F7)
 private val BubbleLawan = Color(0xFFDEDEE4)
-private val TeksUtama = Color(0xFF000000)
-private val TeksSekunder = Color(0xFF8E8E93)
+private val TeksUtama = WarnaIos.Label
+private val TeksSekunder = WarnaIos.Abu
 private val LatarBanner = Color(0xFFFEF7DC)
 private val TeksBanner = Color(0xFF6B5D2E)
-private val Merah = Color(0xFFFF3B30)
+private val Merah = WarnaIos.Merah
 
 /** Aksen merek. Dipakai untuk hal yang menuntut perhatian: sorotan lompatan,
  *  mode sunting, dan tombol '@'. */
-private val Oranye = Color(0xFFEA580C)
+private val Oranye = WarnaIos.Aksen
 private val OranyeMenyala = Color(0xFFFF8A00)
 
 /** Warna nama pengirim di grup — satu warna tetap per orang, seperti WA. */
@@ -1233,15 +1246,13 @@ private fun ChatScreenContent(
 private fun LembarSemuaEmoji(onPilih: (String) -> Unit, onTutup: () -> Unit) {
     ModalBottomSheet(
         onDismissRequest = onTutup,
-        containerColor = Color(0xFFF7F7F8),
+        containerColor = WarnaIos.Latar,
         shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
     ) {
         Column(Modifier.navigationBarsPadding()) {
             Text(
                 "Pilih reaksi",
-                fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = TeksUtama,
+                style = TipeIos.Utama,
                 modifier = Modifier.padding(start = 20.dp, bottom = 8.dp),
             )
             PapanEmoji(
@@ -1546,9 +1557,7 @@ private fun HeaderChat(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (tampilkanKembali) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBackIos, "Kembali", tint = BiruIos)
-                }
+                TombolBundarIos(IkonIos.ArrowBack, "Kembali", onBack, Modifier.padding(start = 10.dp, end = 6.dp))
             }
             // Seluruh blok identitas grup dapat diketuk untuk membuka info —
             // kebiasaan iOS Messages, dan sekaligus membuat pengaturan bisa
@@ -1581,25 +1590,23 @@ private fun HeaderChat(
                 Column(Modifier.weight(1f)) {
                     Text(
                         judul,
-                        fontSize = 16.5.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = TeksUtama,
+                        style = TipeIos.Utama,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
                         subtitle,
-                        fontSize = 11.5.sp,
-                        color = if (subtitleAktif) BiruIos else TeksSekunder,
+                        style = TipeIos.Kecil,
+                        color = if (subtitleAktif) BiruIos else WarnaIos.LabelKedua,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
                 Icon(
-                    Icons.Filled.ChevronRight,
+                    IkonIos.ChevronRight,
                     null,
-                    tint = Color(0xFFC7C7CC),
-                    modifier = Modifier.size(20.dp),
+                    tint = WarnaIos.LabelKetiga,
+                    modifier = Modifier.size(15.dp),
                 )
             }
         }
@@ -2273,12 +2280,11 @@ private fun PemisahTanggal(label: String) {
     Box(Modifier.fillMaxWidth().padding(vertical = 10.dp), contentAlignment = Alignment.Center) {
         Text(
             label,
-            fontSize = 11.5.sp,
+            style = TipeIos.Kecil,
             fontWeight = FontWeight.Medium,
-            color = TeksSekunder,
             modifier = Modifier
-                .clip(RoundedCornerShape(10.dp))
-                .background(Color(0xFFF2F2F7))
+                .clip(UkuranIos.SudutKapsul)
+                .background(WarnaIos.Latar)
                 .padding(horizontal = 10.dp, vertical = 4.dp),
         )
     }
@@ -2303,29 +2309,25 @@ private fun BannerSementara() {
 
 @Composable
 private fun KeadaanKosong() {
-    Column(
-        Modifier.fillMaxWidth().padding(vertical = 40.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text("👋", fontSize = 40.sp)
-        Spacer(Modifier.height(8.dp))
-        Text("Belum ada pesan hari ini", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = TeksUtama)
-        Text("Jadilah yang pertama menyapa tim!", fontSize = 13.sp, color = TeksSekunder)
-    }
+    KeadaanIos(
+        ikon = Icons.Outlined.ChatBubbleOutline,
+        judul = "Belum ada pesan hari ini",
+        pesan = "Jadilah yang pertama menyapa tim!",
+        nada = NadaIos.INFO,
+    )
 }
 
 @Composable
 private fun KeadaanGalat(pesan: String, onCoba: () -> Unit) {
-    Column(
-        Modifier.fillMaxSize().padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Icon(Icons.Filled.ErrorOutline, null, tint = TeksSekunder, modifier = Modifier.size(40.dp))
-        Spacer(Modifier.height(10.dp))
-        Text(pesan, fontSize = 14.sp, color = TeksSekunder, textAlign = TextAlign.Center)
-        Spacer(Modifier.height(12.dp))
-        TextButton(onClick = onCoba) { Text("Coba lagi", color = BiruIos) }
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        KeadaanIos(
+            ikon = IkonIos.ErrorOutline,
+            judul = "Chat belum bisa dimuat",
+            pesan = pesan,
+            nada = NadaIos.BAHAYA,
+            teksAksi = "Coba lagi",
+            onAksi = onCoba,
+        )
     }
 }
 
@@ -2373,9 +2375,8 @@ private fun TombolKeBawah(badge: Int, onClick: () -> Unit) {
         Box(
             Modifier
                 .size(40.dp)
-                .clip(CircleShape)
-                .background(Color.White)
-                .clickable(onClick = onClick),
+                .permukaanIos(CircleShape)
+                .tekanIos(onClick),
             contentAlignment = Alignment.Center,
         ) {
             Icon(Icons.Filled.KeyboardArrowDown, "Ke pesan terbaru", tint = BiruIos)
@@ -2458,13 +2459,13 @@ private fun KartuSuntingComposer(target: PesanChat, onTutup: () -> Unit) {
             .padding(start = 12.dp, end = 4.dp, top = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.width(3.dp).height(36.dp).clip(RoundedCornerShape(2.dp)).background(Color(0xFFEA580C)))
+        Box(Modifier.width(3.dp).height(36.dp).clip(RoundedCornerShape(2.dp)).background(Oranye))
         Column(Modifier.weight(1f).padding(horizontal = 8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     Icons.Filled.Edit,
                     null,
-                    tint = Color(0xFFEA580C),
+                    tint = Oranye,
                     modifier = Modifier.size(13.dp),
                 )
                 Spacer(Modifier.width(4.dp))
@@ -2472,7 +2473,7 @@ private fun KartuSuntingComposer(target: PesanChat, onTutup: () -> Unit) {
                     "Mengedit pesan",
                     fontSize = 12.5.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFFEA580C),
+                    color = Oranye,
                     maxLines = 1,
                 )
             }
@@ -2643,7 +2644,7 @@ private fun KomposerChat(
                         .padding(bottom = 6.dp)
                         .size(34.dp)
                         .clip(CircleShape)
-                        .background(if (modeSunting) Color(0xFFEA580C) else BiruIos)
+                        .background(if (modeSunting) Oranye else BiruIos)
                         .clickable(enabled = bisaKirim, onClick = onKirim),
                     contentAlignment = Alignment.Center,
                 ) {
