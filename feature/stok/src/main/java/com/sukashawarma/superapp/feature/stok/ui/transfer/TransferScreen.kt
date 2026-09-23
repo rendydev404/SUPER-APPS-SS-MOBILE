@@ -1,6 +1,14 @@
 package com.sukashawarma.superapp.feature.stok.ui.transfer
 
-import androidx.compose.foundation.BorderStroke
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
+import com.sukashawarma.superapp.core.ui.ios.KartuIos
+import com.sukashawarma.superapp.core.ui.ios.LencanaIos
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,16 +21,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -30,8 +31,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -47,9 +46,6 @@ import com.sukashawarma.superapp.feature.stok.ui.HeaderStok
 import com.sukashawarma.superapp.feature.stok.ui.KeadaanGagal
 import com.sukashawarma.superapp.feature.stok.ui.KeadaanKosong
 import com.sukashawarma.superapp.feature.stok.ui.MemuatPenuh
-import com.sukashawarma.superapp.presentation.theme.SukaOnSurface
-import com.sukashawarma.superapp.presentation.theme.SukaOnSurfaceVariant
-import com.sukashawarma.superapp.presentation.theme.SukaSurface
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -95,7 +91,7 @@ fun TransferScreen(onKeluar: () -> Unit, viewModel: TransferViewModel = viewMode
     val state by viewModel.state.collectAsState()
     LaunchedEffect(Unit) { viewModel.muat() }
 
-    Column(Modifier.fillMaxSize().background(SukaSurface)) {
+    Column(Modifier.fillMaxSize().background(WarnaIos.Latar)) {
         HeaderStok(
             judul = "Saran Transfer",
             subjudul = "Sekadar saran, tidak memindahkan stok",
@@ -110,8 +106,8 @@ fun TransferScreen(onKeluar: () -> Unit, viewModel: TransferViewModel = viewMode
             )
             else -> LazyColumn(
                 Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                contentPadding = PaddingValues(horizontal = UkuranIos.TepiLayar, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(UkuranIos.JarakKartu),
             ) {
                 items(
                     state.saran,
@@ -124,63 +120,42 @@ fun TransferScreen(onKeluar: () -> Unit, viewModel: TransferViewModel = viewMode
 
 @Composable
 private fun KartuSaran(s: SaranTransfer) {
-    Surface(
-        Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        color = Color.White,
-        border = BorderStroke(1.dp, Color(0xFFF1F5F9)),
-    ) {
-        Column(Modifier.padding(16.dp)) {
-            Text(
-                s.bahanNama,
-                color = SukaOnSurface,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(10.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("DARI", color = Color(0xFF94A3B8), fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                    Text(
-                        s.dariOutletNama,
-                        color = SukaOnSurfaceVariant,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                Icon(
-                    Icons.Default.ArrowForward, null,
-                    tint = Color(0xFFEA580C),
-                    modifier = Modifier.size(18.dp).padding(horizontal = 2.dp),
+    KartuIos {
+        Text(s.bahanNama, style = TipeIos.Utama, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Spacer(Modifier.height(12.dp))
+        Row(
+            Modifier.fillMaxWidth().clip(UkuranIos.SudutBlok).background(WarnaIos.Latar).padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("Dari", style = TipeIos.Kecil.copy(fontWeight = FontWeight.Medium))
+                Text(
+                    s.dariOutletNama,
+                    style = TipeIos.Keterangan.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
-                    Text("KE", color = Color(0xFF94A3B8), fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                    Text(
-                        s.keOutletNama,
-                        color = SukaOnSurfaceVariant,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
             }
-            Spacer(Modifier.height(12.dp))
-            Text(
-                s.qtyTampil,
-                Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFFFFF7ED), RoundedCornerShape(11.dp))
-                    .padding(vertical = 9.dp),
-                color = Color(0xFFC2410C),
-                fontSize = 15.sp,
-                fontWeight = FontWeight.ExtraBold,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            )
+            Box(
+                Modifier.padding(horizontal = 8.dp).size(28.dp).clip(CircleShape).background(WarnaIos.Aksen.copy(alpha = 0.14f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(IkonIos.ArrowForward, null, tint = WarnaIos.Aksen, modifier = Modifier.size(15.dp))
+            }
+            Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
+                Text("Ke", style = TipeIos.Kecil.copy(fontWeight = FontWeight.Medium))
+                Text(
+                    s.keOutletNama,
+                    style = TipeIos.Keterangan.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("Jumlah disarankan", Modifier.weight(1f), style = TipeIos.SubJudul)
+            LencanaIos(s.qtyTampil, NadaIos.AKSEN, titik = false, ikon = IkonIos.SwapHoriz)
         }
     }
 }
