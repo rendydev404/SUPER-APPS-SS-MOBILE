@@ -1,29 +1,17 @@
 package com.sukashawarma.superapp.presentation.absensi.checklist
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Checklist
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.NightsStay
-import androidx.compose.material.icons.filled.PriorityHigh
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.*
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,24 +29,24 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sukashawarma.superapp.core.ui.RealtimeRefresh
 import com.sukashawarma.superapp.core.ui.RealtimeTables
-
-// Stitch Suka Culinary Design Tokens
-private val StitchPrimary = Color(0xFF450700)
-private val StitchPrimaryContainer = Color(0xFF6B1101)
-private val StitchSecondary = Color(0xFF9C4400)
-private val StitchSecondaryContainer = Color(0xFFFE8438)
-private val StitchOnSecondaryContainer = Color(0xFF652A00)
-private val StitchSurface = Color(0xFFF8F9FF)
-private val StitchSurfaceContainerLowest = Color(0xFFFFFFFF)
-private val StitchSurfaceContainerLow = Color(0xFFEFF4FF)
-private val StitchSurfaceContainer = Color(0xFFE5EEFF)
-private val StitchSurfaceContainerHigh = Color(0xFFDCE9FF)
-private val StitchOnSurface = Color(0xFF0B1C30)
-private val StitchOnSurfaceVariant = Color(0xFF57423D)
-private val StitchOutlineVariant = Color(0xFFDEC0B9)
-private val StitchError = Color(0xFFBA1A1A)
-private val StitchErrorContainer = Color(0xFFFFDAD6)
-private val StitchOnErrorContainer = Color(0xFF93000A)
+import com.sukashawarma.superapp.core.ui.ios.BilahJudulIos
+import com.sukashawarma.superapp.core.ui.ios.IkonBulatIos
+import com.sukashawarma.superapp.core.ui.ios.KartuIos
+import com.sukashawarma.superapp.core.ui.ios.KeadaanIos
+import com.sukashawarma.superapp.core.ui.ios.LencanaIos
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.PemisahIos
+import com.sukashawarma.superapp.core.ui.ios.SegmenIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.TombolBundarIos
+import com.sukashawarma.superapp.core.ui.ios.TombolUtamaIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WadahSegmenIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.ios.tekanIos
+import com.sukashawarma.superapp.core.ui.ios.warnaKolomIos
+import com.sukashawarma.superapp.core.ui.ios.warnaSaklarIos
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
 
 private enum class ChecklistTabFilter(val label: String) {
     ALL("All"),
@@ -85,45 +73,22 @@ fun ChecklistManageScreen(
     var itemToDelete by remember { mutableStateOf<ManageChecklistItem?>(null) }
 
     Scaffold(
-        containerColor = StitchSurface,
+        containerColor = WarnaIos.Latar,
         topBar = {
-            TopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = StitchSurface,
-                    titleContentColor = StitchPrimary,
-                    navigationIconContentColor = StitchOnSurface,
-                    actionIconContentColor = StitchOnSurface
-                ),
-                navigationIcon = {
-                    IconButton(onClick = onExit) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali")
-                    }
-                },
-                title = {
-                    Text(
-                        "Checklist Management",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = StitchPrimary
-                    )
-                },
-                actions = {
-                    IconButton(onClick = { viewModel.load() }) {
-                        Icon(Icons.Filled.MoreVert, contentDescription = "More")
-                    }
-                }
-            )
+            BilahJudulIos(judul = "Checklist Management", onKembali = onExit) {
+                TombolBundarIos(IkonIos.MoreHoriz, "More", onKlik = { viewModel.load() })
+            }
         },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { showCreateDialog = true },
-                containerColor = StitchPrimary,
+                containerColor = WarnaIos.Aksen,
                 contentColor = Color.White,
-                shape = RoundedCornerShape(16.dp),
-                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 4.dp),
+                shape = CircleShape,
+                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp),
                 modifier = Modifier.padding(bottom = 12.dp, end = 8.dp)
             ) {
-                Icon(Icons.Filled.Add, contentDescription = "Tambah Checklist Baru", modifier = Modifier.size(28.dp))
+                Icon(IkonIos.Add, contentDescription = "Tambah Checklist Baru", modifier = Modifier.size(26.dp))
             }
         }
     ) { padding ->
@@ -136,91 +101,38 @@ fun ChecklistManageScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 8.dp)
+                    .padding(horizontal = UkuranIos.TepiLayar + 4.dp, vertical = 8.dp)
             ) {
-                Text(
-                    text = "Active Checklists",
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = StitchOnSurface
-                )
-                Spacer(Modifier.height(4.dp))
+                Text(text = "Active Checklists", style = TipeIos.Judul1)
+                Spacer(Modifier.height(2.dp))
                 Text(
                     text = "Kelola dan monitor daftar tugas operasional harian outlet.",
-                    fontSize = 13.5.sp,
-                    color = StitchOnSurfaceVariant,
-                    lineHeight = 18.sp
+                    style = TipeIos.SubJudul,
                 )
             }
 
             Spacer(Modifier.height(6.dp))
 
-            // Tab Filter Row: All, Open, Closed
-            val tabs = ChecklistTabFilter.entries
-            val selectedTabIndex = tabs.indexOf(selectedTab)
-
-            TabRow(
-                selectedTabIndex = selectedTabIndex,
-                containerColor = StitchSurface,
-                contentColor = StitchPrimary,
-                indicator = { tabPositions ->
-                    if (selectedTabIndex < tabPositions.size) {
-                        TabRowDefaults.SecondaryIndicator(
-                            Modifier.tabIndicatorOffset(tabPositions[selectedTabIndex]),
-                            height = 2.5.dp,
-                            color = StitchPrimary
-                        )
-                    }
-                },
-                divider = {
-                    HorizontalDivider(color = StitchOutlineVariant.copy(alpha = 0.4f), thickness = 1.dp)
-                },
-                modifier = Modifier.padding(horizontal = 16.dp)
-            ) {
-                tabs.forEachIndexed { index, tab ->
-                    val isSelected = selectedTab == tab
+            // Filter All / Open / Closed — segmented control iOS, hitungan di lencana kecil.
+            WadahSegmenIos(Modifier.padding(horizontal = UkuranIos.TepiLayar)) {
+                ChecklistTabFilter.entries.forEach { tab ->
                     val count = when (tab) {
                         ChecklistTabFilter.ALL -> state.items.size
                         ChecklistTabFilter.OPEN -> state.items.count { it.phase == ChecklistPhase.BUKA }
                         ChecklistTabFilter.CLOSED -> state.items.count { it.phase == ChecklistPhase.TUTUP }
                     }
-                    Tab(
-                        selected = isSelected,
-                        onClick = { selectedTab = tab },
-                        text = {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Text(
-                                    text = tab.label,
-                                    fontSize = 15.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (isSelected) StitchPrimary else StitchOnSurfaceVariant
-                                )
-                                if (count > 0) {
-                                    Surface(
-                                        shape = CircleShape,
-                                        color = if (isSelected) StitchPrimaryContainer.copy(alpha = 0.12f) else StitchSurfaceContainer,
-                                        modifier = Modifier.size(20.dp)
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Text(
-                                                text = "$count",
-                                                fontSize = 10.5.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = if (isSelected) StitchPrimary else StitchOnSurfaceVariant
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                    SegmenIos(
+                        label = tab.label,
+                        aktif = selectedTab == tab,
+                        onKlik = { selectedTab = tab },
+                        modifier = Modifier.weight(1f),
+                        lencana = if (count > 0) "$count" else null,
+                        warnaLencana = if (selectedTab == tab) WarnaIos.Aksen else WarnaIos.Abu.copy(alpha = 0.35f),
                     )
                 }
             }
 
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(UkuranIos.JarakKartu))
 
             // Body Content
             when {
@@ -231,45 +143,25 @@ fun ChecklistManageScreen(
                             .weight(1f),
                         contentAlignment = Alignment.Center
                     ) {
-                        CircularProgressIndicator(color = StitchPrimary, strokeWidth = 3.dp)
+                        CircularProgressIndicator(color = WarnaIos.Aksen, strokeWidth = 2.5.dp, modifier = Modifier.size(28.dp))
                     }
                 }
 
                 state.error != null -> {
-                    Column(
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .weight(1f)
-                            .padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Surface(
-                            shape = CircleShape,
-                            color = StitchErrorContainer,
-                            modifier = Modifier.size(56.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(Icons.Filled.PriorityHigh, contentDescription = null, tint = StitchError, modifier = Modifier.size(28.dp))
-                            }
-                        }
-                        Spacer(Modifier.height(14.dp))
-                        Text(
-                            state.error.orEmpty(),
-                            color = StitchOnSurface,
-                            fontSize = 14.sp,
-                            textAlign = TextAlign.Center
+                        KeadaanIos(
+                            ikon = IkonIos.ErrorOutline,
+                            judul = "Gagal memuat",
+                            pesan = state.error.orEmpty(),
+                            nada = NadaIos.BAHAYA,
+                            teksAksi = "Coba Lagi",
+                            onAksi = { viewModel.load() },
                         )
-                        Spacer(Modifier.height(16.dp))
-                        Button(
-                            onClick = { viewModel.load() },
-                            colors = ButtonDefaults.buttonColors(containerColor = StitchPrimary),
-                            shape = RoundedCornerShape(10.dp)
-                        ) {
-                            Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text("Coba Lagi")
-                        }
                     }
                 }
 
@@ -286,52 +178,17 @@ fun ChecklistManageScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f),
-                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 88.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                        contentPadding = PaddingValues(start = UkuranIos.TepiLayar, end = UkuranIos.TepiLayar, bottom = 88.dp),
+                        verticalArrangement = Arrangement.spacedBy(UkuranIos.JarakKartu)
                     ) {
                         if (filteredItems.isEmpty()) {
                             item(key = "empty_placeholder") {
-                                Surface(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 20.dp),
-                                    shape = RoundedCornerShape(16.dp),
-                                    color = StitchSurfaceContainerLow,
-                                    border = BorderStroke(1.dp, StitchSurfaceContainerHigh)
-                                ) {
-                                    Column(
-                                        modifier = Modifier.padding(32.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        Surface(
-                                            shape = CircleShape,
-                                            color = StitchSurfaceContainer,
-                                            modifier = Modifier.size(48.dp)
-                                        ) {
-                                            Box(contentAlignment = Alignment.Center) {
-                                                Icon(
-                                                    Icons.Filled.Checklist,
-                                                    contentDescription = null,
-                                                    tint = StitchPrimary,
-                                                    modifier = Modifier.size(24.dp)
-                                                )
-                                            }
-                                        }
-                                        Text(
-                                            "Belum Ada Checklist ${if (selectedTab != ChecklistTabFilter.ALL) selectedTab.label else ""}",
-                                            fontWeight = FontWeight.Bold,
-                                            color = StitchOnSurface,
-                                            fontSize = 15.sp
-                                        )
-                                        Text(
-                                            "Tambahkan tugas operasional dengan menekan tombol (+) di bawah.",
-                                            color = StitchOnSurfaceVariant,
-                                            fontSize = 13.sp,
-                                            textAlign = TextAlign.Center
-                                        )
-                                    }
-                                }
+                                KeadaanIos(
+                                    ikon = IkonIos.Checklist,
+                                    judul = "Belum Ada Checklist ${if (selectedTab != ChecklistTabFilter.ALL) selectedTab.label else ""}",
+                                    pesan = "Tambahkan tugas operasional dengan menekan tombol (+) di bawah.",
+                                    nada = NadaIos.AKSEN,
+                                )
                             }
                         } else {
                             items(filteredItems, key = { it.id }) { item ->
@@ -404,7 +261,7 @@ fun ChecklistManageScreen(
 }
 
 /**
- * Direct Checklist Item Card (No nested category clutter, clean Stitch style).
+ * Kartu satu item checklist — kartu putih iOS dengan lencana fase dan prioritas.
  */
 @Composable
 private fun DirectChecklistItemCard(
@@ -413,183 +270,54 @@ private fun DirectChecklistItemCard(
     onDelete: () -> Unit,
 ) {
     val isBuka = item.phase == ChecklistPhase.BUKA
-    val accentColor = if (isBuka) StitchSecondaryContainer else StitchPrimary
 
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp)),
-        shape = RoundedCornerShape(16.dp),
-        color = StitchSurfaceContainerLow,
-        border = BorderStroke(1.dp, StitchSurfaceContainerHigh.copy(alpha = 0.7f)),
-        shadowElevation = 0.5.dp
-    ) {
-        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-            // Left border accent bar (5dp)
-            Box(
-                modifier = Modifier
-                    .width(5.dp)
-                    .fillMaxHeight()
-                    .background(accentColor)
+    KartuIos(padding = PaddingValues(start = UkuranIos.PaddingKartu, end = 12.dp, top = 14.dp, bottom = 14.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Text(
+                text = item.name,
+                style = TipeIos.Utama,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f).padding(top = 6.dp, end = 10.dp),
             )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TombolBundarIos(Icons.Filled.Edit, "Edit Checklist", onKlik = onEdit)
+                TombolBundarIos(IkonIos.Delete, "Delete Checklist", onKlik = onDelete, warnaIkon = WarnaIos.Merah)
+            }
+        }
 
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 16.dp, vertical = 14.dp)
-            ) {
-                // Top Row: Task Name + Priority badge & Actions
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.Top,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column(modifier = Modifier.weight(1f).padding(end = 10.dp)) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Text(
-                                text = item.name,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = StitchOnSurface,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
+        Spacer(Modifier.height(12.dp))
+        PemisahIos(inset = 0.dp)
+        Spacer(Modifier.height(12.dp))
 
-                    // Action Buttons (Edit & Delete)
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        // Edit Button
-                        Surface(
-                            onClick = onEdit,
-                            shape = CircleShape,
-                            color = StitchSurfaceContainer,
-                            modifier = Modifier.size(34.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    Icons.Filled.Edit,
-                                    contentDescription = "Edit Checklist",
-                                    tint = StitchPrimary,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        }
-
-                        // Delete Button
-                        Surface(
-                            onClick = onDelete,
-                            shape = CircleShape,
-                            color = StitchErrorContainer,
-                            modifier = Modifier.size(34.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    Icons.Filled.Delete,
-                                    contentDescription = "Delete Checklist",
-                                    tint = StitchOnErrorContainer,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-
-                Spacer(Modifier.height(10.dp))
-                HorizontalDivider(color = StitchOutlineVariant.copy(alpha = 0.35f), thickness = 0.75.dp)
-                Spacer(Modifier.height(10.dp))
-
-                // Footer Metadata Row: Phase Tag & Priority Tag
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    // Phase Tag
-                    Surface(
-                        shape = RoundedCornerShape(50),
-                        color = if (isBuka) Color(0xFFFFF3E0) else StitchSurfaceContainer,
-                        border = BorderStroke(0.5.dp, if (isBuka) StitchSecondaryContainer.copy(alpha = 0.4f) else StitchOutlineVariant.copy(alpha = 0.4f))
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (isBuka) Icons.Filled.WbSunny else Icons.Filled.NightsStay,
-                                contentDescription = null,
-                                tint = if (isBuka) StitchSecondary else StitchPrimary,
-                                modifier = Modifier.size(13.dp)
-                            )
-                            Text(
-                                text = if (isBuka) "Buka (Opening)" else "Tutup (Closing)",
-                                fontSize = 11.5.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = if (isBuka) StitchSecondary else StitchPrimary
-                            )
-                        }
-                    }
-
-                    // Priority Tag
-                    if (item.isRequired) {
-                        Surface(
-                            shape = RoundedCornerShape(50),
-                            color = StitchErrorContainer,
-                            border = BorderStroke(0.5.dp, StitchError.copy(alpha = 0.3f))
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Icon(
-                                    Icons.Filled.Star,
-                                    contentDescription = null,
-                                    tint = StitchError,
-                                    modifier = Modifier.size(12.dp)
-                                )
-                                Text(
-                                    text = "Wajib Dikerjakan",
-                                    fontSize = 11.5.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = StitchError
-                                )
-                            }
-                        }
-                    } else {
-                        Surface(
-                            shape = RoundedCornerShape(50),
-                            color = StitchSurfaceContainerLow,
-                            border = BorderStroke(0.5.dp, StitchOutlineVariant.copy(alpha = 0.3f))
-                        ) {
-                            Text(
-                                text = "Opsional",
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                fontSize = 11.5.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = StitchOnSurfaceVariant
-                            )
-                        }
-                    }
-                }
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            LencanaIos(
+                teks = if (isBuka) "Buka (Opening)" else "Tutup (Closing)",
+                nada = if (isBuka) NadaIos.AKSEN else NadaIos.INFO,
+                ikon = if (isBuka) Icons.Filled.WbSunny else Icons.Filled.NightsStay,
+            )
+            if (item.isRequired) {
+                LencanaIos(teks = "Wajib Dikerjakan", nada = NadaIos.BAHAYA, ikon = Icons.Filled.Star)
+            } else {
+                LencanaIos(teks = "Opsional", nada = NadaIos.NETRAL, titik = false)
             }
         }
     }
 }
 
 /**
- * Dashed "Create New Checklist" Placeholder Card.
+ * Kartu ajakan "Tambah Checklist Baru" bergaris putus-putus.
  */
 @Composable
 private fun DashedCreateChecklistCard(onClick: () -> Unit) {
-    val borderColor = StitchOutlineVariant
+    val borderColor = WarnaIos.LabelKetiga
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -602,11 +330,11 @@ private fun DashedCreateChecklistCard(onClick: () -> Unit) {
                 drawRoundRect(
                     color = borderColor,
                     style = stroke,
-                    cornerRadius = CornerRadius(16.dp.toPx(), 16.dp.toPx())
+                    cornerRadius = CornerRadius(20.dp.toPx(), 20.dp.toPx())
                 )
             }
-            .clip(RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick)
+            .clip(UkuranIos.SudutKartu)
+            .tekanIos(onClick)
             .padding(vertical = 20.dp, horizontal = 16.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -614,32 +342,19 @@ private fun DashedCreateChecklistCard(onClick: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Surface(
-                shape = CircleShape,
-                color = StitchSurfaceContainer,
-                modifier = Modifier.size(38.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        Icons.Filled.Add,
-                        contentDescription = null,
-                        tint = StitchPrimary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
+            IkonBulatIos(IkonIos.Add, NadaIos.AKSEN.warna, ukuran = 38.dp, padat = false)
             Text(
                 "Tambah Checklist Baru",
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = StitchPrimary
+                color = WarnaIos.Aksen,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
             )
         }
     }
 }
 
 /**
- * User-Friendly, Modern Modal Form Dialog for creating and editing Checklists.
+ * Formulir tambah/ubah checklist dalam dialog bergaya iOS.
  */
 @Composable
 private fun ChecklistFormDialog(
@@ -657,41 +372,18 @@ private fun ChecklistFormDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(24.dp),
-        containerColor = Color.White,
+        shape = UkuranIos.SudutKartu,
+        containerColor = WarnaIos.Kartu,
         modifier = Modifier.padding(vertical = 12.dp),
         title = {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Surface(
-                    shape = CircleShape,
-                    color = StitchSurfaceContainer,
-                    modifier = Modifier.size(44.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            Icons.Filled.Checklist,
-                            contentDescription = null,
-                            tint = StitchPrimary,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-                }
+                IkonBulatIos(IkonIos.Checklist, NadaIos.AKSEN.warna, ukuran = 44.dp, padat = false)
                 Column {
-                    Text(
-                        title,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = StitchPrimary
-                    )
-                    Text(
-                        subtitle,
-                        fontSize = 12.sp,
-                        color = StitchOnSurfaceVariant,
-                        lineHeight = 16.sp
-                    )
+                    Text(title, style = TipeIos.Judul3)
+                    Text(subtitle, style = TipeIos.Catatan)
                 }
             }
         },
@@ -704,28 +396,19 @@ private fun ChecklistFormDialog(
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         "Nama Checklist / Tugas",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = StitchOnSurface
+                        style = TipeIos.Catatan.copy(color = WarnaIos.Label, fontWeight = FontWeight.SemiBold),
                     )
                     OutlinedTextField(
                         value = name,
                         onValueChange = { name = it },
-                        placeholder = { Text("Contoh: Cek regulator gas LPG", fontSize = 13.5.sp, color = StitchOnSurfaceVariant.copy(alpha = 0.6f)) },
+                        placeholder = { Text("Contoh: Cek regulator gas LPG", fontSize = 14.sp) },
                         singleLine = true,
-                        shape = RoundedCornerShape(14.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = StitchPrimary,
-                            unfocusedBorderColor = StitchOutlineVariant,
-                            focusedLabelColor = StitchPrimary,
-                            cursorColor = StitchPrimary,
-                            focusedContainerColor = StitchSurfaceContainerLow.copy(alpha = 0.4f),
-                            unfocusedContainerColor = StitchSurfaceContainerLow.copy(alpha = 0.2f),
-                        ),
+                        shape = UkuranIos.SudutKontrol,
+                        colors = warnaKolomIos(),
                         trailingIcon = {
                             if (name.isNotBlank()) {
                                 IconButton(onClick = { name = "" }, modifier = Modifier.size(24.dp)) {
-                                    Icon(Icons.Filled.Close, contentDescription = "Clear", tint = StitchOnSurfaceVariant, modifier = Modifier.size(16.dp))
+                                    Icon(IkonIos.Close, contentDescription = "Clear", tint = WarnaIos.Abu, modifier = Modifier.size(15.dp))
                                 }
                             }
                         },
@@ -737,198 +420,131 @@ private fun ChecklistFormDialog(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
                         "Waktu Pelaksanaan",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = StitchOnSurface
+                        style = TipeIos.Catatan.copy(color = WarnaIos.Label, fontWeight = FontWeight.SemiBold),
                     )
-
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        // Card 1: Buka Outlet (Opening)
-                        val isBuka = phase == ChecklistPhase.BUKA
-                        Surface(
-                            onClick = { phase = ChecklistPhase.BUKA },
-                            shape = RoundedCornerShape(14.dp),
-                            color = if (isBuka) Color(0xFFFFF8F2) else StitchSurfaceContainerLow,
-                            border = BorderStroke(
-                                width = if (isBuka) 2.dp else 1.dp,
-                                color = if (isBuka) StitchSecondaryContainer else StitchOutlineVariant.copy(alpha = 0.5f)
-                            ),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(12.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Icon(
-                                        Icons.Filled.WbSunny,
-                                        contentDescription = null,
-                                        tint = if (isBuka) StitchSecondary else StitchOnSurfaceVariant,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Text(
-                                        "Buka",
-                                        fontSize = 14.sp,
-                                        fontWeight = if (isBuka) FontWeight.Bold else FontWeight.SemiBold,
-                                        color = if (isBuka) StitchSecondary else StitchOnSurface
-                                    )
-                                }
-                                Text(
-                                    "Sebelum buka outlet",
-                                    fontSize = 11.sp,
-                                    color = StitchOnSurfaceVariant,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-                        }
-
-                        // Card 2: Tutup Outlet (Closing)
-                        val isTutup = phase == ChecklistPhase.TUTUP
-                        Surface(
-                            onClick = { phase = ChecklistPhase.TUTUP },
-                            shape = RoundedCornerShape(14.dp),
-                            color = if (isTutup) Color(0xFFFCF0EE) else StitchSurfaceContainerLow,
-                            border = BorderStroke(
-                                width = if (isTutup) 2.dp else 1.dp,
-                                color = if (isTutup) StitchPrimary else StitchOutlineVariant.copy(alpha = 0.5f)
-                            ),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(12.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Icon(
-                                        Icons.Filled.NightsStay,
-                                        contentDescription = null,
-                                        tint = if (isTutup) StitchPrimary else StitchOnSurfaceVariant,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Text(
-                                        "Tutup",
-                                        fontSize = 14.sp,
-                                        fontWeight = if (isTutup) FontWeight.Bold else FontWeight.SemiBold,
-                                        color = if (isTutup) StitchPrimary else StitchOnSurface
-                                    )
-                                }
-                                Text(
-                                    "Saat closing/tutup outlet",
-                                    fontSize = 11.sp,
-                                    color = StitchOnSurfaceVariant,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-                        }
+                        PilihanFase(
+                            judul = "Buka",
+                            keterangan = "Sebelum buka outlet",
+                            ikon = Icons.Filled.WbSunny,
+                            terpilih = phase == ChecklistPhase.BUKA,
+                            onKlik = { phase = ChecklistPhase.BUKA },
+                            modifier = Modifier.weight(1f),
+                        )
+                        PilihanFase(
+                            judul = "Tutup",
+                            keterangan = "Saat closing/tutup outlet",
+                            ikon = Icons.Filled.NightsStay,
+                            terpilih = phase == ChecklistPhase.TUTUP,
+                            onKlik = { phase = ChecklistPhase.TUTUP },
+                            modifier = Modifier.weight(1f),
+                        )
                     }
                 }
 
                 // Section 3: Pengaturan Tugas Wajib / Prioritas
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = if (isRequired) StitchErrorContainer.copy(alpha = 0.45f) else StitchSurfaceContainerLow,
-                    border = BorderStroke(
-                        width = 1.dp,
-                        color = if (isRequired) StitchError.copy(alpha = 0.35f) else StitchOutlineVariant.copy(alpha = 0.4f)
-                    ),
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .clickable { isRequired = !isRequired }
+                        .clip(UkuranIos.SudutBlok)
+                        .background(WarnaIos.Latar)
+                        .tekanIos({ isRequired = !isRequired }, skalaTekan = 0.99f)
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    Box(
+                        Modifier.size(32.dp).clip(CircleShape).background(if (isRequired) WarnaIos.Merah else WarnaIos.Isian),
+                        contentAlignment = Alignment.Center,
                     ) {
-                        Surface(
-                            shape = CircleShape,
-                            color = if (isRequired) StitchError else StitchSurfaceContainer,
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = if (isRequired) Icons.Filled.Star else Icons.Filled.Check,
-                                    contentDescription = null,
-                                    tint = if (isRequired) Color.White else StitchOnSurfaceVariant,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        }
-
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                "Tugas Wajib / Prioritas",
-                                fontSize = 13.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isRequired) StitchError else StitchOnSurface
-                            )
-                            Text(
-                                "Harus dicentang staff saat operasional",
-                                fontSize = 11.5.sp,
-                                color = StitchOnSurfaceVariant
-                            )
-                        }
-
-                        Switch(
-                            checked = isRequired,
-                            onCheckedChange = { isRequired = it },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = StitchError,
-                                uncheckedThumbColor = StitchOnSurfaceVariant,
-                                uncheckedTrackColor = StitchSurfaceContainer
-                            )
+                        Icon(
+                            imageVector = if (isRequired) Icons.Filled.Star else IkonIos.Check,
+                            contentDescription = null,
+                            tint = if (isRequired) Color.White else WarnaIos.LabelKedua,
+                            modifier = Modifier.size(16.dp)
                         )
                     }
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Tugas Wajib / Prioritas",
+                            style = TipeIos.Keterangan.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
+                        )
+                        Text("Harus dicentang staff saat operasional", style = TipeIos.Kecil)
+                    }
+
+                    Switch(
+                        checked = isRequired,
+                        onCheckedChange = { isRequired = it },
+                        colors = warnaSaklarIos(),
+                    )
                 }
             }
         },
         confirmButton = {
-            Button(
-                onClick = { onConfirm(name.trim(), phase, isRequired) },
-                enabled = name.isNotBlank(),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = StitchPrimary,
-                    disabledContainerColor = StitchOutlineVariant.copy(alpha = 0.5f)
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-            ) {
-                Text(
-                    "Simpan Checklist",
-                    fontSize = 14.5.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-            }
+            TombolUtamaIos(
+                teks = "Simpan Checklist",
+                onKlik = { onConfirm(name.trim(), phase, isRequired) },
+                aktif = name.isNotBlank(),
+            )
         },
         dismissButton = {
             TextButton(
                 onClick = onDismiss,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Batal", color = StitchOnSurfaceVariant, fontWeight = FontWeight.Medium)
+                Text("Batal", color = WarnaIos.Aksen, fontSize = 16.sp)
             }
         }
     )
 }
 
+/** Satu pilihan fase di formulir: isian abu, aksen tipis + garis aksen saat terpilih. */
+@Composable
+private fun PilihanFase(
+    judul: String,
+    keterangan: String,
+    ikon: androidx.compose.ui.graphics.vector.ImageVector,
+    terpilih: Boolean,
+    onKlik: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .clip(UkuranIos.SudutBlok)
+            .background(if (terpilih) WarnaIos.Aksen.copy(alpha = 0.10f) else WarnaIos.Latar)
+            .border(1.5.dp, if (terpilih) WarnaIos.Aksen else Color.Transparent, UkuranIos.SudutBlok)
+            .tekanIos(onKlik)
+            .padding(12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(
+                ikon,
+                contentDescription = null,
+                tint = if (terpilih) WarnaIos.Aksen else WarnaIos.LabelKedua,
+                modifier = Modifier.size(18.dp)
+            )
+            Text(
+                judul,
+                color = if (terpilih) NadaIos.AKSEN.teks else WarnaIos.Label,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        Text(keterangan, style = TipeIos.Kecil, textAlign = TextAlign.Center)
+    }
+}
+
 /**
- * Clean & Friendly Confirmation Dialog for Deletion.
+ * Dialog konfirmasi hapus bergaya iOS.
  */
 @Composable
 private fun ConfirmDeleteDialog(
@@ -939,57 +555,24 @@ private fun ConfirmDeleteDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(22.dp),
-        containerColor = Color.White,
-        icon = {
-            Surface(
-                shape = CircleShape,
-                color = StitchErrorContainer,
-                modifier = Modifier.size(48.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        Icons.Filled.Delete,
-                        contentDescription = null,
-                        tint = StitchError,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
-        },
+        shape = UkuranIos.SudutKartu,
+        containerColor = WarnaIos.Kartu,
+        icon = { IkonBulatIos(IkonIos.Delete, NadaIos.BAHAYA.warna, ukuran = 48.dp, padat = false) },
         title = {
-            Text(
-                title,
-                fontSize = 17.sp,
-                fontWeight = FontWeight.Bold,
-                color = StitchPrimary,
-                textAlign = TextAlign.Center
-            )
+            Text(title, style = TipeIos.Judul3, textAlign = TextAlign.Center)
         },
         text = {
-            Text(
-                message,
-                fontSize = 13.sp,
-                color = StitchOnSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
+            Text(message, style = TipeIos.SubJudul, textAlign = TextAlign.Center)
         },
         confirmButton = {
-            Button(
-                onClick = onConfirm,
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = StitchError),
-                modifier = Modifier.fillMaxWidth().height(44.dp)
-            ) {
-                Text("Hapus", color = Color.White, fontWeight = FontWeight.Bold)
-            }
+            TombolUtamaIos(teks = "Hapus", onKlik = onConfirm, warna = WarnaIos.Merah)
         },
         dismissButton = {
             TextButton(
                 onClick = onDismiss,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Batal", color = StitchOnSurfaceVariant)
+                Text("Batal", color = WarnaIos.Aksen, fontSize = 16.sp)
             }
         }
     )
