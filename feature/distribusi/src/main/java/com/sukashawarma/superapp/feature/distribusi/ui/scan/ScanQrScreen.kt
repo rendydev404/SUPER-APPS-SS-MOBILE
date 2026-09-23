@@ -10,12 +10,12 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -24,21 +24,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Keyboard
-import androidx.compose.material.icons.filled.QrCodeScanner
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -60,6 +55,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -68,19 +64,20 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
-import com.sukashawarma.superapp.presentation.theme.SukaBrown
-import com.sukashawarma.superapp.presentation.theme.SukaCream
-import com.sukashawarma.superapp.presentation.theme.SukaGray200
-import com.sukashawarma.superapp.presentation.theme.SukaGray500
-import com.sukashawarma.superapp.presentation.theme.SukaInk
-import com.sukashawarma.superapp.presentation.theme.SukaOnSurface
+import com.sukashawarma.superapp.core.ui.ios.BilahJudulIos
+import com.sukashawarma.superapp.core.ui.ios.KartuIos
+import com.sukashawarma.superapp.core.ui.ios.LencanaIos
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.TombolUtamaIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.ios.warnaKolomIos
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
 import com.sukashawarma.superapp.presentation.theme.SukaOrange
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
-
-private val ScanError = Color(0xFFB91C1C)
-private val ScanErrorSurface = Color(0xFFFFF1F2)
 
 @androidx.annotation.OptIn(androidx.camera.core.ExperimentalGetImage::class)
 @Composable
@@ -135,7 +132,7 @@ fun ScanQrScreen(
     Column(
         Modifier
             .fillMaxSize()
-            .background(SukaCream),
+            .background(WarnaIos.Latar),
     ) {
         KepalaScan(onKeluar = onKeluar)
 
@@ -143,8 +140,8 @@ fun ScanQrScreen(
             Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 4.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+                .padding(horizontal = UkuranIos.TepiLayar, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(UkuranIos.JarakKartu),
         ) {
             KartuLangkahScan()
 
@@ -160,28 +157,26 @@ fun ScanQrScreen(
             )
 
             if (state.memproses) {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    color = SukaBrown.copy(alpha = 0.08f),
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(UkuranIos.SudutBlok)
+                        .background(WarnaIos.Aksen.copy(alpha = 0.10f))
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Row(
-                        Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            color = SukaBrown,
-                            strokeWidth = 2.dp,
-                        )
-                        Spacer(Modifier.size(10.dp))
-                        Text(
-                            "Memeriksa surat jalan...",
-                            color = SukaBrown,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        color = WarnaIos.Aksen,
+                        strokeWidth = 2.dp,
+                    )
+                    Spacer(Modifier.size(10.dp))
+                    Text(
+                        "Memeriksa surat jalan...",
+                        color = NadaIos.AKSEN.teks,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
                 }
             }
 
@@ -196,21 +191,19 @@ fun ScanQrScreen(
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 20.dp),
+                    .padding(start = 4.dp, end = 4.dp, bottom = 20.dp),
                 verticalAlignment = Alignment.Top,
             ) {
                 Icon(
-                    Icons.Default.Info,
+                    IkonIos.ErrorOutline,
                     contentDescription = null,
-                    tint = SukaGray500,
+                    tint = WarnaIos.Abu,
                     modifier = Modifier.size(16.dp),
                 )
                 Spacer(Modifier.size(8.dp))
                 Text(
                     "Pastikan kode pada surat jalan terlihat jelas dan belum pernah diverifikasi.",
-                    color = SukaGray500,
-                    fontSize = 11.sp,
-                    lineHeight = 16.sp,
+                    style = TipeIos.Catatan,
                 )
             }
         }
@@ -219,98 +212,42 @@ fun ScanQrScreen(
 
 @Composable
 private fun KepalaScan(onKeluar: () -> Unit) {
-    Surface(color = SukaCream) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
+    BilahJudulIos(
+        judul = "Scan QR",
+        subjudul = "Verifikasi surat jalan",
+        onKembali = onKeluar,
+    ) {
+        Box(
+            Modifier.size(38.dp).clip(CircleShape).background(WarnaIos.Aksen.copy(alpha = 0.14f)),
+            contentAlignment = Alignment.Center,
         ) {
-            IconButton(onClick = onKeluar) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali")
-            }
-            Column(Modifier.weight(1f)) {
-                Text(
-                    "Scan QR",
-                    color = SukaOnSurface,
-                    fontSize = 21.sp,
-                    fontWeight = FontWeight.Black,
-                )
-                Text(
-                    "Verifikasi surat jalan",
-                    color = SukaGray500,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-            Surface(
-                shape = CircleShape,
-                color = SukaOrange.copy(alpha = 0.16f),
-                modifier = Modifier.size(42.dp),
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        Icons.Default.QrCodeScanner,
-                        contentDescription = null,
-                        tint = SukaBrown,
-                        modifier = Modifier.size(23.dp),
-                    )
-                }
-            }
-            Spacer(Modifier.size(8.dp))
+            Icon(
+                IkonIos.QrCodeScanner,
+                contentDescription = null,
+                tint = WarnaIos.Aksen,
+                modifier = Modifier.size(20.dp),
+            )
         }
     }
 }
 
 @Composable
 private fun KartuLangkahScan() {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        color = SukaBrown,
-        shadowElevation = 3.dp,
-    ) {
-        Row(
-            Modifier.padding(18.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Surface(
-                shape = CircleShape,
-                color = SukaOrange.copy(alpha = 0.18f),
-                modifier = Modifier.size(48.dp),
+    KartuIos {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.size(40.dp).clip(CircleShape).background(WarnaIos.Aksen),
+                contentAlignment = Alignment.Center,
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        "1",
-                        color = SukaOrange,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Black,
-                    )
-                }
+                Text("1", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
             }
             Spacer(Modifier.size(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(
-                    "Mulai dari QR",
-                    color = Color.White,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Black,
-                )
-                Spacer(Modifier.height(3.dp))
-                Text(
-                    "Arahkan kamera ke QR pada surat jalan kurir.",
-                    color = Color.White.copy(alpha = 0.75f),
-                    fontSize = 11.sp,
-                    lineHeight = 16.sp,
-                )
+                Text("Mulai dari QR", style = TipeIos.Utama)
+                Text("Arahkan kamera ke QR pada surat jalan kurir.", style = TipeIos.Catatan)
             }
-            Text(
-                "1 / 2",
-                color = SukaOrange,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Black,
-                letterSpacing = 0.8.sp,
-            )
+            Spacer(Modifier.width(8.dp))
+            LencanaIos("1 / 2", NadaIos.AKSEN, titik = false)
         }
     }
 }
@@ -327,112 +264,90 @@ private fun KartuPemindai(
     onKodeDitemukan: (String) -> Unit,
     onKameraGagal: (String) -> Unit,
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
-        color = SukaInk,
-        shadowElevation = 8.dp,
-    ) {
-        Column(Modifier.padding(12.dp)) {
-            Row(
+    KartuIos(padding = PaddingValues(12.dp)) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(start = 4.dp, end = 0.dp, top = 2.dp, bottom = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Area pemindaian", Modifier.weight(1f), style = TipeIos.Utama)
+            if (memproses) {
+                LencanaIos("Memeriksa", NadaIos.AKSEN)
+            } else {
+                LencanaIos("Kamera aktif", NadaIos.SUKSES)
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+
+        if (izinKamera && kameraGagal == null) {
+            Box(
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 4.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                    .aspectRatio(1f)
+                    .clip(UkuranIos.SudutBlok)
+                    .background(Color.Black),
             ) {
-                Text(
-                    "AREA PEMINDAIAN",
-                    color = Color.White.copy(alpha = 0.7f),
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 1.sp,
+                PemindaiKamera(
+                    lifecycleOwner = pemilikDaurHidup,
+                    pemindai = pemindai,
+                    pelaksana = pelaksana,
+                    onKodeDitemukan = onKodeDitemukan,
+                    onKameraGagal = onKameraGagal,
+                    modifier = Modifier.fillMaxSize(),
                 )
-                Spacer(Modifier.weight(1f))
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .padding(30.dp),
+                ) {
+                    BingkaiQr()
+                }
                 Surface(
-                    shape = CircleShape,
-                    color = if (memproses) SukaOrange else Color.White.copy(alpha = 0.12f),
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 16.dp),
+                    shape = RoundedCornerShape(50),
+                    color = Color.Black.copy(alpha = 0.62f),
                 ) {
                     Text(
-                        if (memproses) "MEMERIKSA" else "KAMERA AKTIF",
-                        Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
-                        color = if (memproses) Color.White else SukaOrange,
-                        fontSize = 8.sp,
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = 0.7.sp,
+                        "Posisikan QR di dalam kotak",
+                        Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
                     )
                 }
             }
-            Spacer(Modifier.height(8.dp))
-
-            if (izinKamera && kameraGagal == null) {
+        } else {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
+                    .clip(UkuranIos.SudutBlok)
+                    .background(WarnaIos.Latar)
+                    .padding(28.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
                 Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(1f)
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(Color.Black),
+                    Modifier.size(64.dp).clip(CircleShape).background(WarnaIos.Aksen.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    PemindaiKamera(
-                        lifecycleOwner = pemilikDaurHidup,
-                        pemindai = pemindai,
-                        pelaksana = pelaksana,
-                        onKodeDitemukan = onKodeDitemukan,
-                        onKameraGagal = onKameraGagal,
-                        modifier = Modifier.fillMaxSize(),
+                    Icon(
+                        IkonIos.PhotoCamera,
+                        contentDescription = null,
+                        tint = WarnaIos.Aksen,
+                        modifier = Modifier.size(30.dp),
                     )
-                    Box(
-                        Modifier
-                            .fillMaxSize()
-                            .padding(30.dp),
-                    ) {
-                        BingkaiQr()
-                    }
-                    Surface(
-                        Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = 16.dp),
-                        shape = RoundedCornerShape(50),
-                        color = Color.Black.copy(alpha = 0.62f),
-                    ) {
-                        Text(
-                            "Posisikan QR di dalam kotak",
-                            Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                            color = Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
                 }
-            } else {
-                Surface(
-                    Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(1f),
-                    shape = RoundedCornerShape(20.dp),
-                    color = Color.White.copy(alpha = 0.08f),
-                ) {
-                    Column(
-                        Modifier.padding(28.dp),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Icon(
-                            Icons.Default.Info,
-                            contentDescription = null,
-                            tint = SukaOrange,
-                            modifier = Modifier.size(42.dp),
-                        )
-                        Spacer(Modifier.height(12.dp))
-                        Text(
-                            kameraGagal
-                                ?: "Kamera belum tersedia. Gunakan kode manual di bawah.",
-                            color = Color.White,
-                            fontSize = 12.sp,
-                            lineHeight = 18.sp,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                        )
-                    }
-                }
+                Spacer(Modifier.height(14.dp))
+                Text(
+                    kameraGagal
+                        ?: "Kamera belum tersedia. Gunakan kode manual di bawah.",
+                    style = TipeIos.SubJudul,
+                    textAlign = TextAlign.Center,
+                )
             }
         }
     }
@@ -639,99 +554,73 @@ private fun KartuKodeManual(
     onKodeBerubah: (String) -> Unit,
     onKirim: () -> Unit,
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        color = Color.White,
-        border = BorderStroke(1.dp, SukaGray200),
-        tonalElevation = 1.dp,
-    ) {
-        Column(Modifier.padding(18.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = SukaOrange.copy(alpha = 0.14f),
-                    modifier = Modifier.size(40.dp),
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            Icons.Default.Keyboard,
-                            contentDescription = null,
-                            tint = SukaBrown,
-                            modifier = Modifier.size(22.dp),
-                        )
-                    }
-                }
-                Spacer(Modifier.size(10.dp))
-                Column {
-                    Text(
-                        "Tidak bisa scan?",
-                        color = SukaOnSurface,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Black,
-                    )
-                    Text(
-                        "Masukkan kode verifikasi dari surat jalan.",
-                        color = SukaGray500,
-                        fontSize = 11.sp,
-                    )
-                }
-            }
-            Spacer(Modifier.height(14.dp))
-            OutlinedTextField(
-                value = kode,
-                onValueChange = onKodeBerubah,
-                label = { Text("Kode verifikasi") },
-                placeholder = { Text("Contoh: A7K9P2") },
-                supportingText = { Text("6 karakter · huruf dan angka") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.Characters,
-                ),
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(4.dp))
-            Button(
-                onClick = onKirim,
-                enabled = !memproses,
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
+    KartuIos {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.size(38.dp).clip(CircleShape).background(WarnaIos.Aksen.copy(alpha = 0.14f)),
+                contentAlignment = Alignment.Center,
             ) {
-                if (memproses) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        color = Color.White,
-                        strokeWidth = 2.dp,
-                    )
-                    Spacer(Modifier.size(8.dp))
-                } else {
-                    Icon(
-                        Icons.Default.CheckCircle,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(Modifier.size(8.dp))
-                }
-                Text(if (memproses) "Memeriksa..." else "Lanjutkan verifikasi")
+                Icon(
+                    Icons.Default.Keyboard,
+                    contentDescription = null,
+                    tint = WarnaIos.Aksen,
+                    modifier = Modifier.size(20.dp),
+                )
             }
-            (hasil as? HasilPindai.Ditolak)?.let {
-                Spacer(Modifier.height(10.dp))
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    color = ScanErrorSurface,
-                ) {
-                    Text(
-                        it.pesan,
-                        Modifier.padding(12.dp),
-                        color = ScanError,
-                        fontSize = 11.sp,
-                        lineHeight = 16.sp,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                }
+            Spacer(Modifier.size(12.dp))
+            Column {
+                Text("Tidak bisa scan?", style = TipeIos.Utama)
+                Text("Masukkan kode verifikasi dari surat jalan.", style = TipeIos.Catatan)
+            }
+        }
+        Spacer(Modifier.height(14.dp))
+        OutlinedTextField(
+            value = kode,
+            onValueChange = onKodeBerubah,
+            label = { Text("Kode verifikasi") },
+            placeholder = { Text("Contoh: A7K9P2") },
+            supportingText = { Text("6 karakter · huruf dan angka") },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(
+                capitalization = KeyboardCapitalization.Characters,
+            ),
+            shape = UkuranIos.SudutKontrol,
+            colors = warnaKolomIos(),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(4.dp))
+        // Teks "Memeriksa..." dipertahankan (bukan hanya pemutar) karena itulah
+        // satu-satunya tanda di kartu ini bahwa kode sedang diperiksa.
+        TombolUtamaIos(
+            teks = if (memproses) "Memeriksa..." else "Lanjutkan verifikasi",
+            onKlik = onKirim,
+            aktif = !memproses,
+            ikon = if (memproses) null else IkonIos.CheckCircle,
+        )
+        (hasil as? HasilPindai.Ditolak)?.let {
+            Spacer(Modifier.height(10.dp))
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(UkuranIos.SudutKontrol)
+                    .background(WarnaIos.Merah.copy(alpha = 0.10f))
+                    .padding(12.dp),
+                verticalAlignment = Alignment.Top,
+            ) {
+                Icon(
+                    IkonIos.ErrorOutline,
+                    contentDescription = null,
+                    tint = NadaIos.BAHAYA.teks,
+                    modifier = Modifier.size(16.dp),
+                )
+                Spacer(Modifier.size(8.dp))
+                Text(
+                    it.pesan,
+                    color = NadaIos.BAHAYA.teks,
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
         }
     }
