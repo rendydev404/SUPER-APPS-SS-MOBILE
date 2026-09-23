@@ -3,18 +3,14 @@ package com.sukashawarma.superapp.presentation.absensi.checklist
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.NotificationsNone
-import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -25,18 +21,31 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.sukashawarma.superapp.core.ui.ios.JudulSeksiIos
+import com.sukashawarma.superapp.core.ui.ios.KartuIos
+import com.sukashawarma.superapp.core.ui.ios.KeadaanIos
+import com.sukashawarma.superapp.core.ui.ios.LencanaIos
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.SegmenIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.TombolBundarIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WadahSegmenIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
 import com.sukashawarma.superapp.domain.session.AppSession
-import com.sukashawarma.superapp.presentation.theme.*
+import com.sukashawarma.superapp.presentation.absensi.KartuMemuatIos
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import com.sukashawarma.superapp.core.ui.RealtimeRefresh
 import com.sukashawarma.superapp.core.ui.RealtimeTables
+import com.sukashawarma.superapp.core.ui.kaca.denganRuangNav
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,7 +55,7 @@ fun ChecklistScreen(onExit: () -> Unit, viewModel: ChecklistViewModel = viewMode
     val staff by AppSession.staff.collectAsState()
 
     Scaffold(
-        containerColor = SukaCream,
+        containerColor = WarnaIos.Latar,
         topBar = {
             ChecklistTopBar(
                 outletName = staff?.outletName ?: "Outlet",
@@ -62,8 +71,13 @@ fun ChecklistScreen(onExit: () -> Unit, viewModel: ChecklistViewModel = viewMode
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize(),
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            contentPadding = PaddingValues(
+                start = UkuranIos.TepiLayar,
+                end = UkuranIos.TepiLayar,
+                top = 8.dp,
+                bottom = 32.dp,
+            ).denganRuangNav(),
+            verticalArrangement = Arrangement.spacedBy(UkuranIos.JarakKartu),
         ) {
             item(key = "title") { ChecklistHeader() }
             item(key = "progress") {
@@ -77,19 +91,32 @@ fun ChecklistScreen(onExit: () -> Unit, viewModel: ChecklistViewModel = viewMode
             }
 
             when {
-                state.loading -> item(key = "loading") { LoadingCard() }
+                state.loading -> item(key = "loading") { KartuMemuatIos() }
                 state.error != null -> item(key = "error") {
-                    MessageCard(
-                        message = state.error.orEmpty(),
-                        actionLabel = "Coba lagi",
-                        onAction = viewModel::load,
+                    KeadaanIos(
+                        ikon = IkonIos.ErrorOutline,
+                        judul = "Gagal memuat",
+                        pesan = state.error.orEmpty(),
+                        nada = NadaIos.BAHAYA,
+                        teksAksi = "Coba lagi",
+                        onAksi = viewModel::load,
                     )
                 }
                 state.categories.isEmpty() -> item(key = "empty") {
-                    MessageCard(message = "Belum ada tugas ${state.phase.label.lowercase()} outlet hari ini.")
+                    KeadaanIos(
+                        ikon = IkonIos.Checklist,
+                        judul = "Belum ada tugas",
+                        pesan = "Belum ada tugas ${state.phase.label.lowercase()} outlet hari ini.",
+                    )
                 }
                 else -> state.categories.forEach { category ->
-                    item(key = "category-${category.id}") { CategoryHeader(category.name) }
+                    item(key = "category-${category.id}") {
+                        CategoryHeader(
+                            name = category.name,
+                            selesai = category.items.count { it.ticked },
+                            total = category.items.size,
+                        )
+                    }
                     items(category.items, key = { it.id }) { checklistItem ->
                         ChecklistTaskCard(
                             item = checklistItem,
@@ -106,33 +133,32 @@ fun ChecklistScreen(onExit: () -> Unit, viewModel: ChecklistViewModel = viewMode
 @Composable
 private fun ChecklistTopBar(outletName: String, staffInitial: String) {
     TopAppBar(
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = SukaCream),
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = WarnaIos.Latar),
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
-                    Icons.Default.Storefront,
+                    IkonIos.Storefront,
                     contentDescription = null,
-                    tint = SukaOrange,
-                    modifier = Modifier.size(19.dp),
+                    tint = WarnaIos.Aksen,
+                    modifier = Modifier.size(18.dp),
                 )
                 Spacer(Modifier.width(8.dp))
-                Text(outletName, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = SukaInk)
+                Text(outletName, style = TipeIos.Keterangan.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold))
             }
         },
         actions = {
-            IconButton(onClick = { }) {
-                Icon(Icons.Default.NotificationsNone, contentDescription = "Notifikasi", tint = SukaInk)
-            }
-            Surface(
+            // Tombol notifikasi memang belum punya tujuan (sama seperti sebelumnya).
+            TombolBundarIos(Icons.Default.NotificationsNone, "Notifikasi", onKlik = { }, warnaIkon = WarnaIos.Label)
+            Spacer(Modifier.width(8.dp))
+            Box(
                 modifier = Modifier
-                    .padding(end = 14.dp)
-                    .size(38.dp),
-                shape = CircleShape,
-                color = SukaOrange.copy(alpha = 0.20f),
+                    .padding(end = 12.dp)
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .background(WarnaIos.Aksen.copy(alpha = 0.16f)),
+                contentAlignment = Alignment.Center,
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(staffInitial, color = SukaInk, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                }
+                Text(staffInitial, color = NadaIos.AKSEN.teks, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
             }
         },
     )
@@ -140,19 +166,12 @@ private fun ChecklistTopBar(outletName: String, staffInitial: String) {
 
 @Composable
 private fun ChecklistHeader() {
-    Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            "Tutup/Buka Outlet",
-            color = SukaInk,
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(4.dp))
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
+        Text("Tutup/Buka Outlet", style = TipeIos.Judul1)
+        Spacer(Modifier.height(2.dp))
         Text(
             "Hari ini, ${SimpleDateFormat("d MMMM yyyy", Locale("id", "ID")).format(Date())}",
-            color = SukaGray500,
-            style = MaterialTheme.typography.bodyMedium,
+            style = TipeIos.SubJudul,
         )
     }
 }
@@ -171,201 +190,98 @@ private fun ProgressCard(
         label = "checklistProgress",
     )
 
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = Color.White,
-        shape = RoundedCornerShape(20.dp),
-        border = BorderStroke(1.dp, SukaGray200),
-        shadowElevation = 2.dp,
-    ) {
-        Column(
-            modifier = Modifier.padding(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(
-                "Progress ${phase.label} Outlet",
-                color = SukaInk,
-                fontWeight = FontWeight.SemiBold,
-                style = MaterialTheme.typography.titleSmall,
-            )
-            Spacer(Modifier.height(14.dp))
+    KartuIos {
+        // Segmented control iOS menggantikan dua tombol bertumpuk — pilihan fase tetap sama.
+        WadahSegmenIos {
+            ChecklistPhase.entries.forEach { option ->
+                SegmenIos(
+                    label = "${option.label} Outlet",
+                    aktif = phase == option,
+                    onKlik = { onPhaseSelected(option) },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+        Spacer(Modifier.height(16.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier
-                    .size(88.dp)
+                    .size(76.dp)
                     .semantics { contentDescription = "Progress ${(progress * 100).toInt()} persen" },
                 contentAlignment = Alignment.Center,
             ) {
                 CircularProgressIndicator(
                     progress = { animatedProgress },
                     modifier = Modifier.fillMaxSize(),
-                    color = SukaOrange,
-                    trackColor = SukaSurfaceContainerHighest,
-                    strokeWidth = 9.dp,
+                    color = WarnaIos.Aksen,
+                    trackColor = WarnaIos.Isian,
+                    strokeWidth = 8.dp,
                 )
-                Text(
-                    "${(progress * 100).toInt()}%",
-                    color = SukaOrange,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                )
+                Text("${(progress * 100).toInt()}%", style = TipeIos.Utama.copy(fontSize = 16.sp))
             }
-            Spacer(Modifier.height(12.dp))
-            Text("$completed/$total tugas selesai", color = SukaGray500, fontSize = 12.sp)
-            Spacer(Modifier.height(18.dp))
-
-            ChecklistPhase.entries.forEachIndexed { index, option ->
-                PhaseButton(
-                    label = "${option.label} Outlet",
-                    selected = phase == option,
-                    onClick = { onPhaseSelected(option) },
-                )
-                if (index < ChecklistPhase.entries.lastIndex) Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.width(16.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Progress ${phase.label} Outlet", style = TipeIos.Utama)
+                Spacer(Modifier.height(2.dp))
+                Text("$completed/$total tugas selesai", style = TipeIos.Catatan)
             }
         }
     }
 }
 
 @Composable
-private fun PhaseButton(label: String, selected: Boolean, onClick: () -> Unit) {
-    if (selected) {
-        Button(
-            onClick = onClick,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp),
-            shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = SukaOrange, contentColor = Color.White),
-            elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp),
-        ) { Text(label, fontWeight = FontWeight.Bold) }
-    } else {
-        OutlinedButton(
-            onClick = onClick,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp),
-            shape = RoundedCornerShape(12.dp),
-            border = BorderStroke(1.dp, SukaGray200),
-            colors = ButtonDefaults.outlinedButtonColors(
-                containerColor = SukaGray100,
-                contentColor = SukaGray700,
-            ),
-        ) { Text(label, fontWeight = FontWeight.SemiBold) }
-    }
-}
-
-@Composable
-private fun CategoryHeader(name: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Box(
-            modifier = Modifier
-                .size(38.dp)
-                .clip(CircleShape)
-                .background(SukaOrange),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(Icons.Default.Checklist, contentDescription = null, tint = SukaInk, modifier = Modifier.size(20.dp))
-        }
-        Text(name, color = SukaInk, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-        HorizontalDivider(modifier = Modifier.weight(1f), color = SukaOrange.copy(alpha = 0.35f))
-    }
+private fun CategoryHeader(name: String, selesai: Int, total: Int) {
+    JudulSeksiIos(name, keterangan = "$selesai/$total")
 }
 
 @Composable
 private fun ChecklistTaskCard(item: ChecklistItemUi, onCheckedChange: (Boolean) -> Unit) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onCheckedChange(!item.ticked) },
-        color = Color.White,
-        shape = RoundedCornerShape(14.dp),
-        border = BorderStroke(1.dp, SukaGray200),
+    // Seluruh kartu menjadi kotak centang (sebelumnya kartu & Checkbox sama-sama membalik
+    // status); lingkaran di kanan hanya penanda visual bergaya iOS.
+    KartuIos(
+        modifier = Modifier.semantics {
+            stateDescription = if (item.ticked) "Selesai" else "Belum"
+        },
+        onKlik = { onCheckedChange(!item.ticked) },
+        padding = PaddingValues(horizontal = UkuranIos.PaddingKartu, vertical = 14.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .width(4.dp)
-                    .height(76.dp)
-                    .background(if (item.ticked) SukaOrange.copy(alpha = 0.45f) else SukaOrange),
-            )
             Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(7.dp),
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 if (item.isRequired) {
-                    Surface(color = SukaOrange.copy(alpha = 0.14f), shape = RoundedCornerShape(50)) {
-                        Text(
-                            "Wajib",
-                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
-                            color = SukaInk,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
+                    LencanaIos("Wajib", NadaIos.AKSEN, titik = false)
                 }
                 Text(
                     item.name,
-                    color = if (item.ticked) SukaGray400 else SukaInk,
-                    fontWeight = FontWeight.Medium,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = TipeIos.Keterangan.copy(
+                        color = if (item.ticked) WarnaIos.LabelKedua else WarnaIos.Label,
+                        fontWeight = FontWeight.Medium,
+                    ),
                 )
             }
-            Checkbox(
-                checked = item.ticked,
-                onCheckedChange = onCheckedChange,
-                modifier = Modifier.padding(end = 10.dp),
-                colors = CheckboxDefaults.colors(
-                    checkedColor = SukaOrange,
-                    checkmarkColor = Color.White,
-                    uncheckedColor = SukaGray400,
-                ),
-            )
+            Spacer(Modifier.width(12.dp))
+            CentangBulat(item.ticked)
         }
     }
 }
 
+/** Lingkaran centang ala aplikasi Pengingat iOS. */
 @Composable
-private fun LoadingCard() {
-    Surface(
+private fun CentangBulat(tercentang: Boolean) {
+    Box(
         modifier = Modifier
-            .fillMaxWidth()
-            .height(120.dp),
-        color = Color.White,
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, SukaGray200),
+            .size(26.dp)
+            .clip(CircleShape)
+            .then(
+                if (tercentang) Modifier.background(WarnaIos.Aksen)
+                else Modifier.border(1.5.dp, WarnaIos.LabelKetiga, CircleShape)
+            ),
+        contentAlignment = Alignment.Center,
     ) {
-        Box(contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = SukaOrange, strokeWidth = 3.dp, modifier = Modifier.size(32.dp))
-        }
-    }
-}
-
-@Composable
-private fun MessageCard(message: String, actionLabel: String? = null, onAction: (() -> Unit)? = null) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = Color.White,
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, SukaGray200),
-    ) {
-        Column(
-            modifier = Modifier.padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(message, color = SukaGray500, textAlign = TextAlign.Center)
-            if (actionLabel != null && onAction != null) {
-                Button(onClick = onAction, colors = ButtonDefaults.buttonColors(containerColor = SukaOrange)) {
-                    Text(actionLabel)
-                }
-            }
+        if (tercentang) {
+            Icon(IkonIos.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
         }
     }
 }
