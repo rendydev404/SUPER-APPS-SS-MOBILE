@@ -190,7 +190,17 @@ object AppUpdateManager {
         }
     }
 
+    /** Jarak minimum antar-cek REST. Rilis baru tetap sampai seketika lewat
+     *  [handleRealtimePayload]; cek REST hanya jaring pengaman untuk event yang terlewat
+     *  selama socket putus, jadi tidak perlu diulang setiap kali socket tersambung lagi. */
+    private const val JEDA_CEK_MIN_MS = 15 * 60_000L
+
+    @Volatile private var terakhirCekAt = 0L
+
     fun checkForUpdateAsync() {
+        val sekarang = android.os.SystemClock.elapsedRealtime()
+        if (terakhirCekAt != 0L && sekarang - terakhirCekAt < JEDA_CEK_MIN_MS) return
+        terakhirCekAt = sekarang
         scope.launch { checkForUpdate() }
     }
 
