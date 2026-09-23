@@ -1,5 +1,18 @@
 package com.sukashawarma.superapp.feature.chat.ui
 
+import com.sukashawarma.superapp.core.ui.ios.BarisIos
+import com.sukashawarma.superapp.core.ui.ios.LabelSeksiIos
+import com.sukashawarma.superapp.core.ui.ios.LencanaIos
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.PemisahIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.TombolUtamaIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.ios.bayanganIos
+import com.sukashawarma.superapp.core.ui.ios.permukaanIos
+import com.sukashawarma.superapp.core.ui.ios.tekanIos
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
 import android.graphics.BitmapFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -93,10 +106,12 @@ import com.sukashawarma.superapp.feature.chat.data.labelRole
  * kolomnya saja yang tidak bisa disunting. Menyembunyikan halamannya sama
  * sekali hanya membuat pengguna bertanya-tanya ke mana perginya keterangan grup.
  */
-private val BiruIosInfo = Color(0xFF007AFF)
-private val AbuInfo = Color(0xFF8E8E93)
-private val LatarGrup = Color(0xFFF2F2F7)
-private val PemisahInfo = Color(0x1F3C3C43)
+// Lembar pengaturan memakai aksen aplikasi (bukan biru percakapan) supaya
+// seragam dengan grup pengaturan di modul lain.
+private val BiruIosInfo = WarnaIos.Aksen
+private val AbuInfo = WarnaIos.LabelKedua
+private val LatarGrup = WarnaIos.Latar
+private val PemisahInfo = WarnaIos.Pemisah
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -152,7 +167,7 @@ fun InfoGrupSheet(
         onDismissRequest = onTutup,
         sheetState = sheetState,
         containerColor = LatarGrup,
-        shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp),
+        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
     ) {
         Column(
             Modifier
@@ -180,10 +195,10 @@ fun InfoGrupSheet(
                 Spacer(Modifier.height(6.dp))
                 Text(
                     "Hapus foto",
-                    fontSize = 13.sp,
-                    color = Color(0xFFFF3B30),
+                    fontSize = 15.sp,
+                    color = WarnaIos.Merah,
                     modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(UkuranIos.SudutKontrol)
                         .clickable { fotoBaru = null; pratinjauBaru = null; hapusFoto = true }
                         .padding(horizontal = 10.dp, vertical = 4.dp),
                 )
@@ -191,11 +206,10 @@ fun InfoGrupSheet(
 
             Spacer(Modifier.height(10.dp))
             if (!bolehSunting) {
-                Text(nama, fontSize = 21.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                Text(nama, style = TipeIos.Judul2)
                 Text(
                     deskripsi.ifBlank { "Tanpa deskripsi" },
-                    fontSize = 13.sp,
-                    color = AbuInfo,
+                    style = TipeIos.Catatan,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(top = 4.dp, start = 12.dp, end = 12.dp),
                 )
@@ -218,22 +232,18 @@ fun InfoGrupSheet(
                 Spacer(Modifier.height(18.dp))
                 LabelBagian("Siapa yang boleh mengirim")
                 Kartu {
-                    Row(
-                        Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 11.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(Icons.Filled.Campaign, null, tint = BiruIosInfo, modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.width(12.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text("Mode pengumuman", fontSize = 15.sp, color = Color.Black)
-                            Text("Hanya pengelola yang bisa mengirim.", fontSize = 12.sp, color = AbuInfo)
-                        }
-                        Switch(
-                            checked = hanyaAdmin,
-                            onCheckedChange = { hanyaAdmin = it },
-                            colors = SwitchDefaults.colors(checkedTrackColor = Color(0xFF34C759)),
-                        )
-                    }
+                    BarisIos(
+                        judul = "Mode pengumuman",
+                        keterangan = "Hanya pengelola yang bisa mengirim.",
+                        ikon = Icons.Filled.Campaign,
+                        trailing = {
+                            Switch(
+                                checked = hanyaAdmin,
+                                onCheckedChange = { hanyaAdmin = it },
+                                colors = SwitchDefaults.colors(checkedTrackColor = WarnaIos.Hijau),
+                            )
+                        },
+                    )
                 }
             } else {
                 LabelBagian("Aturan grup")
@@ -262,21 +272,20 @@ fun InfoGrupSheet(
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
                         .clickable(enabled = bolehUbahWallpaper) {
                             if (bolehUbahWallpaper) {
                                 sheetPilihWallpaper = true
                             }
                         }
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Box(
                         Modifier
                             .size(44.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color.White)
-                            .border(1.dp, PemisahInfo, RoundedCornerShape(8.dp)),
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(WarnaIos.Kartu)
+                            .border(0.5.dp, PemisahInfo, RoundedCornerShape(10.dp)),
                         contentAlignment = Alignment.Center,
                     ) {
                         WallpaperLatarChat(wallpaperId = wallpaperAktif, dimming = dimmingPribadi)
@@ -286,44 +295,21 @@ fun InfoGrupSheet(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 namaWallpaper,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Color.Black,
+                                style = TipeIos.Isi,
+                                modifier = Modifier.weight(1f, fill = false),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
                             if (!bolehUbahWallpaper) {
                                 Spacer(Modifier.width(6.dp))
-                                Surface(
-                                    shape = RoundedCornerShape(4.dp),
-                                    color = Color(0xFFF2F2F7),
-                                    border = BorderStroke(0.5.dp, Color(0xFFD1D1D6)),
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                    ) {
-                                        Icon(
-                                            Icons.Filled.Lock,
-                                            contentDescription = "Terkunci",
-                                            tint = AbuInfo,
-                                            modifier = Modifier.size(10.dp),
-                                        )
-                                        Spacer(Modifier.width(3.dp))
-                                        Text(
-                                            "Terkunci",
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            color = AbuInfo,
-                                        )
-                                    }
-                                }
+                                LencanaIos("Terkunci", NadaIos.NETRAL, ikon = IkonIos.Lock)
                             }
                         }
                         Text(
                             if (!bolehUbahWallpaper) "Hanya Developer yang dapat mengubah wallpaper chat"
                             else if (wallpaperPribadi != ChatWallpaperPrefs.ID_BAWAAN) "Kustom pribadi (hanya di HP ini)"
                             else "Wallpaper tim: $namaWallpaper",
-                            fontSize = 12.sp,
-                            color = AbuInfo,
+                            style = TipeIos.Catatan,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -331,23 +317,22 @@ fun InfoGrupSheet(
                     if (bolehUbahWallpaper) {
                         Text(
                             "Ganti",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = BiruIosInfo,
+                            style = TipeIos.Keterangan,
+                            color = WarnaIos.LabelKedua,
                         )
-                        Spacer(Modifier.width(4.dp))
+                        Spacer(Modifier.width(6.dp))
                         Icon(
-                            Icons.Filled.ChevronRight,
+                            IkonIos.ChevronRight,
                             contentDescription = null,
-                            tint = Color(0xFFC7C7CC),
-                            modifier = Modifier.size(18.dp),
+                            tint = WarnaIos.LabelKetiga,
+                            modifier = Modifier.size(15.dp),
                         )
                     } else {
                         Icon(
-                            Icons.Filled.Lock,
+                            IkonIos.Lock,
                             contentDescription = "Terkunci",
-                            tint = Color(0xFF8E8E93),
-                            modifier = Modifier.size(18.dp),
+                            tint = WarnaIos.Abu,
+                            modifier = Modifier.size(17.dp),
                         )
                     }
                 }
@@ -380,14 +365,13 @@ fun InfoGrupSheet(
                                     modifier = Modifier.size(18.dp),
                                 )
                                 Spacer(Modifier.width(12.dp))
-                                Text("Memuat anggota…", fontSize = 14.sp, color = AbuInfo)
+                                Text("Memuat anggota…", style = TipeIos.SubJudul)
                             }
 
                             anggota.isEmpty() -> Text(
                                 "Daftar anggota belum tersedia.",
-                                fontSize = 14.sp,
-                                color = AbuInfo,
-                                modifier = Modifier.padding(14.dp),
+                                style = TipeIos.SubJudul,
+                                modifier = Modifier.padding(16.dp),
                             )
 
                             // LazyColumn, BUKAN forEach di dalam Column.
@@ -436,29 +420,17 @@ fun InfoGrupSheet(
 
             galat?.let {
                 Spacer(Modifier.height(14.dp))
-                Text(it, fontSize = 12.5.sp, color = Color(0xFFFF3B30), textAlign = TextAlign.Center)
+                Text(it, style = TipeIos.Catatan, color = NadaIos.BAHAYA.teks, textAlign = TextAlign.Center)
             }
 
             if (bolehSunting) {
                 Spacer(Modifier.height(22.dp))
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(13.dp))
-                        .background(
-                            if (menyimpan || !berubah) BiruIosInfo.copy(alpha = 0.4f) else BiruIosInfo
-                        )
-                        .clickable(enabled = !menyimpan && berubah) {
-                            onSimpan(nama, deskripsi, hanyaAdmin, fotoBaru, hapusFoto, wallpaper)
-                        }
-                        .padding(vertical = 14.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        if (menyimpan) "Menyimpan…" else "Simpan",
-                        color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
-                    )
-                }
+                TombolUtamaIos(
+                    teks = "Simpan",
+                    onKlik = { onSimpan(nama, deskripsi, hanyaAdmin, fotoBaru, hapusFoto, wallpaper) },
+                    aktif = berubah,
+                    memuat = menyimpan,
+                )
             }
         }
     }
@@ -511,7 +483,7 @@ private fun FotoGrupBesar(
             Modifier
                 .size(88.dp)
                 .clip(CircleShape)
-                .background(Color(0xFFD8E7FB))
+                .background(BiruIosInfo.copy(alpha = 0.14f))
                 .then(if (bolehSunting) Modifier.clickable(onClick = onGanti) else Modifier),
             contentAlignment = Alignment.Center,
         ) {
@@ -539,9 +511,10 @@ private fun FotoGrupBesar(
             Box(
                 Modifier
                     .size(30.dp)
+                    .bayanganIos(CircleShape, 4.dp)
                     .clip(CircleShape)
                     .background(BiruIosInfo)
-                    .clickable(onClick = onGanti),
+                    .tekanIos(onGanti),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(Icons.Filled.PhotoCamera, "Ganti foto grup", tint = Color.White, modifier = Modifier.size(16.dp))
@@ -575,26 +548,25 @@ private fun KepalaAccordionAnggota(
         Modifier
             .fillMaxWidth()
             .clickable(onClick = onKlik)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            Modifier.size(30.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFFD8E7FB)),
+            Modifier.size(30.dp).clip(CircleShape).background(BiruIosInfo.copy(alpha = 0.14f)),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Filled.Groups, null, tint = BiruIosInfo, modifier = Modifier.size(17.dp))
+            Icon(IkonIos.Groups, null, tint = BiruIosInfo, modifier = Modifier.size(17.dp))
         }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text("Anggota grup", fontSize = 15.sp, color = Color.Black)
+            Text("Anggota grup", style = TipeIos.Isi)
             Text(
                 when {
                     memuat && jumlah == 0 -> "Memuat…"
                     jumlah == 0 -> "Belum tersedia"
                     else -> "$jumlah orang"
                 },
-                fontSize = 12.sp,
-                color = AbuInfo,
+                style = TipeIos.Catatan,
             )
         }
         AnimatedVisibility(
@@ -606,10 +578,10 @@ private fun KepalaAccordionAnggota(
         }
         Spacer(Modifier.width(8.dp))
         Icon(
-            Icons.Filled.ChevronRight,
+            IkonIos.ChevronRight,
             if (terbuka) "Tutup daftar anggota" else "Buka daftar anggota",
-            tint = Color(0xFFC7C7CC),
-            modifier = Modifier.size(18.dp).graphicsLayer { rotationZ = putaran },
+            tint = WarnaIos.LabelKetiga,
+            modifier = Modifier.size(15.dp).graphicsLayer { rotationZ = putaran },
         )
     }
 }
@@ -644,7 +616,7 @@ private fun BarisAnggota(anggota: AnggotaGrup, akuSendiri: Boolean, onKlik: () -
         Modifier
             .fillMaxWidth()
             .clickable(onClick = onKlik)
-            .padding(horizontal = 14.dp, vertical = 9.dp),
+            .padding(horizontal = 16.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val namaTampil = anggota.namaTampil
@@ -659,55 +631,40 @@ private fun BarisAnggota(anggota: AnggotaGrup, akuSendiri: Boolean, onKlik: () -
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     namaTampil,
-                    fontSize = 15.sp,
-                    color = Color.Black,
+                    style = TipeIos.Isi,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
                 )
                 if (akuSendiri) {
                     Spacer(Modifier.width(6.dp))
-                    Text(
-                        "Anda",
-                        fontSize = 10.5.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = BiruIosInfo,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Color(0x1F007AFF))
-                            .padding(horizontal = 5.dp, vertical = 1.dp),
-                    )
+                    LencanaIos("Anda", NadaIos.AKSEN, titik = false)
                 }
             }
             Text(
                 listOfNotNull(labelRole(anggota.role), anggota.outlet?.takeIf { it.isNotBlank() })
                     .joinToString(" · "),
-                fontSize = 12.sp,
-                color = AbuInfo,
+                style = TipeIos.Catatan,
                 maxLines = 1,
             )
         }
         Icon(
-            Icons.Filled.ChevronRight,
+            IkonIos.ChevronRight,
             null,
-            tint = Color(0xFFC7C7CC),
-            modifier = Modifier.size(18.dp),
+            tint = WarnaIos.LabelKetiga,
+            modifier = Modifier.size(15.dp),
         )
     }
 }
 
 @Composable
 private fun PemisahAnggota() {
-    Box(Modifier.fillMaxWidth().padding(start = 64.dp).height(0.5.dp).background(PemisahInfo))
+    PemisahIos(inset = 66.dp)
 }
 
 @Composable
 private fun LabelBagian(teks: String) {
-    Text(
-        teks.uppercase(),
-        fontSize = 11.sp,
-        fontWeight = FontWeight.SemiBold,
-        color = AbuInfo,
-        modifier = Modifier.fillMaxWidth().padding(start = 14.dp, bottom = 6.dp),
-    )
+    LabelSeksiIos(teks, Modifier.fillMaxWidth().padding(start = 16.dp, bottom = 7.dp))
 }
 
 @Composable
@@ -715,14 +672,13 @@ private fun Kartu(isi: @Composable () -> Unit) {
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(11.dp))
-            .background(Color.White),
+            .permukaanIos(UkuranIos.SudutGrup),
     ) { isi() }
 }
 
 @Composable
 private fun Pemisah() {
-    Box(Modifier.fillMaxWidth().padding(start = 14.dp).height(0.5.dp).background(PemisahInfo))
+    PemisahIos(inset = 58.dp)
 }
 
 @Composable
@@ -731,31 +687,19 @@ private fun BarisInfo(
     judul: String,
     isi: String,
 ) {
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 11.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (ikon != null) {
-            Icon(ikon, null, tint = BiruIosInfo, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.width(12.dp))
-        }
-        Column {
-            Text(judul, fontSize = 15.sp, color = Color.Black)
-            Text(isi, fontSize = 12.sp, color = AbuInfo)
-        }
-    }
+    BarisIos(judul = judul, keterangan = isi, ikon = ikon)
 }
 
 @Composable
 private fun IsianBaris(nilai: String, petunjuk: String, satuBaris: Boolean, onUbah: (String) -> Unit) {
-    Box(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp)) {
-        if (nilai.isEmpty()) Text(petunjuk, fontSize = 15.sp, color = AbuInfo)
+    Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+        if (nilai.isEmpty()) Text(petunjuk, style = TipeIos.Isi, color = WarnaIos.LabelKetiga)
         BasicTextField(
             value = nilai,
             onValueChange = onUbah,
             singleLine = satuBaris,
             maxLines = if (satuBaris) 1 else 3,
-            textStyle = TextStyle(fontSize = 15.sp, color = Color.Black),
+            textStyle = TipeIos.Isi,
             cursorBrush = androidx.compose.ui.graphics.SolidColor(BiruIosInfo),
             modifier = Modifier.fillMaxWidth(),
         )
