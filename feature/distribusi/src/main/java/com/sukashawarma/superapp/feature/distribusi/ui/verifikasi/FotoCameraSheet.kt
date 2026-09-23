@@ -19,10 +19,6 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -37,6 +33,10 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import com.sukashawarma.superapp.core.ui.ios.TombolKeduaIos
+import com.sukashawarma.superapp.core.ui.ios.TombolUtamaIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
 import java.io.ByteArrayOutputStream
 
 /**
@@ -73,7 +73,7 @@ fun FotoCameraSheet(onDiambil: (Bitmap) -> Unit, onBatal: () -> Unit) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Box(
             Modifier.fillMaxWidth().aspectRatio(3f / 4f)
-                .clip(RoundedCornerShape(16.dp)).background(Color.Black)
+                .clip(UkuranIos.SudutBlok).background(Color.Black)
         ) {
             AndroidView(
                 factory = { ctx ->
@@ -99,9 +99,11 @@ fun FotoCameraSheet(onDiambil: (Bitmap) -> Unit, onBatal: () -> Unit) {
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = onBatal, modifier = Modifier.weight(1f)) { Text("Batal") }
-            Button(
-                onClick = {
+            TombolKeduaIos("Batal", onBatal, Modifier.weight(1f))
+            TombolUtamaIos(
+                teks = if (mengambil) "Mengambil..." else "Ambil Foto",
+                ikon = if (mengambil) null else IkonIos.PhotoCamera,
+                onKlik = {
                     mengambil = true
                     penangkap.takePicture(
                         ContextCompat.getMainExecutor(konteks),
@@ -119,9 +121,9 @@ fun FotoCameraSheet(onDiambil: (Bitmap) -> Unit, onBatal: () -> Unit) {
                         },
                     )
                 },
-                enabled = !mengambil,
+                aktif = !mengambil,
                 modifier = Modifier.weight(1f),
-            ) { Text(if (mengambil) "Mengambil..." else "Ambil Foto") }
+            )
         }
     }
 }
