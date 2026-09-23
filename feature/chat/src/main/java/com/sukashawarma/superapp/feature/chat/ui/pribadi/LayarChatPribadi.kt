@@ -1,5 +1,9 @@
 package com.sukashawarma.superapp.feature.chat.ui.pribadi
 
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.TombolBundarIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
@@ -144,8 +148,8 @@ import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.format.DateTimeFormatter
 
-private val BiruIos = Color(0xFF007AFF)
-private val TeksSekunder = Color(0xFF8E8E93)
+private val BiruIos = WarnaIos.Biru
+private val TeksSekunder = WarnaIos.Abu
 private val LatarWallpaper = Color(0xFFEFE7DE)
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -287,50 +291,46 @@ fun LayarChatPribadi(
                         Column {
                             Text(
                                 text = partnerName,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color(0xFF1C1C1E)
+                                style = TipeIos.Utama,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
                             Text(
                                 text = "Obrolan Pribadi",
-                                fontSize = 11.sp,
-                                color = TeksSekunder
+                                style = TipeIos.Kecil,
                             )
                         }
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Kembali",
-                            tint = BiruIos
-                        )
-                    }
+                    TombolBundarIos(
+                        IkonIos.ArrowBack,
+                        "Kembali",
+                        onBack,
+                        Modifier.padding(start = 10.dp, end = 6.dp),
+                    )
                 },
                 actions = {
                     if (isDeveloper) {
-                        IconButton(onClick = { sheetWallpaperPribadi = true }) {
-                            Icon(
-                                imageVector = Icons.Filled.Wallpaper,
-                                contentDescription = "Ganti Wallpaper",
-                                tint = BiruIos
-                            )
-                        }
+                        TombolBundarIos(
+                            Icons.Filled.Wallpaper,
+                            "Ganti Wallpaper",
+                            { sheetWallpaperPribadi = true },
+                            Modifier.padding(end = 12.dp),
+                        )
                     } else {
-                        IconButton(onClick = {
-                            Toast.makeText(context, "Wallpaper chat dikunci oleh Developer.", Toast.LENGTH_SHORT).show()
-                        }) {
-                            Icon(
-                                imageVector = Icons.Filled.Lock,
-                                contentDescription = "Wallpaper Terkunci",
-                                tint = Color(0xFF8E8E93).copy(alpha = 0.7f),
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
+                        TombolBundarIos(
+                            IkonIos.Lock,
+                            "Wallpaper Terkunci",
+                            {
+                                Toast.makeText(context, "Wallpaper chat dikunci oleh Developer.", Toast.LENGTH_SHORT).show()
+                            },
+                            Modifier.padding(end = 12.dp),
+                            warnaIkon = WarnaIos.Abu,
+                        )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = WarnaIos.Kartu)
             )
         },
         modifier = Modifier.imePadding()
@@ -394,7 +394,7 @@ fun LayarChatPribadi(
                                         Text(
                                             text = "Pesan di obrolan ini otomatis terhapus setiap 03:00 WIB",
                                             fontSize = 11.5.sp,
-                                            color = Color(0xFF48484A),
+                                            color = WarnaIos.AbuGelap,
                                             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                                             lineHeight = 15.sp
                                         )
@@ -621,7 +621,7 @@ fun LayarChatPribadi(
                         konfirmasiHapus = null
                     }
                 ) {
-                    Text("Hapus", color = Color(0xFFFF3B30), fontWeight = FontWeight.SemiBold)
+                    Text("Hapus", color = WarnaIos.Merah, fontWeight = FontWeight.SemiBold)
                 }
             },
             dismissButton = {
@@ -1068,7 +1068,7 @@ private fun KartuBalasComposer(
     Row(
         Modifier
             .fillMaxWidth()
-            .background(Color(0xFFF2F2F7))
+            .background(WarnaIos.Latar)
             .padding(start = 12.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -1113,15 +1113,13 @@ private fun KartuBalasComposer(
 private fun LembarSemuaEmoji(onPilih: (String) -> Unit, onTutup: () -> Unit) {
     ModalBottomSheet(
         onDismissRequest = onTutup,
-        containerColor = Color(0xFFF7F7F8),
+        containerColor = WarnaIos.Latar,
         shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
     ) {
         Column(Modifier.navigationBarsPadding()) {
             Text(
                 text = "Pilih reaksi",
-                fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Color(0xFF1C1C1E),
+                style = TipeIos.Utama,
                 modifier = Modifier.padding(start = 20.dp, bottom = 8.dp)
             )
             PapanEmoji(
@@ -1216,9 +1214,9 @@ private fun KomposerChatPribadi(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(Color(0xFFF2F2F7))
+            .background(WarnaIos.Latar)
     ) {
-        Box(modifier = Modifier.fillMaxWidth().height(0.5.dp).background(Color(0xFFE5E5EA)))
+        Box(modifier = Modifier.fillMaxWidth().height(0.5.dp).background(WarnaIos.Pemisah))
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1261,7 +1259,7 @@ private fun KomposerChatPribadi(
                     .weight(1f)
                     .padding(vertical = 2.dp)
                     .clip(RoundedCornerShape(20.dp))
-                    .background(Color.White)
+                    .background(WarnaIos.Kartu)
             ) {
                 Row(verticalAlignment = Alignment.Bottom) {
                     Box(
@@ -1275,7 +1273,7 @@ private fun KomposerChatPribadi(
                         BasicTextField(
                             value = inputTeks,
                             onValueChange = { inputTeks = it },
-                            textStyle = TextStyle(fontSize = 15.sp, color = Color(0xFF1C1C1E)),
+                            textStyle = TextStyle(fontSize = 15.sp, color = WarnaIos.Label),
                             cursorBrush = SolidColor(BiruIos),
                             maxLines = 5,
                             modifier = Modifier.fillMaxWidth()
@@ -1336,7 +1334,7 @@ private fun KomposerChatPribadi(
                     modifier = Modifier
                         .size(42.dp)
                         .clip(CircleShape)
-                        .background(if (bolehKirim) BiruIos else Color(0xFFC7C7CC))
+                        .background(if (bolehKirim) BiruIos else WarnaIos.LabelKetiga)
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.Send,
