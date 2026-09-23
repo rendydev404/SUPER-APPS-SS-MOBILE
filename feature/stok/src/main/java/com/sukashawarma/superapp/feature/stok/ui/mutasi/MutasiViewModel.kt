@@ -11,6 +11,7 @@ import com.sukashawarma.superapp.feature.stok.data.model.StatusMutasi
 import com.sukashawarma.superapp.feature.stok.domain.bolehTampilDiOutlet
 import com.sukashawarma.superapp.feature.stok.domain.formatAngkaStok
 import com.sukashawarma.superapp.feature.stok.domain.stokErrorMessage
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -153,9 +154,7 @@ class MutasiViewModel : ViewModel() {
         viewModelScope.launch { muatDaftar() }
     }
 
-    fun segarkanManual() {
-        viewModelScope.launch { muatDaftar() }
-    }
+    fun segarkanManual(): Job = viewModelScope.launch { muatDaftar() }
 
     private suspend fun muatDaftar() {
         val outlet = _state.value.outletTerpilih ?: return
