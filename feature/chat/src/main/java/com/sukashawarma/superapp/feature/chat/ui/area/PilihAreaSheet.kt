@@ -1,5 +1,14 @@
 package com.sukashawarma.superapp.feature.chat.ui.area
 
+import androidx.compose.ui.text.style.TextOverflow
+import com.sukashawarma.superapp.core.ui.ios.LencanaIos
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.ios.permukaanIos
+import com.sukashawarma.superapp.core.ui.ios.tekanIos
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -51,13 +60,13 @@ fun PilihAreaSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = Color(0xFFF9FAFB),
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+        containerColor = WarnaIos.Latar,
+        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp)
+                .padding(horizontal = UkuranIos.TepiLayar)
                 .navigationBarsPadding()
         ) {
             // Header
@@ -69,28 +78,25 @@ fun PilihAreaSheet(
                     modifier = Modifier
                         .size(40.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFFEBF5FF)),
+                        .background(WarnaIos.Biru.copy(alpha = 0.14f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Default.LocationOn,
+                        imageVector = IkonIos.LocationOn,
                         contentDescription = null,
-                        tint = Color(0xFF007AFF),
-                        modifier = Modifier.size(22.dp)
+                        tint = WarnaIos.Biru,
+                        modifier = Modifier.size(21.dp)
                     )
                 }
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text(
                         text = "Pilih Grup Area",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF111827)
+                        style = TipeIos.Judul3,
                     )
                     Text(
                         text = "Akses ruang komunikasi Area Manager & Crew",
-                        fontSize = 13.sp,
-                        color = Color(0xFF6B7280)
+                        style = TipeIos.Catatan,
                     )
                 }
             }
@@ -99,7 +105,7 @@ fun PilihAreaSheet(
 
             // List of Area Cards
             LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(UkuranIos.JarakKartu),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 items(daftarArea, key = { it.areaId }) { area ->
@@ -127,21 +133,14 @@ private fun KartuItemArea(
     isDipilih: Boolean,
     onClick: () -> Unit,
 ) {
-    val borderColor = if (isDipilih) Color(0xFF007AFF) else Color(0xFFE5E7EB)
-    val bgColor = if (isDipilih) Color(0xFFF0F7FF) else Color.White
-
+    // Pilihan aktif ditandai centang beraksen & isian aksen tipis, bukan garis
+    // tepi tebal — gaya daftar pilihan iOS.
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(bgColor)
-            .border(
-                width = if (isDipilih) 2.dp else 1.dp,
-                color = borderColor,
-                shape = RoundedCornerShape(16.dp)
-            )
-            .clickable(onClick = onClick)
-            .padding(14.dp)
+            .permukaanIos(UkuranIos.SudutKartu, if (isDipilih) PilihanAktif else WarnaIos.Kartu)
+            .tekanIos(onClick)
+            .padding(UkuranIos.PaddingKartu)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -154,8 +153,8 @@ private fun KartuItemArea(
                     .clip(CircleShape)
                     .background(
                         Brush.linearGradient(
-                            if (isDipilih) listOf(Color(0xFF007AFF), Color(0xFF0056B3))
-                            else listOf(Color(0xFF4B5563), Color(0xFF374151))
+                            if (isDipilih) listOf(WarnaIos.Aksen, Color(0xFFF97316))
+                            else listOf(WarnaIos.Abu, WarnaIos.AbuGelap)
                         )
                     ),
                 contentAlignment = Alignment.Center
@@ -175,24 +174,12 @@ private fun KartuItemArea(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = area.namaArea,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF111827)
+                        style = TipeIos.Utama,
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f, fill = false)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Color(0xFFFEF3C7))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = "👑 AM " + area.amName,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFFB45309)
-                        )
-                    }
+                    LencanaIos("👑 AM " + area.amName, NadaIos.PERINGATAN, titik = false)
                 }
 
                 Spacer(modifier = Modifier.height(4.dp))
@@ -201,15 +188,15 @@ private fun KartuItemArea(
                     Icon(
                         imageVector = Icons.Default.Store,
                         contentDescription = null,
-                        modifier = Modifier.size(12.dp),
-                        tint = Color(0xFF6B7280)
+                        modifier = Modifier.size(13.dp),
+                        tint = WarnaIos.Abu
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = "${area.outlets.size} Cabang: " + area.outlets.joinToString(", "),
-                        fontSize = 12.sp,
-                        color = Color(0xFF6B7280),
-                        maxLines = 1
+                        style = TipeIos.Catatan,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
@@ -222,7 +209,7 @@ private fun KartuItemArea(
                     modifier = Modifier
                         .size(24.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFF007AFF)),
+                        .background(WarnaIos.Aksen),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -236,3 +223,5 @@ private fun KartuItemArea(
         }
     }
 }
+
+private val PilihanAktif = Color(0xFFFFF4EC)
