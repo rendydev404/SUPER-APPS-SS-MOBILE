@@ -1,9 +1,6 @@
 package com.sukashawarma.superapp.feature.manager.ui.persetujuan
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,46 +13,28 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Cancel
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Storefront
-import androidx.compose.material.icons.filled.VpnKey
-import androidx.compose.material.icons.filled.WarningAmber
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePickerDefaults
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DateRangePicker
 import com.sukashawarma.superapp.core.ui.SukaDropdownHeader
 import com.sukashawarma.superapp.core.ui.SukaDropdownMenu
 import com.sukashawarma.superapp.core.ui.SukaDropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDateRangePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -66,8 +45,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -75,6 +54,26 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sukashawarma.superapp.core.ui.RealtimeRefresh
 import com.sukashawarma.superapp.core.ui.RealtimeTables
+import com.sukashawarma.superapp.core.ui.ios.BilahJudulIos
+import com.sukashawarma.superapp.core.ui.ios.IkonBulatIos
+import com.sukashawarma.superapp.core.ui.ios.KeadaanIos
+import com.sukashawarma.superapp.core.ui.ios.KolomCariIos
+import com.sukashawarma.superapp.core.ui.ios.LabelSeksiIos
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.PemisahIos
+import com.sukashawarma.superapp.core.ui.ios.SegmenIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.TombolBundarIos
+import com.sukashawarma.superapp.core.ui.ios.TombolKapsulIos
+import com.sukashawarma.superapp.core.ui.ios.TombolKeduaIos
+import com.sukashawarma.superapp.core.ui.ios.TombolUtamaIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WadahSegmenIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.ios.warnaKolomIos
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
+import com.sukashawarma.superapp.core.ui.kaca.denganRuangNav
+import com.sukashawarma.superapp.core.ui.kaca.navigationBarsPaddingKaca
 import com.sukashawarma.superapp.feature.manager.domain.PengajuanBypass
 import com.sukashawarma.superapp.feature.manager.domain.PengajuanVoid
 import com.sukashawarma.superapp.feature.manager.domain.PesananSelesaiItem
@@ -84,17 +83,7 @@ import com.sukashawarma.superapp.feature.manager.domain.cacah
 import com.sukashawarma.superapp.feature.manager.domain.rupiah
 import com.sukashawarma.superapp.feature.manager.domain.waktuRelatif
 import com.sukashawarma.superapp.feature.manager.ui.ChipJingga
-import com.sukashawarma.superapp.feature.manager.ui.GarisKartu
-import com.sukashawarma.superapp.feature.manager.ui.HijauLatar
-import com.sukashawarma.superapp.feature.manager.ui.HijauTeks
 import com.sukashawarma.superapp.feature.manager.ui.KartuPanel
-import com.sukashawarma.superapp.feature.manager.ui.MerahGaris
-import com.sukashawarma.superapp.feature.manager.ui.MerahLatar
-import com.sukashawarma.superapp.feature.manager.ui.MerahTeks
-import com.sukashawarma.superapp.presentation.theme.SukaBrown
-import com.sukashawarma.superapp.presentation.theme.SukaCream
-import com.sukashawarma.superapp.presentation.theme.SukaGray400
-import com.sukashawarma.superapp.presentation.theme.SukaOrange
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -106,9 +95,10 @@ private val FILTER_PERIODE = listOf(
     PresetPeriode.BULAN to "30 Hari",
 )
 
-private val AMBER_LATAR = Color(0xFFFEF3C7)
-private val AMBER_GARIS = Color(0xFFFCD34D)
-private val AMBER_TEKS = Color(0xFF78350F)
+// Baris rincian pesanan: satu ukuran untuk qty, nama, dan subtotal supaya kolomnya
+// sejajar; hanya warnanya yang membedakan nama dari angka pendamping.
+private val TeksRincian = TextStyle(fontSize = 14.sp, color = WarnaIos.Label)
+private val TeksRincianKedua = TextStyle(fontSize = 14.sp, color = WarnaIos.LabelKedua)
 
 /**
  * Persetujuan & Pembatalan — cermin `app/approvals/` web.
@@ -142,31 +132,25 @@ fun PersetujuanScreen(
     }
 
     Scaffold(
-        containerColor = SukaCream,
-        snackbarHost = { SnackbarHost(snackbar) },
+        containerColor = WarnaIos.Latar,
+        snackbarHost = { SnackbarHost(snackbar, Modifier.navigationBarsPaddingKaca()) },
         topBar = {
-            TopAppBar(
-                title = {
-                    Text("Persetujuan", fontWeight = FontWeight.Black, fontSize = 17.sp, color = SukaBrown, maxLines = 1)
-                },
-                navigationIcon = {
-                    IconButton(onClick = onExit) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Kembali", tint = SukaBrown)
-                    }
-                },
-                actions = {
-                    IconButton(onClick = viewModel::muatUlang) {
-                        Icon(Icons.Default.Refresh, "Muat ulang", tint = SukaBrown)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White),
+            BilahJudulIos(
+                judul = "Persetujuan",
+                onKembali = onExit,
+                aksi = { TombolBundarIos(IkonIos.Refresh, "Muat ulang", viewModel::muatUlang) },
             )
         },
     ) { padding ->
         LazyColumn(
             Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(
+                start = UkuranIos.TepiLayar,
+                end = UkuranIos.TepiLayar,
+                top = 12.dp,
+                bottom = 16.dp,
+            ).denganRuangNav(),
+            verticalArrangement = Arrangement.spacedBy(UkuranIos.JarakKartu),
         ) {
             item { PanelKepala(state, viewModel) }
             item { BarisTab(state, viewModel) }
@@ -196,38 +180,26 @@ private fun PanelKepala(state: PersetujuanUiState, viewModel: PersetujuanViewMod
     var dialogTanggal by remember { mutableStateOf(false) }
 
     KartuPanel {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    "Persetujuan & Pembatalan",
-                    color = SukaBrown,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Black,
-                )
-                Spacer(Modifier.height(3.dp))
-                Text(
-                    "Antrean pengajuan dari kasir outlet",
-                    color = SukaGray400,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                )
-            }
-        }
-        Spacer(Modifier.height(14.dp))
-        Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
+        Text("Persetujuan & Pembatalan", style = TipeIos.Utama)
+        Spacer(Modifier.height(2.dp))
+        Text("Antrean pengajuan dari kasir outlet", style = TipeIos.Catatan)
+        Spacer(Modifier.height(12.dp))
+        // Deret periode bisa lebih lebar dari layar sempit (label kustom memuat dua
+        // tanggal), jadi segmennya digulir alih-alih dipaksa berbagi lebar.
+        WadahSegmenIos(gulir = true) {
             FILTER_PERIODE.forEach { (preset, label) ->
-                ChipPeriode(label, !state.memakaiKustom && state.preset == preset) {
-                    viewModel.pilihPreset(preset)
-                }
+                SegmenIos(
+                    label = label,
+                    aktif = !state.memakaiKustom && state.preset == preset,
+                    onKlik = { viewModel.pilihPreset(preset) },
+                )
             }
-            ChipPeriode(
-                state.kustom?.let { "${it.dari} - ${it.sampai}" } ?: "Kustom",
-                state.memakaiKustom,
-                Icons.Default.CalendarMonth,
-            ) { dialogTanggal = true }
+            SegmenIos(
+                label = state.kustom?.let { "${it.dari} - ${it.sampai}" } ?: "Kustom",
+                aktif = state.memakaiKustom,
+                onKlik = { dialogTanggal = true },
+                ikon = IkonIos.CalendarMonth,
+            )
         }
     }
 
@@ -242,42 +214,17 @@ private fun PanelKepala(state: PersetujuanUiState, viewModel: PersetujuanViewMod
     }
 }
 
-@Composable
-private fun ChipPeriode(
-    label: String,
-    aktif: Boolean,
-    ikon: ImageVector? = null,
-    onClick: () -> Unit,
-) {
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = if (aktif) SukaOrange else Color.White,
-        border = BorderStroke(1.dp, if (aktif) SukaOrange else SukaBrown.copy(alpha = 0.15f)),
-        modifier = Modifier.clickable(onClick = onClick),
-    ) {
-        Row(
-            Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (ikon != null) {
-                Icon(ikon, null, tint = if (aktif) Color.White else SukaBrown, modifier = Modifier.size(13.dp))
-                Spacer(Modifier.width(5.dp))
-            }
-            Text(
-                label,
-                color = if (aktif) Color.White else SukaBrown,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Black,
-                maxLines = 1,
-            )
-        }
-    }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DialogRentang(onTutup: () -> Unit, onPilih: (LocalDate, LocalDate) -> Unit) {
     val picker = rememberDateRangePickerState()
+    val warnaKalender = DatePickerDefaults.colors(
+        containerColor = WarnaIos.Kartu,
+        selectedDayContainerColor = WarnaIos.Aksen,
+        dayInSelectionRangeContainerColor = WarnaIos.Aksen.copy(alpha = 0.14f),
+        todayDateBorderColor = WarnaIos.Aksen,
+        todayContentColor = WarnaIos.Aksen,
+    )
     DatePickerDialog(
         onDismissRequest = onTutup,
         confirmButton = {
@@ -288,17 +235,29 @@ private fun DialogRentang(onTutup: () -> Unit, onPilih: (LocalDate, LocalDate) -
                     if (dari != null) onPilih(dari, sampai ?: dari)
                 },
                 enabled = picker.selectedStartDateMillis != null,
-            ) { Text("Terapkan", fontWeight = FontWeight.ExtraBold) }
+                colors = ButtonDefaults.textButtonColors(contentColor = WarnaIos.Aksen),
+            ) { Text("Terapkan", fontSize = 16.sp, fontWeight = FontWeight.SemiBold) }
         },
-        dismissButton = { TextButton(onClick = onTutup) { Text("Batal") } },
+        dismissButton = {
+            TextButton(
+                onClick = onTutup,
+                colors = ButtonDefaults.textButtonColors(contentColor = WarnaIos.Aksen),
+            ) { Text("Batal", fontSize = 16.sp) }
+        },
+        shape = UkuranIos.SudutKartu,
+        colors = warnaKalender,
     ) {
-        DateRangePicker(state = picker, title = {
-            Text(
-                "Pilih Rentang Tanggal",
-                Modifier.padding(start = 24.dp, top = 16.dp),
-                fontWeight = FontWeight.Black,
-            )
-        })
+        DateRangePicker(
+            state = picker,
+            colors = warnaKalender,
+            title = {
+                Text(
+                    "Pilih Rentang Tanggal",
+                    Modifier.padding(start = 24.dp, top = 16.dp),
+                    style = TipeIos.Utama,
+                )
+            },
+        )
     }
 }
 
@@ -307,75 +266,96 @@ private fun tanggalDari(millis: Long): LocalDate =
 
 @Composable
 private fun BarisTab(state: PersetujuanUiState, viewModel: PersetujuanViewModel) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .background(Color.White, RoundedCornerShape(16.dp))
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        TombolTab(
-            terpilih = state.tab == TabPersetujuan.VOID,
+    // Tiga label tab ini terlalu panjang untuk dibagi rata di ponsel 360dp tanpa
+    // terpotong, jadi segmennya selebar isinya dan deretnya digulir.
+    WadahSegmenIos(gulir = true) {
+        SegmenIos(
             label = "Void Transaksi",
-            jumlah = state.jumlahVoid,
-            modifier = Modifier.weight(1f),
-        ) { viewModel.pilihTab(TabPersetujuan.VOID) }
-        TombolTab(
-            terpilih = state.tab == TabPersetujuan.BYPASS,
+            aktif = state.tab == TabPersetujuan.VOID,
+            onKlik = { viewModel.pilihTab(TabPersetujuan.VOID) },
+            lencana = state.jumlahVoid.takeIf { it > 0 }?.let(::cacah),
+        )
+        SegmenIos(
             label = "Bypass POS",
-            jumlah = state.jumlahBypass,
-            modifier = Modifier.weight(1f),
-        ) { viewModel.pilihTab(TabPersetujuan.BYPASS) }
-        TombolTab(
-            terpilih = state.tab == TabPersetujuan.BATAL_PAKSA,
+            aktif = state.tab == TabPersetujuan.BYPASS,
+            onKlik = { viewModel.pilihTab(TabPersetujuan.BYPASS) },
+            lencana = state.jumlahBypass.takeIf { it > 0 }?.let(::cacah),
+        )
+        SegmenIos(
             label = "Pesanan Selesai",
-            jumlah = 0,
-            modifier = Modifier.weight(1f),
-        ) { viewModel.pilihTab(TabPersetujuan.BATAL_PAKSA) }
+            aktif = state.tab == TabPersetujuan.BATAL_PAKSA,
+            onKlik = { viewModel.pilihTab(TabPersetujuan.BATAL_PAKSA) },
+        )
+    }
+}
+
+/* ----------------------------------------------------------------------- */
+/* Potongan kartu bersama                                                   */
+/* ----------------------------------------------------------------------- */
+
+/** Baris pembuka kartu: lencana outlet lalu waktu relatif pengajuan. */
+@Composable
+private fun BarisOutletWaktu(outlet: String, dibuatPada: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        ChipJingga(outlet)
+        Spacer(Modifier.width(8.dp))
+        Icon(IkonIos.Schedule, null, tint = WarnaIos.LabelKedua, modifier = Modifier.size(13.dp))
+        Spacer(Modifier.width(4.dp))
+        Text(waktuRelatif(dibuatPada), style = TipeIos.Kecil, maxLines = 1)
+    }
+}
+
+/** Judul kartu "Void Transaksi #123": label hitam, nomor order beraksen. */
+@Composable
+private fun JudulNomorOrder(label: String, nomor: String) {
+    Row(verticalAlignment = Alignment.Bottom) {
+        Text(label, style = TipeIos.Utama)
+        Text("#$nomor", style = TipeIos.Utama.copy(color = WarnaIos.Aksen))
     }
 }
 
 @Composable
-private fun TombolTab(
-    terpilih: Boolean,
-    label: String,
-    jumlah: Int,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit,
-) {
-    Surface(
-        modifier = modifier.clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
-        color = if (terpilih) SukaOrange else Color.Transparent,
-    ) {
-        Row(
-            Modifier.padding(horizontal = 4.dp, vertical = 9.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                label,
-                color = if (terpilih) Color.White else SukaBrown.copy(alpha = 0.7f),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Black,
-                maxLines = 1,
-            )
-            if (jumlah > 0) {
-                Spacer(Modifier.width(4.dp))
-                Surface(
-                    shape = RoundedCornerShape(6.dp),
-                    color = if (terpilih) Color.White.copy(alpha = 0.25f) else SukaOrange.copy(alpha = 0.12f),
-                ) {
-                    Text(
-                        cacah(jumlah),
-                        Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
-                        color = if (terpilih) Color.White else SukaOrange,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Black,
-                    )
-                }
-            }
-        }
+private fun RincianItem(qty: String, nama: String, subtotal: String) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+        Text(qty, Modifier.width(32.dp), style = TeksRincianKedua)
+        Text(nama, Modifier.weight(1f), style = TeksRincian, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Spacer(Modifier.width(8.dp))
+        Text(subtotal, style = TeksRincianKedua, maxLines = 1)
+    }
+}
+
+@Composable
+private fun BarisTotal(total: Long) {
+    Spacer(Modifier.height(12.dp))
+    PemisahIos(inset = 0.dp)
+    Spacer(Modifier.height(10.dp))
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text("Total Nilai", Modifier.weight(1f), style = TipeIos.SubJudul)
+        Text(rupiah(total), style = TipeIos.Angka, maxLines = 1)
+    }
+}
+
+/** Pasangan tombol tolak/setujui. Selama diproses keduanya terkunci agar tidak terkirim dua kali. */
+@Composable
+private fun BarisTolakSetujui(sedangDiproses: Boolean, onTolak: () -> Unit, onSetujui: () -> Unit) {
+    Spacer(Modifier.height(14.dp))
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        TombolKeduaIos(
+            teks = "Tolak",
+            onKlik = onTolak,
+            modifier = Modifier.weight(1f),
+            aktif = !sedangDiproses,
+            ikon = IkonIos.Close,
+            warna = WarnaIos.Merah,
+        )
+        TombolUtamaIos(
+            teks = "Setujui",
+            onKlik = onSetujui,
+            modifier = Modifier.weight(1f),
+            memuat = sedangDiproses,
+            ikon = IkonIos.Check,
+            warna = WarnaIos.Hijau,
+        )
     }
 }
 
@@ -406,136 +386,44 @@ private fun KartuVoid(
     onTolak: () -> Unit,
 ) {
     KartuPanel {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            ChipJingga(pengajuan.outletNama)
-            Spacer(Modifier.width(8.dp))
-            Icon(Icons.Default.Schedule, null, tint = SukaGray400, modifier = Modifier.size(11.dp))
-            Spacer(Modifier.width(3.dp))
-            Text(
-                waktuRelatif(pengajuan.dibuatPada),
-                color = SukaGray400,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-            )
-        }
+        BarisOutletWaktu(pengajuan.outletNama, pengajuan.dibuatPada)
 
         Spacer(Modifier.height(10.dp))
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text("Void Transaksi ", color = SukaBrown, fontSize = 16.sp, fontWeight = FontWeight.Black)
-            Text("#${pengajuan.nomorOrder}", color = SukaOrange, fontSize = 16.sp, fontWeight = FontWeight.Black)
-        }
+        JudulNomorOrder("Void Transaksi ", pengajuan.nomorOrder)
 
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(4.dp))
         Text(
             "Pelanggan: ${pengajuan.namaPelanggan} • Kasir: ${pengajuan.pemohon}",
-            color = SukaGray400,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold,
-            lineHeight = 16.sp,
+            style = TipeIos.Catatan,
         )
 
         Spacer(Modifier.height(12.dp))
-        Surface(
-            Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            color = SukaBrown.copy(alpha = 0.03f),
-            border = BorderStroke(1.dp, GarisKartu),
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .clip(UkuranIos.SudutBlok)
+                .background(WarnaIos.Latar)
+                .padding(12.dp),
         ) {
-            Column(Modifier.padding(12.dp)) {
-                Text(
-                    "ALASAN PEMBATALAN",
-                    color = SukaGray400,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 0.6.sp,
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    pengajuan.alasan.ifBlank { "Tanpa keterangan" },
-                    color = SukaBrown,
-                    fontSize = 12.sp,
-                    lineHeight = 17.sp,
-                    fontWeight = FontWeight.Medium,
-                )
-            }
+            LabelSeksiIos("Alasan pembatalan")
+            Spacer(Modifier.height(4.dp))
+            Text(
+                pengajuan.alasan.ifBlank { "Tanpa keterangan" },
+                style = TipeIos.SubJudul.copy(color = WarnaIos.Label),
+            )
         }
 
         if (pengajuan.items.isNotEmpty()) {
-            Spacer(Modifier.height(12.dp))
-            Text(
-                "RINCIAN PESANAN",
-                color = SukaGray400,
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Black,
-                letterSpacing = 0.6.sp,
-            )
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(14.dp))
+            LabelSeksiIos("Rincian pesanan")
+            Spacer(Modifier.height(4.dp))
             pengajuan.items.forEach { item ->
-                Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
-                    Text(
-                        "${item.qty}x",
-                        Modifier.width(28.dp),
-                        color = SukaGray400,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Text(
-                        item.nama,
-                        Modifier.weight(1f),
-                        color = SukaBrown,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        rupiah(item.subtotal),
-                        color = SukaGray400,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
+                RincianItem("${item.qty}x", item.nama, rupiah(item.subtotal))
             }
         }
 
-        Spacer(Modifier.height(12.dp))
-        HorizontalDivider(color = GarisKartu)
-        Spacer(Modifier.height(10.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                "TOTAL NILAI",
-                Modifier.weight(1f),
-                color = SukaGray400,
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Black,
-                letterSpacing = 0.6.sp,
-            )
-            Text(rupiah(pengajuan.total), color = SukaBrown, fontSize = 19.sp, fontWeight = FontWeight.Black)
-        }
-
-        Spacer(Modifier.height(14.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            TombolAksi(
-                label = "Tolak",
-                ikon = Icons.Default.Close,
-                latar = Color.White,
-                teks = MerahTeks,
-                garis = MerahGaris,
-                sedangDiproses = sedangDiproses,
-                modifier = Modifier.weight(1f),
-                onClick = onTolak,
-            )
-            TombolAksi(
-                label = "Setujui",
-                ikon = Icons.Default.Check,
-                latar = Color(0xFFD97706),
-                teks = Color.White,
-                garis = Color(0xFFD97706),
-                sedangDiproses = sedangDiproses,
-                modifier = Modifier.weight(1f),
-                onClick = onSetujui,
-            )
-        }
+        BarisTotal(pengajuan.total)
+        BarisTolakSetujui(sedangDiproses, onTolak = onTolak, onSetujui = onSetujui)
     }
 }
 
@@ -571,144 +459,69 @@ private fun KartuBypass(
     onTolak: () -> Unit,
 ) {
     KartuPanel {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            ChipJingga(pengajuan.outletNama)
-            Spacer(Modifier.width(8.dp))
-            Icon(Icons.Default.Schedule, null, tint = SukaGray400, modifier = Modifier.size(11.dp))
-            Spacer(Modifier.width(3.dp))
-            Text(
-                waktuRelatif(pengajuan.dibuatPada),
-                color = SukaGray400,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-            )
-        }
+        BarisOutletWaktu(pengajuan.outletNama, pengajuan.dibuatPada)
 
         Spacer(Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.VpnKey, null, tint = AMBER_TEKS, modifier = Modifier.size(16.dp))
-            Spacer(Modifier.width(7.dp))
-            Text(
-                "Bypass POS dari ${pengajuan.pemohon}",
-                color = SukaBrown,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Black,
-                lineHeight = 20.sp,
-            )
+            IkonBulatIos(IkonIos.Lock, WarnaIos.Oranye, ukuran = 28.dp)
+            Spacer(Modifier.width(10.dp))
+            Text("Bypass POS dari ${pengajuan.pemohon}", style = TipeIos.Utama)
         }
 
         Spacer(Modifier.height(12.dp))
-        Surface(
-            Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            color = AMBER_LATAR.copy(alpha = 0.5f),
-            border = BorderStroke(1.dp, AMBER_GARIS),
+        // Blok alasan bernada peringatan: bypass membuka kuncian POS, jadi dibedakan
+        // dari alasan void yang netral.
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .clip(UkuranIos.SudutBlok)
+                .background(NadaIos.PERINGATAN.warna.copy(alpha = 0.10f))
+                .padding(12.dp),
         ) {
-            Column(Modifier.padding(12.dp)) {
-                Text(
-                    "ALASAN BYPASS",
-                    color = AMBER_TEKS.copy(alpha = 0.75f),
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 0.6.sp,
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    pengajuan.alasan,
-                    color = SukaBrown,
-                    fontSize = 12.sp,
-                    lineHeight = 17.sp,
-                    fontWeight = FontWeight.Medium,
-                )
-            }
+            Text(
+                "Alasan Bypass",
+                style = TipeIos.Kecil.copy(color = NadaIos.PERINGATAN.teks, fontWeight = FontWeight.SemiBold),
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(pengajuan.alasan, style = TipeIos.SubJudul.copy(color = WarnaIos.Label))
         }
 
-        Spacer(Modifier.height(14.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            TombolAksi(
-                label = "Tolak",
-                ikon = Icons.Default.Close,
-                latar = Color.White,
-                teks = MerahTeks,
-                garis = MerahGaris,
-                sedangDiproses = sedangDiproses,
-                modifier = Modifier.weight(1f),
-                onClick = onTolak,
-            )
-            TombolAksi(
-                label = "Setujui",
-                ikon = Icons.Default.Check,
-                latar = Color(0xFFD97706),
-                teks = Color.White,
-                garis = Color(0xFFD97706),
-                sedangDiproses = sedangDiproses,
-                modifier = Modifier.weight(1f),
-                onClick = onSetujui,
-            )
-        }
-    }
-}
-
-@Composable
-private fun TombolAksi(
-    label: String,
-    ikon: ImageVector,
-    latar: Color,
-    teks: Color,
-    garis: Color,
-    sedangDiproses: Boolean,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit,
-) {
-    Surface(
-        modifier = modifier.clickable(enabled = !sedangDiproses, onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
-        color = if (sedangDiproses) latar.copy(alpha = 0.55f) else latar,
-        border = BorderStroke(1.dp, garis),
-    ) {
-        Row(
-            Modifier.padding(vertical = 11.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (sedangDiproses) {
-                CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp, color = teks)
-            } else {
-                Icon(ikon, null, tint = teks, modifier = Modifier.size(15.dp))
-            }
-            Spacer(Modifier.width(6.dp))
-            Text(label, color = teks, fontSize = 12.sp, fontWeight = FontWeight.Black)
-        }
+        BarisTolakSetujui(sedangDiproses, onTolak = onTolak, onSetujui = onSetujui)
     }
 }
 
 @Composable
 private fun PanelAntreanKosong(memuat: Boolean, pesan: String) {
     KartuPanel {
-        Column(
-            Modifier.fillMaxWidth().padding(vertical = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            // Cabang ditulis eksplisit if/else, BUKAN keluar-awal `return@Column`.
-            // `Column` adalah fungsi inline: keluar dari lambdanya setelah sudah
-            // memancarkan composable meninggalkan pembukuan grup kompilator tidak
-            // seimbang, dan begitu keadaannya berbalik, tabel slot dibaca dengan
-            // indeks negatif -> ArrayIndexOutOfBoundsException di SlotTableKt.key.
-            if (memuat) {
-                Text("Memuat antrean...", color = SukaGray400, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-            } else {
-                Box(
-                    Modifier.size(52.dp).background(HijauLatar, RoundedCornerShape(50)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(Icons.Default.CheckCircle, null, tint = HijauTeks, modifier = Modifier.size(26.dp))
-                }
-                Spacer(Modifier.height(12.dp))
-                Text("Antrean bersih", color = SukaBrown, fontSize = 15.sp, fontWeight = FontWeight.Black)
-                Spacer(Modifier.height(4.dp))
-                Text(pesan, color = SukaGray400, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-            }
+        // Cabang ditulis eksplisit if/else, BUKAN keluar-awal `return@Column`.
+        // `Column` adalah fungsi inline: keluar dari lambdanya setelah sudah
+        // memancarkan composable meninggalkan pembukuan grup kompilator tidak
+        // seimbang, dan begitu keadaannya berbalik, tabel slot dibaca dengan
+        // indeks negatif -> ArrayIndexOutOfBoundsException di SlotTableKt.key.
+        if (memuat) {
+            PanelMemuat("Memuat antrean...")
+        } else {
+            KeadaanIos(
+                ikon = IkonIos.CheckCircle,
+                judul = "Antrean bersih",
+                pesan = pesan,
+                nada = NadaIos.SUKSES,
+            )
         }
+    }
+}
+
+/** Isi kartu saat data belum datang: pemutar kecil dan satu baris keterangan. */
+@Composable
+private fun PanelMemuat(teks: String) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 28.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        CircularProgressIndicator(Modifier.size(16.dp), color = WarnaIos.Abu, strokeWidth = 2.dp)
+        Spacer(Modifier.width(10.dp))
+        Text(teks, style = TipeIos.SubJudul)
     }
 }
 
@@ -771,56 +584,23 @@ private fun PanelKontrolPesananSelesai(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
-                Text(
-                    "Cari Pesanan Selesai",
-                    color = SukaBrown,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Black,
-                )
+                Text("Cari Pesanan Selesai", style = TipeIos.Utama)
                 Spacer(Modifier.height(2.dp))
                 Text(
                     "Hanya pesanan berstatus selesai yang dapat dibatalkan di sini",
-                    color = SukaGray400,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Medium,
+                    style = TipeIos.Catatan,
                 )
             }
             if (state.daftarOutlet.size > 1) {
+                Spacer(Modifier.width(10.dp))
                 Box {
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = SukaOrange.copy(alpha = 0.08f),
-                        border = BorderStroke(1.dp, SukaOrange.copy(alpha = 0.3f)),
-                        modifier = Modifier.clickable { menuOutlet = true },
-                    ) {
-                        Row(
-                            Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                Icons.Default.Storefront,
-                                null,
-                                tint = SukaOrange,
-                                modifier = Modifier.size(13.dp),
-                            )
-                            Spacer(Modifier.width(5.dp))
-                            Text(
-                                state.outletTerpilih?.nama ?: "Pilih Outlet",
-                                color = SukaBrown,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Black,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.padding(end = 2.dp),
-                            )
-                            Icon(
-                                Icons.Default.ArrowDropDown,
-                                null,
-                                tint = SukaBrown,
-                                modifier = Modifier.size(16.dp),
-                            )
-                        }
-                    }
+                    TombolKapsulIos(
+                        teks = state.outletTerpilih?.nama ?: "Pilih Outlet",
+                        onKlik = { menuOutlet = true },
+                        modifier = Modifier.widthIn(max = 170.dp),
+                        ikon = IkonIos.Storefront,
+                        chevron = true,
+                    )
 
                     SukaDropdownMenu(
                         expanded = menuOutlet,
@@ -840,36 +620,18 @@ private fun PanelKontrolPesananSelesai(
                     }
                 }
             } else if (state.daftarOutlet.size == 1) {
+                Spacer(Modifier.width(10.dp))
                 ChipJingga(state.daftarOutlet[0].nama)
             }
         }
 
         Spacer(Modifier.height(12.dp))
 
-        OutlinedTextField(
-            value = state.kueriPencarian,
-            onValueChange = viewModel::ubahKueri,
+        KolomCariIos(
+            nilai = state.kueriPencarian,
+            onUbah = viewModel::ubahKueri,
             modifier = Modifier.fillMaxWidth(),
-            placeholder = {
-                Text("Cari nomor order atau nama pelanggan...", fontSize = 12.sp, color = SukaGray400)
-            },
-            leadingIcon = {
-                Icon(Icons.Default.Search, null, tint = SukaGray400, modifier = Modifier.size(18.dp))
-            },
-            trailingIcon = {
-                if (state.kueriPencarian.isNotEmpty()) {
-                    IconButton(onClick = { viewModel.ubahKueri("") }) {
-                        Icon(Icons.Default.Close, "Hapus pencarian", tint = SukaGray400, modifier = Modifier.size(16.dp))
-                    }
-                }
-            },
-            singleLine = true,
-            shape = RoundedCornerShape(12.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = SukaOrange,
-                unfocusedBorderColor = SukaBrown.copy(alpha = 0.15f),
-                cursorColor = SukaOrange,
-            ),
+            placeholder = "Cari nomor order atau nama pelanggan...",
         )
     }
 }
@@ -880,140 +642,47 @@ private fun KartuPesananSelesai(
     onBatal: () -> Unit,
 ) {
     KartuPanel {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            ChipJingga(pesanan.outletNama)
-            Spacer(Modifier.width(8.dp))
-            Icon(Icons.Default.Schedule, null, tint = SukaGray400, modifier = Modifier.size(11.dp))
-            Spacer(Modifier.width(3.dp))
-            Text(
-                waktuRelatif(pesanan.dibuatPada),
-                color = SukaGray400,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-            )
-        }
+        BarisOutletWaktu(pesanan.outletNama, pesanan.dibuatPada)
 
         Spacer(Modifier.height(10.dp))
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text("Pesanan ", color = SukaBrown, fontSize = 16.sp, fontWeight = FontWeight.Black)
-            Text("#${pesanan.nomorOrder}", color = SukaOrange, fontSize = 16.sp, fontWeight = FontWeight.Black)
-        }
+        JudulNomorOrder("Pesanan ", pesanan.nomorOrder)
 
         Spacer(Modifier.height(4.dp))
-        Text(
-            "Pelanggan: ${pesanan.namaPelanggan}",
-            color = SukaGray400,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold,
-        )
+        Text("Pelanggan: ${pesanan.namaPelanggan}", style = TipeIos.Catatan)
 
         if (pesanan.items.isNotEmpty()) {
-            Spacer(Modifier.height(12.dp))
-            Text(
-                "RINCIAN PESANAN",
-                color = SukaGray400,
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Black,
-                letterSpacing = 0.6.sp,
-            )
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(14.dp))
+            LabelSeksiIos("Rincian pesanan")
+            Spacer(Modifier.height(4.dp))
             pesanan.items.forEach { item ->
-                Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
-                    Text(
-                        "${item.qty}x",
-                        Modifier.width(28.dp),
-                        color = SukaGray400,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Text(
-                        item.nama,
-                        Modifier.weight(1f),
-                        color = SukaBrown,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        rupiah(item.subtotal),
-                        color = SukaGray400,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
+                RincianItem("${item.qty}x", item.nama, rupiah(item.subtotal))
             }
         }
 
-        Spacer(Modifier.height(12.dp))
-        HorizontalDivider(color = GarisKartu)
-        Spacer(Modifier.height(10.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                "TOTAL NILAI",
-                Modifier.weight(1f),
-                color = SukaGray400,
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Black,
-                letterSpacing = 0.6.sp,
-            )
-            Text(rupiah(pesanan.total), color = SukaBrown, fontSize = 18.sp, fontWeight = FontWeight.Black)
-        }
+        BarisTotal(pesanan.total)
 
         Spacer(Modifier.height(14.dp))
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onBatal),
-            shape = RoundedCornerShape(12.dp),
-            color = MerahLatar,
-            border = BorderStroke(1.dp, MerahGaris),
-        ) {
-            Row(
-                Modifier.padding(vertical = 11.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(Icons.Default.Cancel, null, tint = MerahTeks, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(7.dp))
-                Text("Batalkan Pesanan", color = MerahTeks, fontSize = 12.sp, fontWeight = FontWeight.Black)
-            }
-        }
+        TombolKeduaIos(
+            teks = "Batalkan Pesanan",
+            onKlik = onBatal,
+            ikon = IkonIos.Close,
+            warna = WarnaIos.Merah,
+        )
     }
 }
 
 @Composable
 private fun PanelPesananSelesaiKosong(kueri: String) {
     KartuPanel {
-        Column(
-            Modifier.fillMaxWidth().padding(vertical = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Box(
-                Modifier.size(52.dp).background(SukaCream, RoundedCornerShape(50)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(Icons.Default.Search, null, tint = SukaGray400, modifier = Modifier.size(26.dp))
-            }
-            Spacer(Modifier.height(12.dp))
-            Text(
-                if (kueri.isNotBlank()) "Tidak Ditemukan" else "Belum Ada Pesanan",
-                color = SukaBrown,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Black,
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                if (kueri.isNotBlank()) {
-                    "Tidak ada pesanan selesai yang cocok dengan pencarian \"$kueri\"."
-                } else {
-                    "Tidak ada pesanan selesai pada periode dan outlet ini."
-                },
-                color = SukaGray400,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium,
-            )
-        }
+        KeadaanIos(
+            ikon = IkonIos.Search,
+            judul = if (kueri.isNotBlank()) "Tidak Ditemukan" else "Belum Ada Pesanan",
+            pesan = if (kueri.isNotBlank()) {
+                "Tidak ada pesanan selesai yang cocok dengan pencarian \"$kueri\"."
+            } else {
+                "Tidak ada pesanan selesai pada periode dan outlet ini."
+            },
+        )
     }
 }
 
@@ -1029,63 +698,54 @@ private fun DialogBatalPaksa(
     AlertDialog(
         onDismissRequest = { if (!sedangMembatalkan) onTutup() },
         confirmButton = {
-            Surface(
-                modifier = Modifier.clickable(
-                    enabled = catatan.isNotBlank() && !sedangMembatalkan,
-                    onClick = onKonfirmasi,
+            // Aksi destruktif ala alert iOS: teks merah, bukan tombol terisi.
+            TextButton(
+                onClick = onKonfirmasi,
+                enabled = catatan.isNotBlank() && !sedangMembatalkan,
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = WarnaIos.Merah,
+                    disabledContentColor = WarnaIos.Merah.copy(alpha = 0.4f),
                 ),
-                shape = RoundedCornerShape(10.dp),
-                color = if (catatan.isNotBlank() && !sedangMembatalkan) Color(0xFFDC2626) else Color(0xFFDC2626).copy(alpha = 0.4f),
             ) {
-                Row(
-                    Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    if (sedangMembatalkan) {
-                        CircularProgressIndicator(
-                            Modifier.size(13.dp),
-                            strokeWidth = 2.dp,
-                            color = Color.White,
-                        )
-                    } else {
-                        Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(14.dp))
-                    }
-                    Spacer(Modifier.width(6.dp))
-                    Text("Ya, Batalkan", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
+                if (sedangMembatalkan) {
+                    CircularProgressIndicator(
+                        Modifier.size(14.dp),
+                        strokeWidth = 2.dp,
+                        color = WarnaIos.Merah,
+                    )
+                    Spacer(Modifier.width(8.dp))
                 }
+                Text("Ya, Batalkan", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
             }
         },
         dismissButton = {
             TextButton(
                 onClick = onTutup,
                 enabled = !sedangMembatalkan,
+                colors = ButtonDefaults.textButtonColors(contentColor = WarnaIos.Aksen),
             ) {
-                Text("Kembali", color = SukaBrown, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text("Kembali", fontSize = 16.sp)
             }
         },
         icon = {
             Box(
-                Modifier.size(48.dp).background(MerahLatar, RoundedCornerShape(50)),
+                Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(NadaIos.BAHAYA.warna.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Default.WarningAmber, null, tint = MerahTeks, modifier = Modifier.size(26.dp))
+                Icon(IkonIos.WarningAmber, null, tint = NadaIos.BAHAYA.warna, modifier = Modifier.size(26.dp))
             }
         },
         title = {
-            Text(
-                "Batalkan Pesanan #${target.nomorOrder}?",
-                fontWeight = FontWeight.Black,
-                fontSize = 16.sp,
-                color = SukaBrown,
-            )
+            Text("Batalkan Pesanan #${target.nomorOrder}?", style = TipeIos.Utama)
         },
         text = {
             Column {
                 Text(
                     "Pesanan yang berstatus selesai ini akan dibatalkan secara permanen. Catatan alasan wajib diisi.",
-                    fontSize = 12.sp,
-                    color = SukaGray400,
-                    lineHeight = 17.sp,
+                    style = TipeIos.Catatan,
                 )
                 Spacer(Modifier.height(12.dp))
                 OutlinedTextField(
@@ -1093,21 +753,16 @@ private fun DialogBatalPaksa(
                     onValueChange = onUbahCatatan,
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = {
-                        Text("Contoh: order double input, duplikat dari #...", fontSize = 11.sp, color = SukaGray400)
+                        Text("Contoh: order double input, duplikat dari #...", style = TipeIos.Catatan.copy(color = WarnaIos.Abu))
                     },
                     minLines = 3,
                     maxLines = 5,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MerahTeks,
-                        unfocusedBorderColor = SukaBrown.copy(alpha = 0.2f),
-                        cursorColor = MerahTeks,
-                    ),
+                    shape = UkuranIos.SudutKontrol,
+                    colors = warnaKolomIos(),
                 )
             }
         },
-        shape = RoundedCornerShape(18.dp),
-        containerColor = Color.White,
+        shape = UkuranIos.SudutKartu,
+        containerColor = WarnaIos.Kartu,
     )
 }
-
