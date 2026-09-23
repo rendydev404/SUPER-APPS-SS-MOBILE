@@ -10,18 +10,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -32,23 +27,40 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.sukashawarma.superapp.core.ui.ios.BarisIos
+import com.sukashawarma.superapp.core.ui.ios.BilahJudulIos
+import com.sukashawarma.superapp.core.ui.ios.GrupIos
+import com.sukashawarma.superapp.core.ui.ios.KartuIos
+import com.sukashawarma.superapp.core.ui.ios.LencanaIos
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.PemisahIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.TombolKeduaIos
+import com.sukashawarma.superapp.core.ui.ios.TombolUtamaIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.ios.warnaKolomIos
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
 import com.sukashawarma.superapp.feature.distribusi.data.SuratJalanRepository
 import com.sukashawarma.superapp.feature.distribusi.domain.KondisiItem
 import com.sukashawarma.superapp.feature.distribusi.ui.LayarGalat
 import com.sukashawarma.superapp.feature.distribusi.ui.LayarKosong
 import com.sukashawarma.superapp.feature.distribusi.ui.LayarMemuat
 import com.sukashawarma.superapp.feature.distribusi.ui.ttd.TandaTanganCanvas
-import com.sukashawarma.superapp.presentation.theme.SukaGray500
-import com.sukashawarma.superapp.presentation.theme.SukaOnSurface
-import com.sukashawarma.superapp.presentation.theme.SukaOrange
-import com.sukashawarma.superapp.presentation.theme.SukaSurface
 
-private val MerahTeks = Color(0xFFB91C1C)
+/** Jarak isi langkah verifikasi — sama dengan layar lain modul ini. */
+private val PaddingLangkah = PaddingValues(
+    start = UkuranIos.TepiLayar,
+    end = UkuranIos.TepiLayar,
+    top = 12.dp,
+    bottom = 28.dp,
+)
 
 @Composable
 fun VerifikasiScreen(
@@ -69,18 +81,23 @@ fun VerifikasiScreen(
             LayarKosong(
                 "Tidak Berwenang",
                 "Verifikasi penerimaan dikerjakan crew atau leader di outlet tujuan.",
+                ikon = IkonIos.Lock,
             ); return
         }
         state.terkunci -> {
             LayarKosong(
                 "Verifikasi Terkunci",
                 "Pindai kode QR pada lembar surat jalan fisik yang dibawa kurir terlebih dahulu.",
+                ikon = IkonIos.QrCodeScanner,
+                nada = NadaIos.PERINGATAN,
             ); return
         }
         state.sudahDiverifikasi -> {
             LayarKosong(
                 "Sudah Diverifikasi",
                 "Surat jalan ini sudah pernah diverifikasi. Lihat detailnya di Riwayat.",
+                ikon = IkonIos.CheckCircle,
+                nada = NadaIos.SUKSES,
             ); return
         }
         state.error != null && state.detail == null -> {
@@ -91,42 +108,37 @@ fun VerifikasiScreen(
         }
     }
 
-    Column(Modifier.fillMaxSize().background(SukaSurface)) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = { if (state.langkah == LangkahVerifikasi.KARTU && state.indeksItem == 0) onKeluar() else viewModel.mundur() }) {
-                Icon(Icons.Default.ArrowBack, "Kembali")
-            }
-            Column(Modifier.weight(1f)) {
-                Text(
-                    "SJ ${state.detail?.nomorDokumen ?: ""}",
-                    color = SukaOnSurface,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                )
-                Text(
-                    when (state.langkah) {
-                        LangkahVerifikasi.KARTU ->
-                            "Item ${state.indeksItem + 1} dari ${state.items.size}"
-                        LangkahVerifikasi.RINGKASAN -> "Ringkasan"
-                        LangkahVerifikasi.TTD -> "Tanda tangan penerimaan"
-                    },
-                    color = SukaGray500,
-                    fontSize = 11.sp,
-                )
-            }
-        }
+    Column(Modifier.fillMaxSize().background(WarnaIos.Latar)) {
+        BilahJudulIos(
+            judul = "SJ ${state.detail?.nomorDokumen ?: ""}",
+            subjudul = when (state.langkah) {
+                LangkahVerifikasi.KARTU ->
+                    "Item ${state.indeksItem + 1} dari ${state.items.size}"
+                LangkahVerifikasi.RINGKASAN -> "Ringkasan"
+                LangkahVerifikasi.TTD -> "Tanda tangan penerimaan"
+            },
+            onKembali = { if (state.langkah == LangkahVerifikasi.KARTU && state.indeksItem == 0) onKeluar() else viewModel.mundur() },
+            garisBawah = false,
+        )
 
         LinearProgressIndicator(
             progress = { (state.indeksItem + 1f) / state.items.size },
-            modifier = Modifier.fillMaxWidth(),
-            color = SukaOrange,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = UkuranIos.TepiLayar)
+                .height(4.dp)
+                .clip(UkuranIos.SudutKapsul),
+            color = WarnaIos.Aksen,
+            trackColor = WarnaIos.Isian,
         )
 
         state.error?.let {
-            Text(it, Modifier.padding(horizontal = 16.dp, vertical = 8.dp), color = MerahTeks, fontSize = 12.sp)
+            Text(
+                it,
+                Modifier.padding(horizontal = UkuranIos.TepiLayar, vertical = 8.dp),
+                color = NadaIos.BAHAYA.teks,
+                fontSize = 13.sp,
+            )
         }
 
         when (state.langkah) {
@@ -145,25 +157,20 @@ private fun KartuItem(state: VerifikasiUiState, viewModel: VerifikasiViewModel) 
 
     LazyColumn(
         Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingLangkah,
+        verticalArrangement = Arrangement.spacedBy(UkuranIos.JarakKartu),
     ) {
         item {
-            Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), color = Color.White) {
-                Column(Modifier.padding(14.dp)) {
-                    Text(
-                        item.item.bahan?.nama ?: "Bahan tidak dikenal",
-                        color = SukaOnSurface,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "Dikirim ${item.qtyDikirimTampil} ${item.satuan}",
-                        color = SukaGray500,
-                        fontSize = 12.sp,
-                    )
-                }
+            KartuIos {
+                Text(
+                    item.item.bahan?.nama ?: "Bahan tidak dikenal",
+                    style = TipeIos.Judul3,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Dikirim ${item.qtyDikirimTampil} ${item.satuan}",
+                    style = TipeIos.SubJudul,
+                )
             }
         }
 
@@ -175,22 +182,25 @@ private fun KartuItem(state: VerifikasiUiState, viewModel: VerifikasiViewModel) 
                 onValueChange = viewModel::ubahQty,
                 label = { Text("Jumlah diterima (${item.satuan})") },
                 singleLine = true,
+                shape = UkuranIos.SudutKontrol,
+                colors = warnaKolomIos(),
                 modifier = Modifier.fillMaxWidth(),
             )
         }
 
         item {
-            OutlinedButton(onClick = viewModel::samakanQty, modifier = Modifier.fillMaxWidth()) {
-                Text("Sesuai Kirim (${item.qtyDikirimTampil} ${item.satuan})")
-            }
+            TombolKeduaIos(
+                "Sesuai Kirim (${item.qtyDikirimTampil} ${item.satuan})",
+                viewModel::samakanQty,
+            )
         }
 
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TombolKondisi("Baik", isian.kondisi == KondisiItem.BAIK, Modifier.weight(1f)) {
+                TombolKondisi("Baik", isian.kondisi == KondisiItem.BAIK, WarnaIos.Hijau, Modifier.weight(1f)) {
                     viewModel.ubahKondisi(KondisiItem.BAIK)
                 }
-                TombolKondisi("Tidak Sesuai", isian.kondisi == KondisiItem.TIDAK_SESUAI, Modifier.weight(1f)) {
+                TombolKondisi("Tidak Sesuai", isian.kondisi == KondisiItem.TIDAK_SESUAI, WarnaIos.Merah, Modifier.weight(1f)) {
                     viewModel.ubahKondisi(KondisiItem.TIDAK_SESUAI)
                 }
             }
@@ -202,19 +212,20 @@ private fun KartuItem(state: VerifikasiUiState, viewModel: VerifikasiViewModel) 
                     value = isian.catatan,
                     onValueChange = viewModel::ubahCatatan,
                     label = { Text("Catatan alasan (wajib)") },
+                    shape = UkuranIos.SudutKontrol,
+                    colors = warnaKolomIos(),
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
         }
 
         item {
-            Button(
-                onClick = viewModel::konfirmasiKondisi,
-                enabled = !state.kondisiTerkonfirmasi,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(if (state.kondisiTerkonfirmasi) "Kondisi Terkonfirmasi" else "Konfirmasi Kondisi")
-            }
+            TombolUtamaIos(
+                if (state.kondisiTerkonfirmasi) "Kondisi Terkonfirmasi" else "Konfirmasi Kondisi",
+                viewModel::konfirmasiKondisi,
+                aktif = !state.kondisiTerkonfirmasi,
+                ikon = if (state.kondisiTerkonfirmasi) IkonIos.CheckCircle else null,
+            )
         }
 
         item {
@@ -227,30 +238,24 @@ private fun KartuItem(state: VerifikasiUiState, viewModel: VerifikasiViewModel) 
                     onBatal = { kameraTerbuka = false },
                 )
             } else {
-                OutlinedButton(
-                    onClick = { kameraTerbuka = true },
-                    enabled = !state.mengunggahFoto,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(
-                        when {
-                            state.mengunggahFoto -> "Mengunggah foto..."
-                            isian.fotoPath != null -> "Foto bukti tersimpan — Ambil Ulang"
-                            else -> "Ambil Foto Bukti (wajib)"
-                        }
-                    )
-                }
+                TombolKeduaIos(
+                    when {
+                        state.mengunggahFoto -> "Mengunggah foto..."
+                        isian.fotoPath != null -> "Foto bukti tersimpan — Ambil Ulang"
+                        else -> "Ambil Foto Bukti (wajib)"
+                    },
+                    { kameraTerbuka = true },
+                    aktif = !state.mengunggahFoto,
+                )
             }
         }
 
         item {
-            Button(
-                onClick = viewModel::lanjut,
-                enabled = state.kondisiTerkonfirmasi && isian.fotoPath != null,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(if (state.indeksItem + 1 >= state.items.size) "Lanjut ke Ringkasan" else "Item Berikutnya")
-            }
+            TombolUtamaIos(
+                if (state.indeksItem + 1 >= state.items.size) "Lanjut ke Ringkasan" else "Item Berikutnya",
+                viewModel::lanjut,
+                aktif = state.kondisiTerkonfirmasi && isian.fotoPath != null,
+            )
         }
     }
 }
@@ -259,36 +264,39 @@ private fun KartuItem(state: VerifikasiUiState, viewModel: VerifikasiViewModel) 
 private fun Ringkasan(state: VerifikasiUiState, viewModel: VerifikasiViewModel) {
     LazyColumn(
         Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingLangkah,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         items(state.items, key = { it.item.id }) { tampil ->
             val isian = state.isian[tampil.item.id]
             val tidakSesuai = isian?.kondisi == KondisiItem.TIDAK_SESUAI ||
                 (isian?.qtyTerima ?: 0.0) < tampil.qtyDikirimTampil
-            Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), color = Color.White) {
-                Column(Modifier.padding(12.dp)) {
+            KartuIos(padding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         tampil.item.bahan?.nama ?: "-",
-                        color = SukaOnSurface,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
+                        Modifier.weight(1f),
+                        style = TipeIos.Utama,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
+                    Spacer(Modifier.width(8.dp))
                     Text(
                         "${isian?.qtyTerima?.toLong() ?: 0} / ${tampil.qtyDikirimTampil} ${tampil.satuan}",
-                        color = if (tidakSesuai) MerahTeks else SukaGray500,
-                        fontSize = 12.sp,
+                        style = TipeIos.Keterangan.copy(
+                            color = if (tidakSesuai) NadaIos.BAHAYA.teks else WarnaIos.LabelKedua,
+                        ),
                     )
-                    if (!isian?.catatan.isNullOrBlank()) {
-                        Text(isian!!.catatan, color = SukaGray500, fontSize = 11.sp)
-                    }
+                }
+                if (!isian?.catatan.isNullOrBlank()) {
+                    Spacer(Modifier.height(2.dp))
+                    Text(isian!!.catatan, style = TipeIos.Catatan)
                 }
             }
         }
         item {
-            Button(onClick = viewModel::keTandaTangan, modifier = Modifier.fillMaxWidth()) {
-                Text("Lanjut ke Tanda Tangan")
-            }
+            Spacer(Modifier.height(4.dp))
+            TombolUtamaIos("Lanjut ke Tanda Tangan", viewModel::keTandaTangan)
         }
     }
 }
@@ -303,32 +311,60 @@ private fun LangkahTtd(state: VerifikasiUiState, viewModel: VerifikasiViewModel)
 
     LazyColumn(
         Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        contentPadding = PaddingLangkah,
+        verticalArrangement = Arrangement.spacedBy(UkuranIos.JarakKartu),
     ) {
         items(state.ttdPenerimaan) { ttd ->
-            Text(
-                "${ttd.peran}: ${ttd.namaPenandaTangan}",
-                color = SukaOnSurface,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
+            KartuIos(padding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(IkonIos.CheckCircle, null, tint = WarnaIos.Hijau, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        "${ttd.peran}: ${ttd.namaPenandaTangan}",
+                        Modifier.weight(1f),
+                        style = TipeIos.Keterangan.copy(fontSize = 15.sp),
+                    )
+                }
+            }
         }
 
         if (peranAktif == null) {
             item {
-                OutlinedButton(
-                    onClick = { peranAktif = SuratJalanRepository.PERAN_CREW },
-                    enabled = !sudahCrew,
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text(if (sudahCrew) "Crew Penerima sudah tanda tangan" else "Tanda Tangan Crew Penerima") }
-            }
-            item {
-                OutlinedButton(
-                    onClick = { peranAktif = SuratJalanRepository.PERAN_SUPIR },
-                    enabled = !sudahSupir,
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text(if (sudahSupir) "Supir sudah tanda tangan" else "Tanda Tangan Supir") }
+                // Dua pintu tanda tangan dalam satu grup ala Pengaturan iOS. Baris yang
+                // sudah ditandatangani tidak bisa ditekan — setara tombol nonaktif lama.
+                GrupIos {
+                    BarisIos(
+                        judul = if (sudahCrew) "Crew Penerima sudah tanda tangan" else "Tanda Tangan Crew Penerima",
+                        ikon = IkonIos.Person,
+                        nadaIkon = if (sudahCrew) NadaIos.SUKSES else NadaIos.AKSEN,
+                        onKlik = if (!sudahCrew) {
+                            { peranAktif = SuratJalanRepository.PERAN_CREW }
+                        } else {
+                            null
+                        },
+                        trailing = if (sudahCrew) {
+                            { LencanaIos("Selesai", NadaIos.SUKSES, titik = false) }
+                        } else {
+                            null
+                        },
+                    )
+                    PemisahIos(inset = 58.dp)
+                    BarisIos(
+                        judul = if (sudahSupir) "Supir sudah tanda tangan" else "Tanda Tangan Supir",
+                        ikon = IkonIos.LocalShipping,
+                        nadaIkon = if (sudahSupir) NadaIos.SUKSES else NadaIos.AKSEN,
+                        onKlik = if (!sudahSupir) {
+                            { peranAktif = SuratJalanRepository.PERAN_SUPIR }
+                        } else {
+                            null
+                        },
+                        trailing = if (sudahSupir) {
+                            { LencanaIos("Selesai", NadaIos.SUKSES, titik = false) }
+                        } else {
+                            null
+                        },
+                    )
+                }
             }
         } else {
             val peran = peranAktif!!
@@ -342,11 +378,17 @@ private fun LangkahTtd(state: VerifikasiUiState, viewModel: VerifikasiViewModel)
                         onValueChange = { namaSupir = it },
                         label = { Text("Nama supir / kurir") },
                         singleLine = true,
+                        shape = UkuranIos.SudutKontrol,
+                        colors = warnaKolomIos(),
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
             } else {
-                item { Text("Nama: ${state.namaCrew}", color = SukaOnSurface, fontSize = 12.sp) }
+                item {
+                    GrupIos {
+                        BarisIos(judul = "Nama: ${state.namaCrew}", ikon = IkonIos.Person)
+                    }
+                }
             }
             item {
                 TandaTanganCanvas(
@@ -361,28 +403,27 @@ private fun LangkahTtd(state: VerifikasiUiState, viewModel: VerifikasiViewModel)
         }
 
         item {
-            Button(
-                onClick = viewModel::finalisasi,
-                enabled = state.ttdLengkap && !state.memfinalisasi,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(if (state.memfinalisasi) "Menyimpan..." else "Selesaikan Penerimaan")
-            }
+            TombolUtamaIos(
+                if (state.memfinalisasi) "Menyimpan..." else "Selesaikan Penerimaan",
+                viewModel::finalisasi,
+                aktif = state.ttdLengkap && !state.memfinalisasi,
+            )
         }
         if (!state.ttdLengkap) {
             item {
                 Text(
                     "Kedua tanda tangan wajib lengkap sebelum penerimaan bisa diselesaikan.",
-                    color = SukaGray500,
-                    fontSize = 11.sp,
+                    Modifier.padding(horizontal = 4.dp),
+                    style = TipeIos.Catatan,
                 )
             }
         }
     }
 }
 
+/** Pilihan kondisi: terisi warnanya saat terpilih, isian tipis saat tidak. */
 @Composable
-private fun TombolKondisi(teks: String, aktif: Boolean, modifier: Modifier, onKlik: () -> Unit) {
-    if (aktif) Button(onClick = onKlik, modifier = modifier) { Text(teks) }
-    else OutlinedButton(onClick = onKlik, modifier = modifier) { Text(teks) }
+private fun TombolKondisi(teks: String, aktif: Boolean, warna: Color, modifier: Modifier, onKlik: () -> Unit) {
+    if (aktif) TombolUtamaIos(teks, onKlik, modifier, warna = warna)
+    else TombolKeduaIos(teks, onKlik, modifier, warna = warna)
 }
