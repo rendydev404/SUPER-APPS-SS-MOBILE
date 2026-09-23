@@ -1,7 +1,23 @@
 package com.sukashawarma.superapp.feature.stok.ui.laporan
 
+import com.sukashawarma.superapp.core.ui.ios.GrupIos
+import com.sukashawarma.superapp.core.ui.ios.JudulSeksiIos
+import com.sukashawarma.superapp.core.ui.ios.KartuIos
+import com.sukashawarma.superapp.core.ui.ios.NadaIos
+import com.sukashawarma.superapp.core.ui.ios.PemisahIos
+import com.sukashawarma.superapp.core.ui.ios.SegmenIos
+import com.sukashawarma.superapp.core.ui.ios.TipeIos
+import com.sukashawarma.superapp.core.ui.ios.TombolBundarIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WadahSegmenIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.feature.stok.ui.MemuatPenuh
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.size
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
+import com.sukashawarma.superapp.core.ui.kaca.denganRuangNav
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,21 +31,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -55,11 +62,6 @@ import kotlinx.coroutines.launch
 import com.sukashawarma.superapp.core.ui.RealtimeRefresh
 import com.sukashawarma.superapp.core.ui.RealtimeTables
 
-private val ORANGE = Color(0xFFEA580C)
-private val SLATE400 = Color(0xFF94A3B8)
-private val SLATE500 = Color(0xFF64748B)
-private val SLATE900 = Color(0xFF0F172A)
-private val GARIS = Color(0xFFE2E8F0)
 
 /** Preset rentang — cermin tombol periode di `laporan-penjualan/page.tsx`. */
 enum class PeriodeLaporan(val label: String) {
@@ -133,24 +135,20 @@ fun LaporanPenjualanScreen(
     RealtimeRefresh(RealtimeTables.ORDERS, RealtimeTables.ORDER_ITEMS) { viewModel.muatUlang() }
     val r = state.ringkas
 
-    Column(Modifier.fillMaxSize().background(Color(0xFFF8FAFC))) {
+    Column(Modifier.fillMaxSize().background(WarnaIos.Latar)) {
         HeaderStok(
             judul = "Laporan Penjualan",
             subjudul = if (state.memuat) "Memuat…" else "${r.jumlahOrder} order selesai",
             onKembali = onBack,
             aksi = {
-                IconButton(onClick = viewModel::muatUlang) {
-                    Icon(Icons.Default.Refresh, "Muat ulang", tint = Color(0xFF1E293B))
-                }
+                TombolBundarIos(IkonIos.Refresh, "Muat ulang", viewModel::muatUlang)
             },
         )
 
         BarisPeriode(state.periode, viewModel::pilihPeriode)
 
         when {
-            state.memuat -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = ORANGE)
-            }
+            state.memuat -> MemuatPenuh()
             state.error != null -> PesanKosongLaporan(state.error!!)
             r.jumlahOrder == 0 -> PesanKosongLaporan(
                 if (r.jumlahBatal > 0) "Tidak ada pesanan selesai pada periode ini (${r.jumlahBatal} dibatalkan)."
@@ -158,82 +156,58 @@ fun LaporanPenjualanScreen(
             )
             else -> LazyColumn(
                 Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(horizontal = UkuranIos.TepiLayar, vertical = 12.dp).denganRuangNav(),
+                verticalArrangement = Arrangement.spacedBy(UkuranIos.JarakKartu),
             ) {
                 item { KartuOmzet(r) }
                 if (r.perKanal.isNotEmpty()) item { KartuKanal(r.perKanal, r.omzetBersih) }
                 if (r.perOutlet.isNotEmpty()) item { KartuOutlet(r.perOutlet) }
-                if (r.menuTerlaris.isNotEmpty()) item { JudulSeksi("MENU TERLARIS") }
+                if (r.menuTerlaris.isNotEmpty()) item { JudulSeksi("Menu terlaris") }
                 items(r.menuTerlaris, key = { it.nama }) { BarisMenu(it) }
             }
         }
     }
 }
 
+/** Pilihan periode sebagai kontrol segmen iOS. */
 @Composable
 private fun BarisPeriode(aktif: PeriodeLaporan, onPilih: (PeriodeLaporan) -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().background(Color.White).padding(horizontal = 16.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        PeriodeLaporan.entries.forEach { p ->
-            val terpilih = p == aktif
-            Surface(
-                shape = RoundedCornerShape(50),
-                color = if (terpilih) Color(0xFFFFEDD5) else Color(0xFFF1F5F9),
-                modifier = Modifier.clickable { onPilih(p) },
-            ) {
-                Text(
-                    p.label,
-                    Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
-                    color = if (terpilih) Color(0xFFC2410C) else SLATE500,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
+    WadahSegmenIos(Modifier.padding(horizontal = UkuranIos.TepiLayar, vertical = 8.dp)) {
+        PeriodeLaporan.entries.forEach { periode ->
+            SegmenIos(periode.label, periode == aktif, { onPilih(periode) }, Modifier.weight(1f), jarakSisi = 6.dp)
         }
     }
 }
 
 @Composable
 private fun KartuOmzet(r: RingkasPenjualan) {
-    Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), color = SLATE900) {
-        Column(Modifier.padding(18.dp)) {
-            Text(
-                "OMZET BERSIH",
-                color = SLATE400,
-                fontSize = 9.5.sp,
-                fontWeight = FontWeight.Black,
-                letterSpacing = 0.8.sp,
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                formatRupiah(r.omzetBersih),
-                color = Color.White,
-                fontSize = 26.sp,
-                fontWeight = FontWeight.Black,
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "Kotor ${formatRupiah(r.omzetKotor)} · potongan ${formatRupiah(r.potongan)}",
-                color = Color(0xFFCBD5E1),
-                fontSize = 11.5.sp,
-                fontWeight = FontWeight.Medium,
-            )
+    KartuIos {
+        Text("Omzet bersih", style = TipeIos.SubJudul)
+        Spacer(Modifier.height(4.dp))
+        Text(formatRupiah(r.omzetBersih), style = TipeIos.JudulBesar.copy(fontSize = 30.sp))
+        Spacer(Modifier.height(2.dp))
+        Text(
+            "Kotor ${formatRupiah(r.omzetKotor)} · potongan ${formatRupiah(r.potongan)}",
+            style = TipeIos.Catatan,
+        )
 
-            Spacer(Modifier.height(14.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Spacer(Modifier.height(14.dp))
+        Column(
+            Modifier.fillMaxWidth().clip(UkuranIos.SudutBlok).background(WarnaIos.Latar).padding(vertical = 10.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 AngkaGelap("Order", r.jumlahOrder.toString(), Modifier.weight(1f))
+                Box(Modifier.width(0.5.dp).height(30.dp).background(WarnaIos.Pemisah))
                 AngkaGelap("Rata-rata", formatRupiah(r.rataRataOrder), Modifier.weight(1f))
             }
-            Spacer(Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Box(Modifier.padding(horizontal = 12.dp, vertical = 8.dp).fillMaxWidth().height(0.5.dp).background(WarnaIos.Pemisah))
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 AngkaGelap(
                     "Jam tersibuk",
                     r.jamTersibuk?.let { "%02d:00".format(it) } ?: "—",
                     Modifier.weight(1f),
                 )
+                Box(Modifier.width(0.5.dp).height(30.dp).background(WarnaIos.Pemisah))
                 AngkaGelap("Dibatalkan", r.jumlahBatal.toString(), Modifier.weight(1f))
             }
         }
@@ -242,33 +216,27 @@ private fun KartuOmzet(r: RingkasPenjualan) {
 
 @Composable
 private fun AngkaGelap(label: String, nilai: String, modifier: Modifier = Modifier) {
-    Column(modifier) {
-        Text(label.uppercase(), color = SLATE400, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp)
-        Spacer(Modifier.height(3.dp))
-        Text(nilai, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(label, style = TipeIos.Kecil.copy(fontWeight = FontWeight.Medium))
+        Spacer(Modifier.height(2.dp))
+        Text(
+            nilai, color = WarnaIos.Label, fontSize = 17.sp, fontWeight = FontWeight.Bold,
+            maxLines = 1, overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
 @Composable
 private fun KartuKanal(baris: List<BarisKanal>, omzetTotal: Double) {
-    Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), color = Color.White) {
-        Column(Modifier.padding(16.dp)) {
-            Text("PER KANAL", color = SLATE400, fontSize = 9.5.sp, fontWeight = FontWeight.Black, letterSpacing = 0.8.sp)
-            Spacer(Modifier.height(10.dp))
-            baris.forEachIndexed { i, b ->
-                if (i > 0) HorizontalDivider(Modifier.padding(vertical = 9.dp), color = GARIS)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(b.kanal.label, color = SLATE900, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            "${b.jumlahOrder} order · ${porsiPersen(b.omzet, omzetTotal)}",
-                            color = SLATE500,
-                            fontSize = 11.sp,
-                        )
-                    }
-                    Text(formatRupiah(b.omzet), color = ORANGE, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+    GrupIos(judul = "Per kanal") {
+        baris.forEachIndexed { i, b ->
+            if (i > 0) PemisahIos()
+            Row(Modifier.padding(horizontal = 16.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(b.kanal.label, style = TipeIos.Keterangan.copy(fontWeight = FontWeight.SemiBold))
+                    Text("${b.jumlahOrder} order · ${porsiPersen(b.omzet, omzetTotal)}", style = TipeIos.Catatan)
                 }
+                Text(formatRupiah(b.omzet), color = NadaIos.AKSEN.teks, fontSize = 15.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -276,31 +244,26 @@ private fun KartuKanal(baris: List<BarisKanal>, omzetTotal: Double) {
 
 @Composable
 private fun KartuOutlet(baris: List<BarisOutletJual>) {
-    Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), color = Color.White) {
-        Column(Modifier.padding(16.dp)) {
-            Text("PER OUTLET", color = SLATE400, fontSize = 9.5.sp, fontWeight = FontWeight.Black, letterSpacing = 0.8.sp)
-            Spacer(Modifier.height(10.dp))
-            baris.forEachIndexed { i, b ->
-                if (i > 0) HorizontalDivider(Modifier.padding(vertical = 9.dp), color = GARIS)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "${i + 1}",
-                        Modifier.width(22.dp),
-                        color = SLATE400,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Black,
-                    )
-                    Column(Modifier.weight(1f)) {
-                        Text(b.nama, color = SLATE900, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            "${b.jumlahOrder} order · ${formatAngkaStok(b.porsi)} porsi",
-                            color = SLATE500,
-                            fontSize = 11.sp,
-                        )
-                    }
-                    Text(formatRupiah(b.omzet), color = SLATE900, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+    GrupIos(judul = "Per outlet") {
+        baris.forEachIndexed { i, b ->
+            if (i > 0) PemisahIos(inset = 50.dp)
+            Row(Modifier.padding(horizontal = 16.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier.size(24.dp).clip(CircleShape).background(WarnaIos.Isian),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("${i + 1}", color = WarnaIos.LabelKedua, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        b.nama, style = TipeIos.Keterangan.copy(fontWeight = FontWeight.SemiBold),
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    )
+                    Text("${b.jumlahOrder} order · ${formatAngkaStok(b.porsi)} porsi", style = TipeIos.Catatan)
+                }
+                Spacer(Modifier.width(8.dp))
+                Text(formatRupiah(b.omzet), color = WarnaIos.Label, fontSize = 15.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -308,19 +271,19 @@ private fun KartuOutlet(baris: List<BarisOutletJual>) {
 
 @Composable
 private fun JudulSeksi(teks: String) {
-    Text(teks, color = SLATE400, fontSize = 9.5.sp, fontWeight = FontWeight.Black, letterSpacing = 0.8.sp)
+    JudulSeksiIos(teks)
 }
 
 @Composable
 private fun BarisMenu(m: BarisMenuLaris) {
-    Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), color = Color.White) {
-        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+    KartuIos(padding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(m.nama, color = SLATE900, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Spacer(Modifier.height(2.dp))
-                Text("${formatAngkaStok(m.qty)} terjual", color = SLATE500, fontSize = 11.sp)
+                Text(m.nama, style = TipeIos.Keterangan.copy(fontWeight = FontWeight.SemiBold), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text("${formatAngkaStok(m.qty)} terjual", style = TipeIos.Catatan)
             }
-            Text(formatRupiah(m.omzet), color = ORANGE, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+            Spacer(Modifier.width(8.dp))
+            Text(formatRupiah(m.omzet), color = NadaIos.AKSEN.teks, fontSize = 15.sp, fontWeight = FontWeight.Bold)
         }
     }
 }
