@@ -4,44 +4,37 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sukashawarma.superapp.feature.distribusi.ui.KartuSuratJalan
 import com.sukashawarma.superapp.feature.distribusi.ui.LayarGalat
 import com.sukashawarma.superapp.feature.distribusi.ui.LayarKosong
 import com.sukashawarma.superapp.feature.distribusi.ui.LayarMemuat
-import com.sukashawarma.superapp.feature.distribusi.ui.NavBawah
+import com.sukashawarma.superapp.feature.distribusi.ui.ShellDistribusi
 import com.sukashawarma.superapp.feature.distribusi.ui.TabBawah
 import com.sukashawarma.superapp.feature.distribusi.ui.SegarkanSaatAktif
-import com.sukashawarma.superapp.presentation.theme.SukaOnSurface
-import com.sukashawarma.superapp.presentation.theme.SukaSurface
 import com.sukashawarma.superapp.core.ui.RealtimeRefresh
+import com.sukashawarma.superapp.core.ui.ios.BilahJudulIos
+import com.sukashawarma.superapp.core.ui.ios.TombolBundarIos
+import com.sukashawarma.superapp.core.ui.ios.UkuranIos
+import com.sukashawarma.superapp.core.ui.ios.WarnaIos
+import com.sukashawarma.superapp.core.ui.kaca.IkonIos
 import com.sukashawarma.superapp.core.ui.RealtimeTables
+import com.sukashawarma.superapp.core.ui.kaca.denganRuangNav
+import com.sukashawarma.superapp.core.ui.kaca.navigationBarsPaddingKaca
 
 @Composable
 fun RiwayatScreen(
@@ -68,51 +61,44 @@ fun RiwayatScreen(
         }
     }
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        bottomBar = {
-            NavBawah(
-                aktif = TabBawah.RIWAYAT,
-                bolehVerifikasi = state.bolehVerifikasi,
-                onDashboard = onBukaDashboard,
-                onScan = onBukaScan,
-                onRiwayat = {},
-            )
-        },
-    ) { padding ->
-        Column(Modifier.fillMaxSize().background(SukaSurface).padding(padding)) {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onKeluar) { Icon(Icons.Default.ArrowBack, "Kembali") }
-                Text(
-                    "Riwayat Penerimaan",
-                    color = SukaOnSurface,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                )
-                Spacer(Modifier.weight(1f))
-                IconButton(onClick = { viewModel.muat(paksa = true) }) {
-                    Icon(Icons.Default.Refresh, "Segarkan")
+    ShellDistribusi(
+        aktif = TabBawah.RIWAYAT,
+        bolehVerifikasi = state.bolehVerifikasi,
+        onDashboard = onBukaDashboard,
+        onScan = onBukaScan,
+        onRiwayat = {},
+    ) {
+        Scaffold(
+            containerColor = WarnaIos.Latar,
+            snackbarHost = { SnackbarHost(snackbarHostState, Modifier.navigationBarsPaddingKaca()) },
+        ) { padding ->
+            Column(Modifier.fillMaxSize().background(WarnaIos.Latar).padding(padding)) {
+                BilahJudulIos(judul = "Riwayat Penerimaan", onKembali = onKeluar) {
+                    TombolBundarIos(IkonIos.Refresh, "Segarkan", { viewModel.muat(paksa = true) })
                 }
-            }
 
-            when {
-                state.memuat && state.daftar.isEmpty() -> LayarMemuat()
-                state.error != null && state.daftar.isEmpty() ->
-                    LayarGalat(state.error!!) { viewModel.muat(paksa = true) }
-                state.daftar.isEmpty() -> LayarKosong(
-                    "Belum Ada Riwayat",
-                    "Penerimaan yang sudah diverifikasi dan ditandatangani akan tercatat di sini.",
-                )
-                else -> LazyColumn(
-                    Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    items(state.daftar, key = { it.id }) { baris ->
-                        KartuSuratJalan(baris = baris, onKlik = { onBukaDetail(baris.id) })
+                when {
+                    state.memuat && state.daftar.isEmpty() -> LayarMemuat()
+                    state.error != null && state.daftar.isEmpty() ->
+                        LayarGalat(state.error!!) { viewModel.muat(paksa = true) }
+                    state.daftar.isEmpty() -> LayarKosong(
+                        "Belum Ada Riwayat",
+                        "Penerimaan yang sudah diverifikasi dan ditandatangani akan tercatat di sini.",
+                        ikon = IkonIos.History,
+                    )
+                    else -> LazyColumn(
+                        Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(
+                            start = UkuranIos.TepiLayar,
+                            end = UkuranIos.TepiLayar,
+                            top = 12.dp,
+                            bottom = 24.dp,
+                        ).denganRuangNav(),
+                        verticalArrangement = Arrangement.spacedBy(UkuranIos.JarakKartu),
+                    ) {
+                        items(state.daftar, key = { it.id }) { baris ->
+                            KartuSuratJalan(baris = baris, onKlik = { onBukaDetail(baris.id) })
+                        }
                     }
                 }
             }
