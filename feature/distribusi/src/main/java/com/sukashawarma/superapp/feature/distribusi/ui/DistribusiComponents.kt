@@ -66,6 +66,8 @@ fun LencanaStatus(status: StatusSuratJalan?, adaSelisih: Boolean) {
     val (teks, nada) = when {
         status == null -> "Tidak Dikenal" to NadaIos.NETRAL
         adaSelisih && status.nilai.startsWith("diterima") -> "Ada Selisih" to NadaIos.BAHAYA
+        status == StatusSuratJalan.DIBATALKAN -> status.label to NadaIos.NETRAL
+        status == StatusSuratJalan.DRAFT -> status.label to NadaIos.NETRAL
         status == StatusSuratJalan.SELESAI -> status.label to NadaIos.SUKSES
         status == StatusSuratJalan.DITERIMA_LENGKAP -> status.label to NadaIos.SUKSES
         status == StatusSuratJalan.DITERIMA_SEBAGIAN -> status.label to NadaIos.BAHAYA
