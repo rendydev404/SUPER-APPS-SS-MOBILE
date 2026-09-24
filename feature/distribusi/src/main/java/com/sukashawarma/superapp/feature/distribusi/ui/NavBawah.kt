@@ -6,7 +6,7 @@ import com.sukashawarma.superapp.core.ui.kaca.IkonIos
 import com.sukashawarma.superapp.core.ui.kaca.ItemTabKaca
 import com.sukashawarma.superapp.core.ui.kaca.ShellKaca
 
-enum class TabBawah { DASHBOARD, SCAN, RIWAYAT }
+enum class TabBawah { DASHBOARD, SCAN, BUAT, RIWAYAT }
 
 /**
  * Kerangka tiga layar ber-tab modul ini: isi layar dengan tab bar kaca di bawahnya,
@@ -17,7 +17,8 @@ enum class TabBawah { DASHBOARD, SCAN, RIWAYAT }
  *
  * Tab tengah hanya muncul untuk role yang berhak memverifikasi. Pengawas
  * membuka modul ini untuk memantau, bukan menerima barang, jadi menampilkan
- * pintu pindai kepada mereka hanya akan menyesatkan.
+ * pintu pindai kepada mereka hanya akan menyesatkan. Kitchen (pengirim) justru
+ * mendapat "Buat SJ" di tengah — cermin varian `isPusat` `BottomNav.tsx`.
  */
 @Composable
 fun ShellDistribusi(
@@ -26,17 +27,21 @@ fun ShellDistribusi(
     onDashboard: () -> Unit,
     onScan: () -> Unit,
     onRiwayat: () -> Unit,
+    bolehTerbitkan: Boolean = false,
+    onBuat: () -> Unit = {},
     isi: @Composable () -> Unit,
 ) {
-    val tab = if (bolehVerifikasi) {
-        listOf(TabBawah.DASHBOARD, TabBawah.SCAN, TabBawah.RIWAYAT)
-    } else {
-        listOf(TabBawah.DASHBOARD, TabBawah.RIWAYAT)
+    val tab = buildList {
+        add(TabBawah.DASHBOARD)
+        if (bolehVerifikasi) add(TabBawah.SCAN)
+        if (bolehTerbitkan) add(TabBawah.BUAT)
+        add(TabBawah.RIWAYAT)
     }
     val item = tab.map {
         when (it) {
             TabBawah.DASHBOARD -> ItemTabKaca("Dashboard", IkonIos.Dashboard)
             TabBawah.SCAN -> ItemTabKaca("Scan QR", IkonIos.QrCodeScanner)
+            TabBawah.BUAT -> ItemTabKaca("Buat SJ", IkonIos.Add)
             TabBawah.RIWAYAT -> ItemTabKaca("Riwayat", IkonIos.History)
         }
     }
@@ -48,6 +53,7 @@ fun ShellDistribusi(
                 when (tab[i]) {
                     TabBawah.DASHBOARD -> onDashboard()
                     TabBawah.SCAN -> onScan()
+                    TabBawah.BUAT -> onBuat()
                     TabBawah.RIWAYAT -> onRiwayat()
                 }
             })
