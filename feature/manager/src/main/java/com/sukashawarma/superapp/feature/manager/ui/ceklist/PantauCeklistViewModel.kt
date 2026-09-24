@@ -34,6 +34,8 @@ data class PantauCeklistUiState(
     val meninjau: Boolean = false,
     val role: Role? = null,
     val galat: String? = null,
+    /** Galat pemuatan — bertahan setelah snackbar [galat] ditutup. */
+    val galatMuat: String? = null,
     val kabar: String? = null,
 ) {
     val hariIni: Boolean get() = tanggal == CeklistHarianRepository.hariIni()
@@ -102,20 +104,21 @@ class PantauCeklistViewModel : ViewModel() {
         val tanggal = _state.value.tanggal
         pemuatan?.cancel()
         pemuatan = viewModelScope.launch {
-            if (!silent) _state.update { it.copy(memuat = true, galat = null) }
+            if (!silent) _state.update { it.copy(memuat = true, galat = null, galatMuat = null) }
             try {
                 val data = CeklistHarianRepository.muatHari(tanggal)
                 _state.update {
                     // Tanggal bisa sudah digeser lagi selagi permintaan berjalan.
                     if (it.tanggal != tanggal) it
-                    else it.copy(memuat = false, outlets = data.outlets, laporan = data.laporan)
+                    else it.copy(memuat = false, outlets = data.outlets, laporan = data.laporan, galatMuat = null)
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 android.util.Log.e("PantauCeklistVM", "muatUlang() gagal", e)
                 _state.update {
-                    it.copy(memuat = false, galat = if (silent) null else pesanGalatJaringan(e, "ceklist harian"))
+                    val pesan = if (silent) null else pesanGalatJaringan(e, "ceklist harian")
+                    it.copy(memuat = false, galat = pesan, galatMuat = pesan ?: it.galatMuat)
                 }
             }
         }
@@ -160,7 +163,7 @@ class PantauCeklistViewModel : ViewModel() {
         _state.update { it.copy(meninjau = true) }
         viewModelScope.launch {
             try {
-                CeklistHarianRepository.tinjau(laporan.id, awal.tanggapan)
+                CeklistHarianRepository.tinjau(laporan.id, awal.tanggapan, laporan.diperbaruiPada, laporan.ditinjauPada)
                 _state.update { it.copy(meninjau = false, outletDibuka = null, kabar = "Laporan disetujui. AM sudah diberi tahu.") }
                 muatUlang(silent = true)
             } catch (e: CancellationException) {
@@ -168,6 +171,15 @@ class PantauCeklistViewModel : ViewModel() {
                 throw e
             } catch (e: Exception) {
                 android.util.Log.e("PantauCeklistVM", "tinjau() gagal", e)
+                if (CeklistHarianRepository.PESAN_VERSI_BERUBAH in e.message.orEmpty()) {
+                    // AM mengirim ulang atau peninjau lain baru saja menanggapi: tampilkan
+                    // versi terbaru dulu, jangan setujui isi yang belum dilihat.
+                    _state.update {
+                        it.copy(meninjau = false, galat = "Laporan ini baru saja diperbarui. Periksa lagi isinya sebelum menyetujui.")
+                    }
+                    muatUlang(silent = true)
+                    return@launch
+                }
                 _state.update { it.copy(meninjau = false, galat = if (adalahGalatJaringan(e)) pesanGalatJaringan(e, "") else "Gagal menyetujui laporan. Coba lagi.") }
             }
         }
