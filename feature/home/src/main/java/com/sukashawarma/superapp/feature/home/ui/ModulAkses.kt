@@ -53,14 +53,15 @@ internal val STOK_ROLES = STOK_ROLES_OUTLET + STOK_ROLES_PUSAT
  * `DistribusiAkses.ROLE_MODUL`, disalin ke sini supaya `:feature:home` tidak
  * perlu bergantung pada `:feature:distribusi` hanya untuk satu himpunan.
  *
- * `kitchen` dan `admin` sengaja tidak masuk: penerbitan surat jalan tetap di web,
- * dan database memang hanya mengizinkan mereka menerbitkannya.
+ * `kitchen` masuk sebagai pengirim (buat, tanda tangan, kirim surat jalan);
+ * `admin` dan `owner` tetap memakai versi web.
  */
 internal val DISTRIBUSI_ROLES = setOf(
     Role.CREW,
     Role.LEADER,
     Role.AREA_MANAGER,
     Role.REGIONAL_MANAGER,
+    Role.KITCHEN,
 )
 
 /**
