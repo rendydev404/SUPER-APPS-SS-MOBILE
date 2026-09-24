@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
@@ -73,12 +74,17 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import com.sukashawarma.superapp.core.update.model.AppUpdateManifest
-import com.sukashawarma.superapp.core.update.ui.AppUpdateIndicator
+import com.sukashawarma.superapp.BuildConfig
+import com.sukashawarma.superapp.core.update.ui.LayarWajibUpdate
+import com.sukashawarma.superapp.presentation.home.ChefPembaruan
+import com.sukashawarma.superapp.presentation.home.ModeChef
+import androidx.activity.compose.BackHandler
 import com.sukashawarma.superapp.core.update.ui.AppUpdateSuccessIndicator
 import com.sukashawarma.superapp.core.update.ui.DraggableUpdateOverlay
 import kotlinx.coroutines.launch
 import android.content.Context
+
+private const val EXTRA_PRATINJAU_UPDATE = "pratinjau_wajib_update"
 
 object Routes {
     const val LOGIN = "login"
@@ -101,10 +107,28 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         bacaTujuanNotifikasi(intent)
         handleInstallStatus(intent)
+        bacaPratinjauUpdate(intent)
         setContent {
             SukaSuperappTheme {
-                RootNav()
+                Box(Modifier.fillMaxSize()) {
+                    RootNav()
+                    // Di atas RootNav, bukan di dalamnya: layar loading dan login pun
+                    // harus tertutup — versi lama tidak boleh dipakai sama sekali.
+                    GerbangWajibUpdate()
+                }
             }
+        }
+    }
+
+    /**
+     * Khusus build debug: `adb shell am start -n <paket>/.presentation.MainActivity
+     * --ez pratinjau_wajib_update true` memunculkan layar wajib update dengan unduhan
+     * tiruan. Build debug tidak pernah mengecek rilis, jadi inilah satu-satunya cara
+     * melihat layarnya di perangkat uji.
+     */
+    private fun bacaPratinjauUpdate(intent: Intent?) {
+        if (BuildConfig.DEBUG && intent?.getBooleanExtra(EXTRA_PRATINJAU_UPDATE, false) == true) {
+            AppUpdateManager.mulaiPratinjau()
         }
     }
 
@@ -118,6 +142,7 @@ class MainActivity : FragmentActivity() {
         setIntent(intent)
         bacaTujuanNotifikasi(intent)
         handleInstallStatus(intent)
+        bacaPratinjauUpdate(intent)
     }
 
     private fun handleInstallStatus(intent: Intent?) {
@@ -280,8 +305,11 @@ private fun RootNav() {
         return
     }
 
-    LocationPermissionGate(staff != null)
-    IzinNotifikasiGate(staff != null)
+    // Selama update wajib menunggu, dialog izin tidak ditumpuk di atas layar blokir.
+    if (updateManifest == null) {
+        LocationPermissionGate(staff != null)
+        IzinNotifikasiGate(staff != null)
+    }
 
     val destination = resolveStartDestination(staff, mitraProfile, mitraLoadFailed)
     val isMitra = destination.isMitraArea
@@ -323,6 +351,10 @@ private fun RootNav() {
             }
             NotifikasiTujuan.MANAGER_PETTY_CASH -> {
                 tujuanManager = TujuanManager.PETTY_CASH
+                navController.navigate(Routes.MANAGER)
+            }
+            NotifikasiTujuan.MANAGER_CEKLIST -> {
+                tujuanManager = TujuanManager.CEKLIST
                 navController.navigate(Routes.MANAGER)
             }
             NotifikasiTujuan.LEADER_PETTY_CASH -> {
@@ -474,49 +506,67 @@ private fun RootNav() {
                     onDismiss = { AppUpdateManager.acknowledgeRecentInstall(context) }
                 )
             }
-        } else updateManifest?.let { manifest ->
-            OverlayUpdateOtomatis(manifest = manifest, context = context)
         }
         }
     }
 }
 
 /**
- * Overlay update yang mengisolasi observasi downloadProgress dan downloadState
- * agar lonjakan event saat mengunduh APK tidak memicu recomposition di seluruh RootNav.
+ * Layar wajib update: menutup seluruh aplikasi selama ada versi yang lebih baru.
+ *
+ * Observasi kemajuan unduhan diisolasi di sini supaya lonjakan event saat
+ * mengunduh tidak memicu recomposition di seluruh RootNav.
  */
 @Composable
-private fun OverlayUpdateOtomatis(
-    manifest: AppUpdateManifest,
-    context: Context,
-) {
+private fun GerbangWajibUpdate() {
+    val manifest by AppUpdateManager.availableUpdate.collectAsState()
+    val context = LocalContext.current
+    val m = manifest ?: return
+
     val downloadState by AppUpdateManager.downloadState.collectAsState()
     val downloadPayload by AppUpdateManager.downloadPayload.collectAsState()
     val downloadPayloadSizeBytes by AppUpdateManager.downloadPayloadSizeBytes.collectAsState()
     val downloadProgress by AppUpdateManager.downloadProgress.collectAsState()
 
-    DraggableUpdateOverlay {
-        AppUpdateIndicator(
-            manifest = manifest,
-            downloadState = downloadState,
-            downloadPayload = downloadPayload,
-            downloadPayloadSizeBytes = downloadPayloadSizeBytes,
-            downloadProgress = downloadProgress,
-            onAction = {
-                when (downloadState) {
-                    AppUpdateManager.DownloadState.IDLE,
-                    AppUpdateManager.DownloadState.FAILED ->
-                        AppUpdateManager.startDownload(context, manifest)
-                    AppUpdateManager.DownloadState.READY_TO_INSTALL ->
-                        AppUpdateManager.installDownloadedApk(context)
-                    AppUpdateManager.DownloadState.AWAITING_USER_ACTION ->
-                        AppUpdateManager.continueInstallWithUserAction(context)
+    // Tombol Kembali ditelan: tidak ada jalan keluar selain memasang update.
+    BackHandler(enabled = true) {}
+
+    LayarWajibUpdate(
+        manifest = m,
+        versiSekarang = AppUpdateManager.currentVersionName,
+        ilustrasi = {
+            ChefPembaruan(
+                mode = when (downloadState) {
+                    AppUpdateManager.DownloadState.IDLE -> ModeChef.DIAM
                     AppUpdateManager.DownloadState.DOWNLOADING,
-                    AppUpdateManager.DownloadState.INSTALLING -> Unit
-                }
+                    AppUpdateManager.DownloadState.INSTALLING -> ModeChef.SIBUK
+                    AppUpdateManager.DownloadState.READY_TO_INSTALL,
+                    AppUpdateManager.DownloadState.AWAITING_USER_ACTION -> ModeChef.SIAP
+                    AppUpdateManager.DownloadState.FAILED -> ModeChef.GAGAL
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        state = downloadState,
+        progress = downloadProgress,
+        payload = downloadPayload,
+        ukuranPayload = downloadPayloadSizeBytes,
+        onAksi = {
+            when (downloadState) {
+                AppUpdateManager.DownloadState.IDLE,
+                AppUpdateManager.DownloadState.FAILED ->
+                    AppUpdateManager.startDownload(context, m)
+                AppUpdateManager.DownloadState.READY_TO_INSTALL ->
+                    AppUpdateManager.installDownloadedApk(context)
+                AppUpdateManager.DownloadState.AWAITING_USER_ACTION ->
+                    AppUpdateManager.continueInstallWithUserAction(context)
+                AppUpdateManager.DownloadState.DOWNLOADING,
+                AppUpdateManager.DownloadState.INSTALLING -> Unit
             }
-        )
-    }
+        },
+        pratinjau = AppUpdateManager.modePratinjau,
+        onTutupPratinjau = { AppUpdateManager.akhiriPratinjau() },
+    )
 }
 
 private enum class IzinBukaOtomatis { TIDAK_PERLU, DITAWARKAN, DI_PENGATURAN }
