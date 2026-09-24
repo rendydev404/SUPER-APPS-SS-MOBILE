@@ -2,7 +2,8 @@ package com.sukashawarma.superapp.feature.distribusi.domain
 
 /**
  * Siklus hidup surat jalan, cermin CHECK constraint `surat_jalan_status_check`:
- * draft -> dikirim -> diterima_lengkap/diterima_sebagian -> selesai.
+ * draft -> dikirim -> diterima_lengkap/diterima_sebagian -> selesai, atau
+ * draft -> dibatalkan lewat RPC `batalkan_surat_jalan_draft`.
  *
  * `dikirim_lengkap` adalah varian lama dari `dikirim` yang masih ada di data
  * produksi; keduanya diperlakukan sama persis, termasuk labelnya.
@@ -13,7 +14,8 @@ enum class StatusSuratJalan(val nilai: String, val label: String) {
     DIKIRIM_LENGKAP("dikirim_lengkap", "Dalam Transit"),
     DITERIMA_SEBAGIAN("diterima_sebagian", "Diterima Sebagian"),
     DITERIMA_LENGKAP("diterima_lengkap", "Diterima Lengkap"),
-    SELESAI("selesai", "Selesai");
+    SELESAI("selesai", "Selesai"),
+    DIBATALKAN("dibatalkan", "Dibatalkan");
 
     companion object {
         /** Nilai tak dikenal mengembalikan null, bukan melempar: satu baris lama
