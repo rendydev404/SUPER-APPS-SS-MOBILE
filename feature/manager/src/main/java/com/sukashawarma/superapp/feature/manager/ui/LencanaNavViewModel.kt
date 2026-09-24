@@ -2,7 +2,10 @@ package com.sukashawarma.superapp.feature.manager.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.sukashawarma.superapp.domain.session.AppSession
+import com.sukashawarma.superapp.feature.manager.data.CeklistHarianRepository
 import com.sukashawarma.superapp.feature.manager.data.PersetujuanRepository
+import com.sukashawarma.superapp.feature.manager.domain.meninjauCeklist
 import com.sukashawarma.superapp.feature.manager.data.WasteRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
@@ -13,7 +16,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /** Angka lencana pada nav bawah dan lembar menu. */
-data class LencanaNav(val persetujuan: Int = 0, val waste: Int = 0)
+data class LencanaNav(val persetujuan: Int = 0, val waste: Int = 0, val ceklist: Int = 0)
 
 /**
  * Hitungan antrean yang menempel di navigasi, bukan di satu layar.
@@ -46,9 +49,25 @@ class LencanaNavViewModel : ViewModel() {
                         data.void.size + data.bypass.size
                     }
                     val waste = async { WasteRepository.jumlahMenunggu(null) }
+                    // Ceklist hari ini yang belum ditinjau — antrean milik peninjau
+                    // saja. Bagi area manager angka ini bukan tugasnya, jadi nol.
+                    // Galatnya ditelan DI DALAM async: anak yang gagal membatalkan
+                    // seluruh coroutineScope dan ikut menghapus dua lencana lain.
+                    val ceklist = async {
+                        if (!meninjauCeklist(AppSession.staff.value?.role)) return@async 0
+                        try {
+                            CeklistHarianRepository.jumlahBelumDitinjau()
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            android.util.Log.e("LencanaNavViewModel", "jumlahBelumDitinjau() gagal", e)
+                            0
+                        }
+                    }
                     val jumlahPersetujuan = persetujuan.await()
                     val jumlahWaste = waste.await()
-                    _lencana.update { LencanaNav(jumlahPersetujuan, jumlahWaste) }
+                    val jumlahCeklist = ceklist.await()
+                    _lencana.update { LencanaNav(jumlahPersetujuan, jumlahWaste, jumlahCeklist) }
                 }
             } catch (e: CancellationException) {
                 throw e
