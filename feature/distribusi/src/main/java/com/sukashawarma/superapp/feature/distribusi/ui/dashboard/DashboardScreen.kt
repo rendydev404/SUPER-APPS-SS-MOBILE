@@ -86,6 +86,7 @@ fun DashboardScreen(
     onBukaScan: () -> Unit,
     onBukaRiwayat: () -> Unit,
     onBukaDetail: (String) -> Unit,
+    onBukaBuat: () -> Unit = {},
     viewModel: DashboardViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
@@ -136,6 +137,8 @@ fun DashboardScreen(
         onDashboard = {},
         onScan = onBukaScan,
         onRiwayat = onBukaRiwayat,
+        bolehTerbitkan = state.bolehTerbitkan,
+        onBuat = onBukaBuat,
     ) {
         Scaffold(
             containerColor = WarnaIos.Latar,
@@ -145,6 +148,7 @@ fun DashboardScreen(
                 KepalaDashboard(
                     namaOutlet = state.namaOutlet,
                     namaPengguna = state.namaPengguna,
+                    pusat = state.bolehTerbitkan,
                     onKeluar = onKeluar,
                     onSegarkan = { viewModel.muat(paksa = true) },
                 )
@@ -165,8 +169,10 @@ fun DashboardScreen(
                             namaOutlet = state.namaOutlet,
                             rentang = state.rentang,
                             bolehVerifikasi = state.bolehVerifikasi,
+                            bolehTerbitkan = state.bolehTerbitkan,
                             onUbahRentang = viewModel::ubahRentang,
                             onScan = onBukaScan,
+                            onBuat = onBukaBuat,
                         )
                     }
 
@@ -241,7 +247,7 @@ fun DashboardScreen(
                                 aksiLabel = when {
                                     !bolehTutup -> null
                                     sedangDiproses -> "Menutup..."
-                                    else -> "Tutup Dokumen"
+                                    else -> if (state.bolehTerbitkan) "Verifikasi Akhir" else "Tutup Dokumen"
                                 },
                                 onKlik = { onBukaDetail(baris.id) },
                                 onAksi = if (bolehTutup && !sedangDiproses) {
@@ -350,12 +356,14 @@ private fun KontrolPaginationSuratJalan(
 private fun KepalaDashboard(
     namaOutlet: String,
     namaPengguna: String,
+    pusat: Boolean,
     onKeluar: () -> Unit,
     onSegarkan: () -> Unit,
 ) {
     BilahJudulIos(
         judul = "Pusat Komando Distribusi",
-        subjudul = "Outlet Supply Unit • ${namaOutlet.ifBlank { "Outlet" }}",
+        subjudul = if (pusat) "Gudang Pusat • Semua outlet"
+        else "Outlet Supply Unit • ${namaOutlet.ifBlank { "Outlet" }}",
         onKembali = onKeluar,
     ) {
         TombolBundarIos(IkonIos.Refresh, "Segarkan", onSegarkan)
@@ -379,8 +387,10 @@ private fun BannerHero(
     namaOutlet: String,
     rentang: RentangTanggal,
     bolehVerifikasi: Boolean,
+    bolehTerbitkan: Boolean,
     onUbahRentang: (RentangTanggal) -> Unit,
     onScan: () -> Unit,
+    onBuat: () -> Unit,
 ) {
     KartuIos {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -395,16 +405,26 @@ private fun BannerHero(
         }
 
         Spacer(Modifier.height(10.dp))
-        Text(
-            "Penerimaan Logistik ${namaOutlet.ifBlank { "Outlet" }}",
-            style = TipeIos.Judul2,
-        )
-        Spacer(Modifier.height(4.dp))
-        Text(
-            "Pastikan barang fisik yang tiba dicocokkan dengan manifes surat jalan " +
-                "dan bubuhkan tanda tangan penerima sebelum dimasukkan ke kartu stok outlet.",
-            style = TipeIos.SubJudul,
-        )
+        if (bolehTerbitkan) {
+            Text("Pengiriman Gudang Pusat", style = TipeIos.Judul2)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Terbitkan surat jalan, lengkapi tanda tangan admin gudang dan supir, lalu kirim. " +
+                    "Setelah outlet memverifikasi, tutup dokumennya lewat Verifikasi Akhir.",
+                style = TipeIos.SubJudul,
+            )
+        } else {
+            Text(
+                "Penerimaan Logistik ${namaOutlet.ifBlank { "Outlet" }}",
+                style = TipeIos.Judul2,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Pastikan barang fisik yang tiba dicocokkan dengan manifes surat jalan " +
+                    "dan bubuhkan tanda tangan penerima sebelum dimasukkan ke kartu stok outlet.",
+                style = TipeIos.SubJudul,
+            )
+        }
 
         Spacer(Modifier.height(14.dp))
         // Segmented control iOS: isian abu, segmen aktif berupa pil putih berbayang.
@@ -428,6 +448,10 @@ private fun BannerHero(
         if (bolehVerifikasi) {
             Spacer(Modifier.height(14.dp))
             TombolUtamaIos("Scan QR Kedatangan", onScan, ikon = IkonIos.QrCodeScanner)
+        }
+        if (bolehTerbitkan) {
+            Spacer(Modifier.height(14.dp))
+            TombolUtamaIos("Buat Surat Jalan", onBuat, ikon = IkonIos.Add)
         }
     }
 }
