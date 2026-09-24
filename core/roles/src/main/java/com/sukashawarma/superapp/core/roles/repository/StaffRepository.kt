@@ -20,12 +20,13 @@ object StaffRepository {
             "outlet_staff",
             listOf(
                 "id" to "eq.$userId",
-                "select" to "id,outlet_id,name,role,status,ref_photo_url,username,allow_manual_button,display_name,display_username,avatar_url,outlets!outlet_staff_outlet_id_fkey(name)"
+                "select" to "id,outlet_id,name,role,status,ref_photo_url,username,allow_manual_button,display_name,display_username,avatar_url,outlets!outlet_staff_outlet_id_fkey(name,slug)"
             )
         ) ?: return null
 
         var outletId = row.optString("outlet_id")
         var outletName = row.optJsonObject("outlets")?.optString("name")
+        var outletSlug = row.optJsonObject("outlets")?.optString("slug")
 
         val todayStart = JakartaTime.todayStartIso()
         val attRow = Postgrest.select(
@@ -33,7 +34,7 @@ object StaffRepository {
             listOf(
                 "outlet_staff_id" to "eq.$userId",
                 "created_at" to "gte.$todayStart",
-                "select" to "outlet_id,outlets(name)",
+                "select" to "outlet_id,outlets(name,slug)",
                 "order" to "created_at.desc",
                 "limit" to "1"
             )
@@ -41,13 +42,17 @@ object StaffRepository {
 
         attRow?.optString("outlet_id")?.let { attOutletId ->
             outletId = attOutletId
-            attRow.optJsonObject("outlets")?.optString("name")?.let { outletName = it }
+            attRow.optJsonObject("outlets")?.let { outlet ->
+                outlet.optString("name")?.let { outletName = it }
+                outletSlug = outlet.optString("slug")
+            }
         }
 
         return StaffProfile(
             id = row.optString("id") ?: userId,
             outletId = outletId,
             outletName = outletName,
+            outletSlug = outletSlug,
             name = row.optString("name") ?: "",
             role = Role.from(row.optString("role")),
             roleRaw = row.optString("role") ?: "",
