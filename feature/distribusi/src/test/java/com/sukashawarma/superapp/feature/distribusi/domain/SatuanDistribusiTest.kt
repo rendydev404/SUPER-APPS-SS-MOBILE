@@ -130,4 +130,16 @@ class SatuanDistribusiTest {
         val b = meta("Dus", satuanDistribusi = "Pack", satuanTengah = "Pack", faktorTengah = -5.0)
         assertEquals(1.0, SatuanDistribusi.faktor(b), 0.0001)
     }
+
+    @Test
+    fun `bks dan bungkus dianggap satuan yang sama seperti web`() {
+        val b = meta("Dus", satuanDistribusi = "bks", satuanTengah = "Bungkus", faktorTengah = 20.0)
+        assertEquals(20.0, SatuanDistribusi.faktor(b), 0.0001)
+    }
+
+    @Test
+    fun `spasi di nama satuan diabaikan`() {
+        val b = meta("Dus", satuanDistribusi = " Pack ", satuanTengah = "pack", faktorTengah = 10.0)
+        assertEquals(10.0, SatuanDistribusi.faktor(b), 0.0001)
+    }
 }
