@@ -121,6 +121,7 @@ object AppUpdateManager {
         }
 
         cleanOldInstallers(appCtx)
+        pulihkanUpdateWajib(appCtx)
 
         val prefs = appCtx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         if (prefs.getInt(KEY_ACKNOWLEDGED_VERSION, 0) == currentVersionCode) return
@@ -230,7 +231,16 @@ object AppUpdateManager {
     }
 
     private fun applyIfNewer(manifest: AppUpdateManifest) {
-        if (manifest.versionCode <= currentVersionCode) return
+        if (modePratinjau) return
+        if (manifest.versionCode <= currentVersionCode) {
+            // Rilis ditarik mundur di server: aplikasi tidak boleh terus terkunci
+            // oleh versi yang sudah tidak ditawarkan lagi.
+            if (_availableUpdate.value != null) {
+                appContext?.let { hapusUpdateWajib(it) }
+                _availableUpdate.value = null
+            }
+            return
+        }
 
         val context = appContext
         val isDifferentRelease = pendingManifest?.versionCode != manifest.versionCode
@@ -251,6 +261,7 @@ object AppUpdateManager {
         }
 
         _availableUpdate.value = manifest
+        context?.let { simpanUpdateWajib(it, manifest) }
 
         if (context != null && _downloadState.value == DownloadState.IDLE) {
             startDownload(context, manifest)
@@ -258,6 +269,10 @@ object AppUpdateManager {
     }
 
     fun startDownload(context: Context, manifest: AppUpdateManifest) {
+        if (modePratinjau) {
+            simulasiUnduh()
+            return
+        }
         if (_downloadState.value == DownloadState.DOWNLOADING || processingDownloadedPayload.get()) return
         pendingManifest = manifest
 
@@ -458,6 +473,98 @@ object AppUpdateManager {
 
     private const val PREFS_NAME = "superapp_update_prefs"
     private const val KEY_ACKNOWLEDGED_VERSION = "acknowledged_superapp_version"
+    private const val KEY_MANIFEST_WAJIB = "manifest_update_wajib"
+
+    /**
+     * Setiap versi baru WAJIB dipasang — aplikasi terkunci sampai update terpasang.
+     *
+     * Manifestnya disimpan di perangkat supaya kuncinya bertahan saat aplikasi
+     * ditutup paksa atau dibuka tanpa internet. Tanpa ini, cukup mematikan data
+     * seluler sebelum membuka aplikasi untuk melewati kewajiban update.
+     */
+    private fun simpanUpdateWajib(context: Context, manifest: AppUpdateManifest) {
+        context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putString(KEY_MANIFEST_WAJIB, gson.toJson(manifest)).apply()
+    }
+
+    private fun hapusUpdateWajib(context: Context) {
+        context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().remove(KEY_MANIFEST_WAJIB).apply()
+    }
+
+    /**
+     * Dipanggil sekali saat aplikasi mulai. Manifest yang sudah tidak lebih baru
+     * dari versi terpasang (update berhasil, atau dipasang manual) dibuang.
+     */
+    private fun pulihkanUpdateWajib(context: Context) {
+        if (BuildConfig.DEBUG) return
+        val json = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_MANIFEST_WAJIB, null) ?: return
+        val manifest = runCatching { gson.fromJson(json, AppUpdateManifest::class.java) }.getOrNull()
+        if (manifest == null || manifest.versionCode <= currentVersionCode) {
+            hapusUpdateWajib(context)
+            return
+        }
+        applyIfNewer(manifest)
+    }
+
+    // ------------------------------------------------------------------ pratinjau
+
+    /**
+     * true selama layar wajib update sedang dipratinjau di build debug. Build debug
+     * tidak pernah mengecek rilis (lihat [checkForUpdate]), jadi tanpa mode ini
+     * layar blokir mustahil dilihat di perangkat uji.
+     */
+    @Volatile var modePratinjau = false
+        private set
+
+    /** Hanya build debug. Memunculkan layar wajib update dengan unduhan tiruan. */
+    fun mulaiPratinjau() {
+        if (!BuildConfig.DEBUG) return
+        modePratinjau = true
+        _downloadState.value = DownloadState.IDLE
+        _downloadProgress.value = 0
+        _downloadPayload.value = DownloadPayload.DELTA_PATCH
+        _downloadPayloadSizeBytes.value = 4_718_592L
+        _availableUpdate.value = AppUpdateManifest(
+            versionCode = currentVersionCode + 1,
+            versionName = "${currentVersionName.substringBeforeLast('.')}.${(currentVersionName.substringAfterLast('.').toIntOrNull() ?: 0) + 1}",
+            apkUrl = "",
+            notes = "Ceklist Harian untuk Area Manager & Regional Manager\n" +
+                "Push notifikasi saat ceklist dikirim dan disetujui\n" +
+                "Foto lebih hemat kuota (WebP)",
+        )
+    }
+
+    fun akhiriPratinjau() {
+        if (!modePratinjau) return
+        modePratinjau = false
+        _availableUpdate.value = null
+        reset()
+    }
+
+    private fun simulasiUnduh() {
+        if (_downloadState.value == DownloadState.DOWNLOADING) return
+        _downloadState.value = DownloadState.DOWNLOADING
+        _downloadProgress.value = 0
+        scope.launch {
+            for (persen in 1..100) {
+                if (!modePratinjau) return@launch
+                delay(if (persen < 80) 45 else 90)
+                _downloadProgress.value = persen
+            }
+            if (modePratinjau) _downloadState.value = DownloadState.READY_TO_INSTALL
+        }
+    }
+
+    private fun simulasiPasang() {
+        _downloadState.value = DownloadState.INSTALLING
+        scope.launch {
+            delay(2600)
+            // Pratinjau tidak pernah memasang apa pun: kembali ke "siap dipasang".
+            if (modePratinjau) _downloadState.value = DownloadState.READY_TO_INSTALL
+        }
+    }
 
     private fun markComplete(context: Context, versionCode: Int) {
         context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -494,6 +601,10 @@ object AppUpdateManager {
     }
 
     fun installDownloadedApk(context: Context) {
+        if (modePratinjau) {
+            simulasiPasang()
+            return
+        }
         val manifest = pendingManifest ?: return
         val updatesDir = File(context.getExternalFilesDir(null), "updates")
         val apkFile = File(updatesDir, "suka-superapp-${manifest.versionCode}.apk")
@@ -569,6 +680,10 @@ object AppUpdateManager {
     }
 
     fun continueInstallWithUserAction(context: Context) {
+        if (modePratinjau) {
+            simulasiPasang()
+            return
+        }
         val confirmation = pendingUserAction
         if (confirmation != null) {
             confirmation.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
