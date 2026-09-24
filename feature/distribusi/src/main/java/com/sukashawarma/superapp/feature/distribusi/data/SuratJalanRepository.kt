@@ -42,10 +42,11 @@ object SuratJalanRepository {
             "surat_jalan_item(qty_dikirim,qty_terima,kondisi)"
 
     private const val SELECT_DETAIL =
-        "id,outlet_id,status,created_at,document_number,verification_code," +
+        "id,outlet_id,status,created_at,document_number,verification_code,notes," +
             "signatures,receipt_signatures,outlets(name)," +
             "surat_jalan_item(id,bahan_baku_id,qty_dikirim,qty_terima,kondisi,catatan," +
-            "foto_path,verified_at,bahan_baku(id,nama,kategori,satuan,satuan_distribusi," +
+            "foto_path,verified_at,vendor_id,vendor:supplier!surat_jalan_item_vendor_id_fkey(id,nama)," +
+            "bahan_baku(id,nama,kategori,satuan,satuan_distribusi," +
             "satuan_tengah,satuan_kecil,faktor_tengah,faktor_tampilan))"
 
     private const val TTL_MS = 60_000L
@@ -128,6 +129,13 @@ object SuratJalanRepository {
         ).map { it.asJsonObject.keRingkas() }
     }
 
+    /**
+     * Seluruh surat jalan di cakupan, semua status — daftar "Riwayat" sisi pusat
+     * (`/distribusi/surat-jalan` web). Cakupan kitchen dari
+     * `accessible_outlet_ids()` memang seluruh outlet.
+     */
+    suspend fun semua(): List<SuratJalanRingkas> = daftar(RentangTanggal.SEMUA)
+
     suspend fun detail(id: String): SuratJalanDetail? {
         val baris = Postgrest.selectOne(
             "surat_jalan",
@@ -169,7 +177,7 @@ object SuratJalanRepository {
 
     /** PostgREST mengembalikan relasi to-one sebagai objek, tapi beberapa versi
      *  membungkusnya dalam array satu elemen. Tangani keduanya. */
-    private fun JsonObject.relasiTunggal(key: String): JsonObject? {
+    internal fun JsonObject.relasiTunggal(key: String): JsonObject? {
         optJsonObject(key)?.let { return it }
         val arr = optJsonArray(key) ?: return null
         return arr.firstOrNull()?.takeIf { it.isJsonObject }?.asJsonObject
@@ -208,6 +216,7 @@ object SuratJalanRepository {
         namaOutlet = relasiTunggal("outlets")?.optString("name"),
         nomorDokumen = optString("document_number"),
         kodeVerifikasi = optString("verification_code"),
+        catatan = optString("notes"),
         dibuatPada = optString("created_at"),
         ttdPengirim = keTandaTangan(optJsonArray("signatures")),
         ttdPenerimaan = keTandaTangan(optJsonArray("receipt_signatures")),
@@ -223,11 +232,13 @@ object SuratJalanRepository {
                 fotoPath = o.optString("foto_path"),
                 terverifikasiPada = o.optString("verified_at"),
                 bahan = o.relasiTunggal("bahan_baku")?.keBahanMeta(),
+                vendorId = o.optString("vendor_id"),
+                vendorNama = o.relasiTunggal("vendor")?.optString("nama"),
             )
         }.sortedBy { it.bahan?.nama ?: "" },
     )
 
-    private fun JsonObject.keBahanMeta() = BahanBakuMeta(
+    internal fun JsonObject.keBahanMeta() = BahanBakuMeta(
         id = optString("id").orEmpty(),
         nama = optString("nama").orEmpty(),
         satuan = optString("satuan").orEmpty(),
@@ -239,7 +250,7 @@ object SuratJalanRepository {
         kategori = optString("kategori"),
     )
 
-    private fun keTandaTangan(arr: JsonArray?): List<TandaTangan> =
+    internal fun keTandaTangan(arr: JsonArray?): List<TandaTangan> =
         (arr ?: JsonArray()).mapNotNull { elemen ->
             val o = elemen.takeIf { it.isJsonObject }?.asJsonObject ?: return@mapNotNull null
             TandaTangan(
@@ -369,14 +380,25 @@ object SuratJalanRepository {
      *
      * RLS `surat_jalan_update_scoped` adalah jaring pengaman terakhirnya di server.
      */
-    suspend fun tutupDokumen(suratJalanId: String) {
+    suspend fun tutupDokumen(suratJalanId: String): Boolean {
         val patch = JsonObject()
         patch.addProperty("status", StatusSuratJalan.SELESAI.nilai)
         patch.addProperty(
             "updated_at",
             OffsetDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME),
         )
-        Postgrest.update("surat_jalan", listOf("id" to "eq.$suratJalanId"), patch)
+        // Syarat status ikut di filter: dua pengawas yang menutup bersamaan, atau
+        // dokumen yang statusnya berubah sejak layar dimuat, tidak ikut tertimpa.
+        // Balasan kosong berarti tidak ada baris yang berubah — bukan sukses.
+        val hasil = Postgrest.update(
+            "surat_jalan",
+            listOf(
+                "id" to "eq.$suratJalanId",
+                "status" to "in.(diterima_lengkap,diterima_sebagian)",
+            ),
+            patch,
+        )
         invalidate()
+        return hasil.size() > 0
     }
 }
