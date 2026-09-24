@@ -245,13 +245,25 @@ object CeklistHarianRepository {
         daftar.map { it.trim() }.filter { it.isNotEmpty() }.forEach { add(it) }
     }
 
-    /** Regional manager menandai laporan sudah ditinjau, dengan tanggapan opsional. */
-    suspend fun tinjau(ceklistId: String, tanggapan: String) {
+    /** Galat RPC saat laporan berubah sejak dilihat peninjau (migrasi 20300242). */
+    const val PESAN_VERSI_BERUBAH = "baru saja diperbarui"
+
+    /**
+     * Regional manager menandai laporan sudah ditinjau, dengan tanggapan opsional.
+     *
+     * [diperbaruiPada] dan [ditinjauPada] adalah versi laporan yang SEDANG TAMPIL
+     * di layar peninjau, diteruskan persis seperti diterima dari PostgREST. Server
+     * menolak bila AM sudah mengirim ulang atau peninjau lain sudah menanggapi
+     * sejak itu — persetujuan tidak boleh jatuh ke isi yang belum pernah dilihat.
+     */
+    suspend fun tinjau(ceklistId: String, tanggapan: String, diperbaruiPada: String, ditinjauPada: String?) {
         Postgrest.rpc(
             "tinjau_ceklist_harian",
             JsonObject().apply {
                 addProperty("p_ceklist_id", ceklistId)
                 addProperty("p_tanggapan", tanggapan.trim().takeIf { it.isNotEmpty() })
+                addProperty("p_diperbarui_pada", diperbaruiPada.takeIf { it.isNotBlank() })
+                addProperty("p_ditinjau_pada", ditinjauPada?.takeIf { it.isNotBlank() })
             },
         )
     }
