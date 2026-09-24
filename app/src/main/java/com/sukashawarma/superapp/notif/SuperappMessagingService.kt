@@ -288,6 +288,7 @@ class SuperappMessagingService : FirebaseMessagingService() {
             NotifikasiTujuan.MANAGER_PERSETUJUAN,
             NotifikasiTujuan.MANAGER_WASTE,
             NotifikasiTujuan.MANAGER_PETTY_CASH,
+            NotifikasiTujuan.MANAGER_CEKLIST,
             NotifikasiTujuan.LEADER_PETTY_CASH,
             NotifikasiTujuan.CHAT,
         )
@@ -298,7 +299,7 @@ class SuperappMessagingService : FirebaseMessagingService() {
             if (manajer.getNotificationChannel(SALURAN) != null) return
             manajer.createNotificationChannel(
                 NotificationChannel(SALURAN, "Pemberitahuan", NotificationManager.IMPORTANCE_HIGH).apply {
-                    description = "Persetujuan waste, permintaan, dan kabar operasional lain."
+                    description = "Persetujuan waste, ceklist harian, permintaan, dan kabar operasional lain."
                 }
             )
         }
