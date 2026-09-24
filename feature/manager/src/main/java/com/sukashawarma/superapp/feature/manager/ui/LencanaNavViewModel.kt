@@ -13,6 +13,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 /** Angka lencana pada nav bawah dan lembar menu. */
@@ -37,8 +38,13 @@ class LencanaNavViewModel : ViewModel() {
         muatUlang()
     }
 
+    /** Dibatalkan setiap kali muat ulang baru dimulai: saat realtime beruntun,
+     *  balasan lama yang tiba belakangan tidak boleh menimpa angka yang lebih baru. */
+    private var pemuatan: Job? = null
+
     fun muatUlang() {
-        viewModelScope.launch {
+        pemuatan?.cancel()
+        pemuatan = viewModelScope.launch {
             try {
                 coroutineScope {
                     // Lencana menghitung seluruh antrean layar Persetujuan, bukan hanya
