@@ -48,6 +48,7 @@ import com.sukashawarma.superapp.core.ui.RealtimeTables
 import com.sukashawarma.superapp.core.ui.ios.BilahJudulIos
 import com.sukashawarma.superapp.core.ui.ios.IkonBulatIos
 import com.sukashawarma.superapp.core.ui.ios.KapsulPilihanIos
+import com.sukashawarma.superapp.core.ui.ios.PanelGalatIos
 import com.sukashawarma.superapp.core.ui.ios.KartuIos
 import com.sukashawarma.superapp.core.ui.ios.LencanaIos
 import com.sukashawarma.superapp.core.ui.ios.NadaIos
@@ -179,7 +180,11 @@ private fun DaftarPantau(state: PantauCeklistUiState, viewModel: PantauCeklistVi
         }
 
         val daftar = state.outletTerlihat
-        if (daftar.isEmpty()) {
+        if (daftar.isEmpty() && state.galatMuat != null) {
+            item(key = "galat-muat") {
+                PanelGalatIos("Data ceklist belum termuat.", { viewModel.muatUlang() })
+            }
+        } else if (daftar.isEmpty()) {
             item(key = "kosong") {
                 KartuPanel {
                     PanelKosong(
