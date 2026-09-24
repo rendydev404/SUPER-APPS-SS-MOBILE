@@ -42,6 +42,7 @@ fun RiwayatScreen(
     onBukaDetail: (String) -> Unit,
     onBukaDashboard: () -> Unit,
     onBukaScan: () -> Unit,
+    onBukaBuat: () -> Unit = {},
     viewModel: RiwayatViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
@@ -67,13 +68,18 @@ fun RiwayatScreen(
         onDashboard = onBukaDashboard,
         onScan = onBukaScan,
         onRiwayat = {},
+        bolehTerbitkan = state.pusat,
+        onBuat = onBukaBuat,
     ) {
         Scaffold(
             containerColor = WarnaIos.Latar,
             snackbarHost = { SnackbarHost(snackbarHostState, Modifier.navigationBarsPaddingKaca()) },
         ) { padding ->
             Column(Modifier.fillMaxSize().background(WarnaIos.Latar).padding(padding)) {
-                BilahJudulIos(judul = "Riwayat Penerimaan", onKembali = onKeluar) {
+                BilahJudulIos(
+                    judul = if (state.pusat) "Semua Surat Jalan" else "Riwayat Penerimaan",
+                    onKembali = onKeluar,
+                ) {
                     TombolBundarIos(IkonIos.Refresh, "Segarkan", { viewModel.muat(paksa = true) })
                 }
 
@@ -83,7 +89,8 @@ fun RiwayatScreen(
                         LayarGalat(state.error!!) { viewModel.muat(paksa = true) }
                     state.daftar.isEmpty() -> LayarKosong(
                         "Belum Ada Riwayat",
-                        "Penerimaan yang sudah diverifikasi dan ditandatangani akan tercatat di sini.",
+                        if (state.pusat) "Surat jalan yang diterbitkan Gudang Pusat akan tercatat di sini."
+                        else "Penerimaan yang sudah diverifikasi dan ditandatangani akan tercatat di sini.",
                         ikon = IkonIos.History,
                     )
                     else -> LazyColumn(
