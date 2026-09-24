@@ -6,6 +6,7 @@ object DistribusiRoutes {
     const val INBOX = "distribusi/inbox"
     const val SCAN = "distribusi/scan"
     const val RIWAYAT = "distribusi/riwayat"
+    const val BUAT = "distribusi/buat"
 
     private const val VERIFIKASI_POLA = "distribusi/verifikasi"
     const val VERIFIKASI = "$VERIFIKASI_POLA/{suratJalanId}"
