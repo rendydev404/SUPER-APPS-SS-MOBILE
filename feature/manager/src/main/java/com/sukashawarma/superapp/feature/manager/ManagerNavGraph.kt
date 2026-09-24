@@ -31,7 +31,10 @@ import com.sukashawarma.superapp.feature.manager.ui.IsiMenuManager
 import com.sukashawarma.superapp.feature.manager.ui.LencanaNavViewModel
 import com.sukashawarma.superapp.feature.manager.ui.NavBawahManager
 import com.sukashawarma.superapp.feature.manager.ui.TujuanManager
+import com.sukashawarma.superapp.feature.manager.domain.mengisiCeklist
 import com.sukashawarma.superapp.feature.manager.domain.mengisiInventaris
+import com.sukashawarma.superapp.feature.manager.ui.ceklist.CeklistHarianScreen
+import com.sukashawarma.superapp.feature.manager.ui.ceklist.PantauCeklistScreen
 import com.sukashawarma.superapp.feature.manager.ui.hpp.HppScreen
 import com.sukashawarma.superapp.feature.manager.ui.inventaris.InventarisScreen
 import com.sukashawarma.superapp.feature.manager.ui.inventaris.LaporanInventarisScreen
@@ -85,6 +88,7 @@ fun ManagerNavGraph(onExit: () -> Unit, tujuanAwal: TujuanManager? = null) {
     RealtimeRefresh(
         RealtimeTables.CANCELLATION_REQUESTS,
         RealtimeTables.WASTE_REPORTS,
+        RealtimeTables.CEKLIST_HARIAN,
     ) { lencanaVm.muatUlang() }
 
     /**
@@ -122,6 +126,7 @@ fun ManagerNavGraph(onExit: () -> Unit, tujuanAwal: TujuanManager? = null) {
             NavBawahManager(
                 aktif = aktif,
                 jumlahPersetujuan = lencana.persetujuan,
+                jumlahCeklist = lencana.ceklist,
                 latar = latar,
                 onPilih = { pindah(it) },
                 onBukaMenu = { menuTerbuka = true },
@@ -142,6 +147,15 @@ fun ManagerNavGraph(onExit: () -> Unit, tujuanAwal: TujuanManager? = null) {
                     onExit = onExit,
                     onBukaWaste = { pindah(TujuanManager.WASTE) },
                 )
+            }
+            composable(TujuanManager.CEKLIST.rute) {
+                // Satu tujuan, dua wajah — pola yang sama dengan Inventori: area
+                // manager mengisi, regional manager memantau.
+                if (mengisiCeklist(staff?.role)) {
+                    CeklistHarianScreen(onExit = onExit)
+                } else {
+                    PantauCeklistScreen(onExit = onExit)
+                }
             }
             composable(TujuanManager.LAPORAN.rute) {
                 LaporanScreen(onExit = onExit)
@@ -191,6 +205,7 @@ fun ManagerNavGraph(onExit: () -> Unit, tujuanAwal: TujuanManager? = null) {
                     tujuanTerlihat = tujuanTerlihat,
                     jumlahPersetujuan = lencana.persetujuan,
                     jumlahWaste = lencana.waste,
+                    jumlahCeklist = lencana.ceklist,
                     onPilih = { tujuan ->
                         // Lembar ditutup dengan animasinya sendiri lebih dulu; menutup
                         // paksa bersamaan dengan navigasi membuat isinya berkedip.
