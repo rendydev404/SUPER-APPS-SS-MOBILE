@@ -537,14 +537,16 @@ private fun GerbangWajibUpdate() {
         ilustrasi = {
             ChefPembaruan(
                 mode = when (downloadState) {
-                    AppUpdateManager.DownloadState.IDLE -> ModeChef.DIAM
-                    AppUpdateManager.DownloadState.DOWNLOADING,
                     AppUpdateManager.DownloadState.INSTALLING -> ModeChef.SIBUK
-                    AppUpdateManager.DownloadState.READY_TO_INSTALL,
-                    AppUpdateManager.DownloadState.AWAITING_USER_ACTION -> ModeChef.SIAP
                     AppUpdateManager.DownloadState.FAILED -> ModeChef.GAGAL
+                    else -> ModeChef.DIAM
                 },
                 modifier = Modifier.fillMaxWidth(),
+                // Sengaja TIDAK menutup aplikasi setelah roket meluncur. Menutup di
+                // sini memutus alur saat pemasangan butuh konfirmasi atau dibatalkan
+                // pengguna: app terbuka lagi masih INSTALLING, roket meluncur lagi,
+                // dan tertutup lagi — pengguna terkunci. Penggantian paket oleh sistem
+                // sudah mematikan proses lama; AppUpdateRelauncher membukanya kembali.
             )
         },
         state = downloadState,
