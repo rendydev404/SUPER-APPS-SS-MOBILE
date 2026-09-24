@@ -18,12 +18,19 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material3.Icon
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,16 +59,54 @@ import com.sukashawarma.superapp.core.ui.ios.WarnaIos
 import com.sukashawarma.superapp.core.ui.kaca.IkonIos
 import com.sukashawarma.superapp.feature.distribusi.data.model.SuratJalanDetail
 import com.sukashawarma.superapp.feature.distribusi.data.model.TandaTangan
+import com.sukashawarma.superapp.feature.distribusi.domain.PengirimanPusat
+import com.sukashawarma.superapp.feature.distribusi.domain.StatusSuratJalan
+import com.sukashawarma.superapp.feature.distribusi.domain.bolehDitutup
 import com.sukashawarma.superapp.feature.distribusi.ui.LayarGalat
 import com.sukashawarma.superapp.feature.distribusi.ui.LayarMemuat
 import com.sukashawarma.superapp.feature.distribusi.ui.LencanaStatus
 import com.sukashawarma.superapp.feature.distribusi.ui.formatTanggal
 
 @Composable
-fun DetailSuratJalanScreen(suratJalanId: String, onKeluar: () -> Unit) {
+fun DetailSuratJalanScreen(
+    suratJalanId: String,
+    onKeluar: () -> Unit,
+    /** Setelah dokumen dikirim atau dibatalkan — kembali ke daftar. */
+    onSelesaiAksi: () -> Unit = onKeluar,
+) {
     val viewModel: DetailViewModel = viewModel(factory = DetailViewModel.Factory(suratJalanId))
     val state by viewModel.state.collectAsState()
     RealtimeRefresh(RealtimeTables.SURAT_JALAN) { viewModel.muat() }
+    val snackbar = remember { SnackbarHostState() }
+    var mintaBatal by remember { mutableStateOf(false) }
+    var mintaTutup by remember { mutableStateOf(false) }
+    // Di luar LazyColumn dan saveable: menggulir daftar atau memutar layar tidak
+    // boleh membuang goresan tanda tangan yang sedang dibuat.
+    var ttdPeran by rememberSaveable { mutableStateOf<String?>(null) }
+
+    // Tampilkan dulu, baru bersihkan. Membersihkan lebih dulu mengubah kunci efek,
+    // efeknya dibatalkan, dan snackbar ikut tertutup sebelum sempat terbaca.
+    LaunchedEffect(state.pesan, state.galatAksi) {
+        val teks = state.galatAksi ?: state.pesan
+        if (teks != null) {
+            snackbar.showSnackbar(teks)
+            viewModel.bersihkanPesan()
+        }
+    }
+    // Form tanda tangan hanya ditutup setelah server benar-benar mencatat perannya.
+    LaunchedEffect(state.peranTtd, ttdPeran) {
+        val peran = ttdPeran ?: return@LaunchedEffect
+        val tercatat = if (peran == PengirimanPusat.PERAN_ADMIN) PengirimanPusat.sudahTtdAdmin(state.peranTtd)
+        else PengirimanPusat.sudahTtdSupir(state.peranTtd)
+        if (tercatat || !state.draft) ttdPeran = null
+    }
+    LaunchedEffect(state.selesaiAksi) {
+        if (state.selesaiAksi) {
+            // Beri waktu snackbar sukses terbaca sebelum layar ditutup, seperti jeda 1 detik web.
+            kotlinx.coroutines.delay(1000)
+            onSelesaiAksi()
+        }
+    }
 
     if (state.memuat && state.detail == null) { LayarMemuat(); return }
     val detail = state.detail
@@ -79,57 +124,111 @@ fun DetailSuratJalanScreen(suratJalanId: String, onKeluar: () -> Unit) {
     val jumlahBermasalah = state.baris.count { it.bermasalah }
     val jumlahBukti = state.baris.count { it.fotoPath != null }
 
-    Column(Modifier.fillMaxSize().background(WarnaIos.Latar)) {
-        KepalaDetail(detail, state.baris.any { it.bermasalah }, onKeluar)
+    Box(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize().background(WarnaIos.Latar)) {
+            KepalaDetail(detail, state.baris.any { it.bermasalah }, onKeluar)
 
-        LazyColumn(
-            Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                start = UkuranIos.TepiLayar,
-                end = UkuranIos.TepiLayar,
-                top = 12.dp,
-                bottom = 28.dp,
-            ),
-            verticalArrangement = Arrangement.spacedBy(UkuranIos.JarakKartu),
-        ) {
-            item(key = "ringkasan") {
-                RingkasanDetail(
-                    jumlahBarang = jumlahBarang,
-                    jumlahDiperiksa = jumlahDiperiksa,
-                    jumlahBermasalah = jumlahBermasalah,
-                    jumlahBukti = jumlahBukti,
-                )
-            }
-
-            // Kode verifikasi hanya untuk pengawas — lihat DistribusiAkses.
-            if (state.bolehLihatKode && detail.kodeVerifikasi != null) {
-                item(key = "kode-verifikasi") {
-                    KartuKodeVerifikasi(detail.kodeVerifikasi)
+            LazyColumn(
+                Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    start = UkuranIos.TepiLayar,
+                    end = UkuranIos.TepiLayar,
+                    top = 12.dp,
+                    bottom = 28.dp,
+                ),
+                verticalArrangement = Arrangement.spacedBy(UkuranIos.JarakKartu),
+            ) {
+                item(key = "ringkasan") {
+                    RingkasanDetail(
+                        jumlahBarang = jumlahBarang,
+                        jumlahDiperiksa = jumlahDiperiksa,
+                        jumlahBermasalah = jumlahBermasalah,
+                        jumlahBukti = jumlahBukti,
+                    )
                 }
-            }
 
-            item(key = "judul-rincian") {
-                KepalaBagian(
-                    judul = "Rincian barang",
-                    keterangan = "Bandingkan jumlah kirim dengan jumlah yang diterima",
-                    jumlah = "$jumlahBarang item",
-                )
-            }
+                if (detail.status == StatusSuratJalan.DIBATALKAN) {
+                    item(key = "dibatalkan") { KartuDibatalkan(detail.catatan) }
+                }
 
-            itemsIndexed(state.baris) { indeks, baris ->
-                KartuItemDetail(
-                    nomor = indeks + 1,
-                    baris = baris,
-                    bitmap = baris.fotoPath?.let { state.foto[it] },
-                )
-            }
+                if (state.bolehTutup && detail.status?.bolehDitutup == true) {
+                    item(key = "verifikasi-akhir") { KartuVerifikasiAkhir(state) { mintaTutup = true } }
+                }
 
-            item(key = "judul-persetujuan") {
-                KepalaBagian("Persetujuan", "Jejak tanda tangan dokumen", "2 tahap")
+                // Kode verifikasi hanya untuk pengawas — lihat DistribusiAkses — dan
+                // baru bermakna setelah dikirim; saat draft web menampilkannya terkunci.
+                if (state.bolehLihatKode && detail.kodeVerifikasi != null && PengirimanPusat.kodeTerbuka(detail.status)) {
+                    item(key = "kode-verifikasi") {
+                        KartuKodeVerifikasi(detail.kodeVerifikasi)
+                    }
+                }
+
+                if (state.draft && state.bolehKelolaKirim) {
+                    item(key = "vendor-draft") { KartuVendorDraft(state, viewModel) }
+                }
+
+                item(key = "judul-rincian") {
+                    KepalaBagian(
+                        judul = "Rincian barang",
+                        keterangan = "Bandingkan jumlah kirim dengan jumlah yang diterima",
+                        jumlah = "$jumlahBarang item",
+                    )
+                }
+
+                itemsIndexed(state.baris) { indeks, baris ->
+                    KartuItemDetail(
+                        nomor = indeks + 1,
+                        baris = baris,
+                        bitmap = baris.fotoPath?.let { state.foto[it] },
+                    )
+                }
+
+                item(key = "judul-persetujuan") {
+                    KepalaBagian("Persetujuan", "Jejak tanda tangan dokumen", "2 tahap")
+                }
+                item(key = "ttd-pengirim") { BlokTandaTangan("Tanda Tangan Pengirim", detail.ttdPengirim) }
+                if (state.draft) {
+                    item(key = "aksi-draft") {
+                        KartuPengirimanDraft(
+                            state = state,
+                            viewModel = viewModel,
+                            onMulaiTtd = { ttdPeran = it },
+                            onMintaBatal = { mintaBatal = true },
+                        )
+                    }
+                }
+                item(key = "ttd-penerimaan") { BlokTandaTangan("Tanda Tangan Penerimaan", detail.ttdPenerimaan) }
             }
-            item(key = "ttd-pengirim") { BlokTandaTangan("Tanda Tangan Pengirim", detail.ttdPengirim) }
-            item(key = "ttd-penerimaan") { BlokTandaTangan("Tanda Tangan Penerimaan", detail.ttdPenerimaan) }
         }
+        SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
+    }
+
+    ttdPeran?.let { peran ->
+        LayarTtdPengirim(
+            peran = peran,
+            state = state,
+            onSimpan = { nama, gambar -> viewModel.tandaTangan(peran, nama, gambar) },
+            onTutup = { ttdPeran = null },
+        )
+    }
+
+    if (mintaBatal) {
+        DialogBatalkan(
+            onKonfirmasi = { alasan ->
+                mintaBatal = false
+                viewModel.batalkan(alasan)
+            },
+            onTutup = { mintaBatal = false },
+        )
+    }
+    if (mintaTutup) {
+        DialogTutup(
+            onKonfirmasi = {
+                mintaTutup = false
+                viewModel.tutupDokumen()
+            },
+            onTutup = { mintaTutup = false },
+        )
     }
 }
 
@@ -245,7 +344,10 @@ private fun KartuItemDetail(nomor: Int, baris: BarisItemDetail, bitmap: Bitmap?)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(baris.nama, style = TipeIos.Utama, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text("Satuan ${baris.satuan}", style = TipeIos.Catatan)
+                Text(
+                    "Satuan ${baris.satuan}" + (baris.vendorNama?.let { " · Vendor $it" } ?: ""),
+                    style = TipeIos.Catatan,
+                )
             }
             Spacer(Modifier.width(8.dp))
             LabelKondisi(baris)
