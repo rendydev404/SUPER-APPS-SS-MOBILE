@@ -51,6 +51,9 @@ import com.sukashawarma.superapp.core.ui.RealtimeTables
 fun CutiScreen(
     onExit: () -> Unit,
     onNavigateTab: (Int) -> Unit = {},
+    /** true = digambar sebagai halaman pager (tab Cuti milik Kantor Pusat), yang sudah
+     *  dibungkus [AbsensiShell] oleh pager-nya; bungkus lagi di sini = bilah tab ganda. */
+    sebagaiTab: Boolean = false,
     viewModel: CutiViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
@@ -69,7 +72,7 @@ fun CutiScreen(
 
     // Cuti & Izin diakses dari tab "More" (index 3) di hub — bilah tab tetap tampil di
     // sini (bukan cuma di 4 tab utama) supaya user bisa lompat tab tanpa balik dulu.
-    AbsensiShell(selectedIndex = 3, onSelect = onNavigateTab) {
+    val isi: @Composable () -> Unit = {
         Scaffold(
             // Samakan dengan latar isi; warna bawaan tema (krem) tampil sebagai pita di belakang nav.
             containerColor = WarnaIos.Latar,
@@ -149,6 +152,7 @@ fun CutiScreen(
             }
         }
     }
+    if (sebagaiTab) isi() else AbsensiShell(selectedIndex = 3, onSelect = onNavigateTab) { isi() }
 
     if (showForm) {
         var wasSubmitting by remember { mutableStateOf(false) }
