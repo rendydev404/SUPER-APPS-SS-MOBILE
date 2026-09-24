@@ -20,6 +20,10 @@ data class StaffProfile(
     /** Path objek di bucket `avatars` ("avatars/<id>/<file>.jpg"), bukan URL penuh.
      *  Berbeda dari [refPhotoUrl] yang dipakai pencocokan wajah saat absen. */
     val avatarUrl: String? = null,
+    /** `outlets.slug` outlet efektif (termasuk override BKO hari ini). Dipakai mengenali
+     *  Kantor Pusat — `outlets.type = 'office'` juga memuat Gudang Pusat, jadi tak bisa
+     *  dipakai. null pada snapshot offline lama yang belum menyimpan kolom ini. */
+    val outletSlug: String? = null,
 ) {
     val isActive: Boolean get() = status == "active"
 
@@ -29,4 +33,11 @@ data class StaffProfile(
         get() = displayUsername?.takeIf { it.isNotBlank() }
             ?: displayName?.takeIf { it.isNotBlank() }
             ?: name
+
+    val diKantorPusat: Boolean get() = outletSlug == SLUG_KANTOR_PUSAT
+
+    companion object {
+        /** Slug Kantor Pusat — identitas yang dijamin migration pembuatnya (ON CONFLICT (slug)). */
+        const val SLUG_KANTOR_PUSAT = "kantor-pusat"
+    }
 }
