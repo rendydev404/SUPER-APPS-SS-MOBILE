@@ -49,6 +49,9 @@ dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("io.coil-kt:coil-compose:2.5.0")
     testImplementation("junit:junit:4.13.2")
+    // Kompresi selfie memakai BitmapFactory/ExifInterface; mode grafis native
+    // Robolectric menjalankan encoder JPEG sungguhan di JVM.
+    testImplementation("org.robolectric:robolectric:4.13")
 }
 
 
