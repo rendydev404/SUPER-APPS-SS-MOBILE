@@ -14,6 +14,7 @@ import com.sukashawarma.superapp.core.ui.masukMaju
 import com.sukashawarma.superapp.core.ui.masukMundur
 import com.sukashawarma.superapp.core.ui.navigateSekali
 import com.sukashawarma.superapp.core.ui.popAman
+import com.sukashawarma.superapp.feature.distribusi.ui.buat.BuatSuratJalanScreen
 import com.sukashawarma.superapp.feature.distribusi.ui.dashboard.DashboardScreen
 import com.sukashawarma.superapp.feature.distribusi.ui.detail.DetailSuratJalanScreen
 import com.sukashawarma.superapp.feature.distribusi.ui.inbox.InboxScreen
@@ -72,6 +73,29 @@ fun DistribusiNavGraph(onExit: () -> Unit) {
                 onBukaScan = { navController.navigateSekali(DistribusiRoutes.SCAN) },
                 onBukaRiwayat = { navController.navigateSekali(DistribusiRoutes.RIWAYAT) },
                 onBukaDetail = { id -> navController.navigateSekali(DistribusiRoutes.detail(id)) },
+                onBukaBuat = { navController.navigateSekali(DistribusiRoutes.BUAT) },
+            )
+        }
+
+        composable(DistribusiRoutes.BUAT) {
+            BuatSuratJalanScreen(
+                onKeluar = { navController.popAman() },
+                onDibuat = { id ->
+                    // Form dikeluarkan dari tumpukan: Kembali dari detail draft
+                    // mendarat di dashboard, bukan di form kosong yang bisa
+                    // membuat surat jalan ganda.
+                    navController.navigate(DistribusiRoutes.detail(id)) {
+                        launchSingleTop = true
+                        popUpTo(DistribusiRoutes.BUAT) { inclusive = true }
+                    }
+                },
+                onBukaDashboard = { navController.popBackStack(DistribusiRoutes.DASHBOARD, false) },
+                onBukaRiwayat = {
+                    navController.navigate(DistribusiRoutes.RIWAYAT) {
+                        launchSingleTop = true
+                        popUpTo(DistribusiRoutes.DASHBOARD)
+                    }
+                },
             )
         }
 
@@ -127,6 +151,12 @@ fun DistribusiNavGraph(onExit: () -> Unit) {
                 onBukaDetail = { id -> navController.navigateSekali(DistribusiRoutes.detail(id)) },
                 onBukaDashboard = { navController.popBackStack(DistribusiRoutes.DASHBOARD, false) },
                 onBukaScan = { navController.navigateSekali(DistribusiRoutes.SCAN) },
+                onBukaBuat = {
+                    navController.navigate(DistribusiRoutes.BUAT) {
+                        launchSingleTop = true
+                        popUpTo(DistribusiRoutes.DASHBOARD)
+                    }
+                },
             )
         }
 
