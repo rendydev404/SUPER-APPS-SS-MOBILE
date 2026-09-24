@@ -15,13 +15,14 @@ private data class ItemUji(
 class StatusSuratJalanTest {
 
     @Test
-    fun `keenam nilai status dikenali`() {
+    fun `ketujuh nilai status dikenali`() {
         assertEquals(StatusSuratJalan.DRAFT, StatusSuratJalan.dari("draft"))
         assertEquals(StatusSuratJalan.DIKIRIM, StatusSuratJalan.dari("dikirim"))
         assertEquals(StatusSuratJalan.DIKIRIM_LENGKAP, StatusSuratJalan.dari("dikirim_lengkap"))
         assertEquals(StatusSuratJalan.DITERIMA_SEBAGIAN, StatusSuratJalan.dari("diterima_sebagian"))
         assertEquals(StatusSuratJalan.DITERIMA_LENGKAP, StatusSuratJalan.dari("diterima_lengkap"))
         assertEquals(StatusSuratJalan.SELESAI, StatusSuratJalan.dari("selesai"))
+        assertEquals(StatusSuratJalan.DIBATALKAN, StatusSuratJalan.dari("dibatalkan"))
     }
 
     @Test
