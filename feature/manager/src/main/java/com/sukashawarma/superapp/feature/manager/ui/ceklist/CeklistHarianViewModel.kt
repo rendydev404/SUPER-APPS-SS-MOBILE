@@ -54,6 +54,10 @@ data class CeklistHarianUiState(
     /** Ceklist baru saja terkirim — layar sukses ditampilkan. */
     val terkirim: Boolean = false,
     val galat: String? = null,
+    /** Galat pemuatan daftar — terpisah dari [galat] yang dibersihkan setelah
+     *  snackbar tertutup, supaya daftar kosong karena gagal tidak berubah jadi
+     *  "Belum ada outlet binaan". */
+    val galatMuat: String? = null,
 ) {
     val namaOutletDiisi: String get() = outlets.find { it.id == outletDiisi }?.nama ?: "Outlet"
 
@@ -90,6 +94,15 @@ class CeklistHarianViewModel : ViewModel() {
 
     private var pemuatan: Job? = null
 
+    /**
+     * Nomor sesi form. Naik setiap kali form dibuka atau ditutup. Unggahan dan
+     * pengiriman membawa nomor sesinya sendiri dan hanya boleh menyentuh form
+     * yang sama: unggahan dari kunjungan yang sudah ditutup tidak boleh mengurangi
+     * hitungan unggahan form baru (tombol Kirim terbuka terlalu cepat), dan
+     * pengiriman outlet A tidak boleh menandai form outlet B "terkirim".
+     */
+    private var sesiForm = 0
+
     /** Path yang URL tanda tangannya sudah diminta — lihat InventarisViewModel. */
     private val urlDiminta: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
@@ -103,18 +116,19 @@ class CeklistHarianViewModel : ViewModel() {
         pemuatan = viewModelScope.launch {
             // Hari bisa berganti selagi aplikasi terbuka semalaman.
             val hari = CeklistHarianRepository.hariIni()
-            if (!senyap) _state.update { it.copy(memuat = true, galat = null) }
+            if (!senyap) _state.update { it.copy(memuat = true, galat = null, galatMuat = null) }
             try {
                 val data = CeklistHarianRepository.muatHari(hari)
                 _state.update {
-                    it.copy(memuat = false, tanggal = hari, outlets = data.outlets, laporan = data.laporan)
+                    it.copy(memuat = false, tanggal = hari, outlets = data.outlets, laporan = data.laporan, galatMuat = null)
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 android.util.Log.e("CeklistHarianVM", "muatUlang() gagal", e)
                 _state.update {
-                    it.copy(memuat = false, galat = if (senyap) null else pesanGalatJaringan(e, "ceklist harian"))
+                    val pesan = if (senyap) null else pesanGalatJaringan(e, "ceklist harian")
+                    it.copy(memuat = false, galat = pesan, galatMuat = pesan ?: it.galatMuat)
                 }
             }
         }
@@ -122,6 +136,7 @@ class CeklistHarianViewModel : ViewModel() {
 
     /** Membuka form satu outlet, disemai dari laporan hari ini bila sudah pernah dikirim. */
     fun mulaiIsi(outletId: String) {
+        sesiForm++
         urlDiminta.clear()
         val lama = _state.value.laporan[outletId]
         _state.update {
@@ -139,6 +154,13 @@ class CeklistHarianViewModel : ViewModel() {
     }
 
     fun tutupForm() {
+        // Menutup form di tengah pengiriman membuat hasilnya tak punya tempat
+        // mendarat — dan input yang diketik selama itu hilang diam-diam.
+        if (_state.value.mengirim) {
+            _state.update { it.copy(galat = "Tunggu, ceklist sedang dikirim.") }
+            return
+        }
+        sesiForm++
         urlDiminta.clear()
         _state.update {
             it.copy(
@@ -147,6 +169,7 @@ class CeklistHarianViewModel : ViewModel() {
                 foto = emptyMap(),
                 bebas = emptyMap(),
                 catatan = "",
+                mengunggah = emptyMap(),
                 terkirim = false,
             )
         }
@@ -235,33 +258,65 @@ class CeklistHarianViewModel : ViewModel() {
     }
 
     /**
+     * Mencadangkan satu slot unggahan untuk [kategori] pada form yang sedang
+     * terbuka. Mengembalikan (outlet, sesi), atau null bila tidak ada form atau
+     * batas foto sudah tercapai. Slot dihitung SEBELUM pekerjaan berat apa pun
+     * (decode galeri, kompresi), supaya selama itu tombol Kirim tetap tertahan
+     * dan batas 3 foto tidak bisa dilampaui dengan ketukan beruntun.
+     */
+    private fun pesanSlot(kategori: String): Pair<String, Int>? {
+        var hasil: Pair<String, Int>? = null
+        _state.update {
+            val outletId = it.outletDiisi ?: return@update it
+            val terpakai = it.foto[kategori].orEmpty().size + (it.mengunggah[kategori] ?: 0)
+            if (terpakai >= FOTO_MAKS_PER_KATEGORI) {
+                it.copy(kameraUntuk = null, galat = "Maksimal $FOTO_MAKS_PER_KATEGORI foto per kategori.")
+            } else {
+                hasil = outletId to sesiForm
+                it.copy(kameraUntuk = null, mengunggah = it.mengunggah + (kategori to (it.mengunggah[kategori] ?: 0) + 1))
+            }
+        }
+        return hasil
+    }
+
+    /** Melepas slot — hanya bila form yang memesannya masih terbuka. */
+    private fun lepasSlot(kategori: String, sesi: Int) {
+        if (sesi != sesiForm) return
+        _state.update {
+            it.copy(mengunggah = it.mengunggah + (kategori to ((it.mengunggah[kategori] ?: 1) - 1).coerceAtLeast(0)))
+        }
+    }
+
+    /**
      * Foto diunggah segera setelah dipotret, bukan ditumpuk sampai tombol kirim —
      * satu kegagalan jaringan di akhir tidak boleh membuang seluruh kunjungan.
      */
     fun simpanFoto(kategori: String, bitmap: Bitmap) {
-        val outletId = _state.value.outletDiisi ?: return
-        _state.update {
-            it.copy(kameraUntuk = null, mengunggah = it.mengunggah + (kategori to (it.mengunggah[kategori] ?: 0) + 1))
-        }
-        viewModelScope.launch {
-            try {
-                val webp = withContext(Dispatchers.Default) { bitmap.keWebp() }
-                val path = CeklistHarianRepository.unggahFoto(outletId, kategori, webp)
-                _state.update {
-                    // Form bisa sudah ditutup atau berganti outlet selama unggahan berjalan.
-                    if (it.outletDiisi != outletId) it
-                    else it.copy(foto = it.foto + (kategori to it.foto[kategori].orEmpty() + FotoCeklist(path)))
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                android.util.Log.e("CeklistHarianVM", "simpanFoto() gagal", e)
-                _state.update { it.copy(galat = "Foto gagal diunggah. Coba potret ulang.") }
-            } finally {
-                _state.update {
-                    it.copy(mengunggah = it.mengunggah + (kategori to ((it.mengunggah[kategori] ?: 1) - 1).coerceAtLeast(0)))
-                }
+        val (outletId, sesi) = pesanSlot(kategori) ?: return
+        viewModelScope.launch { unggah(kategori, outletId, sesi) { bitmap } }
+    }
+
+    private suspend fun unggah(kategori: String, outletId: String, sesi: Int, sumber: suspend () -> Bitmap?) {
+        try {
+            val bitmap = sumber()
+            if (bitmap == null) {
+                if (sesi == sesiForm) _state.update { it.copy(galat = "Gambar tidak bisa dibaca. Pilih gambar lain.") }
+                return
             }
+            val webp = withContext(Dispatchers.Default) { bitmap.keWebp() }
+            val path = CeklistHarianRepository.unggahFoto(outletId, kategori, webp)
+            _state.update {
+                // Form bisa sudah ditutup atau dibuka ulang selama unggahan berjalan.
+                if (sesi != sesiForm) it
+                else it.copy(foto = it.foto + (kategori to it.foto[kategori].orEmpty() + FotoCeklist(path)))
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            android.util.Log.e("CeklistHarianVM", "unggah() gagal", e)
+            if (sesi == sesiForm) _state.update { it.copy(galat = "Foto gagal diunggah. Coba potret ulang.") }
+        } finally {
+            lepasSlot(kategori, sesi)
         }
     }
 
@@ -271,19 +326,9 @@ class CeklistHarianViewModel : ViewModel() {
      * dimuat penuh ke memori, lalu dipampatkan WebP seperti foto kamera.
      */
     fun simpanFotoGaleri(kategori: String, uri: Uri, resolver: ContentResolver) {
-        val s = _state.value
-        val terpakai = s.foto[kategori].orEmpty().size + (s.mengunggah[kategori] ?: 0)
-        if (terpakai >= FOTO_MAKS_PER_KATEGORI) {
-            _state.update { it.copy(galat = "Maksimal $FOTO_MAKS_PER_KATEGORI foto per kategori.") }
-            return
-        }
+        val (outletId, sesi) = pesanSlot(kategori) ?: return
         viewModelScope.launch {
-            val bitmap = withContext(Dispatchers.IO) { bacaBitmap(resolver, uri) }
-            if (bitmap == null) {
-                _state.update { it.copy(galat = "Gambar tidak bisa dibaca. Pilih gambar lain.") }
-                return@launch
-            }
-            simpanFoto(kategori, bitmap)
+            unggah(kategori, outletId, sesi) { withContext(Dispatchers.IO) { bacaBitmap(resolver, uri) } }
         }
     }
 
@@ -317,6 +362,7 @@ class CeklistHarianViewModel : ViewModel() {
             if (lolos) it.copy(mengirim = true, galat = null) else it
         }
         if (!lolos) return
+        val sesi = sesiForm
 
         viewModelScope.launch {
             try {
@@ -329,7 +375,11 @@ class CeklistHarianViewModel : ViewModel() {
                     perbaikan = awal.teksTerisi(BagianBebas.PERBAIKAN),
                     catatan = awal.catatan,
                 )
-                _state.update { it.copy(mengirim = false, terkirim = true) }
+                _state.update {
+                    // Layar sukses hanya untuk form yang memang dikirim.
+                    if (sesi == sesiForm && it.outletDiisi == outletId) it.copy(mengirim = false, terkirim = true)
+                    else it.copy(mengirim = false)
+                }
                 muatUlang(silent = true)
             } catch (e: CancellationException) {
                 _state.update { it.copy(mengirim = false) }
