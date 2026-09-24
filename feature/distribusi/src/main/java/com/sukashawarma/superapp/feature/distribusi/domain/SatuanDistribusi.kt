@@ -34,28 +34,32 @@ object SatuanDistribusi {
      * yang akan menghasilkan `Infinity` atau `NaN` di ledger_stok produksi.
      */
     fun faktor(b: BahanBakuMeta): Double {
-        val dist = b.satuanDistribusi ?: return 1.0
-        if (dist.equals(b.satuan, ignoreCase = true)) return 1.0
+        val dist = b.satuanDistribusi.normal() ?: return 1.0
+        if (dist == b.satuan.normal()) return 1.0
 
         val tengah = b.faktorTengah?.takeIf { it > 0.0 }
-        if (dist.equals(b.satuanTengah, ignoreCase = true) && tengah != null) {
-            return tengah
-        }
+        if (tengah != null && satuanSama(dist, b.satuanTengah.normal())) return tengah
+
         val kecil = b.faktorTampilan?.takeIf { it > 0.0 }
-        if (dist.equals(b.satuanKecil, ignoreCase = true) && kecil != null) {
-            return kecil
-        }
+        if (kecil != null && satuanSama(dist, b.satuanKecil.normal())) return kecil
+
         // Pemetaan implisit yang ada di web: satuan distribusi "kg" sementara
         // satuan kecilnya "gram". Faktor tampilan dinyatakan dalam gram, jadi
         // harus dibagi seribu dulu untuk mendapatkan faktor per kilogram.
-        val implisit = b.faktorTampilan?.takeIf { it > 0.0 }
-        if (dist.equals("kg", ignoreCase = true) &&
-            b.satuanKecil.equals("gram", ignoreCase = true) &&
-            implisit != null
-        ) {
-            return implisit / 1000.0
+        if (dist == "kg" && b.satuanKecil.normal() == "gram" && kecil != null) {
+            return kecil / 1000.0
         }
         return 1.0
+    }
+
+    /** `toLowerCase().trim()` web; string kosong sama dengan tidak tersetel. */
+    private fun String?.normal(): String? = this?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }
+
+    /** Web menganggap `bks` dan `bungkus` satuan yang sama di ketiga layarnya. */
+    private fun satuanSama(dist: String, lain: String?): Boolean {
+        if (lain == null) return false
+        if (dist == lain) return true
+        return (dist == "bks" && lain == "bungkus") || (dist == "bungkus" && lain == "bks")
     }
 
     /**
