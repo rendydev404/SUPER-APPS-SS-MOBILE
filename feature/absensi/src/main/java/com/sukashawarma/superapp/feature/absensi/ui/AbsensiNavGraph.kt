@@ -152,11 +152,15 @@ private val ENROLL_TAB_ROLES = setOf(Role.LEADER, Role.AREA_MANAGER, Role.REGION
 
 /** Sumber tunggal isi bottom nav — jumlah tab tetap 4, hanya slot index 2 yang berganti,
  *  supaya indeks tab dan `pendingTab` dari layar sub-route tidak ikut bergeser.
- *  Untuk role HR, slot index 1 berganti dari Checklist ke Monitor. */
-private fun absensiBottomTabs(enrollTab: Boolean, isHr: Boolean = false) = listOf(
+ *  Untuk role HR, slot index 1 berganti dari Checklist ke Monitor; untuk staf Kantor Pusat
+ *  (tidak ada outlet yang dibuka/ditutup) Checklist diganti Cuti. */
+private fun absensiBottomTabs(enrollTab: Boolean, isHr: Boolean = false, kantorPusat: Boolean = false) = listOf(
     ItemTabKaca("Home", IkonIos.Home),
-    if (isHr) ItemTabKaca("Monitor", IkonIos.FactCheck)
-    else ItemTabKaca("Checklist", IkonIos.Checklist),
+    when {
+        isHr -> ItemTabKaca("Monitor", IkonIos.FactCheck)
+        kantorPusat -> ItemTabKaca("Cuti", IkonIos.CalendarMonth)
+        else -> ItemTabKaca("Checklist", IkonIos.Checklist)
+    },
     if (enrollTab) ItemTabKaca("Enroll", IkonIos.PersonAdd)
     else ItemTabKaca("Profile", IkonIos.Person),
     ItemTabKaca("More", IkonIos.MoreHoriz),
@@ -176,6 +180,14 @@ private fun isHrRole(): Boolean {
     return staff?.role == Role.ADMIN_HR
 }
 
+/** Kantor Pusat dikenali lewat slug outlet efektif, bukan `outlets.type` (Gudang Pusat
+ *  juga bertipe `office` dan tetap butuh Checklist). */
+@Composable
+private fun isKantorPusat(): Boolean {
+    val staff by AppSession.staff.collectAsState()
+    return staff?.diKantorPusat == true
+}
+
 /**
  * Kerangka kaca dengan bilah 4 tab yang sama, dipakai di [AbsensiMainPagerScreen] (pager,
  * `selectedIndex` mengikuti halaman aktif) maupun di layar sub-route seperti [CutiScreen]
@@ -193,7 +205,7 @@ fun AbsensiShell(
     onSelect: (Int) -> Unit,
     isi: @Composable () -> Unit,
 ) {
-    val tabs = absensiBottomTabs(enrollTab = isEnrollTabRole(), isHr = isHrRole())
+    val tabs = absensiBottomTabs(enrollTab = isEnrollTabRole(), isHr = isHrRole(), kantorPusat = isKantorPusat())
     ShellKaca(
         bilah = { latar -> BilahTabKaca(tabs, selectedIndex, latar, onPilih = onSelect) },
         isi = isi,
@@ -211,7 +223,20 @@ fun AbsensiMainPagerScreen(
     val coroutineScope = rememberCoroutineScope()
     val enrollTab = isEnrollTabRole()
     val isHr = isHrRole()
+    // HR tetap Monitor walau berkantor di pusat — mengikuti urutan `when` di absensiBottomTabs.
+    val tabCuti = isKantorPusat() && !isHr
     var moreSheetVisible by rememberSaveable { mutableStateOf(false) }
+
+    // Cuti di menu More sudah jadi tab sendiri bagi Kantor Pusat: pindah ke tab itu,
+    // bukan membuka salinan layarnya dengan bilah tab yang menyorot "More".
+    val bukaRute: (String) -> Unit = { route ->
+        if (tabCuti && route == AbsensiRoutes.CUTI) {
+            moreSheetVisible = false
+            coroutineScope.launch { pagerState.animateScrollToPage(1) }
+        } else {
+            onNavigateToSubRoute(route)
+        }
+    }
 
     // More adalah quick action, bukan tab pager. Jadi sheet dibuka di atas
     // halaman aktif agar konten di belakangnya tidak ikut bergeser.
@@ -270,19 +295,19 @@ fun AbsensiMainPagerScreen(
                             (pagerState.currentPage == 0 || pagerState.targetPage == 0),
                         onExit = onExit,
                         // Absen hadir berlanjut ke checklist untuk kru. Role HR hanya memantau,
-                        // tidak mengisi checklist, jadi tidak ditarik ke tab 1.
+                        // dan Kantor Pusat tidak punya checklist, jadi keduanya tidak ditarik ke tab 1.
                         // Dijaga `currentPage == 0` supaya kru yang sudah telanjur
                         // menggeser ke tab lain tidak ditarik balik.
                         onAbsenMasukSelesai = {
-                            if (pagerState.currentPage == 0 && !isHr) {
+                            if (pagerState.currentPage == 0 && !isHr && !tabCuti) {
                                 coroutineScope.launch { pagerState.animateScrollToPage(1) }
                             }
                         },
                     )
-                    1 -> if (isHr) {
-                        ChecklistMonitorScreen(onExit = onExit)
-                    } else {
-                        ChecklistScreen(onExit = onExit)
+                    1 -> when {
+                        isHr -> ChecklistMonitorScreen(onExit = onExit)
+                        tabCuti -> CutiScreen(onExit = onExit, sebagaiTab = true)
+                        else -> ChecklistScreen(onExit = onExit)
                     }
                     // Slot yang sama dengan tab index 2 di bottom nav — ikut berganti isi
                     // supaya label tab dan halaman yang muncul selalu cocok.
@@ -306,7 +331,7 @@ fun AbsensiMainPagerScreen(
                         }
                     }
                     3 -> AbsensiHubScreen(
-                        onNavigate = onNavigateToSubRoute,
+                        onNavigate = bukaRute,
                         isSheetVisible = pagerState.currentPage == 3,
                         onDismiss = {
                             coroutineScope.launch {
@@ -324,7 +349,7 @@ fun AbsensiMainPagerScreen(
                 AbsensiHubScreen(
                     onNavigate = { route ->
                         moreSheetVisible = false
-                        onNavigateToSubRoute(route)
+                        bukaRute(route)
                     },
                     onExit = {
                         moreSheetVisible = false
