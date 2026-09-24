@@ -39,6 +39,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -109,7 +110,7 @@ fun CeklistHarianScreen(
     // Layar AM ikut bergerak begitu RM meninjau — tanggapannya muncul tanpa muat ulang.
     RealtimeRefresh(RealtimeTables.CEKLIST_HARIAN) { viewModel.muatUlang(silent = true) }
 
-    var kategoriMenungguIzin by remember { mutableStateOf<String?>(null) }
+    var kategoriMenungguIzin by rememberSaveable { mutableStateOf<String?>(null) }
     val pemintaIzin = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
         val k = kategoriMenungguIzin
         kategoriMenungguIzin = null
@@ -117,7 +118,7 @@ fun CeklistHarianScreen(
     }
 
     // Galeri hanya untuk kategori yang mengizinkannya (screenshot ulasan online).
-    var kategoriGaleri by remember { mutableStateOf<String?>(null) }
+    var kategoriGaleri by rememberSaveable { mutableStateOf<String?>(null) }
     val pemilihGaleri = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         val k = kategoriGaleri
         kategoriGaleri = null
@@ -226,7 +227,7 @@ private fun DaftarOutletCeklist(
         item { PanelHariIni(state) }
 
         when {
-            state.outlets.isEmpty() && state.galat == null && !state.memuat -> item {
+            state.outlets.isEmpty() && state.galatMuat == null && !state.memuat -> item {
                 KartuPanel { PanelKosong("Belum ada outlet binaan. Hubungi admin untuk penugasan outlet.") }
             }
             state.outlets.isEmpty() -> item {
