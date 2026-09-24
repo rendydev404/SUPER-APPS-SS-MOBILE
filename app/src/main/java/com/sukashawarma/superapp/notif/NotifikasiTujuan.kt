@@ -71,6 +71,8 @@ object NotifikasiTujuan {
     const val MANAGER_PERSETUJUAN = "manager_persetujuan"
     const val MANAGER_WASTE = "manager_waste"
     const val MANAGER_PETTY_CASH = "manager_petty_cash"
+    /** Ceklist harian: AM mengirim (ke RM) dan RM menyetujui (ke AM). */
+    const val MANAGER_CEKLIST = "manager_ceklist"
     const val LEADER_PETTY_CASH = "leader_petty_cash"
     const val CHAT = "chat"
     const val CHAT_AREA = "chat_area"
