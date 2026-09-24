@@ -293,15 +293,15 @@ fun InteractiveChefMascot(
 
 /* ---------- Lambaian tangan ---------- */
 
-private const val LAMBAI_AMPLITUDO = 13f   // derajat
-private const val LAMBAI_GELOMBANG = 3f    // jumlah ayunan penuh per lambaian
+internal const val LAMBAI_AMPLITUDO = 13f   // derajat
+internal const val LAMBAI_GELOMBANG = 3f    // jumlah ayunan penuh per lambaian
 
 /** Pusat pergelangan di dalam manset, piksel gambar asli — titik putar tangan. */
 private const val PERGELANGAN_X_PX = 255f
 private const val PERGELANGAN_Y_PX = 292f
 
 /** Titik putar sebagai pecahan ukuran layer, memperhitungkan offset `ContentScale.Fit`. */
-private fun titikPergelangan(lebar: Float, tinggi: Float): TransformOrigin {
+internal fun titikPergelangan(lebar: Float, tinggi: Float): TransformOrigin {
     val skala = minOf(lebar / MASKOT_LEBAR_PX, tinggi / MASKOT_TINGGI_PX)
     val ofsX = (lebar - MASKOT_LEBAR_PX * skala) / 2f
     val ofsY = (tinggi - MASKOT_TINGGI_PX * skala) / 2f
@@ -314,8 +314,8 @@ private fun titikPergelangan(lebar: Float, tinggi: Float): TransformOrigin {
 /* ---------- Kedipan mata ---------- */
 
 /** Ukuran piksel asli maskot (scripts/maskot/img_mascot_chef_header.png); mata Ukuran piksel asli `img_mascot_chef_header.png`; titik mata diukur dari gambar itu. pergelangan diukur dari situ. */
-private const val MASKOT_LEBAR_PX = 909f
-private const val MASKOT_TINGGI_PX = 749f
+internal const val MASKOT_LEBAR_PX = 909f
+internal const val MASKOT_TINGGI_PX = 749f
 
 /** Elips mata dalam piksel gambar asli: pusat dan setengah sumbu. */
 private class Mata(val cx: Float, val cy: Float, val rx: Float, val ry: Float, val kulit: Color)
@@ -332,7 +332,7 @@ private val WARNA_BULU_MATA = Color(0xFF3A2418)
  * Gambar ditata `ContentScale.Fit`, jadi posisi mata dihitung ulang dari skala
  * dan offset yang sama supaya kelopak tetap menempel di mata pada ukuran apa pun.
  */
-private fun DrawScope.gambarKelopakMata(tutup: Float) {
+internal fun DrawScope.gambarKelopakMata(tutup: Float) {
     if (tutup <= 0.01f) return
     val skala = minOf(size.width / MASKOT_LEBAR_PX, size.height / MASKOT_TINGGI_PX)
     val ofsX = (size.width - MASKOT_LEBAR_PX * skala) / 2f
