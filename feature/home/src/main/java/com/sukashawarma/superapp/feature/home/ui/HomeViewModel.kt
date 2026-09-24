@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.sukashawarma.superapp.data.remote.Postgrest
 import com.sukashawarma.superapp.data.remote.Realtime
 import com.sukashawarma.superapp.data.remote.optString
+import com.sukashawarma.superapp.domain.model.Role
 import com.sukashawarma.superapp.domain.model.StaffProfile
 import com.sukashawarma.superapp.feature.chat.ChatBacaan
 import com.sukashawarma.superapp.feature.chat.data.ChatRepository
@@ -222,7 +223,8 @@ class HomeViewModel : ViewModel() {
                 }.getOrNull()
             }
             val kiriman = async {
-                if (outletId == null || role !in DISTRIBUSI_ROLES) null
+                // Kitchen adalah pengirim; "kiriman masuk" ke outletnya tidak bermakna.
+                if (outletId == null || role !in DISTRIBUSI_ROLES || role == Role.KITCHEN) null
                 else runCatching {
                     // Status yang sama dengan SuratJalanRepository.inbox().
                     Postgrest.select(
