@@ -107,7 +107,7 @@ fun LayarWajibUpdate(
             verticalArrangement = Arrangement.Center,
         ) {
             Spacer(Modifier.height(24.dp))
-            Box(Modifier.fillMaxWidth(0.82f)) { ilustrasi() }
+            Box(Modifier.fillMaxWidth(0.72f), contentAlignment = Alignment.Center) { ilustrasi() }
             Spacer(Modifier.height(20.dp))
             BilahKemajuan(state, progress)
             Spacer(Modifier.height(28.dp))
