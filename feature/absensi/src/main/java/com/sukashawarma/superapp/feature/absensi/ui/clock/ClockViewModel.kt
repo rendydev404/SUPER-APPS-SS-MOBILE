@@ -529,7 +529,9 @@ class ClockViewModel(
         val s = _state.value
         if (s.phase != ClockPhase.SUBMITTING || s.selfieCaptureRequestId == null) return
         _state.value = s.copy(selfieCaptureRequestId = null)
-        viewModelScope.launch { doSubmit(pendingManualButton, jpegBytes) }
+        // Dikompres sekali di sini supaya jalur online, antrean offline, dan
+        // fallback gagal-submit semuanya menyimpan/unggah berkas yang sudah kecil.
+        viewModelScope.launch { doSubmit(pendingManualButton, jpegBytes?.let { kompresSelfie(it) }) }
     }
 
     private suspend fun doSubmit(isManualButton: Boolean, jpegBytes: ByteArray?) {
@@ -706,7 +708,8 @@ class ClockViewModel(
                         val file = File(localSelfie)
                         if (file.exists()) {
                             val uploadedPath = try {
-                                val bytes = file.readBytes()
+                                // Antrean dari versi lama masih berisi foto mentah resolusi penuh.
+                                val bytes = file.readBytes().let { if (it.size > 200_000) kompresSelfie(it) else it }
                                 StorageUtil.uploadJpeg("selfies", "${item.outletId}/${item.id}.jpg", bytes).removePrefix("selfies/")
                             } catch (_: Exception) {
                                 null
