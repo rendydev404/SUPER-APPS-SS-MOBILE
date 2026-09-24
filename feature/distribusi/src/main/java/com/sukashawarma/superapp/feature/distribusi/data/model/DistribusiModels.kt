@@ -28,6 +28,9 @@ data class SuratJalanItem(
     val fotoPath: String?,
     val terverifikasiPada: String?,
     val bahan: BahanBakuMeta?,
+    /** Vendor Gudang Pusat asal barang; null pada bahan satu-vendor lama. */
+    val vendorId: String? = null,
+    val vendorNama: String? = null,
 ) : PenandaSelisih
 
 /** Proyeksi ringkas untuk daftar dan dashboard. */
@@ -49,6 +52,8 @@ data class SuratJalanDetail(
     val namaOutlet: String?,
     val nomorDokumen: String?,
     val kodeVerifikasi: String?,
+    /** Kolom `notes`; alasan pembatalan ditambahkan RPC sebagai `[Dibatalkan]: ...`. */
+    val catatan: String? = null,
     val dibuatPada: String?,
     val ttdPengirim: List<TandaTangan>,
     val ttdPenerimaan: List<TandaTangan>,
