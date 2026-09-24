@@ -170,3 +170,37 @@ fun Bitmap.keJpeg(sisiMaks: Int = 1024, mutu: Int = 78): ByteArray {
         keluaran.toByteArray()
     }
 }
+
+/**
+ * Seperti [keJpeg] tetapi WebP lossy — pada mutu visual yang sama berkasnya
+ * kira-kira 25–35% lebih kecil dari JPEG, berarti unggahan lebih cepat di sinyal
+ * outlet dan kuota storage lebih awet.
+ *
+ * WEBP_LOSSY baru ada di API 30; di bawahnya konstanta WEBP lama (juga lossy
+ * untuk mutu < 100) yang dipakai.
+ */
+fun Bitmap.keWebp(sisiMaks: Int = 1280, mutu: Int = 75): ByteArray {
+    val skala = minOf(1f, sisiMaks.toFloat() / maxOf(width, height))
+    val sumber = if (skala < 1f) {
+        Bitmap.createScaledBitmap(
+            this,
+            (width * skala).toInt().coerceAtLeast(1),
+            (height * skala).toInt().coerceAtLeast(1),
+            true,
+        )
+    } else {
+        this
+    }
+    @Suppress("DEPRECATION")
+    val format = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+        Bitmap.CompressFormat.WEBP_LOSSY
+    } else {
+        Bitmap.CompressFormat.WEBP
+    }
+    return ByteArrayOutputStream().use { keluaran ->
+        sumber.compress(format, mutu, keluaran)
+        // Bitmap hasil penyekalaan milik kita; sumber aslinya milik pemanggil.
+        if (sumber !== this) sumber.recycle()
+        keluaran.toByteArray()
+    }
+}
