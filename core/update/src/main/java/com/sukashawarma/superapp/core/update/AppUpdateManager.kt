@@ -622,6 +622,10 @@ object AppUpdateManager {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             installSilently(context.applicationContext, apkFile, manifest.versionCode)
         } else {
+            // Android 11 ke bawah: installer sistem dibuka lewat tombol "Lanjutkan",
+            // bukan otomatis dengan status INSTALLING. Pemasangan legacy tidak punya
+            // callback — bila dibatalkan, INSTALLING tak pernah pulih dan tombolnya
+            // mati. AWAITING_USER_ACTION membiarkan pengguna mencoba lagi kapan saja.
             _downloadState.value = DownloadState.AWAITING_USER_ACTION
         }
     }
