@@ -150,6 +150,8 @@ data class DashboardUiState(
     /** Menentukan apakah tombol "Scan QR Kedatangan" di banner ditampilkan.
      *  Pengawas membuka dashboard untuk memantau, bukan menerima barang. */
     val bolehVerifikasi: Boolean = false,
+    /** Kitchen: dashboard menjadi pusat pengiriman dengan tombol Buat Surat Jalan. */
+    val bolehTerbitkan: Boolean = false,
 )
 
 class DashboardViewModel : ViewModel() {
@@ -164,6 +166,7 @@ class DashboardViewModel : ViewModel() {
             namaPengguna = staff?.name.orEmpty(),
             namaOutlet = staff?.outletName.orEmpty(),
             bolehVerifikasi = DistribusiAkses.bolehVerifikasi(staff?.role),
+            bolehTerbitkan = DistribusiAkses.bolehTerbitkan(staff?.role),
         )
         muat()
     }
@@ -238,10 +241,11 @@ class DashboardViewModel : ViewModel() {
         viewModelScope.launch {
             _state.value = _state.value.copy(sedangMenutup = baris.id, error = null)
             try {
-                SuratJalanRepository.tutupDokumen(baris.id)
+                val tertutup = SuratJalanRepository.tutupDokumen(baris.id)
                 _state.value = _state.value.copy(
                     sedangMenutup = null,
-                    pesan = "Dokumen ${baris.nomorDokumen ?: ""} ditutup.",
+                    pesan = if (tertutup) "Dokumen ${baris.nomorDokumen ?: ""} ditutup."
+                    else "Dokumen ${baris.nomorDokumen ?: ""} tidak ditutup: statusnya sudah berubah.",
                 )
                 muat(paksa = true)
             } catch (e: Exception) {
