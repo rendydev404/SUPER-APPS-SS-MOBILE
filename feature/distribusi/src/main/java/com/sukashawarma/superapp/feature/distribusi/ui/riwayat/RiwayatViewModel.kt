@@ -17,6 +17,9 @@ data class RiwayatUiState(
     val daftar: List<SuratJalanRingkas> = emptyList(),
     /** Menentukan apakah tombol Scan QR di nav bawah ditampilkan. */
     val bolehVerifikasi: Boolean = false,
+    /** Kitchen: riwayat berisi seluruh surat jalan semua status, cermin
+     *  `/distribusi/surat-jalan` web — bukan hanya yang sudah diterima. */
+    val pusat: Boolean = false,
 )
 
 class RiwayatViewModel : ViewModel() {
@@ -27,6 +30,7 @@ class RiwayatViewModel : ViewModel() {
     init {
         _state.value = _state.value.copy(
             bolehVerifikasi = DistribusiAkses.bolehVerifikasi(AppSession.staff.value?.role),
+            pusat = DistribusiAkses.bolehTerbitkan(AppSession.staff.value?.role),
         )
         muat()
     }
@@ -39,7 +43,8 @@ class RiwayatViewModel : ViewModel() {
                 _state.value = _state.value.copy(
                     memuat = false,
                     error = null,
-                    daftar = SuratJalanRepository.riwayat(),
+                    daftar = if (_state.value.pusat) SuratJalanRepository.semua()
+                    else SuratJalanRepository.riwayat(),
                 )
             } catch (e: Exception) {
                 _state.value = _state.value.copy(memuat = false, error = distribusiErrorMessage(e))
