@@ -81,6 +81,10 @@ object RealtimeTables {
      */
     const val INVENTARIS_SUBMISSIONS = "inventaris_submissions"
     const val INVENTARIS_MASTER_ITEMS = "inventaris_master_items"
+
+    // Ditambahkan ke publication lewat migrasi web `20300238000000_ceklist_harian_area_manager`.
+    // Hanya tabel header; item & foto selalu ditulis dalam transaksi yang sama.
+    const val CEKLIST_HARIAN = "ceklist_harian"
 }
 
 /**
