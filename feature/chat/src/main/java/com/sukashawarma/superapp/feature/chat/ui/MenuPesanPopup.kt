@@ -35,6 +35,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Reply
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
@@ -94,6 +95,10 @@ fun MenuPesanPopup(
     onSalin: () -> Unit,
     onHapus: () -> Unit,
     onTutup: () -> Unit,
+    /** Diisi hanya untuk pesan stiker: "Simpan ke favorit" / "Hapus dari favorit".
+     *  null = barisnya tidak ditampilkan. */
+    labelFavorit: String? = null,
+    onFavorit: () -> Unit = {},
     bubble: @Composable () -> Unit,
 ) {
     val haptic = LocalHapticFeedback.current
@@ -159,6 +164,8 @@ fun MenuPesanPopup(
                         onSunting = onSunting,
                         onSalin = onSalin,
                         onHapus = onHapus,
+                        labelFavorit = labelFavorit,
+                        onFavorit = onFavorit,
                     )
                 }
             }
@@ -222,6 +229,8 @@ private fun KartuAksi(
     onSunting: () -> Unit,
     onSalin: () -> Unit,
     onHapus: () -> Unit,
+    labelFavorit: String?,
+    onFavorit: () -> Unit,
 ) {
     Column(
         Modifier
@@ -230,6 +239,10 @@ private fun KartuAksi(
             .background(PutihKartu),
     ) {
         BarisAksi("Balas", Icons.AutoMirrored.Filled.Reply, TeksAksi, onBalas)
+        if (labelFavorit != null) {
+            Pemisah()
+            BarisAksi(labelFavorit, Icons.Filled.Star, TeksAksi, onFavorit)
+        }
         if (bolehInfo) {
             Pemisah()
             BarisAksi("Info", Icons.Outlined.Info, TeksAksi, onInfo)
