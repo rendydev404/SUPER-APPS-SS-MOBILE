@@ -1,5 +1,9 @@
 package com.sukashawarma.superapp.feature.chat.ui.pribadi
 
+import com.sukashawarma.superapp.feature.chat.data.FavoritStiker
+import com.sukashawarma.superapp.feature.chat.data.StikerKlipy
+import com.sukashawarma.superapp.feature.chat.ui.stiker.PapanEmojiStiker
+import com.sukashawarma.superapp.feature.chat.ui.stiker.TataPesanStiker
 import com.sukashawarma.superapp.core.ui.ios.TipeIos
 import com.sukashawarma.superapp.core.ui.ios.TombolBundarIos
 import com.sukashawarma.superapp.core.ui.ios.WarnaIos
@@ -136,7 +140,7 @@ import com.sukashawarma.superapp.feature.chat.ui.FotoChat
 import com.sukashawarma.superapp.feature.chat.ui.FotoTerpilih
 import com.sukashawarma.superapp.feature.chat.ui.LembarPilihSumberFoto
 import com.sukashawarma.superapp.feature.chat.ui.MenuPesanPopup
-import com.sukashawarma.superapp.feature.chat.ui.PenampilFoto
+import com.sukashawarma.superapp.core.ui.PenampilFoto
 import com.sukashawarma.superapp.feature.chat.ui.PratinjauKirimFoto
 import com.sukashawarma.superapp.feature.chat.ui.emoji.PapanEmoji
 import com.sukashawarma.superapp.feature.chat.ui.emoji.hapusSatuKarakter
@@ -456,6 +460,8 @@ fun LayarChatPribadi(
                 onBukaLampiran = { lembarSumber = true },
                 onKirimTeks = { teks -> viewModel.kirim(body = teks) },
                 onKirimSuara = { berkas, durasiMs, wave -> viewModel.kirimSuara(berkas, durasiMs, wave) },
+                userId = myId,
+                onKirimStiker = { viewModel.kirimStiker(it) },
             )
         }
     }
@@ -536,7 +542,8 @@ fun LayarChatPribadi(
             bolehHapus = isMe && pesan.deletedAtMs == null,
             bolehSunting = false,
             bolehInfo = false,
-            adaTeks = pesan.body.isNotBlank(),
+            // Teks pesan stiker hanya cadangan untuk app lama — tidak untuk disalin.
+            adaTeks = pesan.body.isNotBlank() && pesan.stickerUrl == null,
             onEmoji = { emoji ->
                 viewModel.toggleReaksi(pesan, emoji)
                 menuPesan = null
@@ -560,6 +567,19 @@ fun LayarChatPribadi(
                 menuPesan = null
             },
             onTutup = { menuPesan = null },
+            // Favorit disimpan lokal per akun; dibaca ulang di sini supaya labelnya
+            // tepat walau papan stiker belum pernah dibuka sejak app dijalankan.
+            labelFavorit = pesan.stickerUrl?.let { url ->
+                FavoritStiker.muat(context, myId)
+                if (FavoritStiker.ada(url)) "Hapus dari favorit" else "Simpan ke favorit"
+            },
+            onFavorit = {
+                pesan.stickerUrl?.let { url ->
+                    val kini = FavoritStiker.alihkan(context, myId, FavoritStiker.dariPesan(url))
+                    Toast.makeText(context, if (kini) "Disimpan ke favorit" else "Dihapus dari favorit", Toast.LENGTH_SHORT).show()
+                }
+                menuPesan = null
+            },
             bubble = {
                 BubblePribadi(
                     pesan = pesan,
@@ -784,6 +804,36 @@ private fun BubblePribadi(
     val textColor = Color(0xFF1C1C1E)
     val timeColor = Color(0xFF8E8E93)
     val denyut = if (disorot) denyutSorot(sorotKunci) else null
+
+    // Stiker tanpa gelembung. `return` aman di badan fungsi composable (bukan lambda).
+    val stiker = pesan.stickerUrl
+    if (stiker != null && !terhapus) {
+        TataPesanStiker(
+            url = stiker,
+            milikSendiri = isMe,
+            jam = jamFormatted,
+            onTekanLama = onTekanLama,
+            kepala = {
+                if (pesan.replyToId != null || !pesan.replyToSnippet.isNullOrBlank()) {
+                    KutipanBalasanPribadi(
+                        nama = pesan.replyToName ?: if (isMe) "Anda" else partnerName,
+                        snippet = pesan.replyToSnippet.orEmpty(),
+                        diBubbleSendiri = isMe,
+                        onKlik = pesan.replyToId?.let { targetId -> { onLompatKe(targetId) } },
+                        modifier = Modifier
+                            .widthIn(max = 220.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(bubbleColor)
+                            .padding(bottom = 2.dp),
+                    )
+                }
+            },
+            status = if (!isMe) null else {
+                { KomponenCentangPribadi(status = pesan.statusCentang, warnaAbu = Color(0xFFA0A0A8)) }
+            },
+        )
+        return
+    }
 
     val bentuk = RoundedCornerShape(
         topStart = 16.dp,
@@ -1205,6 +1255,8 @@ private fun KomposerChatPribadi(
     onBukaLampiran: () -> Unit,
     onKirimTeks: (String) -> Unit,
     onKirimSuara: (java.io.File, Int, String) -> Unit,
+    userId: String,
+    onKirimStiker: (StikerKlipy) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var inputTeks by remember { mutableStateOf("") }
@@ -1347,9 +1399,11 @@ private fun KomposerChatPribadi(
         }
 
         if (papanEmoji) {
-            PapanEmoji(
-                onPilih = { emoji -> inputTeks += emoji },
-                onHapus = { inputTeks = hapusSatuKarakter(inputTeks) }
+            PapanEmojiStiker(
+                userId = userId,
+                onPilihEmoji = { emoji -> inputTeks += emoji },
+                onHapus = { inputTeks = hapusSatuKarakter(inputTeks) },
+                onPilihStiker = onKirimStiker,
             )
         }
     }
