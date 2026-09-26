@@ -71,7 +71,7 @@ fun StokScreen(
     val snackbar = remember { SnackbarHostState() }
 
     // Saldo bergerak tiap mutasi; dipicu oleh `stok_balance` pada publication realtime.
-    RealtimeRefresh(RealtimeTables.STOK_BALANCE) { viewModel.muatUlang() }
+    RealtimeRefresh(RealtimeTables.STOK_BALANCE, jedaMinimumMs = 30_000L) { viewModel.muatUlang() }
 
     LaunchedEffect(state.galat) {
         state.galat?.let {
