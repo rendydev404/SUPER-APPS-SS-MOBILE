@@ -120,7 +120,7 @@ fun LaporanScreen(
 ) {
     val state by viewModel.state.collectAsState()
 
-    RealtimeRefresh(RealtimeTables.ORDERS, RealtimeTables.ORDER_ITEMS) { viewModel.segarkanDariRealtime() }
+    RealtimeRefresh(RealtimeTables.ORDERS, RealtimeTables.ORDER_ITEMS, jedaMinimumMs = 30_000L) { viewModel.segarkanDariRealtime() }
 
     Scaffold(
         containerColor = WarnaIos.Latar,
