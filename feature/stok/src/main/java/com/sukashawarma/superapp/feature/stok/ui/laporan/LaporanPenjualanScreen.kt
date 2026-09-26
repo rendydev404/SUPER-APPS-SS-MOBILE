@@ -132,7 +132,7 @@ fun LaporanPenjualanScreen(
 
     // Omzet & porsi terjual bergerak tiap kasir menutup pesanan. Layar Laporan
     // milik Manager sudah berlangganan keduanya; layar ini tertinggal.
-    RealtimeRefresh(RealtimeTables.ORDERS, RealtimeTables.ORDER_ITEMS) { viewModel.muatUlang() }
+    RealtimeRefresh(RealtimeTables.ORDERS, RealtimeTables.ORDER_ITEMS, jedaMinimumMs = 30_000L) { viewModel.muatUlang() }
     val r = state.ringkas
 
     Column(Modifier.fillMaxSize().background(WarnaIos.Latar)) {
