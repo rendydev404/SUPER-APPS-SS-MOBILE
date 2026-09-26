@@ -1,6 +1,7 @@
 package com.sukashawarma.superapp.feature.stok
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -14,15 +15,23 @@ import com.sukashawarma.superapp.core.ui.navigateSekali
 import com.sukashawarma.superapp.core.ui.popAman
 import com.sukashawarma.superapp.feature.stok.ui.detail.DetailBahanScreen
 import com.sukashawarma.superapp.feature.stok.ui.StokShell
+import com.sukashawarma.superapp.feature.stok.ui.monitoring.MonitoringScreen
 import com.sukashawarma.superapp.feature.stok.ui.transfer.TransferScreen
 
 /**
  * Navigasi modul Stok. Mengikuti pola yang sama dengan modul Absensi: satu NavHost
  * bersarang yang dipasang pada satu rute di NavHost root.
  */
+/**
+ * @param bukaKritis dashboard dibuka dengan filter "Kritis" sudah menyala — dipakai
+ *   kartu "Stok kritis" di Beranda.
+ */
 @Composable
-fun StokNavGraph(onExit: () -> Unit) {
+fun StokNavGraph(onExit: () -> Unit, bukaKritis: Boolean = false) {
     val navController = rememberNavController()
+    // Ditangkap sekali: pemanggil mengosongkan nilainya setelah modul terbuka, dan
+    // NavHost bisa baru menyusun tujuan awalnya pada frame berikutnya.
+    val kritisAwal = rememberSaveable { bukaKritis }
 
     NavHost(
         navController = navController,
@@ -39,6 +48,23 @@ fun StokNavGraph(onExit: () -> Unit) {
                     navController.navigateSekali(StokRoutes.detail(outletId, bahanId, nama))
                 },
                 onBukaTransfer = { navController.navigateSekali(StokRoutes.TRANSFER) },
+                onBukaOutlet = { outletId -> navController.navigateSekali(StokRoutes.outlet(outletId)) },
+                bukaKritis = kritisAwal,
+            )
+        }
+
+        composable(
+            StokRoutes.OUTLET,
+            arguments = listOf(navArgument("outletId") { type = NavType.StringType }),
+        ) { entry ->
+            MonitoringScreen(
+                // Dibuka dari papan pantau: "kembali" berarti kembali ke papan, bukan Beranda.
+                onKeluar = { navController.popAman() },
+                onBukaBahan = { outletId, bahanId, nama ->
+                    navController.navigateSekali(StokRoutes.detail(outletId, bahanId, nama))
+                },
+                onBukaTransfer = { navController.navigateSekali(StokRoutes.TRANSFER) },
+                outletAwalId = entry.arguments?.getString("outletId"),
             )
         }
 
