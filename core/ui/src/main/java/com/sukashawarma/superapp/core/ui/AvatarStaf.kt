@@ -46,6 +46,23 @@ object AvatarStorage {
         return "${SupabaseClient.BASE_URL}storage/v1/object/authenticated/$BUCKET/$objek"
     }
 
+    /**
+     * Pasangan HD sebuah foto profil: `…/<uuid>.jpg` -> `…/<uuid>_hd.jpg`.
+     *
+     * Setiap unggahan menyimpan DUA berkas. `avatar_url` tetap menunjuk versi kecil
+     * (512px, ~40 KB) supaya daftar berisi puluhan avatar tetap ringan; versi HD
+     * (1600px) hanya dimuat saat foto dibuka besar. Foto yang diunggah sebelum
+     * versi HD ada tidak punya pasangan ini — pemanggil wajib punya cadangan ke [url].
+     * null bila path bukan unggahan app (URL penuh, atau bukan .jpg).
+     */
+    fun pathHd(path: String?): String? {
+        if (path.isNullOrBlank() || path.startsWith("http")) return null
+        if (!path.endsWith(".jpg") || path.endsWith("_hd.jpg")) return null
+        return path.removeSuffix(".jpg") + "_hd.jpg"
+    }
+
+    fun urlHd(path: String?): String? = url(pathHd(path))
+
     @Volatile
     private var pemuat: ImageLoader? = null
 
@@ -104,6 +121,10 @@ fun AvatarStaf(
     warnaLatar: Color = Color(0x33EA580C),
     warnaHuruf: Color = Color(0xFF0F172A),
     ukuranHuruf: TextUnit = 18.sp,
+    /** true untuk avatar besar (lembar profil, hero Profil). Penyaringan rendah di
+     *  ukuran itu membuat tepi foto bergerigi/"pecah"; di avatar kecil daftar tidak
+     *  terlihat bedanya, jadi bawaannya tetap hemat. */
+    kualitasTinggi: Boolean = false,
 ) {
     val konteks = LocalContext.current
     val url = AvatarStorage.url(path)
@@ -128,7 +149,7 @@ fun AvatarStaf(
                 // 54dp di Beranda). Penyaringan kualitas tinggi di sini hanya
                 // membakar waktu GPU untuk perbedaan yang tidak terlihat pada
                 // lingkaran seukuran kuku jari.
-                filterQuality = FilterQuality.Low,
+                filterQuality = if (kualitasTinggi) FilterQuality.High else FilterQuality.Low,
             )
         }
     }
