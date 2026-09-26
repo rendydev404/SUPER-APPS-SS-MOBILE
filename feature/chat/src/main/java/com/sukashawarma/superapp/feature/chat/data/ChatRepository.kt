@@ -57,6 +57,7 @@ object ChatRepository {
         audioPath: String? = null,
         audioMs: Int? = null,
         audioWave: String? = null,
+        stickerUrl: String? = null,
     ): PesanChat {
         val row = JsonObject().apply {
             addProperty("body", body)
@@ -64,6 +65,7 @@ object ChatRepository {
             audioPath?.let { addProperty("audio_path", it) }
             audioMs?.let { addProperty("audio_ms", it) }
             audioWave?.takeIf { it.isNotBlank() }?.let { addProperty("audio_wave", it.take(56)) }
+            stickerUrl?.let { addProperty("sticker_url", it) }
             replyToId?.let { addProperty("reply_to_id", it) }
             if (mentions.isNotEmpty()) {
                 add("mentions", com.google.gson.JsonArray().apply {
