@@ -96,6 +96,56 @@ object Postgrest {
         if (body.isBlank()) JsonArray() else JsonParser.parseString(body).asJsonArray
     }
 
+    data class PageResponse(val data: JsonArray, val totalCount: Int)
+
+    /**
+     * Membaca tabel terpaginasi sekaligus mendapatkan total baris dari header Content-Range PostgREST.
+     * Menggunakan Prefer: count=exact, sehingga database menghitung total baris di sisi server
+     * tanpa perlu mentransfer seluruh ID atau melakukan query loop terpisah.
+     */
+    suspend fun selectWithCount(
+        table: String,
+        params: List<Pair<String, String>> = emptyList(),
+    ): PageResponse = withContext(Dispatchers.IO) {
+        val req = Request.Builder()
+            .url(urlFor(table, params))
+            .header("Prefer", "count=exact")
+            .get()
+            .build()
+        client.newCall(req).execute().use { resp ->
+            val body = resp.body?.string().orEmpty()
+            if (!resp.isSuccessful) throw PostgrestException(resp.code, body.ifBlank { resp.message })
+            val data = if (body.isBlank()) JsonArray() else JsonParser.parseString(body).asJsonArray
+            val rangeHeader = resp.header("Content-Range")
+            val total = rangeHeader?.substringAfterLast('/')?.trim()?.toIntOrNull() ?: data.size()
+            PageResponse(data, total)
+        }
+    }
+
+    /**
+     * Menghitung total baris yang cocok dengan kriteria filter secara native di server.
+     * Menggunakan limit=0 dan Prefer: count=exact sehingga transfer data berupa 0 baris JSON
+     * dan total baris langsung didapat dari header Content-Range.
+     */
+    suspend fun count(
+        table: String,
+        params: List<Pair<String, String>> = emptyList(),
+    ): Int = withContext(Dispatchers.IO) {
+        val req = Request.Builder()
+            .url(urlFor(table, params + listOf("select" to "id", "limit" to "0")))
+            .header("Prefer", "count=exact")
+            .get()
+            .build()
+        client.newCall(req).execute().use { resp ->
+            if (!resp.isSuccessful) {
+                val body = resp.body?.string().orEmpty()
+                throw PostgrestException(resp.code, body.ifBlank { resp.message })
+            }
+            val rangeHeader = resp.header("Content-Range")
+            rangeHeader?.substringAfterLast('/')?.trim()?.toIntOrNull() ?: 0
+        }
+    }
+
     suspend fun selectOne(table: String, params: List<Pair<String, String>>): JsonObject? {
         val arr = select(table, params + ("limit" to "1"))
         return if (arr.size() > 0) arr[0].asJsonObject else null
