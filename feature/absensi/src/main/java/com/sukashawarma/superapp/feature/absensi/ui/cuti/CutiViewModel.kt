@@ -1,5 +1,8 @@
 package com.sukashawarma.superapp.presentation.absensi.cuti
 
+import com.sukashawarma.superapp.data.remote.LampiranOutbox
+import java.io.File
+import java.util.UUID
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.gson.JsonObject
@@ -87,7 +90,7 @@ class CutiViewModel : ViewModel() {
         }
     }
 
-    fun submit(leaveType: String, startDate: LocalDate, endDate: LocalDate, reason: String) {
+    fun submit(leaveType: String, startDate: LocalDate, endDate: LocalDate, reason: String, bukti: File? = null) {
         if (_state.value.submitting) return
         val staffId = AppSession.staff.value?.id
         if (staffId == null) {
@@ -98,7 +101,16 @@ class CutiViewModel : ViewModel() {
             _state.value = _state.value.copy(submitError = "Tanggal selesai tidak boleh sebelum tanggal mulai.")
             return
         }
+        // Dicek di sini juga, bukan hanya tombol yang dinonaktifkan di form: pemanggil
+        // lain (atau form versi berikutnya) tidak boleh bisa melewatinya.
+        if (leaveType == JENIS_WAJIB_BUKTI && (bukti == null || !bukti.exists())) {
+            _state.value = _state.value.copy(
+                submitError = "Pengajuan sakit wajib melampirkan foto surat dokter atau obat.",
+            )
+            return
+        }
         val days = ChronoUnit.DAYS.between(startDate, endDate).toInt() + 1
+        val clientOpId = UUID.randomUUID().toString()
         _state.value = _state.value.copy(submitting = true, submitError = null)
         viewModelScope.launch {
             try {
@@ -108,7 +120,13 @@ class CutiViewModel : ViewModel() {
                         staffId, leaveType, startDate.toString(), endDate.toString(), days, reason,
                     ),
                     kirim = CutiOffline::kirim,
+                    clientOpId = clientOpId,
                     dibuatOleh = staffId,
+                    // Hanya pengajuan sakit yang membawa bukti; jenis lain tidak mengirim
+                    // foto walau sempat dipilih sebelum jenisnya diganti.
+                    lampiran = bukti?.takeIf { leaveType == JENIS_WAJIB_BUKTI }?.let {
+                        LampiranOutbox(it, CutiOffline.BUCKET, CutiOffline.tujuanBukti(staffId, clientOpId))
+                    },
                 )
                 _state.value = _state.value.copy(
                     submitting = false,
