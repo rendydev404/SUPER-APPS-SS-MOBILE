@@ -53,8 +53,15 @@ data class OpnameUiState(
      * Tidak kosong berarti gerbangnya sedang terbuka; lihat [GerbangNolOpname].
      */
     val penurunan: List<Penurunan> = emptyList(),
+    /**
+     * Nomor surat jalan outlet ini yang belum diverifikasi kru. Tidak kosong berarti
+     * opname dikunci: barang kiriman sudah di rak tetapi belum masuk saldo sistem.
+     */
+    val sjBelumDiverifikasi: List<String> = emptyList(),
 ) {
     val gerbangPenurunanTerbuka: Boolean get() = penurunan.isNotEmpty()
+
+    val terhalangSuratJalan: Boolean get() = sjBelumDiverifikasi.isNotEmpty()
 
     val itemTampil: List<OpnameItemRow>
         get() {
@@ -159,7 +166,9 @@ class OpnameViewModel(app: Application) : AndroidViewModel(app) {
 
     fun pilihOutlet(outlet: OutletRingkas) {
         if (outlet.id == _state.value.outletTerpilih?.id) return
-        _state.value = _state.value.copy(outletTerpilih = outlet, riwayat = emptyList())
+        _state.value = _state.value.copy(
+            outletTerpilih = outlet, riwayat = emptyList(), sjBelumDiverifikasi = emptyList(),
+        )
         viewModelScope.launch { muatRiwayat() }
     }
 
@@ -167,10 +176,27 @@ class OpnameViewModel(app: Application) : AndroidViewModel(app) {
         val outlet = _state.value.outletTerpilih ?: return
         _state.value = _state.value.copy(memuat = true, error = null)
         try {
-            _state.value = _state.value.copy(memuat = false, riwayat = OpnameRepository.daftar(outlet.id))
+            val riwayat = OpnameRepository.daftar(outlet.id)
+            // Gagal membaca surat jalan tidak boleh menyembunyikan riwayat; gerbang
+            // di bukaForm() dan mintaFinalisasi() tetap memeriksa ulang ke server.
+            val sj = runCatching { OpnameRepository.suratJalanBelumDiverifikasi(outlet.id) }
+                .getOrElse { _state.value.sjBelumDiverifikasi }
+            _state.value = _state.value.copy(memuat = false, riwayat = riwayat, sjBelumDiverifikasi = sj)
         } catch (e: Exception) {
             _state.value = _state.value.copy(memuat = false, error = stokErrorMessage(e))
         }
+    }
+
+    /**
+     * Periksa ulang surat jalan tertunda langsung ke server.
+     *
+     * Mengembalikan true bila opname boleh jalan. Kiriman bisa tiba saat layar sudah
+     * terbuka, jadi status di layar tidak cukup dipercaya sebagai gerbang.
+     */
+    private suspend fun bebasSuratJalan(outletId: String): Boolean {
+        val sj = OpnameRepository.suratJalanBelumDiverifikasi(outletId)
+        _state.update { it.copy(sjBelumDiverifikasi = sj) }
+        return sj.isEmpty()
     }
 
     // ------------------------------------------------------------------ form
@@ -188,6 +214,11 @@ class OpnameViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             _state.value = _state.value.copy(formTerbuka = true, memuatForm = true, error = null, pesan = null)
             try {
+                if (!bebasSuratJalan(outlet.id)) {
+                    // Draft sengaja tidak dibuat: layar utama menampilkan peringatan besarnya.
+                    _state.value = _state.value.copy(formTerbuka = false, memuatForm = false)
+                    return@launch
+                }
                 val draft = OpnameRepository.buatAtauPakaiDraft(outlet.id, "harian", staffId)
 
                 // Status diperiksa DI SINI, bukan dibiarkan gagal saat menyimpan.
@@ -381,6 +412,25 @@ class OpnameViewModel(app: Application) : AndroidViewModel(app) {
      * berjalan setelah kru menegaskannya atau melewati baris yang salah ketik.
      */
     fun mintaFinalisasi() {
+        val outletId = _state.value.outletTerpilih?.id ?: return
+        if (_state.value.menyimpan) return
+        viewModelScope.launch {
+            _state.update { it.copy(menyimpan = true, error = null, pesan = null) }
+            val bebas = try {
+                bebasSuratJalan(outletId)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update { it.copy(menyimpan = false, error = stokErrorMessage(e)) }
+                return@launch
+            }
+            _state.update { it.copy(menyimpan = false) }
+            // Terhalang: form menampilkan peringatannya; draft tetap bisa disimpan.
+            if (bebas) lanjutkanFinalisasi()
+        }
+    }
+
+    private fun lanjutkanFinalisasi() {
         val turun = GerbangNolOpname.daftarPenurunan(
             _state.value.items.filter { it.adaMasukan }.map { item ->
                 CalonPenurunan(
