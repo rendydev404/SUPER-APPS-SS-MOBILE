@@ -1,5 +1,6 @@
 package com.sukashawarma.superapp.feature.chat.ui
 
+import com.sukashawarma.superapp.core.ui.PenampilFoto
 import androidx.compose.foundation.layout.heightIn
 import com.sukashawarma.superapp.core.ui.ios.PemisahIos
 import com.sukashawarma.superapp.core.ui.ios.TipeIos
@@ -128,6 +129,7 @@ fun ProfilAnggotaSheet(
                         nama = nama,
                         modifier = Modifier.size(94.dp),
                         ukuranHuruf = 34.sp,
+                        kualitasTinggi = true,
                     )
                 }
             }
@@ -199,8 +201,10 @@ fun ProfilAnggotaSheet(
     // jendela terpisah di atas isi Activity, jadi lapisan yang digambar di
     // bawahnya justru akan tertutup oleh lembar ini sendiri.
     if (lihatFoto && !avatar.isNullOrBlank()) {
+        // Layar penuh memuat versi HD; foto lama tanpa HD jatuh ke versi biasa.
         PenampilFoto(
-            url = AvatarStorage.url(avatar),
+            url = AvatarStorage.urlHd(avatar) ?: AvatarStorage.url(avatar),
+            urlCadangan = AvatarStorage.url(avatar),
             judul = nama,
             onTutup = { lihatFoto = false },
         )
