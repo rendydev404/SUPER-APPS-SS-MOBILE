@@ -79,7 +79,7 @@ import com.sukashawarma.superapp.feature.chat.data.PesanPribadi
 import com.sukashawarma.superapp.feature.chat.data.PrivateChatRepository
 import com.sukashawarma.superapp.feature.chat.domain.formatJamWib
 import com.sukashawarma.superapp.feature.chat.domain.labelTanggal
-import com.sukashawarma.superapp.feature.chat.ui.PenampilFoto
+import com.sukashawarma.superapp.core.ui.PenampilFoto
 import com.sukashawarma.superapp.feature.chat.ui.pribadi.KomponenCentangPribadi
 import com.sukashawarma.superapp.feature.chat.ui.suara.BubbleSuara
 import com.sukashawarma.superapp.feature.chat.ui.suara.PemutarSuara
