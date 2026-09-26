@@ -1,5 +1,6 @@
 package com.sukashawarma.superapp.feature.absensi.offline
 
+import com.sukashawarma.superapp.data.remote.SupabaseClient
 import com.google.gson.JsonObject
 import com.sukashawarma.superapp.data.remote.Postgrest
 import com.sukashawarma.superapp.data.remote.abaikanDuplikat
@@ -43,6 +44,14 @@ object KasbonOffline {
 object CutiOffline {
     const val JENIS = "cuti"
 
+    /** Bucket yang sama dengan web (apps/absensi features/cuti/api.ts): publik, dan
+     *  `attachment_url` menyimpan URL publik LENGKAP — bentuk yang dibaca dashboard HR. */
+    const val BUCKET = "hr-attachments"
+
+    /** Path di dalam bucket. Deterministik per pengajuan (clientOpId) supaya unggahan
+     *  ulang dari antrean menimpa berkas yang sama, bukan menumpuk salinan. */
+    fun tujuanBukti(staffId: String, clientOpId: String) = "${clientOpId}_$staffId.jpg"
+
     fun payload(
         staffId: String,
         leaveType: String,
@@ -61,7 +70,11 @@ object CutiOffline {
     }
 
     suspend fun kirim(clientOpId: String, payload: JsonObject, lampiranUrl: String?) {
-        val body = payload.deepCopy().apply { addProperty("client_op_id", clientOpId) }
+        val body = payload.deepCopy().apply {
+            addProperty("client_op_id", clientOpId)
+            // Pengunggah lampiran mengembalikan "bucket/path"; web menyimpan URL publik.
+            lampiranUrl?.let { addProperty("attachment_url", "${SupabaseClient.BASE_URL}storage/v1/object/public/$it") }
+        }
         abaikanDuplikat { Postgrest.insert("leave_requests", body, returning = false) }
     }
 }
