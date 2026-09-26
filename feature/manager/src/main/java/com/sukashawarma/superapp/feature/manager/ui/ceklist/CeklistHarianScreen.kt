@@ -277,11 +277,27 @@ private fun PanelHariIni(state: CeklistHarianUiState) {
 
 @Composable
 private fun KartuOutletCeklist(nama: String, laporan: LaporanCeklist?, onKlik: () -> Unit) {
+    // Hijau HANYA untuk yang sudah disetujui RM. Terkirim-tapi-menunggu memakai nada
+    // PERINGATAN (kuning pending) — sama dengan lencana "MENUNGGU PERSETUJUAN" di layar
+    // pantau RM, supaya AM tidak mengira laporannya sudah beres padahal belum ditinjau.
+    val nada = when {
+        laporan == null -> NadaIos.AKSEN
+        laporan.sudahDitinjau -> NadaIos.SUKSES
+        else -> NadaIos.PERINGATAN
+    }
     KartuIos(onKlik = onKlik, padding = PaddingValues(horizontal = UkuranIos.PaddingKartu, vertical = 14.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IkonBulatIos(
-                if (laporan != null) IkonIos.CheckCircle else IkonIos.Storefront,
-                if (laporan != null) WarnaIos.Hijau else WarnaIos.Aksen,
+                when {
+                    laporan == null -> IkonIos.Storefront
+                    laporan.sudahDitinjau -> IkonIos.CheckCircle
+                    else -> IkonIos.Schedule
+                },
+                when {
+                    laporan == null -> WarnaIos.Aksen
+                    laporan.sudahDitinjau -> WarnaIos.Hijau
+                    else -> WarnaIos.Oranye
+                },
                 ukuran = 38.dp,
             )
             Spacer(Modifier.width(12.dp))
@@ -294,7 +310,7 @@ private fun KartuOutletCeklist(nama: String, laporan: LaporanCeklist?, onKlik: (
                         else -> "Terkirim ${jamJakarta(laporan.diperbaruiPada)} · menunggu RM"
                     },
                     style = TipeIos.Catatan.copy(
-                        color = if (laporan != null) NadaIos.SUKSES.teks else WarnaIos.LabelKedua,
+                        color = if (laporan != null) nada.teks else WarnaIos.LabelKedua,
                     ),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -303,7 +319,7 @@ private fun KartuOutletCeklist(nama: String, laporan: LaporanCeklist?, onKlik: (
             Spacer(Modifier.width(8.dp))
             LencanaIos(
                 if (laporan != null) "Edit" else "Mulai",
-                if (laporan != null) NadaIos.SUKSES else NadaIos.AKSEN,
+                nada,
                 titik = false,
             )
             Spacer(Modifier.width(6.dp))
