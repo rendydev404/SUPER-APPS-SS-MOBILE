@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
@@ -229,7 +230,12 @@ private fun FullScreenEnrollCamera(
                 bitmap = previewBitmap.asImageBitmap(),
                 contentDescription = "Foto wajah $crewName yang akan didaftarkan",
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
+                // Kamera depan yang live ditampilkan seperti cermin (PreviewView), sedangkan
+                // hasil jepretannya tidak — tanpa ini gambar "melompat" terbalik saat berpindah
+                // dari kamera ke pratinjau (tangan kanan pindah ke kiri). Dibalik HANYA di
+                // tampilan: foto yang diunggah & descriptor wajah tetap arah aslinya, jadi
+                // pencocokan saat absen tidak terpengaruh.
+                modifier = Modifier.fillMaxSize().graphicsLayer { scaleX = -1f },
             )
         } else if (hasCameraPermission) {
             FaceCameraPreview(
