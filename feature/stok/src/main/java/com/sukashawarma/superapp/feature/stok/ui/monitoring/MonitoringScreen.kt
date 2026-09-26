@@ -81,10 +81,16 @@ fun MonitoringScreen(
     onKeluar: () -> Unit,
     onBukaBahan: (outletId: String, bahanId: String, nama: String) -> Unit,
     onBukaTransfer: () -> Unit,
-    viewModel: MonitoringViewModel = viewModel(),
+    outletAwalId: String? = null,
+    // Sengaja tidak masuk kunci ViewModel: nilainya dikosongkan setelah dipakai,
+    // dan kunci yang berubah akan membuang filter yang baru saja dinyalakan.
+    filterAwal: FilterKpi = FilterKpi.SEMUA,
+    viewModel: MonitoringViewModel = viewModel(key = "monitoring|$outletAwalId") {
+        MonitoringViewModel(outletAwalId, filterAwal)
+    },
 ) {
     val state by viewModel.state.collectAsState()
-    RealtimeRefresh(RealtimeTables.STOK_BALANCE, RealtimeTables.BAHAN_BAKU) { viewModel.muatAwal() }
+    RealtimeRefresh(RealtimeTables.STOK_BALANCE, RealtimeTables.BAHAN_BAKU, jedaMinimumMs = 30_000L) { viewModel.muatAwal() }
 
     Column(Modifier.fillMaxSize().background(WarnaIos.Latar)) {
         Header(
