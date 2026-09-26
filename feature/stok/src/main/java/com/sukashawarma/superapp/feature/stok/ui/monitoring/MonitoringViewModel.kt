@@ -85,9 +85,18 @@ data class MonitoringUiState(
     }
 }
 
-class MonitoringViewModel : ViewModel() {
+/**
+ * @param outletAwalId outlet yang langsung dibuka — dipakai papan pantau Gudang Pusat
+ *   saat kartu outlet ditekan. null = outlet pertama yang boleh dilihat.
+ * @param filterAwal filter KPI yang langsung menyala — kartu "Stok kritis" di Beranda
+ *   membuka layar ini dengan [FilterKpi.KRITIS].
+ */
+class MonitoringViewModel(
+    private val outletAwalId: String? = null,
+    filterAwal: FilterKpi = FilterKpi.SEMUA,
+) : ViewModel() {
 
-    private val _state = MutableStateFlow(MonitoringUiState())
+    private val _state = MutableStateFlow(MonitoringUiState(filter = filterAwal))
     val state: StateFlow<MonitoringUiState> = _state
 
     private var muatJob: Job? = null
@@ -108,7 +117,7 @@ class MonitoringViewModel : ViewModel() {
                 }
                 val terpilih = _state.value.outletTerpilih?.let { lama ->
                     outlets.firstOrNull { it.id == lama.id }
-                } ?: outlets.first()
+                } ?: outlets.firstOrNull { it.id == outletAwalId } ?: outlets.first()
                 _state.value = _state.value.copy(outlets = outlets, outletTerpilih = terpilih)
                 muatBahan()
             } catch (e: CancellationException) {
