@@ -1,5 +1,9 @@
 package com.sukashawarma.superapp.feature.profil.ui
 
+import android.graphics.Bitmap
+import com.sukashawarma.superapp.core.camera.keJpeg
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sukashawarma.superapp.domain.model.StaffProfile
@@ -102,11 +106,20 @@ class ProfilViewModel : ViewModel() {
         }
     }
 
-    fun simpanFoto(jpeg: ByteArray) {
+    /**
+     * Menyimpan foto profil baru dalam dua ukuran: [SISI_AVATAR_KECIL] untuk avatar di
+     * daftar (ringan) dan [SISI_AVATAR_HD] untuk dibuka layar penuh (tajam).
+     * Kompresi berjalan di Dispatchers.Default — dua kali encode JPEG sampai 1280px
+     * cukup berat untuk membuat UI tersendat bila dilakukan di thread utama.
+     */
+    fun simpanFoto(foto: Bitmap) {
         _state.value = _state.value.copy(mengurusFoto = true, pesan = null)
         viewModelScope.launch {
             try {
-                val path = ProfilRepository.unggahAvatar(jpeg)
+                val (jpeg, jpegHd) = withContext(Dispatchers.Default) {
+                    foto.keJpeg(SISI_AVATAR_KECIL, 82) to foto.keJpeg(SISI_AVATAR_HD, 82)
+                }
+                val path = ProfilRepository.unggahAvatar(jpeg, jpegHd)
                 ProfilRepository.simpan(avatarPath = path)
                 _state.value = _state.value.copy(
                     mengurusFoto = false,
@@ -169,3 +182,13 @@ class ProfilViewModel : ViewModel() {
         }
     }
 }
+
+/** Avatar di daftar & kartu: cukup tajam sampai ~120dp. */
+private const val SISI_AVATAR_KECIL = 512
+/**
+ * Foto profil yang dibuka layar penuh ("ultra HD"): lebih lebar dari layar HP umum
+ * (720-1440px) supaya tetap tajam saat di-zoom. JPEG mutu 82 di ukuran ini ~200-300 KB,
+ * dan hanya diunduh saat foto dibuka besar - daftar tetap memakai versi 512px.
+ * Bucket `avatars` hanya menerima image/jpeg (batas 2 MB), jadi bukan WebP.
+ */
+private const val SISI_AVATAR_HD = 1600
