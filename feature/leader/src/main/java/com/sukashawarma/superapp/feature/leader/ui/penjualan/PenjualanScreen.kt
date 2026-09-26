@@ -71,7 +71,7 @@ fun PenjualanScreen(
 
     // `orders` dan `order_items` sama-sama ada di publication realtime, jadi pesanan
     // baru maupun perubahan isinya sama-sama menggerakkan layar ini.
-    RealtimeRefresh(RealtimeTables.ORDERS, RealtimeTables.ORDER_ITEMS) { viewModel.muatUlang() }
+    RealtimeRefresh(RealtimeTables.ORDERS, RealtimeTables.ORDER_ITEMS, jedaMinimumMs = 30_000L) { viewModel.muatUlang() }
 
     LaunchedEffect(state.galat) {
         state.galat?.let {
