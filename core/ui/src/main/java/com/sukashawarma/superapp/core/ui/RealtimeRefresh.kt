@@ -1,5 +1,6 @@
 package com.sukashawarma.superapp.core.ui
 
+import android.os.SystemClock
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -8,6 +9,8 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.sukashawarma.superapp.data.remote.Realtime
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.conflate
 
 /**
  * Nama tabel yang benar-benar mengirim event.
@@ -95,15 +98,34 @@ object RealtimeTables {
  * Langganan hanya hidup selama layar terlihat: begitu layar berpindah ke
  * belakang, channel-nya ditinggalkan dan perangkat berhenti menerima aliran
  * tabel itu.
+ *
+ * [jedaMinimumMs] membatasi [onChange] paling banyak sekali per jeda itu.
+ * Perlu untuk tabel yang berubah di setiap transaksi kasir (`stok_balance`,
+ * `orders`, `order_items`): tanpa batas, setiap layar yang terbuka memuat ulang
+ * seluruh datanya tiap kali outlet MANA PUN menjual, dan beban itu dikali jumlah
+ * perangkat. Event pertama setelah hening tetap langsung diproses, dan event yang
+ * datang selama jeda tidak hilang — dilebur menjadi satu muat ulang di ujung
+ * jeda, jadi layar tetap sampai ke keadaan terbaru, hanya tidak lebih sering.
+ * Bawaan 0 = perilaku lama (hanya debounce 250 ms dari [Realtime.updates]).
  */
 @Composable
-fun RealtimeRefresh(vararg tables: String, onChange: () -> Unit) {
+fun RealtimeRefresh(vararg tables: String, jedaMinimumMs: Long = 0L, onChange: () -> Unit) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val latest = rememberUpdatedState(onChange)
     val key = remember(tables) { tables.sorted().joinToString(",") }
-    LaunchedEffect(key, lifecycle) {
+    LaunchedEffect(key, jedaMinimumMs, lifecycle) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            Realtime.updates(*tables).collect { latest.value() }
+            if (jedaMinimumMs <= 0L) {
+                Realtime.updates(*tables).collect { latest.value() }
+            } else {
+                var terakhir = 0L
+                Realtime.updates(*tables).conflate().collect {
+                    val sisa = terakhir + jedaMinimumMs - SystemClock.elapsedRealtime()
+                    if (sisa > 0) delay(sisa)
+                    terakhir = SystemClock.elapsedRealtime()
+                    latest.value()
+                }
+            }
         }
     }
 }
