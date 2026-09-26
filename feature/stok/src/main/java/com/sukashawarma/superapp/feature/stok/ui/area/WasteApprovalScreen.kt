@@ -71,7 +71,10 @@ private data class FotoBuktiPreview(
 @Composable
 fun WasteApprovalScreen(onBack: () -> Unit, vm: WasteApprovalViewModel = viewModel()) {
     val state by vm.state.collectAsState()
-    RealtimeRefresh(RealtimeTables.WASTE_REPORTS, RealtimeTables.STOK_BALANCE) { vm.refresh() }
+    RealtimeRefresh(RealtimeTables.WASTE_REPORTS) { vm.refresh() }
+    // Saldo berubah di setiap transaksi kasir di semua outlet; dibatasi sekali per
+    // 30 detik. Antrean waste di atas tetap seketika.
+    RealtimeRefresh(RealtimeTables.STOK_BALANCE, jedaMinimumMs = 30_000L) { vm.refresh() }
     var photoPreview by remember { mutableStateOf<FotoBuktiPreview?>(null) }
     var menuOutletTerbuka by remember { mutableStateOf(false) }
 
