@@ -1,5 +1,22 @@
 package com.sukashawarma.superapp.feature.profil.ui
 
+import android.graphics.Matrix
+import android.media.ExifInterface
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.window.Dialog
+import androidx.compose.foundation.layout.Arrangement
+import com.sukashawarma.superapp.core.ui.AvatarStorage
+import com.sukashawarma.superapp.core.ui.PenampilFoto
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -51,7 +68,6 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sukashawarma.superapp.core.camera.KameraFotoSheet
-import com.sukashawarma.superapp.core.camera.keJpeg
 import com.sukashawarma.superapp.core.ui.AvatarStaf
 import com.sukashawarma.superapp.core.ui.ios.LabelSeksiIos
 import com.sukashawarma.superapp.core.ui.ios.LencanaIos
@@ -69,7 +85,9 @@ import com.sukashawarma.superapp.domain.model.Role
 import com.sukashawarma.superapp.domain.model.StaffProfile
 import com.sukashawarma.superapp.presentation.theme.*
 
-private const val SISI_AVATAR = 512
+/** Batas sisi saat membaca foto galeri: cukup besar untuk versi HD foto profil (1600px)
+ *  tanpa pernah memuat foto 12 MP utuh ke memori. */
+private const val SISI_BACA_GALERI = 1600
 
 // Token lokal kini menunjuk ke design system iOS bersama (`core.ui.ios`) supaya
 // halaman profil satu bahasa dengan modul lain tanpa menyentuh setiap pemakaian.
@@ -94,6 +112,10 @@ fun ProfilScreen(
 
     var pilihanFotoTerbuka by rememberSaveable { mutableStateOf(false) }
     var kameraTerbuka by rememberSaveable { mutableStateOf(false) }
+    var lihatFotoSendiri by rememberSaveable { mutableStateOf(false) }
+    // Foto baru yang belum disimpan: ditampilkan dulu di pratinjau, baru diunggah
+    // setelah dikonfirmasi. Tidak saveable (Bitmap); rotasi layar = pilih ulang.
+    var fotoCalon by remember { mutableStateOf<Bitmap?>(null) }
 
     var passwordBaru by rememberSaveable { mutableStateOf("") }
     var konfirmasiPassword by rememberSaveable { mutableStateOf("") }
@@ -102,7 +124,7 @@ fun ProfilScreen(
         ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
         val bitmap = uri?.let { bacaGambar(konteks.contentResolver, it) }
-        if (bitmap != null) viewModel.simpanFoto(bitmap.keJpeg(SISI_AVATAR, 82))
+        if (bitmap != null) fotoCalon = bitmap
     }
 
     val izinKamera = rememberLauncherForActivityResult(
@@ -129,7 +151,13 @@ fun ProfilScreen(
             AppleIdHero(
                 staff = state.staff,
                 sibuk = state.mengurusFoto,
-                onUbahFoto = { pilihanFotoTerbuka = true }
+                onUbahFoto = { pilihanFotoTerbuka = true },
+                // Ketuk foto = lihat besar (seperti WhatsApp); ubah lewat lencana kamera.
+                // Belum punya foto -> langsung ke pilihan ganti foto.
+                onKetukFoto = {
+                    if (state.staff?.avatarUrl.isNullOrBlank()) pilihanFotoTerbuka = true
+                    else lihatFotoSendiri = true
+                },
             )
 
             // Feedback Alert Banner (if any)
@@ -341,6 +369,17 @@ fun ProfilScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column {
+                        if (!state.staff?.avatarUrl.isNullOrBlank()) {
+                            IosSheetActionRow(
+                                icon = Icons.Default.Visibility,
+                                text = "Lihat Foto Profil",
+                                onClick = {
+                                    pilihanFotoTerbuka = false
+                                    lihatFotoSendiri = true
+                                }
+                            )
+                            PemisahIos(inset = 50.dp)
+                        }
                         IosSheetActionRow(
                             icon = Icons.Default.PhotoCamera,
                             text = "Ambil Foto Kamera",
@@ -415,12 +454,93 @@ fun ProfilScreen(
                 KameraFotoSheet(
                     onDiambil = { bitmap ->
                         kameraTerbuka = false
-                        viewModel.simpanFoto(bitmap.keJpeg(SISI_AVATAR, 82))
+                        fotoCalon = bitmap
                     },
                     onBatal = { kameraTerbuka = false },
                     labelAmbil = "Pakai Foto Ini",
                     kameraDepan = true,
                 )
+            }
+        }
+    }
+
+    fotoCalon?.let { foto ->
+        PratinjauFotoProfil(
+            foto = foto,
+            nama = state.staff?.namaTampil.orEmpty(),
+            onSimpan = {
+                fotoCalon = null
+                viewModel.simpanFoto(foto)
+            },
+            onGanti = {
+                fotoCalon = null
+                pilihanFotoTerbuka = true
+            },
+            onBatal = { fotoCalon = null },
+        )
+    }
+
+    val avatarSendiri = state.staff?.avatarUrl
+    if (lihatFotoSendiri && !avatarSendiri.isNullOrBlank()) {
+        PenampilFoto(
+            url = AvatarStorage.urlHd(avatarSendiri) ?: AvatarStorage.url(avatarSendiri),
+            urlCadangan = AvatarStorage.url(avatarSendiri),
+            judul = state.staff?.namaTampil ?: "Foto profil",
+            onTutup = { lihatFotoSendiri = false },
+        )
+    }
+}
+
+/**
+ * Pratinjau foto profil baru sebelum diunggah: lingkaran persis seperti yang akan
+ * dilihat orang lain di chat/daftar. Tanpa langkah ini foto galeri langsung terunggah
+ * begitu dipilih - salah pilih berarti harus mengganti lagi.
+ */
+@Composable
+private fun PratinjauFotoProfil(
+    foto: Bitmap,
+    nama: String,
+    onSimpan: () -> Unit,
+    onGanti: () -> Unit,
+    onBatal: () -> Unit,
+) {
+    val gambar = remember(foto) { foto.asImageBitmap() }
+    Dialog(onDismissRequest = onBatal) {
+        Surface(shape = RoundedCornerShape(20.dp), color = Color.White) {
+            Column(
+                Modifier.padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text("Pratinjau Foto Profil", style = TipeIos.Utama)
+                Spacer(Modifier.height(16.dp))
+                Image(
+                    bitmap = gambar,
+                    contentDescription = "Pratinjau foto profil",
+                    contentScale = ContentScale.Crop,
+                    filterQuality = FilterQuality.High,
+                    modifier = Modifier
+                        .size(180.dp)
+                        .clip(CircleShape)
+                        .border(3.dp, SukaOrange.copy(alpha = 0.35f), CircleShape),
+                )
+                Spacer(Modifier.height(10.dp))
+                Text(nama, style = TipeIos.Isi.copy(fontWeight = FontWeight.SemiBold))
+                Text(
+                    "Begini foto profilmu terlihat oleh tim.",
+                    style = TipeIos.Kecil.copy(color = WarnaIos.Abu),
+                )
+                Spacer(Modifier.height(20.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedButton(onClick = onGanti, modifier = Modifier.weight(1f)) {
+                        Text("Pilih Lain", color = SukaOrange)
+                    }
+                    Button(
+                        onClick = onSimpan,
+                        colors = ButtonDefaults.buttonColors(containerColor = SukaOrange),
+                        modifier = Modifier.weight(1f),
+                    ) { Text("Simpan") }
+                }
+                TextButton(onClick = onBatal) { Text("Batal", color = WarnaIos.Abu) }
             }
         }
     }
@@ -471,7 +591,8 @@ private fun IosNavigationBar(
 private fun AppleIdHero(
     staff: StaffProfile?,
     sibuk: Boolean,
-    onUbahFoto: () -> Unit
+    onUbahFoto: () -> Unit,
+    onKetukFoto: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -492,8 +613,9 @@ private fun AppleIdHero(
                     nama = staff?.namaTampil,
                     modifier = Modifier
                         .fillMaxSize()
-                        .clickable(enabled = !sibuk, onClick = onUbahFoto),
-                    ukuranHuruf = 34.sp
+                        .clickable(enabled = !sibuk, onClick = onKetukFoto),
+                    ukuranHuruf = 34.sp,
+                    kualitasTinggi = true,
                 )
             }
 
@@ -934,10 +1056,24 @@ private fun IosSheetActionRow(
 private fun bacaGambar(resolver: android.content.ContentResolver, uri: Uri): Bitmap? = try {
     val batas = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, batas) }
+    // inSampleSize terbesar yang hasilnya masih >= SISI_BACA_GALERI, supaya versi HD
+    // (1600px) benar-benar tajam - batas lama (2x512) berhenti di ~1000px.
     var contoh = 1
-    while (maxOf(batas.outWidth, batas.outHeight) / contoh > SISI_AVATAR * 2) contoh *= 2
+    while (maxOf(batas.outWidth, batas.outHeight) / (contoh * 2) >= SISI_BACA_GALERI) contoh *= 2
     val opsi = BitmapFactory.Options().apply { inSampleSize = contoh }
-    resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opsi) }
+    val mentah = resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opsi) }
+    // Foto kamera HP menyimpan arah di EXIF, bukan di piksel; tanpa ini foto profil
+    // (dan pratinjaunya) bisa tampil miring 90 derajat.
+    val derajat = resolver.openInputStream(uri)?.use { masuk ->
+        when (ExifInterface(masuk).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)) {
+            ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+            ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+            ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+            else -> 0f
+        }
+    } ?: 0f
+    if (mentah == null || derajat == 0f) mentah
+    else Bitmap.createBitmap(mentah, 0, 0, mentah.width, mentah.height, Matrix().apply { postRotate(derajat) }, true)
 } catch (e: Exception) {
     android.util.Log.e("ProfilScreen", "bacaGambar() gagal", e)
     null
