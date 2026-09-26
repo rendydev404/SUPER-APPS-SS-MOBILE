@@ -1,5 +1,8 @@
 package com.sukashawarma.superapp.feature.chat.ui
 
+import com.sukashawarma.superapp.feature.chat.data.KlipyStiker
+import com.sukashawarma.superapp.feature.chat.data.StikerKlipy
+import com.sukashawarma.superapp.feature.chat.data.TEKS_CADANGAN_STIKER
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.gson.JsonObject
@@ -37,6 +40,8 @@ data class KirimanTertunda(
     val suaraM4a: ByteArray? = null,
     val suaraMs: Int? = null,
     val suaraWave: String? = null,
+    /** URL stiker KLIPY. Tidak ada yang diunggah — cukup disimpan di pesan. */
+    val stikerUrl: String? = null,
     val replyTo: PesanChat?,
     val dibuatMs: Long,
     /** Orang yang disebut; ikut bertahan agar kiriman yang diulang tetap
@@ -283,6 +288,20 @@ class ChatViewModel : ViewModel() {
         ))
     }
 
+    fun kirimStiker(stiker: StikerKlipy) {
+        // Disaring lagi di sini walau API sudah menyaring: URL di luar klipy.com akan
+        // ditolak CHECK database, dan lebih baik tidak masuk antrean sama sekali.
+        if (!KlipyStiker.urlSah(stiker.urlKirim)) return
+        antre(KirimanTertunda(
+            kunci = UUID.randomUUID().toString(),
+            body = TEKS_CADANGAN_STIKER,
+            fotoWebp = null,
+            stikerUrl = stiker.urlKirim,
+            replyTo = _state.value.balasTarget,
+            dibuatMs = System.currentTimeMillis(),
+        ))
+    }
+
     fun kirimFoto(webp: ByteArray, keterangan: String, sebutan: List<Sebutan> = emptyList()) {
         antre(KirimanTertunda(
             kunci = UUID.randomUUID().toString(),
@@ -329,6 +348,7 @@ class ChatViewModel : ViewModel() {
                     audioPath = pathSuara,
                     audioMs = kiriman.suaraMs,
                     audioWave = kiriman.suaraWave,
+                    stickerUrl = kiriman.stikerUrl,
                 )
                 _state.value = _state.value.copy(
                     tertunda = _state.value.tertunda.filterNot { it.kunci == kiriman.kunci },
