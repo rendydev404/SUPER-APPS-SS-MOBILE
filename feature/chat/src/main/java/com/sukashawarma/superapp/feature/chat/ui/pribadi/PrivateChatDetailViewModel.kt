@@ -1,5 +1,8 @@
 package com.sukashawarma.superapp.feature.chat.ui.pribadi
 
+import com.sukashawarma.superapp.feature.chat.data.KlipyStiker
+import com.sukashawarma.superapp.feature.chat.data.StikerKlipy
+import com.sukashawarma.superapp.feature.chat.data.TEKS_CADANGAN_STIKER
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sukashawarma.superapp.data.remote.Realtime
@@ -186,6 +189,27 @@ class PrivateChatDetailViewModel(
             } catch (e: Exception) {
                 _state.value = _state.value.copy(mengirim = false)
                 _pesanGalat.tryEmit(e.message ?: "Gagal mengirim pesan suara.")
+            }
+        }
+    }
+
+    fun kirimStiker(stiker: StikerKlipy) {
+        // URL di luar klipy.com ditolak CHECK database; saring sebelum memanggil server.
+        if (!KlipyStiker.urlSah(stiker.urlKirim)) return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(mengirim = true)
+            try {
+                PrivateChatRepository.kirimPesan(
+                    recipientId = partnerId,
+                    body = TEKS_CADANGAN_STIKER,
+                    replyToId = _state.value.balasTarget?.id,
+                    stickerUrl = stiker.urlKirim,
+                )
+                _state.value = _state.value.copy(mengirim = false, balasTarget = null)
+                muatPesanDanTandai()
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(mengirim = false)
+                _pesanGalat.tryEmit(e.message ?: "Gagal mengirim stiker.")
             }
         }
     }
