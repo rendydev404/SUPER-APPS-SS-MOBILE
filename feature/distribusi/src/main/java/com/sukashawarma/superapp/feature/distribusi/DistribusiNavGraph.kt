@@ -3,6 +3,7 @@ package com.sukashawarma.superapp.feature.distribusi
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -16,6 +17,7 @@ import com.sukashawarma.superapp.core.ui.navigateSekali
 import com.sukashawarma.superapp.core.ui.popAman
 import com.sukashawarma.superapp.feature.distribusi.ui.buat.BuatSuratJalanScreen
 import com.sukashawarma.superapp.feature.distribusi.ui.dashboard.DashboardScreen
+import com.sukashawarma.superapp.feature.distribusi.ui.dashboard.TabStatus
 import com.sukashawarma.superapp.feature.distribusi.ui.detail.DetailSuratJalanScreen
 import com.sukashawarma.superapp.feature.distribusi.ui.inbox.InboxScreen
 import com.sukashawarma.superapp.feature.distribusi.ui.riwayat.RiwayatScreen
@@ -25,10 +27,16 @@ import com.sukashawarma.superapp.feature.distribusi.ui.verifikasi.VerifikasiScre
 /**
  * Navigasi modul Distribusi. Pola yang sama dengan Absensi dan Stok: satu
  * NavHost bersarang yang dipasang pada satu rute di NavHost root.
+ *
+ * @param bukaKiriman dashboard dibuka pada tab "Dikirim" — dipakai kartu "Kiriman"
+ *   di Beranda.
  */
 @Composable
-fun DistribusiNavGraph(onExit: () -> Unit) {
+fun DistribusiNavGraph(onExit: () -> Unit, bukaKiriman: Boolean = false) {
     val navController = rememberNavController()
+    // Ditangkap sekali: pemanggil mengosongkan nilainya setelah modul terbuka, dan
+    // NavHost bisa baru menyusun tujuan awalnya pada frame berikutnya.
+    val kirimanAwal = rememberSaveable { bukaKiriman }
 
     NavHost(
         navController = navController,
@@ -74,6 +82,7 @@ fun DistribusiNavGraph(onExit: () -> Unit) {
                 onBukaRiwayat = { navController.navigateSekali(DistribusiRoutes.RIWAYAT) },
                 onBukaDetail = { id -> navController.navigateSekali(DistribusiRoutes.detail(id)) },
                 onBukaBuat = { navController.navigateSekali(DistribusiRoutes.BUAT) },
+                tabAwal = if (kirimanAwal) TabStatus.DIKIRIM else null,
             )
         }
 
