@@ -120,8 +120,10 @@ fun PersetujuanScreen(
     RealtimeRefresh(
         RealtimeTables.CANCELLATION_REQUESTS,
         RealtimeTables.BYPASS_REQUESTS,
-        RealtimeTables.ORDERS,
     ) { viewModel.muatUlang(silent = true) }
+    // Antrean persetujuan di atas tetap seketika. `orders` berubah di setiap
+    // transaksi kasir di semua outlet, jadi dibatasi sekali per 30 detik.
+    RealtimeRefresh(RealtimeTables.ORDERS, jedaMinimumMs = 30_000L) { viewModel.muatUlang(silent = true) }
 
     LaunchedEffect(state.kabar, state.galat) {
         val pesan = state.kabar ?: state.galat
