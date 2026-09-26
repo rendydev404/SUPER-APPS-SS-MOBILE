@@ -32,6 +32,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -87,9 +88,20 @@ fun DashboardScreen(
     onBukaRiwayat: () -> Unit,
     onBukaDetail: (String) -> Unit,
     onBukaBuat: () -> Unit = {},
+    tabAwal: TabStatus? = null,
     viewModel: DashboardViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+
+    // Diterapkan sekali saja: kembali dari detail tidak boleh memaksa tab ini lagi
+    // bila pengguna sudah berpindah tab sendiri.
+    var tabAwalDiterapkan by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(tabAwal) {
+        if (tabAwal != null && !tabAwalDiterapkan) {
+            viewModel.ubahTab(tabAwal)
+            tabAwalDiterapkan = true
+        }
+    }
     RealtimeRefresh(RealtimeTables.SURAT_JALAN) { viewModel.muat(paksa = true) }
     var konfirmasiTutup by remember { mutableStateOf<SuratJalanRingkas?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
