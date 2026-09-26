@@ -312,7 +312,7 @@ private fun KartuAntrean(
             Column(Modifier.weight(1f)) {
                 Text(laporan.bahanNama, style = TipeIos.Utama)
                 Spacer(Modifier.height(2.dp))
-                Text("Kuantitas: ${laporan.qtyTeks} ${laporan.satuan}", style = TipeIos.Catatan)
+                Text("Kuantitas: ${laporan.qtyLabel}", style = TipeIos.Catatan)
             }
             Spacer(Modifier.width(10.dp))
             Column(horizontalAlignment = Alignment.End) {
@@ -601,7 +601,7 @@ private fun BarisBahanTerbuang(nomor: Int, bahan: BahanTerbuang) {
             overflow = TextOverflow.Ellipsis,
         )
         Spacer(Modifier.width(8.dp))
-        Text("${bahan.qtyTeks} ${bahan.satuan}", style = TipeIos.Catatan, maxLines = 1)
+        Text(bahan.qtyLabel, style = TipeIos.Catatan, maxLines = 1)
         Spacer(Modifier.width(8.dp))
         Text(
             rupiah(bahan.nilai),
@@ -746,7 +746,7 @@ private fun KartuRiwayat(laporan: LaporanWaste) {
                 Text(laporan.bahanNama, style = TipeIos.Utama)
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    "${laporan.qtyTeks} ${laporan.satuan} • ${waktuJakarta(laporan.dibuatPada)}",
+                    "${laporan.qtyLabel} • ${waktuJakarta(laporan.dibuatPada)}",
                     style = TipeIos.Catatan,
                 )
             }
