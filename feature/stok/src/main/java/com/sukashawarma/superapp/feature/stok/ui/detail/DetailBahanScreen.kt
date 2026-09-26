@@ -65,7 +65,7 @@ fun DetailBahanScreen(
 ) {
     val state by viewModel.state.collectAsState()
     LaunchedEffect(outletId, bahanId) { viewModel.muat(outletId, bahanId) }
-    RealtimeRefresh(RealtimeTables.STOK_BALANCE) { viewModel.muat(outletId, bahanId) }
+    RealtimeRefresh(RealtimeTables.STOK_BALANCE, jedaMinimumMs = 15_000L) { viewModel.muat(outletId, bahanId) }
 
     Column(Modifier.fillMaxSize().background(WarnaIos.Latar)) {
         HeaderStok(
