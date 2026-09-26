@@ -41,6 +41,16 @@ object StokAkses {
     fun melihatDashboard(role: Role?): Boolean = !pusat(role)
 
     /**
+     * Papan pantau stok SELURUH outlet — cermin `SPVDashboard` / `monitoring-live` web
+     * yang dibuka role kitchen. Menempati slot Dashboard untuk peran ini, sebagai ganti
+     * monitoring satu outlet yang tidak cocok untuk gudang pusat (lihat KDoc kelas).
+     * Cakupan outletnya tetap dari `accessible_outlet_ids()`, bukan dari daftar ini.
+     */
+    private val PANTAU_SEMUA_OUTLET = setOf(Role.KITCHEN)
+
+    fun melihatPantauSemuaOutlet(role: Role?): Boolean = role != null && role in PANTAU_SEMUA_OUTLET
+
+    /**
      * Peran yang berwenang memverifikasi penerimaan fisik PO di Gudang Pusat —
      * cermin fungsi database `can_verify_po_receipt()` dan trigger `trg_po_status_transition_guard`.
      */
