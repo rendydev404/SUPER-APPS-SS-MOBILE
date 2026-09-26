@@ -1,5 +1,10 @@
 package com.sukashawarma.superapp.feature.chat.ui
 
+import com.sukashawarma.superapp.core.ui.PenampilFoto
+import com.sukashawarma.superapp.feature.chat.data.FavoritStiker
+import com.sukashawarma.superapp.feature.chat.ui.stiker.BubbleStiker
+import com.sukashawarma.superapp.feature.chat.ui.stiker.PapanEmojiStiker
+import com.sukashawarma.superapp.feature.chat.ui.stiker.TataPesanStiker
 import com.sukashawarma.superapp.core.ui.ios.KeadaanIos
 import com.sukashawarma.superapp.core.ui.ios.NadaIos
 import com.sukashawarma.superapp.core.ui.ios.TipeIos
@@ -970,9 +975,13 @@ private fun ChatScreenContent(
                 },
             )
             if (papanEmoji) {
-                PapanEmoji(
-                    onPilih = { ketikan.sisip(it) },
+                PapanEmojiStiker(
+                    userId = userId,
+                    onPilihEmoji = { ketikan.sisip(it) },
                     onHapus = { ketikan.teks = hapusSatuKarakter(ketikan.teks) },
+                    // Papan tetap terbuka setelah stiker terkirim, seperti WhatsApp:
+                    // orang sering mengirim beberapa stiker berturut-turut.
+                    onPilihStiker = { viewModel.kirimStiker(it) },
                 )
             }
         } else {
@@ -1043,11 +1052,13 @@ private fun ChatScreenContent(
                 // suara TIDAK: tidak ada teks untuk disunting di sana, dan
                 // menambahkan teks ke rekaman orang membuat bubble-nya berbunyi
                 // lain dari yang diucapkan.
+                // Stiker juga tidak: teksnya hanya cadangan untuk app lama.
                 bolehSunting = item.milikSendiri &&
                     pesan.audioPath == null &&
+                    pesan.stickerUrl == null &&
                     System.currentTimeMillis() - pesan.createdAtMs <= BATAS_SUNTING_MS,
                 bolehInfo = (item.milikSendiri || state.pengelola) && pesan.deletedAtMs == null,
-                adaTeks = pesan.body.isNotBlank(),
+                adaTeks = pesan.body.isNotBlank() && pesan.stickerUrl == null,
                 onEmoji = { emoji ->
                     viewModel.toggleReaksi(pesan, emoji)
                     menuPesan = null
@@ -1069,6 +1080,19 @@ private fun ChatScreenContent(
                 },
                 onHapus = { konfirmasiHapus = pesan; menuPesan = null },
                 onTutup = { menuPesan = null },
+                // Favorit disimpan lokal per akun; dibaca ulang di sini supaya labelnya
+                // tepat walau papan stiker belum pernah dibuka sejak app dijalankan.
+                labelFavorit = pesan.stickerUrl?.let { url ->
+                    FavoritStiker.muat(context, userId)
+                    if (FavoritStiker.ada(url)) "Hapus dari favorit" else "Simpan ke favorit"
+                },
+                onFavorit = {
+                    pesan.stickerUrl?.let { url ->
+                        val kini = FavoritStiker.alihkan(context, userId, FavoritStiker.dariPesan(url))
+                        Toast.makeText(context, if (kini) "Disimpan ke favorit" else "Dihapus dari favorit", Toast.LENGTH_SHORT).show()
+                    }
+                    menuPesan = null
+                },
                 bubble = {
                     // Bubble yang sama persis, tanpa identitas berulang supaya
                     // fokusnya pada isi pesan yang sedang dipilih.
@@ -1809,6 +1833,54 @@ private fun Bubble(
     // sekaligus hanya untuk menganimasikan warna transparan ke transparan.
     val denyut = if (disorot) denyutSorot(sorotKunci) else null
 
+    // Stiker digambar tanpa gelembung. `return` di sini aman: berada di badan fungsi
+    // composable, bukan di dalam lambda (lihat catatan NISAN di bawah).
+    val stiker = p.stickerUrl
+    if (stiker != null && p.deletedAtMs == null) {
+        TataPesanStiker(
+            url = stiker,
+            milikSendiri = item.milikSendiri,
+            jam = item.jam,
+            onTekanLama = onTekanLama,
+            kepala = {
+                if (item.tampilkanIdentitas) {
+                    Text(
+                        namaPengirim,
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = warnaNama(p.senderId),
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                    )
+                }
+                if (p.replyToId != null || p.replyToSnippet != null) {
+                    KutipanReply(
+                        nama = p.replyToName ?: "Pesan",
+                        snippet = p.replyToSnippet.orEmpty(),
+                        fotoPath = p.replyToImage,
+                        diBubbleSendiri = item.milikSendiri,
+                        onKlik = p.replyToId?.let { id -> { onLompatKe(id) } },
+                        modifier = Modifier
+                            .widthIn(max = 220.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (item.milikSendiri) BubbleSendiri else BubbleLawan)
+                            .padding(6.dp),
+                    )
+                }
+            },
+            status = if (!item.milikSendiri) null else {
+                {
+                    Icon(
+                        imageVector = Icons.Filled.DoneAll,
+                        contentDescription = if (item.dibacaSemua) "Dibaca oleh semua anggota" else "Terkirim",
+                        tint = if (item.dibacaSemua) BiruIos else Color(0xFFA0A0A8),
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
+            },
+        )
+        return
+    }
+
     Column(
         modifier
             .widthIn(max = 290.dp + EKOR)
@@ -2192,6 +2264,9 @@ private fun BubbleTertunda(
                         modifier = Modifier.padding(bottom = 4.dp),
                     )
                 }
+                kiriman.stikerUrl?.let { url ->
+                    BubbleStiker(url = url, ukuran = 110.dp, modifier = Modifier.padding(bottom = 4.dp))
+                }
                 kiriman.fotoWebp?.let { bytes ->
                     val bmp = remember(kiriman.kunci) {
                         // Dikecilkan saat di-decode, bukan dimuat penuh. Berkasnya
@@ -2228,7 +2303,7 @@ private fun BubbleTertunda(
                         )
                         Spacer(Modifier.width(6.dp))
                     }
-                    if (kiriman.body.isNotBlank()) {
+                    if (kiriman.body.isNotBlank() && kiriman.stikerUrl == null) {
                         Text(kiriman.body, fontSize = 16.sp, color = TeksUtama, modifier = Modifier.weight(1f, fill = false))
                         Spacer(Modifier.width(6.dp))
                     }
