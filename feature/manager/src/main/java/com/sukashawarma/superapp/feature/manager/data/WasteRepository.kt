@@ -11,6 +11,7 @@ import com.sukashawarma.superapp.feature.manager.domain.StatusWaste
 import com.sukashawarma.superapp.feature.manager.domain.akhirIso
 import com.sukashawarma.superapp.feature.manager.domain.awalIso
 import com.sukashawarma.superapp.feature.manager.domain.nilaiWaste
+import com.sukashawarma.superapp.feature.stok.domain.UnitMeta
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 
@@ -43,11 +44,41 @@ object WasteRepository {
     /** Kolom yang sama dipakai antrean dan riwayat, jadi pemetaannya satu jalur. */
     private const val KOLOM =
         "id,outlet_id,bahan_baku_id,qty,reason,photo_url,status,rejection_reason," +
-            "reported_by,created_at,outlets(name),bahan_baku(nama,satuan)," +
+            "reported_by,created_at,outlets(name),bahan_baku(nama,satuan,satuan_tengah,faktor_tengah,satuan_kecil,faktor_tampilan)," +
             "reporter:outlet_staff!reported_by(id,name),approver:outlet_staff!approved_by(name)"
+
+    /**
+     * Kolom ramping khusus kalkulasi ringkasan KPI & ranking bahan terbuang.
+     * Tidak meng-embed outlets, outlet_staff pelapor/penyetuju, photo_url, atau alasan,
+     * sehingga memangkas ~80% ukuran payload dan menghemat CPU/RAM saat data periode besar.
+     */
+    private const val KOLOM_RINGKASAN =
+        "bahan_baku_id,qty,bahan_baku(nama,satuan,satuan_tengah,faktor_tengah,satuan_kecil,faktor_tampilan)"
 
     private fun filterOutlet(outletId: String?): List<Pair<String, String>> =
         if (outletId.isNullOrBlank()) emptyList() else listOf("outlet_id" to "eq.$outletId")
+
+    /**
+     * Membaca seluruh baris dari query PostgREST sampai tuntas (melewati limit 1000).
+     */
+    private suspend fun selectSemua(
+        tabel: String,
+        params: List<Pair<String, String>>,
+    ): List<JsonObject> {
+        val hasil = mutableListOf<JsonObject>()
+        var offset = 0
+        val ukuran = 1000
+        while (true) {
+            val halaman = Postgrest.select(
+                tabel,
+                params + listOf("limit" to ukuran.toString(), "offset" to offset.toString()),
+            )
+            halaman.forEach { hasil += it.asJsonObject }
+            if (halaman.size() < ukuran) break
+            offset += ukuran
+        }
+        return hasil
+    }
 
     /**
      * Outlet dibatasi cakupan pengguna, BUKAN diserahkan ke RLS.
@@ -81,18 +112,17 @@ object WasteRepository {
     }
 
     /**
-     * Satu halaman riwayat. `totalBaris` dihitung lewat query id-saja atas filter
-     * yang sama — PostgREST menaruh hitungan persisnya di header Content-Range,
-     * dan [Postgrest] hanya mengembalikan body, jadi ini jalan yang tersedia tanpa
-     * menambah API baru. Riwayat waste satu periode berukuran puluhan sampai
-     * ratusan baris, jadi biayanya kecil.
+     * Satu halaman riwayat.
+     * Menggunakan `Postgrest.selectWithCount` (Prefer: count=exact) yang langsung
+     * mengembalikan data 20 baris BESERTA total baris dari header Content-Range dalam 1 HTTP request.
+     * Tidak ada lagi looping query berulang untuk menghitung ID baris.
      */
     suspend fun riwayat(
         rentang: RentangTanggal,
         outletId: String?,
         status: StatusWaste?,
         halaman: Int,
-    ): HalamanRiwayat = coroutineScope {
+    ): HalamanRiwayat {
         val filterStatus = if (status != null) {
             listOf("status" to "eq.${status.nilai}")
         } else {
@@ -106,22 +136,19 @@ object WasteRepository {
             filterOutlet(outletId)
 
         val nomor = halaman.coerceAtLeast(1)
-        val isi = async {
-            Postgrest.select(
-                "stok_waste_reports",
-                dasar + listOf(
-                    "select" to KOLOM,
-                    "order" to "created_at.desc",
-                    "limit" to BARIS_PER_HALAMAN.toString(),
-                    "offset" to ((nomor - 1) * BARIS_PER_HALAMAN).toString(),
-                ),
-            ).map { it.asJsonObject }
-        }
-        val total = async { hitungBaris(dasar) }
+        val response = Postgrest.selectWithCount(
+            "stok_waste_reports",
+            dasar + listOf(
+                "select" to KOLOM,
+                "order" to "created_at.desc",
+                "limit" to BARIS_PER_HALAMAN.toString(),
+                "offset" to ((nomor - 1) * BARIS_PER_HALAMAN).toString(),
+            ),
+        )
 
-        val baris = lengkapiHarga(isi.await())
-        val totalBaris = total.await()
-        HalamanRiwayat(
+        val baris = lengkapiHarga(response.data.map { it.asJsonObject })
+        val totalBaris = response.totalCount
+        return HalamanRiwayat(
             baris = baris,
             totalBaris = totalBaris,
             halaman = nomor,
@@ -129,48 +156,30 @@ object WasteRepository {
         )
     }
 
-    /** Seluruh laporan disetujui pada periode — bahan mentah kartu KPI dan daftar bahan teratas. */
+    /**
+     * Seluruh laporan disetujui pada periode — bahan mentah kartu KPI dan daftar bahan teratas.
+     * Menggunakan KOLOM_RINGKASAN yang ramping (tanpa join outlets & outlet_staff) sehingga
+     * menghemat resource jaringan dan memory secara signifikan.
+     */
     suspend fun disetujuiPada(rentang: RentangTanggal, outletId: String?): List<LaporanWaste> {
-        val baris = Postgrest.select(
+        val baris = selectSemua(
             "stok_waste_reports",
             listOf(
-                "select" to KOLOM,
+                "select" to KOLOM_RINGKASAN,
                 "status" to "eq.${StatusWaste.DISETUJUI.nilai}",
                 "created_at" to "gte.${rentang.awalIso()}",
                 "created_at" to "lte.${rentang.akhirIso()}",
             ) + filterOutlet(outletId),
-        ).map { it.asJsonObject }
-        return lengkapiHarga(baris)
+        )
+        return lengkapiHargaRingkas(baris)
     }
-
-    suspend fun jumlahMenunggu(outletId: String?): Int =
-        hitungBaris(listOf("status" to "eq.${StatusWaste.MENUNGGU.nilai}") + filterOutlet(outletId))
 
     /**
-     * Menghitung baris yang cocok dengan [filter].
-     *
-     * Membaca kolom id saja, dan tetap menelusuri halaman: PostgREST memotong
-     * balasan di 1000 baris, jadi satu permintaan polos akan melaporkan "1000"
-     * untuk periode panjang mana pun dan penomoran halamannya diam-diam salah.
+     * Menghitung jumlah laporan yang masih menunggu keputusan secara server-side
+     * menggunakan Postgrest.count (0 payload JSON, langsung dari header Content-Range).
      */
-    private suspend fun hitungBaris(filter: List<Pair<String, String>>): Int {
-        val ukuran = 1000
-        var offset = 0
-        var jumlah = 0
-        while (true) {
-            val halaman = Postgrest.select(
-                "stok_waste_reports",
-                filter + listOf(
-                    "select" to "id",
-                    "limit" to ukuran.toString(),
-                    "offset" to offset.toString(),
-                ),
-            )
-            jumlah += halaman.size()
-            if (halaman.size() < ukuran) return jumlah
-            offset += ukuran
-        }
-    }
+    suspend fun jumlahMenunggu(outletId: String?): Int =
+        Postgrest.count("stok_waste_reports", listOf("status" to "eq.${StatusWaste.MENUNGGU.nilai}") + filterOutlet(outletId))
 
     /**
      * Menyetujui atau menolak satu laporan.
@@ -220,6 +229,47 @@ object WasteRepository {
         return baris.mapNotNull { petakan(it, harga) }
     }
 
+    private suspend fun lengkapiHargaRingkas(baris: List<JsonObject>): List<LaporanWaste> {
+        if (baris.isEmpty()) return emptyList()
+        val bahanIds = baris.mapNotNull { it.optString("bahan_baku_id") }.toSet()
+        val harga = ManagerRepository.hargaBahan(bahanIds)
+        return baris.mapNotNull { petakanRingkas(it, harga) }
+    }
+
+    private fun petakanRingkas(baris: JsonObject, harga: Map<String, Double>): LaporanWaste? {
+        val bahanId = baris.optString("bahan_baku_id") ?: return null
+        val qty = baris.optDouble("qty") ?: 0.0
+        val hargaBeli = harga[bahanId] ?: 0.0
+        val bahan = baris.optJsonObject("bahan_baku")
+        val meta = UnitMeta(
+            satuan = bahan?.optString("satuan"),
+            satuanTengah = bahan?.optString("satuan_tengah"),
+            satuanKecil = bahan?.optString("satuan_kecil"),
+            faktorTengah = bahan?.optDouble("faktor_tengah"),
+            faktorTampilan = bahan?.optDouble("faktor_tampilan"),
+        )
+        return LaporanWaste(
+            id = "",
+            outletId = "",
+            outletNama = "",
+            bahanId = bahanId,
+            bahanNama = bahan?.optString("nama") ?: "Bahan tidak dikenal",
+            satuan = bahan?.optString("satuan") ?: "Pcs",
+            qty = qty,
+            hargaBeli = hargaBeli,
+            nilai = nilaiWaste(qty, hargaBeli),
+            alasan = "",
+            fotoUrl = null,
+            status = StatusWaste.DISETUJUI,
+            alasanPenolakan = null,
+            pelaporId = null,
+            pelaporNama = "",
+            penyetujuNama = null,
+            dibuatPada = "",
+            meta = meta,
+        )
+    }
+
     private fun petakan(baris: JsonObject, harga: Map<String, Double>): LaporanWaste? {
         val id = baris.optString("id") ?: return null
         val bahanId = baris.optString("bahan_baku_id") ?: return null
@@ -227,6 +277,13 @@ object WasteRepository {
         val qty = baris.optDouble("qty") ?: 0.0
         val hargaBeli = harga[bahanId] ?: 0.0
         val bahan = baris.optJsonObject("bahan_baku")
+        val meta = UnitMeta(
+            satuan = bahan?.optString("satuan"),
+            satuanTengah = bahan?.optString("satuan_tengah"),
+            satuanKecil = bahan?.optString("satuan_kecil"),
+            faktorTengah = bahan?.optDouble("faktor_tengah"),
+            faktorTampilan = bahan?.optDouble("faktor_tampilan"),
+        )
         return LaporanWaste(
             id = id,
             outletId = baris.optString("outlet_id").orEmpty(),
@@ -245,6 +302,7 @@ object WasteRepository {
             pelaporNama = baris.optJsonObject("reporter")?.optString("name") ?: "Kru Outlet",
             penyetujuNama = baris.optJsonObject("approver")?.optString("name"),
             dibuatPada = baris.optString("created_at").orEmpty(),
+            meta = meta,
         )
     }
 }
