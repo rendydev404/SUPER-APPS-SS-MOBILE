@@ -1,6 +1,7 @@
 package com.sukashawarma.superapp.presentation.home
 
 import android.content.Context
+import android.os.SystemClock
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sukashawarma.superapp.data.remote.Postgrest
@@ -176,10 +177,91 @@ class HomeViewModel : ViewModel() {
     fun segarkanSorotan() {
         val staff = AppSession.staff.value
         loadTodayAttendance(staff?.id)
-        muatSorotan(staff)
+        // Estimasi bonus adalah angka bulanan, dan RPC-nya termasuk yang paling
+        // mahal di database (AM/RM hampir satu detik per panggilan). Dulu ikut
+        // dihitung ulang di setiap event realtime beranda — artinya tiap absen atau
+        // surat jalan di outlet mana pun. Kini cukup sekali per [UMUR_BONUS_MS];
+        // pemuatan awal & pergantian sesi tetap selalu menghitungnya.
+        val bonusBasi = SystemClock.elapsedRealtime() - bonusDimuatPada >= UMUR_BONUS_MS
+        muatSorotan(staff, hitungBonus = bonusBasi)
     }
 
-    private fun muatSorotan(staff: StaffProfile?) {
+    /**
+     * Muat ulang hanya angka stok kritis/menipis.
+     *
+     * Dipisah dari [segarkanSorotan] karena sumbernya `stok_balance`, tabel yang
+     * berubah di SETIAP transaksi kasir di semua outlet. Dulu setiap perubahan itu
+     * memicu seluruh sorotan beranda (bonus, absen, surat jalan, waste, petty
+     * cash) di setiap HP yang sedang membuka beranda.
+     */
+    fun segarkanStok() {
+        val staff = AppSession.staff.value ?: return
+        if (staff.role !in STOK_ROLES) return
+        viewModelScope.launch {
+            val hasil = runCatching { hitungStok(staff.role, staff.outletId) }.getOrNull() ?: return@launch
+            _state.value = _state.value.copy(stokKritis = hasil.first, stokMenipis = hasil.second)
+        }
+    }
+
+    /**
+     * Jumlah bahan kritis & menipis. null = tidak ada outlet untuk dihitung.
+     *
+     * AM/RM menjumlahkan SEMUA outlet binaannya — mereka tidak memegang satu outlet,
+     * dan `outlet_id` di profilnya kadang hanya penanda. Role lain tetap outletnya
+     * sendiri.
+     */
+    private suspend fun hitungStok(role: Role?, outletId: String?): Pair<Int, Int>? {
+        val ids = if (role in MANAGER_ROLES) outletBinaan() else listOfNotNull(outletId)
+        if (ids.isEmpty()) return null
+        // Cermin PermintaanRepository.saran(): `monitoring_view_crew` adalah
+        // view SECURITY DEFINER, jadi saldo tetap terbaca walau RLS
+        // stok_balance membatasi. Karena itu cakupannya WAJIB dari filter ini.
+        val baris = Postgrest.select(
+            "monitoring_view_crew",
+            listOf("select" to "status", "outlet_id" to "in.(${ids.joinToString(",")})"),
+        ).map { it.asJsonObject.optString("status") }
+        return baris.count { it == "below" } to baris.count { it == "warning" }
+    }
+
+    /**
+     * Cabang penjualan dalam cakupan pengguna menurut `accessible_outlet_ids()`.
+     *
+     * Tabel `outlets` sendiri terbaca penuh oleh semua orang (policy `USING (true)`),
+     * jadi cakupannya dari RPC, lalu disaring ke tipe `outlet`/`mitra`. Kantor Pusat
+     * dan Gudang Pusat tidak dihitung: bukan cabang binaan.
+     */
+    private suspend fun outletBinaan(): List<String> {
+        val ids = Postgrest.rpc("accessible_outlet_ids").let { el ->
+            if (!el.isJsonArray) emptyList()
+            else el.asJsonArray.mapNotNull { item ->
+                when {
+                    item.isJsonPrimitive -> item.asString
+                    item.isJsonObject -> item.asJsonObject.optString("accessible_outlet_ids")
+                    else -> null
+                }
+            }
+        }.distinct()
+        if (ids.isEmpty()) return emptyList()
+        return Postgrest.select(
+            "outlets",
+            listOf(
+                "select" to "id",
+                "id" to "in.(${ids.joinToString(",")})",
+                "is_active" to "eq.true",
+                "type" to "in.(outlet,mitra)",
+            ),
+        ).mapNotNull { it.asJsonObject.optString("id") }
+    }
+
+    /** Waktu (elapsedRealtime) estimasi bonus terakhir berhasil dihitung. */
+    private var bonusDimuatPada = 0L
+
+    private companion object {
+        /** Umur estimasi bonus sebelum event realtime boleh menghitungnya ulang. */
+        const val UMUR_BONUS_MS = 10 * 60_000L
+    }
+
+    private fun muatSorotan(staff: StaffProfile?, hitungBonus: Boolean = true) {
         val role = staff?.role
         val outletId = staff?.outletId
         if (role == null) {
@@ -187,10 +269,17 @@ class HomeViewModel : ViewModel() {
             return
         }
         val skemaBonus = skemaBonusUntuk(role)
-        _state.value = _state.value.copy(adaSkemaBonus = skemaBonus != null, memuatBonus = skemaBonus != null)
+        // Bonus yang tidak dihitung ulang dibiarkan apa adanya di state — bukan
+        // dikosongkan — supaya kartunya tidak berkedip "memuat".
+        val muatBonus = hitungBonus && skemaBonus != null
+        _state.value = if (muatBonus) {
+            _state.value.copy(adaSkemaBonus = true, memuatBonus = true)
+        } else {
+            _state.value.copy(adaSkemaBonus = skemaBonus != null)
+        }
         viewModelScope.launch {
             val bonus = async {
-                if (skemaBonus == null || staff == null) null
+                if (!muatBonus || skemaBonus == null || staff == null) null
                 else runCatching {
                     // Bulan berjalan menurut WIB — RPC-nya juga memotong periode di
                     // Asia/Jakarta, jadi keduanya sepakat soal "bulan ini".
@@ -210,17 +299,8 @@ class HomeViewModel : ViewModel() {
                 }.getOrNull()
             }
             val stok = async {
-                if (outletId == null || role !in STOK_ROLES) null
-                else runCatching {
-                    // Cermin PermintaanRepository.saran(): `monitoring_view_crew` adalah
-                    // view SECURITY DEFINER, jadi saldo tetap terbaca walau RLS
-                    // stok_balance membatasi.
-                    val baris = Postgrest.select(
-                        "monitoring_view_crew",
-                        listOf("select" to "status", "outlet_id" to "eq.$outletId"),
-                    ).map { it.asJsonObject.optString("status") }
-                    baris.count { it == "below" } to baris.count { it == "warning" }
-                }.getOrNull()
+                if (role !in STOK_ROLES) null
+                else runCatching { hitungStok(role, outletId) }.getOrNull()
             }
             val kiriman = async {
                 // Kitchen adalah pengirim; "kiriman masuk" ke outletnya tidak bermakna.
@@ -250,18 +330,29 @@ class HomeViewModel : ViewModel() {
                 }.getOrNull()
             }
             val pettyCash = async {
-                if (role !in LEADER_ROLES) null
+                // Status yang menunggu tangan pengguna ini. Cakupan outletnya sudah
+                // dijaga RLS `petty_cash_topups` lewat accessible_outlet_ids().
+                val status = when (role) {
+                    // Cermin LencanaViewModel modul Leader: `leader_forward_funds`
+                    // menolak status lain apa pun.
+                    in LEADER_ROLES -> "eq.forwarded_by_area_manager"
+                    // Cermin STATUS_BUTUH_REVIEW modul Manager: menunggu ACC atau
+                    // dana sudah cair dan tinggal diserahkan ke leader.
+                    in MANAGER_ROLES ->
+                        "in.(pending,forwarded_to_area_manager,approved_by_finance,forwarded_by_finance)"
+                    else -> null
+                }
+                if (status == null) null
                 else runCatching {
-                    // Cermin LencanaViewModel modul Leader: hanya status
-                    // `forwarded_by_area_manager` yang benar-benar menunggu tangan
-                    // leader — `leader_forward_funds` menolak status lain apa pun.
                     Postgrest.select(
                         "petty_cash_topups",
-                        listOf("select" to "id", "status" to "eq.forwarded_by_area_manager"),
+                        listOf("select" to "id", "status" to status),
                     ).size()
                 }.getOrNull()
             }
             val hasilStok = stok.await()
+            val hasilBonus = bonus.await()
+            if (muatBonus && hasilBonus != null) bonusDimuatPada = SystemClock.elapsedRealtime()
             _state.value = _state.value.copy(
                 stokKritis = hasilStok?.first,
                 stokMenipis = hasilStok?.second,
@@ -269,7 +360,7 @@ class HomeViewModel : ViewModel() {
                 wasteMenunggu = waste.await(),
                 pettyCashButuhAksi = pettyCash.await(),
                 memuatSorotan = false,
-                bonus = bonus.await(),
+                bonus = if (muatBonus) hasilBonus else _state.value.bonus,
                 memuatBonus = false,
             )
         }
