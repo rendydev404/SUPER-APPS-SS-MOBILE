@@ -15,8 +15,11 @@ import com.sukashawarma.superapp.feature.manager.domain.StatusWaste
 import com.sukashawarma.superapp.feature.manager.domain.halanganMemproses
 import com.sukashawarma.superapp.feature.manager.domain.susunRingkasanWaste
 import com.sukashawarma.superapp.feature.manager.domain.validasiAlasanPenolakan
+import com.sukashawarma.superapp.feature.manager.data.ManagerRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -98,7 +101,26 @@ class WasteViewModel : ViewModel() {
         val tujuan = halaman.coerceIn(1, maxOf(1, batas))
         if (tujuan == _state.value.riwayat.halaman) return
         _state.update { it.copy(riwayat = it.riwayat.copy(halaman = tujuan)) }
-        muatUlang()
+        muatHalamanRiwayat(tujuan)
+    }
+
+    private fun muatHalamanRiwayat(halaman: Int) {
+        viewModelScope.launch {
+            val awal = _state.value
+            try {
+                val riwayatBaru = WasteRepository.riwayat(
+                    rentang = awal.rentang,
+                    outletId = awal.outletTerpilih,
+                    status = awal.filterStatus,
+                    halaman = halaman,
+                )
+                _state.update { it.copy(riwayat = riwayatBaru) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.e("WasteViewModel", "muatHalamanRiwayat() gagal", e)
+            }
+        }
     }
 
     fun tutupKabar() {
@@ -123,6 +145,9 @@ class WasteViewModel : ViewModel() {
     fun muatUlang(silent: Boolean = false) {
         val sudahAdaData = _state.value.menunggu.isNotEmpty() || _state.value.riwayat.baris.isNotEmpty()
         val senyap = silent || sudahAdaData
+        if (!senyap) {
+            ManagerRepository.bersihkanCacheHarga()
+        }
         pemuatan?.cancel()
         pemuatan = viewModelScope.launch {
             val awal = _state.value
@@ -132,26 +157,36 @@ class WasteViewModel : ViewModel() {
             try {
                 val outletId = awal.outletTerpilih
                 val rentang = awal.rentang
-                val menunggu = WasteRepository.menunggu(outletId)
-                val riwayat = WasteRepository.riwayat(
-                    rentang = rentang,
-                    outletId = outletId,
-                    status = awal.filterStatus,
-                    halaman = awal.riwayat.halaman,
-                )
-                val disetujui = WasteRepository.disetujuiPada(rentang, outletId)
-                _state.update {
-                    it.copy(
-                        memuat = false,
-                        galat = null,
-                        role = AppSession.staff.value?.role,
-                        menunggu = menunggu,
-                        riwayat = riwayat,
-                        // Jumlah menunggu diambil dari antrean yang baru saja dibaca, bukan
-                        // query hitung terpisah: dua angka dari dua permintaan berbeda pernah
-                        // membuat badge dan isi daftar tidak sepakat di layar yang sama.
-                        ringkasan = susunRingkasanWaste(disetujui, menunggu.size),
-                    )
+
+                coroutineScope {
+                    val menungguAsync = async { WasteRepository.menunggu(outletId) }
+                    val riwayatAsync = async {
+                        WasteRepository.riwayat(
+                            rentang = rentang,
+                            outletId = outletId,
+                            status = awal.filterStatus,
+                            halaman = awal.riwayat.halaman,
+                        )
+                    }
+                    val disetujuiAsync = async { WasteRepository.disetujuiPada(rentang, outletId) }
+
+                    val menunggu = menungguAsync.await()
+                    val riwayat = riwayatAsync.await()
+                    val disetujui = disetujuiAsync.await()
+
+                    _state.update {
+                        it.copy(
+                            memuat = false,
+                            galat = null,
+                            role = AppSession.staff.value?.role,
+                            menunggu = menunggu,
+                            riwayat = riwayat,
+                            // Jumlah menunggu diambil dari antrean yang baru saja dibaca, bukan
+                            // query hitung terpisah: dua angka dari dua permintaan berbeda pernah
+                            // membuat badge dan isi daftar tidak sepakat di layar yang sama.
+                            ringkasan = susunRingkasanWaste(disetujui, menunggu.size),
+                        )
+                    }
                 }
             } catch (e: CancellationException) {
                 throw e
