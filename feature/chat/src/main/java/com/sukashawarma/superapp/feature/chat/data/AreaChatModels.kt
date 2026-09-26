@@ -37,6 +37,10 @@ data class PesanAreaChat(
     val audioPath: String? = null,
     val audioMs: Int? = null,
     val audioWave: String? = null,
+    /** URL media KLIPY (WebP animasi) bila pesan ini stiker. Dimuat langsung dari CDN
+     *  KLIPY, tidak lewat storage kita. `body` pesan stiker berisi teks cadangan
+     *  [TEKS_CADANGAN_STIKER] untuk app lama/web dan harus diabaikan saat ini terisi. */
+    val stickerUrl: String? = null,
     val replyToId: String? = null,
     val replyToName: String? = null,
     val replyToSnippet: String? = null,
@@ -106,6 +110,7 @@ fun parsePesanAreaChat(o: JsonObject): PesanAreaChat? {
         audioPath = teks("audio_path"),
         audioMs = o.get("audio_ms")?.takeIf { !it.isJsonNull }?.asInt,
         audioWave = teks("audio_wave"),
+        stickerUrl = teks("sticker_url"),
         replyToId = teks("reply_to_id"),
         replyToName = teks("reply_to_name"),
         replyToSnippet = teks("reply_to_snippet"),
