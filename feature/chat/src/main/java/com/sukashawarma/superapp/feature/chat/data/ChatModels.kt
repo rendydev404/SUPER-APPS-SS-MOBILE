@@ -27,6 +27,10 @@ data class PesanChat(
     /** Amplitudo rekaman, satu digit '0'-'9' per bilah waveform. Kosong = belum
      *  ada sampel (pesan lama), bubble menggambar bilah rata. */
     val audioWave: String? = null,
+    /** URL media KLIPY (WebP animasi) bila pesan ini stiker. Dimuat langsung dari CDN
+     *  KLIPY, tidak lewat storage kita. `body` pesan stiker berisi teks cadangan
+     *  [TEKS_CADANGAN_STIKER] untuk app lama/web dan harus diabaikan saat ini terisi. */
+    val stickerUrl: String? = null,
     val replyToId: String?,
     val replyToName: String?,
     val replyToSnippet: String?,
@@ -227,6 +231,7 @@ fun parsePesanChat(o: JsonObject): PesanChat? {
         audioPath = teks("audio_path"),
         audioMs = o.get("audio_ms")?.takeIf { !it.isJsonNull }?.asInt,
         audioWave = teks("audio_wave"),
+        stickerUrl = teks("sticker_url"),
         replyToId = teks("reply_to_id"),
         replyToName = teks("reply_to_name"),
         replyToSnippet = teks("reply_to_snippet"),
