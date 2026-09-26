@@ -178,26 +178,84 @@ object ManagerRepository {
             WasteDisetujui(bahan, baris.optDouble("qty") ?: 0.0)
         }
 
+    private var cacheHargaBahan: Map<String, Double> = emptyMap()
+    private var waktuCacheHargaBahanMs: Long = 0L
+    private const val TTL_CACHE_HARGA_MS = 5 * 60 * 1000L // 5 menit
+
+    fun bersihkanCacheHarga() {
+        cacheHargaBahan = emptyMap()
+        waktuCacheHargaBahanMs = 0L
+    }
+
     /**
      * Jumlah waste yang masih menunggu persetujuan — TANPA batas tanggal, sama seperti
      * web: laporan yang menggantung sejak minggu lalu justru yang paling perlu terlihat.
+     * Menggunakan Postgrest.count (limit=0 & Prefer: count=exact) agar server-side count di SQL.
      */
     suspend fun jumlahWasteMenunggu(): Int =
-        selectSemua("stok_waste_reports", listOf("select" to "id", "status" to "eq.PENDING")).size
+        Postgrest.count("stok_waste_reports", listOf("status" to "eq.PENDING"))
 
-    /** Harga beli untuk bahan yang muncul di laporan waste. */
-    suspend fun hargaBahan(bahanIds: Collection<String>): Map<String, Double> {
+    /** Harga acuan bahan yang muncul di laporan waste untuk menghitung estimasi kerugian nominal. */
+    suspend fun hargaBahan(bahanIds: Collection<String>, paksaRefresh: Boolean = false): Map<String, Double> {
         if (bahanIds.isEmpty()) return emptyMap()
-        return selectSemua(
-            "bahan_baku_harga",
-            listOf(
-                "select" to "bahan_baku_id,harga_beli",
-                "bahan_baku_id" to "in.(${bahanIds.joinToString(",")})",
-            ),
-        ).mapNotNull { baris ->
-            val id = baris.optString("bahan_baku_id") ?: return@mapNotNull null
-            id to (baris.optDouble("harga_beli") ?: 0.0)
-        }.toMap()
+
+        val sekarang = System.currentTimeMillis()
+        if (!paksaRefresh && (sekarang - waktuCacheHargaBahanMs < TTL_CACHE_HARGA_MS) && cacheHargaBahan.isNotEmpty()) {
+            if (bahanIds.all { it in cacheHargaBahan }) {
+                return cacheHargaBahan.filterKeys { it in bahanIds }
+            }
+        }
+
+        // 1. Coba lewat RPC native_stok_price_data (SECURITY DEFINER berhak dibaca Area/Regional Manager)
+        try {
+            val rpcData = Postgrest.rpc("native_stok_price_data", JsonObject().apply {
+                add("p_days", com.google.gson.JsonNull.INSTANCE)
+            }).asJsonObject
+            val pricesArray = rpcData.getAsJsonArray("prices")
+            if (pricesArray != null && pricesArray.size() > 0) {
+                val map = mutableMapOf<String, Double>()
+                pricesArray.forEach { el ->
+                    val obj = el.asJsonObject
+                    val id = obj.optString("bahan_baku_id")
+                    val h = obj.optDouble("harga_beli_display")?.takeIf { it > 0.0 }
+                        ?: obj.optDouble("harga_beli")
+                    if (id != null && h != null && h > 0.0) {
+                        map[id] = h
+                    }
+                }
+                if (map.isNotEmpty()) {
+                    cacheHargaBahan = map
+                    waktuCacheHargaBahanMs = sekarang
+                    return map.filterKeys { it in bahanIds }
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("ManagerRepository", "Gagal mengambil harga via native_stok_price_data, mencoba query langsung: ${e.message}")
+        }
+
+        // 2. Fallback query langsung bahan_baku_harga (berhasil jika role admin, owner, purchasing, dsb)
+        return try {
+            val hasil = selectSemua(
+                "bahan_baku_harga",
+                listOf(
+                    "select" to "bahan_baku_id,harga_beli,harga_beli_display",
+                    "bahan_baku_id" to "in.(${bahanIds.joinToString(",")})",
+                ),
+            ).mapNotNull { baris ->
+                val id = baris.optString("bahan_baku_id") ?: return@mapNotNull null
+                val h = baris.optDouble("harga_beli_display")?.takeIf { it > 0.0 }
+                    ?: baris.optDouble("harga_beli") ?: 0.0
+                id to h
+            }.toMap()
+            if (hasil.isNotEmpty()) {
+                cacheHargaBahan = cacheHargaBahan + hasil
+                waktuCacheHargaBahanMs = sekarang
+            }
+            hasil
+        } catch (e: Exception) {
+            android.util.Log.e("ManagerRepository", "Gagal memuat harga dari bahan_baku_harga", e)
+            emptyMap()
+        }
     }
 
     /** Seluruh pembacaan satu layar Ringkasan Area, dijalankan berbarengan. */
