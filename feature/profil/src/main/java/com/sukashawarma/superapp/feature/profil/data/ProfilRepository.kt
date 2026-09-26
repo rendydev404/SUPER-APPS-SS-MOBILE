@@ -38,10 +38,18 @@ object ProfilRepository {
      * membuat foto lama tetap terlihat sampai cache Coil dan CDN kedaluwarsa — user
      * mengira unggahannya gagal padahal berhasil.
      */
-    suspend fun unggahAvatar(jpeg: ByteArray): String {
+    suspend fun unggahAvatar(jpeg: ByteArray, jpegHd: ByteArray? = null): String {
         val userId = AppSession.staff.value?.id
             ?: throw IllegalStateException("Sesi tidak valid, silakan login ulang.")
         val path = "$userId/${UUID.randomUUID()}.jpg"
+        // Versi HD diunggah LEBIH DULU, di path pasangan `…_hd.jpg` (AvatarStorage.pathHd),
+        // supaya begitu avatar_url berganti, versi besarnya sudah tersedia untuk dibuka.
+        // Gagal di sini tidak membatalkan ganti foto: penampil jatuh ke versi biasa.
+        if (jpegHd != null) {
+            runCatching {
+                StorageUtil.uploadJpeg(AvatarStorage.BUCKET, AvatarStorage.pathHd(path)!!, jpegHd)
+            }.onFailure { android.util.Log.w("ProfilRepository", "foto HD gagal diunggah: ${it.message}") }
+        }
         StorageUtil.uploadJpeg(AvatarStorage.BUCKET, path, jpeg)
         return "${AvatarStorage.BUCKET}/$path"
     }
