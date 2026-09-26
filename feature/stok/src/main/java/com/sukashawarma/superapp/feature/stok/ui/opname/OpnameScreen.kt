@@ -78,7 +78,11 @@ import com.sukashawarma.superapp.feature.stok.domain.Penurunan
 @Composable
 fun OpnameScreen(viewModel: OpnameViewModel = viewModel()) {
     val state by viewModel.state.collectAsState()
-    RealtimeRefresh(RealtimeTables.OPNAME, RealtimeTables.OPNAME_ITEM) { viewModel.muatAwal() }
+    // SURAT_JALAN ikut dipantau supaya peringatan verifikasi hilang sendiri begitu
+    // kru memverifikasi kirimannya.
+    RealtimeRefresh(RealtimeTables.OPNAME, RealtimeTables.OPNAME_ITEM, RealtimeTables.SURAT_JALAN) {
+        viewModel.muatAwal()
+    }
 
     // Detail ditampilkan menukar isi layar, bukan lewat rute tersendiri: OpnameScreen
     // dirender langsung oleh StokShell sebagai tab, sehingga menambah rute berarti
@@ -113,7 +117,12 @@ fun OpnameScreen(viewModel: OpnameViewModel = viewModel()) {
         state.pesan?.let { PitaPesan(it, false, viewModel::bersihkanPesan) }
 
         if (!state.tidakBerhak) {
-            if (state.crewSudahOpname) {
+            if (state.terhalangSuratJalan) {
+                PeringatanSuratJalan(
+                    state.sjBelumDiverifikasi,
+                    Modifier.padding(horizontal = UkuranIos.TepiLayar, vertical = 12.dp),
+                )
+            } else if (state.crewSudahOpname) {
                 // Crew yang sudah opname hari ini: tampilkan pesan, bukan tombol.
                 KartuIos(Modifier.padding(horizontal = UkuranIos.TepiLayar, vertical = 12.dp)) {
                     Row(
@@ -176,6 +185,53 @@ fun OpnameScreen(viewModel: OpnameViewModel = viewModel()) {
     }
 }
 
+/**
+ * Peringatan besar pengganti tombol opname selama masih ada surat jalan yang
+ * belum diverifikasi. Sengaja memakai teks besar dan warna peringatan penuh —
+ * pesannya harus terbaca sekilas oleh kru yang sedang memegang barang.
+ */
+@Composable
+private fun PeringatanSuratJalan(nomor: List<String>, modifier: Modifier = Modifier) {
+    val nada = NadaIos.PERINGATAN
+    Column(
+        modifier
+            .fillMaxWidth()
+            .background(nada.warna.copy(alpha = 0.12f), UkuranIos.SudutKartu)
+            .border(2.dp, nada.warna, UkuranIos.SudutKartu)
+            .padding(20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(IkonIos.WarningAmber, null, tint = nada.warna, modifier = Modifier.size(44.dp))
+        Spacer(Modifier.height(10.dp))
+        Text(
+            "Verifikasi Surat Jalan Dulu",
+            style = TipeIos.Judul2.copy(color = nada.teks),
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Opname belum bisa dilakukan. Masih ada ${nomor.size} surat jalan " +
+                "yang belum diverifikasi di outlet ini.",
+            style = TipeIos.Isi,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(12.dp))
+        nomor.forEach { no ->
+            Text(
+                no,
+                style = TipeIos.Utama.copy(color = nada.teks),
+                textAlign = TextAlign.Center,
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        Text(
+            "Buka menu Distribusi → Penerimaan Barang, verifikasi barangnya, lalu kembali ke sini.",
+            style = TipeIos.Keterangan.copy(fontWeight = FontWeight.SemiBold),
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
 private fun StatusOpname.nadaIos(): NadaIos = when (this) {
     StatusOpname.FINALIZED, StatusOpname.APPROVED -> NadaIos.SUKSES
     StatusOpname.PENDING_APPROVAL -> NadaIos.PERINGATAN
@@ -235,6 +291,14 @@ private fun FormOpname(state: OpnameUiState, viewModel: OpnameViewModel) {
             // penyimpanannya pasti ditolak lebih buruk daripada tidak menampilkannya.
             KeadaanKosong(terkunci.pesan)
         } else {
+        // Kiriman tiba saat form terbuka: hitungan tetap bisa disimpan sebagai draft,
+        // hanya finalisasinya yang ditahan sampai surat jalan diverifikasi.
+        if (state.terhalangSuratJalan) {
+            PeringatanSuratJalan(
+                state.sjBelumDiverifikasi,
+                Modifier.padding(start = UkuranIos.TepiLayar, end = UkuranIos.TepiLayar, top = 10.dp),
+            )
+        }
         KolomCariIos(
             state.cari,
             viewModel::ubahCari,
@@ -270,7 +334,7 @@ private fun FormOpname(state: OpnameUiState, viewModel: OpnameViewModel) {
                     if (state.menyimpan) "Memproses…" else "Finalisasi",
                     viewModel::mintaFinalisasi,
                     Modifier.weight(1f),
-                    aktif = !state.menyimpan,
+                    aktif = !state.menyimpan && !state.terhalangSuratJalan,
                 )
             }
         }
