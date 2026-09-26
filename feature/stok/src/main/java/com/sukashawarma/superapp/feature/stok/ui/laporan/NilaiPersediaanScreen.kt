@@ -117,7 +117,7 @@ fun NilaiPersediaanScreen(
     viewModel: NilaiPersediaanViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
-    RealtimeRefresh(RealtimeTables.STOK_BALANCE, RealtimeTables.BAHAN_BAKU_HARGA) { viewModel.muatUlang() }
+    RealtimeRefresh(RealtimeTables.STOK_BALANCE, RealtimeTables.BAHAN_BAKU_HARGA, jedaMinimumMs = 60_000L) { viewModel.muatUlang() }
 
     Column(Modifier.fillMaxSize().background(WarnaIos.Latar)) {
         HeaderStok(
