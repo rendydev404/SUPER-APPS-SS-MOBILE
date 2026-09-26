@@ -1,5 +1,8 @@
-package com.sukashawarma.superapp.feature.chat.ui
+package com.sukashawarma.superapp.core.ui
 
+import androidx.compose.ui.graphics.FilterQuality
+import coil.request.ImageRequest
+import coil.size.Size
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -54,7 +57,6 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import coil.compose.AsyncImage
-import com.sukashawarma.superapp.core.ui.AvatarStorage
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
@@ -72,6 +74,12 @@ import kotlinx.coroutines.launch
  * latar belakang memudar halus saat ditarik, dan foto membal kembali dengan efek pegas jika
  * tarikan dilepas sebelum ambang batas.
  *
+ * [urlCadangan] dimuat bila [url] gagal — dipakai foto profil: [url] adalah versi HD
+ * (`…_hd.jpg`), yang tidak dimiliki foto lama yang diunggah sebelum versi HD ada.
+ *
+ * Dipindah dari feature:chat ke core:ui supaya halaman Profil (feature:profil) bisa
+ * membuka foto profil sendiri dengan penampil yang sama.
+ *
  * [url] sudah berupa URL siap muat. Kedua bucket-nya privat, jadi pemuatnya
  * memakai `AvatarStorage.imageLoader` yang membawa token sesi — ImageLoader
  * biasa akan menerima 401 dan menampilkan kotak kosong.
@@ -81,6 +89,7 @@ fun PenampilFoto(
     url: String?,
     judul: String,
     keterangan: String? = null,
+    urlCadangan: String? = null,
     onTutup: () -> Unit,
 ) {
     if (url == null) return
@@ -161,9 +170,24 @@ fun PenampilFoto(
                 ),
             contentAlignment = Alignment.Center,
         ) {
+            var urlAktif by remember(url) { mutableStateOf(url) }
+            val konteks = LocalContext.current
+            // Ukuran ASLI berkas, bukan seukuran layar: foto bisa di-zoom sampai 4x, dan
+            // bitmap seukuran layar akan pecah saat diperbesar. Aman untuk memori karena
+            // sumbernya sudah dibatasi (foto profil HD 1600px, foto chat 1600px).
+            val permintaan = remember(urlAktif) {
+                ImageRequest.Builder(konteks).data(urlAktif).size(Size.ORIGINAL).build()
+            }
             AsyncImage(
-                model = url,
+                model = permintaan,
+                // Bawaan AsyncImage adalah FilterQuality.Low: foto yang diperbesar ke layar
+                // penuh jadi kotak-kotak. High = penyaringan halus (mipmap/bikubik).
+                filterQuality = FilterQuality.High,
                 imageLoader = AvatarStorage.imageLoader(LocalContext.current),
+                // Versi HD belum ada (foto lama) -> jatuh ke versi biasa, sekali saja.
+                onError = {
+                    if (urlCadangan != null && urlAktif != urlCadangan) urlAktif = urlCadangan
+                },
                 contentDescription = judul,
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
