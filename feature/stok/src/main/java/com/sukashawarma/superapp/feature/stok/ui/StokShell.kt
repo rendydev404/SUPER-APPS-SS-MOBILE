@@ -44,9 +44,11 @@ import com.sukashawarma.superapp.feature.stok.ui.laporan.NilaiPersediaanScreen
 import com.sukashawarma.superapp.feature.stok.ui.laporan.PlafonBelanjaScreen
 import com.sukashawarma.superapp.feature.stok.ui.laporan.ThresholdScreen
 import com.sukashawarma.superapp.feature.stok.ui.ledger.LedgerScreen
+import com.sukashawarma.superapp.feature.stok.ui.monitoring.FilterKpi
 import com.sukashawarma.superapp.feature.stok.ui.monitoring.MonitoringScreen
 import com.sukashawarma.superapp.feature.stok.ui.mutasi.MutasiScreen
 import com.sukashawarma.superapp.feature.stok.ui.opname.OpnameScreen
+import com.sukashawarma.superapp.feature.stok.ui.pantau.PantauOutletScreen
 import com.sukashawarma.superapp.feature.stok.ui.opname.PersetujuanOpnameScreen
 import com.sukashawarma.superapp.feature.stok.ui.permintaan.PermintaanScreen
 import com.sukashawarma.superapp.feature.stok.ui.po.PenerimaanPoScreen
@@ -103,7 +105,7 @@ private fun tujuanUntukPeran(): List<TabStok> {
     val bolehVendor = StokAkses.bisaTerimaVendor(staff?.outletId)
 
     return buildList {
-        if (StokAkses.melihatDashboard(role)) add(TabStok.DASHBOARD)
+        if (StokAkses.melihatDashboard(role) || StokAkses.melihatPantauSemuaOutlet(role)) add(TabStok.DASHBOARD)
         add(TabStok.PERMINTAAN)
         add(TabStok.OPNAME)
         when {
@@ -230,6 +232,8 @@ fun StokShell(
     onKeluar: () -> Unit,
     onBukaBahan: (outletId: String, bahanId: String, nama: String) -> Unit,
     onBukaTransfer: () -> Unit,
+    onBukaOutlet: (outletId: String) -> Unit,
+    bukaKritis: Boolean = false,
 ) {
     val tabs = tujuanUntukPeran()
     val staff by AppSession.staff.collectAsState()
@@ -237,8 +241,8 @@ fun StokShell(
     val hargaAccess = StokAkses.melihatHargaBahan(peran)
     val wasteAccess = WasteApprovalAccess.allowed(peran)
 
-    // Tab awal adalah yang pertama tersedia: role pusat tidak punya Dashboard, jadi
-    // membukanya di Permintaan, bukan di layar kosong.
+    // Tab awal adalah yang pertama tersedia: role pusat tidak punya Dashboard (kecuali
+    // kitchen, yang mendapat papan pantau semua outlet), jadi dibuka di Permintaan.
     var tab by rememberSaveable { mutableStateOf(tabs.firstOrNull() ?: TabStok.PERMINTAAN) }
     if (tab !in tabs) tab = tabs.firstOrNull() ?: TabStok.PERMINTAAN
 
@@ -282,11 +286,20 @@ fun StokShell(
         },
     ) {
         when (tab) {
-            TabStok.DASHBOARD -> MonitoringScreen(
-                onKeluar = onKeluar,
-                onBukaBahan = onBukaBahan,
-                onBukaTransfer = onBukaTransfer,
-            )
+            TabStok.DASHBOARD -> if (StokAkses.melihatPantauSemuaOutlet(peran)) {
+                PantauOutletScreen(
+                    onKeluar = onKeluar,
+                    onBukaOutlet = onBukaOutlet,
+                    onBukaTransfer = onBukaTransfer,
+                )
+            } else {
+                MonitoringScreen(
+                    onKeluar = onKeluar,
+                    onBukaBahan = onBukaBahan,
+                    onBukaTransfer = onBukaTransfer,
+                    filterAwal = if (bukaKritis) FilterKpi.KRITIS else FilterKpi.SEMUA,
+                )
+            }
             TabStok.PERMINTAAN -> PermintaanScreen()
             TabStok.OPNAME -> OpnameScreen()
             TabStok.LEDGER -> LedgerScreen(onEntriManual = { tab = TabStok.ENTRI })
