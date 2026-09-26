@@ -1,5 +1,7 @@
 package com.sukashawarma.superapp.feature.chat.ui.area
 
+import com.sukashawarma.superapp.feature.chat.data.FavoritStiker
+import com.sukashawarma.superapp.feature.chat.ui.stiker.TataPesanStiker
 import com.sukashawarma.superapp.core.ui.ios.LencanaIos
 import com.sukashawarma.superapp.core.ui.ios.NadaIos
 import com.sukashawarma.superapp.core.ui.ios.TipeIos
@@ -150,7 +152,7 @@ import com.sukashawarma.superapp.feature.chat.ui.EKOR
 import com.sukashawarma.superapp.feature.chat.ui.FotoChat
 import com.sukashawarma.superapp.feature.chat.ui.LembarPilihSumberFoto
 import com.sukashawarma.superapp.feature.chat.ui.MenuPesanPopup
-import com.sukashawarma.superapp.feature.chat.ui.PenampilFoto
+import com.sukashawarma.superapp.core.ui.PenampilFoto
 import com.sukashawarma.superapp.feature.chat.ui.emoji.PapanEmoji
 import com.sukashawarma.superapp.feature.chat.ui.suara.BubbleSuara
 import com.sukashawarma.superapp.feature.chat.ui.suara.PemutarSuara
@@ -496,7 +498,8 @@ fun LayarChatArea(
                     bolehHapus = bolehHapus,
                     bolehSunting = false,
                     bolehInfo = false,
-                    adaTeks = pesan.body.isNotBlank(),
+                    // Teks pesan stiker hanya cadangan untuk app lama — tidak untuk disalin.
+                    adaTeks = pesan.body.isNotBlank() && pesan.stickerUrl == null,
                     onEmoji = { emoji ->
                         vm.toggleReaksi(pesan.id, emoji)
                         menuPesan = null
@@ -520,6 +523,19 @@ fun LayarChatArea(
                         menuPesan = null
                     },
                     onTutup = { menuPesan = null },
+                    // Favorit disimpan lokal per akun; dibaca ulang di sini supaya labelnya
+                    // tepat walau papan stiker belum pernah dibuka sejak app dijalankan.
+                    labelFavorit = pesan.stickerUrl?.let { url ->
+                        FavoritStiker.muat(context, myId)
+                        if (FavoritStiker.ada(url)) "Hapus dari favorit" else "Simpan ke favorit"
+                    },
+                    onFavorit = {
+                        pesan.stickerUrl?.let { url ->
+                            val kini = FavoritStiker.alihkan(context, myId, FavoritStiker.dariPesan(url))
+                            Toast.makeText(context, if (kini) "Disimpan ke favorit" else "Dihapus dari favorit", Toast.LENGTH_SHORT).show()
+                        }
+                        menuPesan = null
+                    },
                     bubble = {
                         BubbleArea(
                             item = itm.copy(tampilkanIdentitas = false),
@@ -986,6 +1002,44 @@ private fun BubbleArea(
 
     val bentuk = BentukGelembung(item.milikSendiri, item.posisi)
     val denyut = if (disorot) denyutSorot(sorotKunci) else null
+
+    // Kotak ketik area belum punya papan stiker, tetapi kolomnya sudah ada di tabel:
+    // pesan stiker yang masuk (mis. dari klien versi berikutnya) tetap tampil benar,
+    // bukan sebagai teks cadangan "Stiker". `return` aman di badan fungsi.
+    val stiker = p.stickerUrl
+    if (stiker != null && p.deletedAtMs == null) {
+        TataPesanStiker(
+            url = stiker,
+            milikSendiri = item.milikSendiri,
+            jam = item.jam,
+            onTekanLama = onTekanLama,
+            kepala = {
+                if (item.tampilkanIdentitas) {
+                    Text(
+                        text = p.senderName,
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = warnaNama(p.senderId),
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                    )
+                }
+                if (p.replyToId != null || p.replyToSnippet != null) {
+                    KutipanReplyArea(
+                        nama = p.replyToName ?: "Pesan",
+                        snippet = p.replyToSnippet.orEmpty(),
+                        fotoPath = p.replyToImage,
+                        onKlik = p.replyToId?.let { id -> { onLompatKe(id) } },
+                        modifier = Modifier
+                            .widthIn(max = 220.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(warnaBubble)
+                            .padding(6.dp),
+                    )
+                }
+            },
+        )
+        return
+    }
 
     Column(
         modifier
