@@ -112,11 +112,18 @@ fun OverviewScreen(
     val state by viewModel.state.collectAsState()
 
     RealtimeRefresh(
-        RealtimeTables.ORDERS,
-        RealtimeTables.ORDER_ITEMS,
         RealtimeTables.ATTENDANCE,
         RealtimeTables.OUTLETS,
         RealtimeTables.WASTE_REPORTS,
+    ) { viewModel.segarkanDariRealtime() }
+    // Pesanan berubah di setiap transaksi kasir di semua outlet, dan tiap muat ulang
+    // menarik seluruh pesanan periode ini dua kali (periode kini & pembanding).
+    // Dibatasi sekali per 30 detik: omzet tetap bergerak, tanpa menarik ulang
+    // ribuan baris di setiap penjualan.
+    RealtimeRefresh(
+        RealtimeTables.ORDERS,
+        RealtimeTables.ORDER_ITEMS,
+        jedaMinimumMs = 30_000L,
     ) { viewModel.segarkanDariRealtime() }
 
     Scaffold(
