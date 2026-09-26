@@ -11,6 +11,12 @@ object StokRoutes {
 
     const val TRANSFER = "stok/transfer"
 
+    /** Monitoring satu outlet yang dibuka dari papan pantau Gudang Pusat. */
+    private const val OUTLET_POLA = "stok/outlet"
+    const val OUTLET = "$OUTLET_POLA/{outletId}"
+
+    fun outlet(outletId: String): String = "$OUTLET_POLA/$outletId"
+
     /** Nama bahan bisa mengandung spasi dan garis miring, jadi wajib di-encode. */
     fun detail(outletId: String, bahanId: String, nama: String): String =
         "$DETAIL_POLA/$outletId/$bahanId/${Uri.encode(nama)}"
