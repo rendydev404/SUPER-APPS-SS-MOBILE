@@ -1,6 +1,8 @@
 package com.sukashawarma.superapp.feature.manager.domain
 
 import com.sukashawarma.superapp.domain.model.Role
+import com.sukashawarma.superapp.feature.stok.domain.UnitMeta
+import com.sukashawarma.superapp.feature.stok.domain.decomposeTriUnit
 import kotlin.math.roundToLong
 
 /**
@@ -15,6 +17,43 @@ enum class StatusWaste(val nilai: String) {
 
     companion object {
         fun dari(nilai: String?): StatusWaste? = entries.find { it.nilai == nilai }
+    }
+}
+
+/** Format angka yang bersih dari artifak floating-point (misal 2.000000000000004 -> 2, 0.15000000000000002 -> 0.15). */
+fun formatAngkaBersih(nilai: Double): String {
+    if (!nilai.isFinite()) return "0"
+    val bulat3 = kotlin.math.round(nilai * 1000.0) / 1000.0
+    if (bulat3 % 1.0 == 0.0) return bulat3.toLong().toString()
+    return String.format(java.util.Locale.US, "%.3f", bulat3)
+        .trimEnd('0')
+        .trimEnd('.')
+}
+
+/**
+ * Format kuantitas ramah pengguna.
+ * Mengubah satuan pecahan desimal (misal 0.004166666666666667 Dus -> 1 Lembar,
+ * 12.806000000000001 kg -> 12 kg · 806 gr, 2.000000000000004 Pack -> 2 Pack).
+ */
+fun formatQtyRamah(qty: Double, meta: UnitMeta): String {
+    val parts = decomposeTriUnit(
+        qty = qty,
+        saldoIsGram = false,
+        satuanTengah = meta.satuanTengah,
+        faktorTengah = meta.faktorTengah,
+        satuanKecil = meta.satuanKecil,
+        faktorTampilan = meta.faktorTampilan,
+    )
+    val daftar = listOf(
+        parts.besar to meta.satuan,
+        parts.tengah to meta.satuanTengah,
+        parts.kecil to meta.satuanKecil,
+    ).filter { it.first != 0.0 && !it.second.isNullOrBlank() }
+
+    return if (daftar.isEmpty()) {
+        "0 ${meta.satuan.orEmpty()}".trim()
+    } else {
+        daftar.joinToString(" · ") { "${formatAngkaBersih(it.first)} ${it.second}" }
     }
 }
 
@@ -37,10 +76,14 @@ data class LaporanWaste(
     val pelaporNama: String,
     val penyetujuNama: String?,
     val dibuatPada: String,
+    val meta: UnitMeta = UnitMeta(satuan = satuan),
 ) {
-    /** Qty ditampilkan tanpa `.0` untuk bilangan bulat — `2 Kg`, bukan `2.0 Kg`. */
+    /** Qty ditampilkan ramah bertingkat — misal "1 Lembar" bukan "0.004166666666666667 Dus". */
+    val qtyLabel: String
+        get() = formatQtyRamah(qty, meta)
+
     val qtyTeks: String
-        get() = if (qty % 1.0 == 0.0) qty.toLong().toString() else qty.toString()
+        get() = qtyLabel
 }
 
 /** Satu baris pada daftar bahan paling banyak terbuang. */
@@ -49,9 +92,13 @@ data class BahanTerbuang(
     val satuan: String,
     val qty: Double,
     val nilai: Long,
+    val meta: UnitMeta = UnitMeta(satuan = satuan),
 ) {
+    val qtyLabel: String
+        get() = formatQtyRamah(qty, meta)
+
     val qtyTeks: String
-        get() = if (qty % 1.0 == 0.0) qty.toLong().toString() else qty.toString()
+        get() = qtyLabel
 }
 
 /** Angka ringkas untuk tab Riwayat & Analitik. */
@@ -83,7 +130,7 @@ fun susunRingkasanWaste(
     disetujui.forEach { laporan ->
         val ada = perBahan[laporan.bahanId]
         perBahan[laporan.bahanId] = if (ada == null) {
-            BahanTerbuang(laporan.bahanNama, laporan.satuan, laporan.qty, laporan.nilai)
+            BahanTerbuang(laporan.bahanNama, laporan.satuan, laporan.qty, laporan.nilai, laporan.meta)
         } else {
             ada.copy(qty = ada.qty + laporan.qty, nilai = ada.nilai + laporan.nilai)
         }
