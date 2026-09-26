@@ -275,7 +275,10 @@ private fun qtyTersimpanTeks(qtyBase: Double, bahan: BahanBaku?, satuanCadangan:
 @Composable
 fun PermintaanScreen(viewModel: PermintaanViewModel = viewModel()) {
     val state by viewModel.state.collectAsState()
-    RealtimeRefresh(RealtimeTables.PERMINTAAN, RealtimeTables.STOK_BALANCE) { viewModel.muatAwal() }
+    RealtimeRefresh(RealtimeTables.PERMINTAAN) { viewModel.muatAwal() }
+    // Saldo berubah di setiap transaksi kasir di semua outlet; dibatasi sekali per
+    // 30 detik. Status permintaan di atas tetap seketika.
+    RealtimeRefresh(RealtimeTables.STOK_BALANCE, jedaMinimumMs = 30_000L) { viewModel.muatAwal() }
 
     when {
         state.approveUntuk != null -> LayarPersetujuan(state, state.approveUntuk!!, viewModel)
