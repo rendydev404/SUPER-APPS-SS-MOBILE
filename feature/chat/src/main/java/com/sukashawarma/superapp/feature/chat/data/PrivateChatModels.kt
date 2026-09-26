@@ -36,6 +36,10 @@ data class PesanPribadi(
     val audioMs: Int? = null,
     /** Amplitudo rekaman, satu digit '0'-'9' per bilah waveform. */
     val audioWave: String? = null,
+    /** URL media KLIPY (WebP animasi) bila pesan ini stiker. Dimuat langsung dari CDN
+     *  KLIPY, tidak lewat storage kita. `body` pesan stiker berisi teks cadangan
+     *  [TEKS_CADANGAN_STIKER] untuk app lama/web dan harus diabaikan saat ini terisi. */
+    val stickerUrl: String? = null,
     /**
      * Kapan rekaman ini didengarkan PENERIMA. null = belum pernah.
      *
@@ -148,6 +152,7 @@ fun parsePesanPribadi(json: JsonObject): PesanPribadi? {
         audioPath = json.get("audio_path")?.takeIf { !it.isJsonNull }?.asString,
         audioMs = json.get("audio_ms")?.takeIf { !it.isJsonNull }?.asInt,
         audioWave = json.get("audio_wave")?.takeIf { !it.isJsonNull }?.asString,
+        stickerUrl = json.get("sticker_url")?.takeIf { !it.isJsonNull }?.asString,
         audioPlayedAtMs = parseIsoMs(json.get("audio_played_at")?.takeIf { !it.isJsonNull }?.asString),
         replyToId = json.get("reply_to_id")?.takeIf { !it.isJsonNull }?.asString,
         replyToName = json.get("reply_to_name")?.takeIf { !it.isJsonNull }?.asString,
