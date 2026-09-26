@@ -77,6 +77,7 @@ object AreaChatRepository {
         audioPath: String? = null,
         audioMs: Int? = null,
         audioWave: String? = null,
+        stickerUrl: String? = null,
     ): PesanAreaChat {
         val staff = AppSession.staff.value
         val userId = staff?.id.orEmpty()
@@ -92,6 +93,7 @@ object AreaChatRepository {
             audioPath?.let { addProperty("audio_path", it) }
             audioMs?.let { addProperty("audio_ms", it) }
             audioWave?.takeIf { it.isNotBlank() }?.let { addProperty("audio_wave", it.take(56)) }
+            stickerUrl?.let { addProperty("sticker_url", it) }
             replyToId?.let { addProperty("reply_to_id", it) }
             replyToName?.let { addProperty("reply_to_name", it) }
             replyToSnippet?.let { addProperty("reply_to_snippet", it) }
@@ -132,6 +134,7 @@ object AreaChatRepository {
             audioPath = audioPath,
             audioMs = audioMs,
             audioWave = audioWave,
+            stickerUrl = stickerUrl,
             replyToId = replyToId,
             replyToName = replyToName,
             replyToSnippet = replyToSnippet,
