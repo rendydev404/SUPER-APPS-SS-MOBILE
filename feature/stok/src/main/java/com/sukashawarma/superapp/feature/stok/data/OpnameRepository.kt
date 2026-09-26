@@ -88,6 +88,23 @@ object OpnameRepository {
 
     // -------------------------------------------------------------- pembacaan
 
+    /**
+     * Nomor surat jalan yang sudah dikirim ke outlet tetapi belum diverifikasi kru.
+     *
+     * Barangnya sudah ada di rak namun belum masuk saldo sistem, jadi opname yang
+     * dijalankan sekarang akan mencatat selisih palsu. `diterima_sebagian` sengaja
+     * tidak ikut: kru sudah memverifikasinya, tinggal ditutup pusat.
+     */
+    suspend fun suratJalanBelumDiverifikasi(outletId: String): List<String> = Postgrest.select(
+        "surat_jalan",
+        listOf(
+            "select" to "document_number",
+            "outlet_id" to "eq.$outletId",
+            "status" to "in.(dikirim,dikirim_lengkap)",
+            "order" to "created_at.asc",
+        ),
+    ).map { it.asJsonObject.optString("document_number") ?: "-" }
+
     suspend fun daftar(outletId: String): List<OpnameHeader> = Postgrest.select(
         "opname",
         listOf(
