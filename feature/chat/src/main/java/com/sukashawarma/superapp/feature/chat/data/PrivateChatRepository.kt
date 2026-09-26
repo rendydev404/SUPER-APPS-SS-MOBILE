@@ -46,6 +46,7 @@ object PrivateChatRepository {
         audioPath: String? = null,
         audioMs: Int? = null,
         audioWave: String? = null,
+        stickerUrl: String? = null,
     ): PesanPribadi {
         val payload = JsonObject().apply {
             addProperty("p_recipient_id", recipientId)
@@ -55,6 +56,9 @@ object PrivateChatRepository {
             audioPath?.let { addProperty("p_audio_path", it) }
             audioMs?.let { addProperty("p_audio_ms", it) }
             audioWave?.takeIf { it.isNotBlank() }?.let { addProperty("p_audio_wave", it.take(56)) }
+            // Hanya dikirim bila ada: RPC lama (sebelum migrasi 20300243) tidak mengenal
+            // parameter ini, dan PostgREST menolak panggilan dengan argumen tak dikenal.
+            stickerUrl?.let { addProperty("p_sticker_url", it) }
         }
         val res = Postgrest.rpc("private_chat_kirim", payload)
         if (!res.isJsonObject) {
