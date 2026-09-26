@@ -84,10 +84,13 @@ fun RingkasanScreen(
     // diserahkan; kehadiran begitu kru menempelkan wajahnya. Ketiganya menyusun satu
     // layar, jadi ketiganya memicu pemuatan ulang yang sama.
     RealtimeRefresh(
-        RealtimeTables.ORDERS,
         RealtimeTables.PETTY_CASH_TOPUPS,
         RealtimeTables.ATTENDANCE,
     ) { viewModel.muatUlang() }
+    // `orders` berubah di setiap transaksi kasir di semua outlet; omzet cukup
+    // bergerak paling sering sekali per 30 detik. Petty cash & kehadiran di atas
+    // tetap seketika.
+    RealtimeRefresh(RealtimeTables.ORDERS, jedaMinimumMs = 30_000L) { viewModel.muatUlang() }
 
     LaunchedEffect(state.galat) {
         state.galat?.let { snackbar.showSnackbar(it) }
