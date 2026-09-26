@@ -52,6 +52,7 @@ import androidx.compose.material.icons.filled.NightsStay
 import androidx.compose.material.icons.filled.PointOfSale
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.WorkspacePremium
+import com.sukashawarma.superapp.domain.model.Role
 import com.sukashawarma.superapp.feature.home.domain.rupiah
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Storefront
@@ -83,6 +84,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sukashawarma.superapp.core.auth.BiometricAuth
 import com.sukashawarma.superapp.core.auth.findActivity
@@ -250,6 +252,12 @@ fun HomeScreen(
     onLoggedOut: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenProfil: () -> Unit,
+    // Pintasan kartu sorotan: langsung ke halaman yang angkanya ditunjuk,
+    // bukan ke halaman awal modulnya.
+    onOpenStokKritis: () -> Unit,
+    onOpenKiriman: () -> Unit,
+    onOpenPettyCash: () -> Unit,
+    onOpenPettyCashManager: () -> Unit,
     viewModel: HomeViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
@@ -322,15 +330,29 @@ fun HomeScreen(
     // Lencana di kartu modul adalah hal pertama yang dilihat setiap kali aplikasi
     // dibuka, dan sebelumnya hanya dihitung sekali saat sesi berubah — angkanya
     // basi begitu rekan kerja mengirim surat jalan atau melaporkan waste.
-    // Tabelnya persis yang dibaca `muatSorotan()`; `monitoring_view_crew`
-    // bersumber dari `stok_balance`.
+    // Tabelnya persis yang dibaca `muatSorotan()`.
     RealtimeRefresh(
         RealtimeTables.ATTENDANCE,
-        RealtimeTables.STOK_BALANCE,
         RealtimeTables.SURAT_JALAN,
         RealtimeTables.WASTE_REPORTS,
         RealtimeTables.PETTY_CASH_TOPUPS,
     ) { viewModel.segarkanSorotan() }
+    // `monitoring_view_crew` bersumber dari `stok_balance`, yang berubah di setiap
+    // transaksi kasir di semua outlet. Sengaja TIDAK lewat realtime: langganan
+    // `stok_balance` tanpa filter membuat server memeriksa RLS untuk setiap
+    // penjualan dikali setiap HP yang sedang membuka beranda — dan beranda terbuka
+    // di hampir semua HP sepanjang hari. Lencana stok kritis cukup disegarkan
+    // sekali per menit selama beranda terlihat (satu query ringan per HP), plus
+    // sekali setiap beranda kembali terlihat.
+    val daurHidupStok = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(daurHidupStok) {
+        daurHidupStok.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                viewModel.segarkanStok()
+                delay(60_000L)
+            }
+        }
+    }
 
     val pemilikDaurHidup = LocalLifecycleOwner.current
     DisposableEffect(pemilikDaurHidup, userId) {
@@ -490,7 +512,15 @@ fun HomeScreen(
                         }
 
                         // 5. Strip angka sorotan
-                        StripSorotan(state = state, staff = staff)
+                        StripSorotan(
+                            state = state,
+                            staff = staff,
+                            onStokKritis = onOpenStokKritis,
+                            onKiriman = onOpenKiriman,
+                            onPettyCashManager = onOpenPettyCashManager,
+                            onPettyCash = onOpenPettyCash,
+                            onChat = onOpenChat,
+                        )
 
                         Spacer(Modifier.height(4.dp))
 
@@ -1278,10 +1308,22 @@ private fun IosAttendanceWidget(
 private fun StripSorotan(
     state: HomeUiState,
     staff: com.sukashawarma.superapp.domain.model.StaffProfile?,
+    onStokKritis: () -> Unit,
+    onKiriman: () -> Unit,
+    onPettyCashManager: () -> Unit,
+    onPettyCash: () -> Unit,
+    onChat: () -> Unit,
 ) {
     // [warna] mengisi lingkaran ikon: angka yang butuh tindakan diberi merah supaya
     // menonjol, angka nol tetap berwarna modul agar tidak tertukar dengan peringatan.
-    data class Sorotan(val label: String, val angka: Int?, val ikon: ImageVector, val warna: Color)
+    // [onKlik] membawa langsung ke halaman yang angkanya ditunjuk.
+    data class Sorotan(
+        val label: String,
+        val angka: Int?,
+        val ikon: ImageVector,
+        val warna: Color,
+        val onKlik: () -> Unit,
+    )
 
     val isAllAccess = staff?.role in setOf(
         com.sukashawarma.superapp.domain.model.Role.DEVELOPER,
@@ -1292,20 +1334,22 @@ private fun StripSorotan(
 
     val sorotan = buildList {
         if (isAllAccess || (staff?.role in STOK_ROLES && staff?.role !in STOK_ROLES_PUSAT)) {
-            val kritis = state.stokKritis ?: 40
-            add(Sorotan("Stok kritis", kritis, IkonIos.Inventory2, if (kritis > 0) WarnaIos.Merah else WarnaIos.Biru))
+            // null = belum/gagal dimuat, tampil "—". Jangan diberi angka cadangan.
+            val kritis = state.stokKritis
+            add(Sorotan("Stok kritis", kritis, IkonIos.Inventory2, if ((kritis ?: 0) > 0) WarnaIos.Merah else WarnaIos.Biru, onStokKritis))
         }
         if (isAllAccess || staff?.role in DISTRIBUSI_ROLES) {
-            add(Sorotan("Kiriman", state.kirimanMenunggu ?: 0, IkonIos.LocalShipping, WarnaIos.Ungu))
+            add(Sorotan("Kiriman", state.kirimanMenunggu, IkonIos.LocalShipping, WarnaIos.Ungu, onKiriman))
         }
-        if (isAllAccess || staff?.role in MANAGER_ROLES) {
-            add(Sorotan("Waste antre", state.wasteMenunggu ?: 2, IkonIos.Delete, WarnaIos.Oranye))
+        // Petty cash menunggu tindakan: leader menerima dana, AM/RM ACC atau serahkan.
+        if (staff?.role in MANAGER_ROLES && !isAllAccess) {
+            add(Sorotan("Petty cash", state.pettyCashButuhAksi, IkonIos.AccountBalanceWallet, WarnaIos.Mint, onPettyCashManager))
         }
         if (staff?.role in LEADER_ROLES && !isAllAccess) {
-            add(Sorotan("Petty cash", state.pettyCashButuhAksi, IkonIos.AccountBalanceWallet, WarnaIos.Mint))
+            add(Sorotan("Petty cash", state.pettyCashButuhAksi, IkonIos.AccountBalanceWallet, WarnaIos.Mint, onPettyCash))
         }
         if (!isAllAccess) {
-            add(Sorotan("Chat baru", state.chatBelumDibaca, Icons.Default.Forum, if (state.chatBelumDibaca > 0) WarnaIos.Merah else WarnaIos.Biru))
+            add(Sorotan("Chat baru", state.chatBelumDibaca, Icons.Default.Forum, if (state.chatBelumDibaca > 0) WarnaIos.Merah else WarnaIos.Biru, onChat))
         }
     }.take(3)
 
@@ -1320,6 +1364,7 @@ private fun StripSorotan(
                 ikon = item.ikon,
                 warna = item.warna,
                 modifier = Modifier.weight(1f),
+                onKlik = item.onKlik,
             )
         }
     }
@@ -1368,18 +1413,23 @@ private fun KartuBonusBulanan(state: HomeUiState) {
             style = TipeIos.AngkaBesar.copy(fontSize = 30.sp),
             maxLines = 1,
         )
-        Spacer(Modifier.height(2.dp))
-        Text(
-            text = when {
-                state.memuatBonus -> "Menghitung porsi terjual bulan ini"
-                bonus == null -> "Gagal memuat estimasi bonus"
-                !bonus.terdaftar -> "Belum terdaftar sebagai penerima bonus bulan ini"
-                else -> "${bonus.rumus} · ${bonus.cakupan}"
-            },
-            style = TipeIos.Catatan,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
+        val role = state.staff?.role
+        val teksKeterangan = when {
+            state.memuatBonus -> if (role == Role.CREW) null else "Menghitung porsi terjual bulan ini"
+            bonus == null -> "Gagal memuat estimasi bonus"
+            !bonus.terdaftar -> "Belum terdaftar sebagai penerima bonus bulan ini"
+            role == Role.CREW -> null // Perhitungan bonus disembunyikan untuk role kru
+            else -> "${bonus.rumus} · ${bonus.cakupan}"
+        }
+        if (teksKeterangan != null) {
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = teksKeterangan,
+                style = TipeIos.Catatan,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
         if (bonus != null) {
             Spacer(Modifier.height(10.dp))
             LencanaIos(bonus.labelBulan, NadaIos.PERINGATAN, ikon = IkonIos.CalendarMonth)
