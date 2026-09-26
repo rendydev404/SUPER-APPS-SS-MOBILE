@@ -1,5 +1,17 @@
 package com.sukashawarma.superapp.presentation.absensi.cuti
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.layout.ContentScale
+import androidx.core.content.ContextCompat
+import coil.compose.AsyncImage
+import com.sukashawarma.superapp.core.camera.KameraFotoSheet
+import java.io.File
 import androidx.compose.ui.platform.LocalContext
 import android.widget.Toast
 import androidx.compose.foundation.background
@@ -164,7 +176,7 @@ fun CutiScreen(
             submitting = state.submitting,
             error = state.submitError,
             onDismiss = { showForm = false; viewModel.clearSubmitError() },
-            onSubmit = { type, start, end, reason -> viewModel.submit(type, start, end, reason) },
+            onSubmit = { type, start, end, reason, bukti -> viewModel.submit(type, start, end, reason, bukti) },
         )
     }
 }
@@ -218,9 +230,15 @@ private fun CutiFormSheet(
     submitting: Boolean,
     error: String?,
     onDismiss: () -> Unit,
-    onSubmit: (String, LocalDate, LocalDate, String) -> Unit,
+    onSubmit: (String, LocalDate, LocalDate, String, File?) -> Unit,
 ) {
     var leaveType by remember { mutableStateOf(LEAVE_TYPE_LABELS.first().second) }
+    val konteks = LocalContext.current
+    // Foto bukti yang sudah dikompres & disimpan di filesDir (lihat BuktiCuti).
+    var bukti by remember { mutableStateOf<File?>(null) }
+    var memprosesBukti by remember { mutableStateOf(false) }
+    var kameraBukti by remember { mutableStateOf(false) }
+    val wajibBukti = leaveType == JENIS_WAJIB_BUKTI
     var reason by remember { mutableStateOf("") }
     var startDate by remember { mutableStateOf<LocalDate?>(null) }
     var endDate by remember { mutableStateOf<LocalDate?>(null) }
@@ -231,12 +249,41 @@ private fun CutiFormSheet(
     val scope = rememberCoroutineScope()
     val dateFormatter = remember { DateTimeFormatter.ofPattern("dd MMM yyyy", Locale("id", "ID")) }
 
+    // Form ditutup TANPA mengajukan: foto bukti belum dipakai siapa pun, buang dari HP.
+    // (Setelah berhasil diajukan form ditutup lewat jalur lain, dan berkasnya jangan
+    // dihapus di sini — bisa jadi masih menunggu di antrean offline.)
+    fun tutupTanpaAjukan() {
+        bukti?.delete()
+        onDismiss()
+    }
+
     fun dismissAnimated() {
-        scope.launch { sheetState.hide() }.invokeOnCompletion { if (!sheetState.isVisible) onDismiss() }
+        scope.launch { sheetState.hide() }.invokeOnCompletion { if (!sheetState.isVisible) tutupTanpaAjukan() }
+    }
+
+    fun pakaiBukti(berkas: File?) {
+        memprosesBukti = false
+        if (berkas == null) {
+            Toast.makeText(konteks, "Foto gagal dibaca. Coba foto lain.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        bukti?.delete()
+        bukti = berkas
+    }
+
+    val galeriBukti = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) {
+            memprosesBukti = true
+            scope.launch { pakaiBukti(BuktiCuti.dariUri(konteks, uri)) }
+        }
+    }
+    val izinKamera = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { diberi ->
+        if (diberi) kameraBukti = true
+        else Toast.makeText(konteks, "Izin kamera diperlukan untuk memotret bukti.", Toast.LENGTH_SHORT).show()
     }
 
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { tutupTanpaAjukan() },
         sheetState = sheetState,
         containerColor = WarnaIos.Kartu,
         dragHandle = { BottomSheetDefaults.DragHandle(color = WarnaIos.LabelKetiga) },
@@ -244,6 +291,8 @@ private fun CutiFormSheet(
         Column(
             Modifier
                 .fillMaxWidth()
+                // Bagian bukti sakit + kamera membuat form lebih tinggi dari layar HP kecil.
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = UkuranIos.TepiLayar + 4.dp)
                 .padding(bottom = 24.dp)
         ) {
@@ -313,6 +362,74 @@ private fun CutiFormSheet(
                 colors = warnaBidangIsianIos(),
             )
 
+            if (wajibBukti) {
+                Spacer(Modifier.height(16.dp))
+                LabelBidang("Bukti Sakit (Wajib)")
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    "Foto surat dokter atau obat yang diminum.",
+                    style = TipeIos.Catatan.copy(color = WarnaIos.LabelKedua),
+                )
+                Spacer(Modifier.height(8.dp))
+                val berkasBukti = bukti
+                when {
+                    kameraBukti -> KameraFotoSheet(
+                        onDiambil = { foto ->
+                            kameraBukti = false
+                            memprosesBukti = true
+                            scope.launch { pakaiBukti(BuktiCuti.dariBitmap(konteks, foto)) }
+                        },
+                        onBatal = { kameraBukti = false },
+                        labelAmbil = "Pakai Foto Ini",
+                    )
+                    memprosesBukti -> Box(
+                        Modifier.fillMaxWidth().height(120.dp).clip(UkuranIos.SudutKontrol).background(WarnaIos.Isian),
+                        contentAlignment = Alignment.Center,
+                    ) { CircularProgressIndicator(Modifier.size(24.dp), color = WarnaIos.Aksen, strokeWidth = 2.dp) }
+                    berkasBukti != null -> {
+                        AsyncImage(
+                            model = berkasBukti,
+                            contentDescription = "Foto bukti sakit",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(180.dp)
+                                .clip(UkuranIos.SudutKontrol)
+                                .background(WarnaIos.Isian),
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(
+                                onClick = { bukti?.delete(); bukti = null },
+                                colors = ButtonDefaults.textButtonColors(contentColor = NadaIos.BAHAYA.teks),
+                            ) { Text("Hapus Foto") }
+                            TextButton(
+                                onClick = { galeriBukti.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                                colors = ButtonDefaults.textButtonColors(contentColor = WarnaIos.Aksen),
+                            ) { Text("Ganti Foto") }
+                        }
+                    }
+                    else -> Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        TombolBukti(
+                            ikon = IkonIos.PhotoCamera,
+                            label = "Kamera",
+                            modifier = Modifier.weight(1f),
+                            onKlik = {
+                                val punyaIzin = ContextCompat.checkSelfPermission(konteks, Manifest.permission.CAMERA) ==
+                                    PackageManager.PERMISSION_GRANTED
+                                if (punyaIzin) kameraBukti = true else izinKamera.launch(Manifest.permission.CAMERA)
+                            },
+                        )
+                        TombolBukti(
+                            ikon = IkonIos.Image,
+                            label = "Galeri",
+                            modifier = Modifier.weight(1f),
+                            onKlik = { galeriBukti.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                        )
+                    }
+                }
+            }
+
             if (error != null) {
                 Spacer(Modifier.height(12.dp))
                 Text(error, style = TipeIos.Catatan.copy(color = NadaIos.BAHAYA.teks))
@@ -321,10 +438,22 @@ private fun CutiFormSheet(
             Spacer(Modifier.height(24.dp))
 
             // Actions
-            val canSubmit = !submitting && startDate != null && endDate != null
+            val buktiLengkap = !wajibBukti || bukti != null
+            val canSubmit = !submitting && !memprosesBukti && startDate != null && endDate != null && buktiLengkap
+            if (wajibBukti && bukti == null && !memprosesBukti) {
+                Text(
+                    "Lampirkan foto bukti untuk mengajukan sakit.",
+                    style = TipeIos.Catatan.copy(color = WarnaIos.LabelKedua),
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+            }
             TombolUtamaIos(
                 teks = if (submitting) "Mengirim..." else "Ajukan",
-                onKlik = { if (startDate != null && endDate != null) onSubmit(leaveType, startDate!!, endDate!!, reason) },
+                onKlik = {
+                    if (startDate != null && endDate != null && buktiLengkap) {
+                        onSubmit(leaveType, startDate!!, endDate!!, reason, bukti.takeIf { wajibBukti })
+                    }
+                },
                 aktif = canSubmit,
             )
             Spacer(Modifier.height(8.dp))
@@ -350,6 +479,28 @@ private fun CutiFormSheet(
             endDate = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
             pickingEnd = false
         }
+    }
+}
+
+@Composable
+private fun TombolBukti(
+    ikon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    modifier: Modifier = Modifier,
+    onKlik: () -> Unit,
+) {
+    Row(
+        modifier
+            .height(UkuranIos.TinggiTombol)
+            .clip(UkuranIos.SudutKontrol)
+            .background(WarnaIos.Isian)
+            .clickable(onClick = onKlik),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(ikon, contentDescription = null, tint = WarnaIos.Aksen, modifier = Modifier.size(19.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(label, style = TipeIos.Keterangan.copy(color = WarnaIos.Label, fontWeight = FontWeight.SemiBold))
     }
 }
 
