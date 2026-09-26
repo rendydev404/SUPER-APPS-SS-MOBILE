@@ -318,6 +318,10 @@ private fun RootNav() {
     // melompat ke halaman manajer sebelum login akan melewati layar login sama sekali.
     var tujuanManager by remember { mutableStateOf<TujuanManager?>(null) }
     var tujuanLeader by remember { mutableStateOf<TujuanLeader?>(null) }
+    // Pintasan kartu sorotan Beranda; dikosongkan lagi setelah modulnya terbuka
+    // supaya kartu modul biasa tetap mendarat di halaman awal.
+    var stokBukaKritis by remember { mutableStateOf(false) }
+    var distribusiBukaKiriman by remember { mutableStateOf(false) }
     val ruteNotifikasi by NotifikasiTujuan.rute.collectAsState()
     val konteks = androidx.compose.ui.platform.LocalContext.current
 
@@ -462,6 +466,22 @@ private fun RootNav() {
                         onOpenChat = { navController.navigate(Routes.CHAT) },
                         onOpenSettings = { navController.navigate(Routes.SETTINGS) },
                         onOpenProfil = { navController.navigate(Routes.PROFIL) },
+                        onOpenStokKritis = {
+                            stokBukaKritis = true
+                            navController.navigate(Routes.STOK)
+                        },
+                        onOpenKiriman = {
+                            distribusiBukaKiriman = true
+                            navController.navigate(Routes.DISTRIBUSI)
+                        },
+                        onOpenPettyCash = {
+                            tujuanLeader = TujuanLeader.PETTY_CASH
+                            navController.navigate(Routes.LEADER)
+                        },
+                        onOpenPettyCashManager = {
+                            tujuanManager = TujuanManager.PETTY_CASH
+                            navController.navigate(Routes.MANAGER)
+                        },
                         onLoggedOut = { navController.navigate(Routes.LOGIN) { popUpTo(0) } }
                     )
                 }
@@ -472,10 +492,18 @@ private fun RootNav() {
                     AbsensiNavGraph(onExit = { navController.popKe(Routes.HOME) })
                 }
                 composable(Routes.STOK) {
-                    StokNavGraph(onExit = { navController.popKe(Routes.HOME) })
+                    StokNavGraph(
+                        onExit = { navController.popKe(Routes.HOME) },
+                        bukaKritis = stokBukaKritis,
+                    )
+                    LaunchedEffect(Unit) { stokBukaKritis = false }
                 }
                 composable(Routes.DISTRIBUSI) {
-                    DistribusiNavGraph(onExit = { navController.popKe(Routes.HOME) })
+                    DistribusiNavGraph(
+                        onExit = { navController.popKe(Routes.HOME) },
+                        bukaKiriman = distribusiBukaKiriman,
+                    )
+                    LaunchedEffect(Unit) { distribusiBukaKiriman = false }
                 }
                 composable(Routes.LEADER) {
                     LaunchedEffect(Unit) { PettyCashAlarmManager.hentikan(konteks) }
