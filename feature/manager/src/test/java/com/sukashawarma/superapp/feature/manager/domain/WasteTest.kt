@@ -1,6 +1,7 @@
 package com.sukashawarma.superapp.feature.manager.domain
 
 import com.sukashawarma.superapp.domain.model.Role
+import com.sukashawarma.superapp.feature.stok.domain.UnitMeta
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -17,6 +18,7 @@ class WasteTest {
         nilai: Long = 24_000,
         status: StatusWaste = StatusWaste.MENUNGGU,
         pelaporId: String? = "kru-1",
+        meta: UnitMeta = UnitMeta(satuan = satuan),
     ) = LaporanWaste(
         id = id,
         outletId = "o1",
@@ -35,6 +37,7 @@ class WasteTest {
         pelaporNama = "Kru Outlet",
         penyetujuNama = null,
         dibuatPada = "2026-09-05T01:00:00+00:00",
+        meta = meta,
     )
 
     @Test
@@ -56,8 +59,56 @@ class WasteTest {
 
     @Test
     fun `qty bulat ditampilkan tanpa koma`() {
-        assertEquals("2", laporan(qty = 2.0).qtyTeks)
-        assertEquals("2.5", laporan(qty = 2.5).qtyTeks)
+        assertEquals("2 Kg", laporan(qty = 2.0).qtyLabel)
+        assertEquals("2.5 Kg", laporan(qty = 2.5).qtyLabel)
+    }
+
+    @Test
+    fun `format kuantitas pecahan terdekomposisi ke satuan ramah dan bersih dari floating point noise`() {
+        // 1. KEJU: 0.004166666666666667 Dus -> 1 Lembar (1 Dus = 240 Lembar)
+        val keju = laporan(
+            bahanNama = "KEJU",
+            satuan = "Dus",
+            qty = 0.004166666666666667,
+            meta = UnitMeta(satuan = "Dus", satuanKecil = "Lembar", faktorTampilan = 240.0),
+        )
+        assertEquals("1 Lembar", keju.qtyLabel)
+
+        // 2. KULIT 25: 2.000000000000004 Pack -> 2 Pack
+        val kulit25 = laporan(
+            bahanNama = "KULIT 25",
+            satuan = "Pack",
+            qty = 2.000000000000004,
+            meta = UnitMeta(satuan = "Pack"),
+        )
+        assertEquals("2 Pack", kulit25.qtyLabel)
+
+        // 3. Sayur (lettuce): 12.806000000000001 kg -> 12 kg · 806 gr
+        val lettuce = laporan(
+            bahanNama = "Sayur (lettuce)",
+            satuan = "kg",
+            qty = 12.806000000000001,
+            meta = UnitMeta(satuan = "kg", satuanKecil = "gr", faktorTampilan = 1000.0),
+        )
+        assertEquals("12 kg · 806 gr", lettuce.qtyLabel)
+
+        // 4. KULIT 32: 0.15000000000000002 Pack -> 15 Lembar (1 Pack = 100 Lembar)
+        val kulit32 = laporan(
+            bahanNama = "KULIT 32",
+            satuan = "Pack",
+            qty = 0.15000000000000002,
+            meta = UnitMeta(satuan = "Pack", satuanKecil = "Lembar", faktorTampilan = 100.0),
+        )
+        assertEquals("15 Lembar", kulit32.qtyLabel)
+
+        // 5. SAPI: 2.593 Blok tanpa satuan kecil -> 2.593 Blok
+        val sapi = laporan(
+            bahanNama = "SAPI",
+            satuan = "Blok",
+            qty = 2.593,
+            meta = UnitMeta(satuan = "Blok"),
+        )
+        assertEquals("2.593 Blok", sapi.qtyLabel)
     }
 
     @Test
