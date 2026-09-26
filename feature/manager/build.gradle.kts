@@ -37,6 +37,8 @@ dependencies {
     implementation(project(":core:ui"))
     implementation(project(":core:roles"))
     implementation(project(":core:network"))
+    // Normalisasi satuan saldo dan waste (UnitMeta, decomposeTriUnit) dari modul Stok
+    implementation(project(":feature:stok"))
     // Form inventaris memotret bukti tiap aset lalu mengunggahnya ke Supabase Storage.
     implementation(project(":core:camera"))
     implementation(project(":core:storage"))
